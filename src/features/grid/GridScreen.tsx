@@ -119,7 +119,7 @@ export function GridScreen() {
                 const t = engine.totals[m]
                 const isToday = m === today
                 return (
-                  <th key={m} className={cn('sticky top-0 z-20 min-w-28 border-b bg-background px-1 py-1 text-right text-xs font-medium', isToday && 'bg-primary/10')}>
+                  <th key={m} className={cn('sticky top-0 z-20 min-w-28 border-b px-1 py-1 text-right text-xs font-medium', isToday ? 'bg-accent' : 'bg-background')}>
                     <DropdownMenu>
                       <DropdownMenuTrigger
                         render={<button className="inline-flex w-full items-center justify-end gap-1 rounded px-1 py-1 hover:bg-muted" aria-label={`${formatMonth(m, locale)}${t?.closed ? ', closed' : ''}`} />}

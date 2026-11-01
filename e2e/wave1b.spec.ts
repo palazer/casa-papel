@@ -24,14 +24,24 @@ test.describe('wave 1b', () => {
     await page.getByRole('button', { name: 'Next' }).click()
     await page.getByLabel('Opening balance').nth(1).fill('5000')
     await page.getByRole('button', { name: 'Next' }).click()
-    await expect(page.getByText('Rex (Pet)')).toBeVisible()
+    // rows: one subject at a time, grouped by money in / spending / moving money
+    await expect(page.getByRole('heading', { name: 'Rows for the household' })).toBeVisible()
+    await expect(page.getByRole('group', { name: /^Money in/ })).toBeVisible()
+    await expect(page.getByRole('group', { name: /^Spending/ })).toBeVisible()
+    await page.getByLabel('Your own row name').fill('Garden')
+    await page.getByRole('button', { name: 'Add row' }).click()
     await page.screenshot({ path: 'e2e/output/wizard-rows.png', fullPage: true })
+    for (const who of ['Ana', 'Ben', 'Cal', 'Rex']) {
+      await page.getByRole('button', { name: 'Next' }).click()
+      await expect(page.getByRole('heading', { name: `Rows for ${who}` })).toBeVisible()
+    }
     await page.getByRole('button', { name: 'Next' }).click()
+    await expect(page.getByText('from November 2026')).toBeVisible()
     await page.getByRole('button', { name: 'Create household' }).click()
     await expect(page.getByRole('banner').getByText('Testers')).toBeVisible()
     await expect(page.getByText('Pocket – Ana', { exact: true })).toBeVisible()
     await expect(page.getByText('To savings', { exact: true })).toBeVisible()
-    for (const name of ['Ana – Salary', 'Ben – Salary', 'Child benefit – Cal', 'Food & supplies – Rex', 'Groceries', 'Travel']) {
+    for (const name of ['Ana – Salary', 'Ben – Salary', 'Child benefit – Cal', 'Food & supplies – Rex', 'Groceries', 'Travel', 'Garden']) {
       await expect(page.getByRole('button', { name: new RegExp(`^${name} Nov 2026`) })).toBeVisible()
     }
     await page.getByRole('button', { name: 'Household' }).click()
@@ -55,7 +65,8 @@ test.describe('wave 1b', () => {
     await page.getByLabel('Amount (EUR)').fill('90')
     await page.getByLabel('How often').selectOption('3')
     await page.getByLabel('Starting from which month of the year').selectOption({ label: 'Feb' })
-    await page.getByLabel('From month').fill('2026-11')
+    await page.getByLabel('From month: month').selectOption('11')
+    await page.getByLabel('From month: year').selectOption('2026')
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByRole('dialog')).toBeHidden()
     await expect(page.getByRole('cell', { name: 'Every 3 months (Feb, May, Aug, Nov)' })).toBeVisible()
@@ -63,6 +74,16 @@ test.describe('wave 1b', () => {
 
     await page.getByRole('button', { name: 'Grid' }).click()
     await expect(page.getByRole('button', { name: /^Water Nov 2026/ })).toContainText('90')
+    // a recurring item straight from a cell, prefilled with the row and its amount
+    await page.getByRole('button', { name: /^Groceries Nov 2026/ }).click()
+    await page.getByRole('button', { name: 'Make recurring…' }).click()
+    await expect(page.getByLabel('Amount (EUR)')).toHaveValue('700')
+    await page.getByLabel('Name', { exact: true }).fill('Weekly shop')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByRole('dialog')).toBeHidden()
+    await page.getByRole('button', { name: 'Register' }).click()
+    await expect(page.getByRole('cell', { name: 'Weekly shop', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Grid' }).click()
     await expect(page.getByRole('button', { name: /^Water Dec 2026: empty/ })).toBeVisible()
     await expect(page.getByRole('button', { name: /^Water Feb 2027/ })).toContainText('90')
 

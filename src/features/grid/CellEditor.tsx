@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { RecurringDialog } from '@/features/register/RecurringDialog'
 import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -43,6 +44,7 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
   const [items, setItems] = useState<CellItem[]>(() => itemsFromCurrent(cell, row.defaultFundedBy, row.defaultStatus))
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [recurring, setRecurring] = useState(false)
 
   const pools = useMemo(() => tables.pools.filter((p) => !p.deletedAt), [tables.pools])
   const fundingOptions = useMemo(
@@ -203,7 +205,10 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
 
         {!closed && (
           <DialogFooter className="flex-row flex-wrap gap-2 sm:justify-between">
-            <Button variant="ghost" onClick={() => void run(() => clearCell(store, row.id, month))} disabled={busy || !cell?.cell}>Clear (inherit)</Button>
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={() => void run(() => clearCell(store, row.id, month))} disabled={busy || !cell?.cell}>Clear (inherit)</Button>
+              <Button variant="ghost" onClick={() => setRecurring(true)} disabled={busy}>Make recurring…</Button>
+            </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
               <Button onClick={mode === 'value' ? saveValue : saveItems} disabled={busy}>Save</Button>
@@ -211,6 +216,17 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
           </DialogFooter>
         )}
       </DialogContent>
+      {recurring && (
+        <RecurringDialog
+          tables={tables}
+          household={household}
+          item={null}
+          defaultMonth={month}
+          prefill={{ rowId: row.id, name: row.name, amount: mode === 'value' ? (parseAmount(text, currency, locale) ?? undefined) : itemsTotal }}
+          onClose={() => setRecurring(false)}
+          onSaved={onClose}
+        />
+      )}
     </Dialog>
   )
 }

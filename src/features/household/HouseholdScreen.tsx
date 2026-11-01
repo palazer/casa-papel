@@ -1,3 +1,4 @@
+import { MonthField } from '@/components/MonthField'
 import { useMemo, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -7,21 +8,17 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Check } from '@/components/Check'
 import { NativeSelect } from '@/features/grid/NativeSelect'
-import { amountToInput, formatAmount, formatMonth, parseAmount } from '@/app/format'
+import { localeExample, localeLabel, amountToInput, formatAmount, formatMonth, parseAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import {
   ENTITY_KIND_LABEL, ENTITY_TEMPLATES, monthOfDate, templateTitle,
-  type Account, type AccountType, type Entity, type EntityKind, type Household,
+  ACCOUNT_TYPE_INFO, type Account, type AccountType, type Entity, type EntityKind, type Household,
 } from '@/model'
 import { addAccount, addEntity, applyTemplates, setAccountActual, updateAccount, updateEntity, updateHousehold } from '@/store'
 
 const LOCALES = ['en-IE', 'en-GB', 'en-US', 'de-DE', 'de-AT', 'tr-TR', 'fr-FR', 'es-ES', 'nl-NL', 'it-IT', 'pt-PT', 'sv-SE']
-const ACCOUNT_TYPES: Array<{ value: AccountType; label: string }> = [
-  { value: 'checking', label: 'Current account' }, { value: 'joint', label: 'Joint account' }, { value: 'savings', label: 'Savings' },
-  { value: 'investment', label: 'Investments' }, { value: 'credit-card', label: 'Credit card' }, { value: 'loan', label: 'Loan' },
-  { value: 'other-asset', label: 'Other asset' }, { value: 'cash', label: 'Cash' },
-]
+const ACCOUNT_TYPES = ACCOUNT_TYPE_INFO
 const KINDS: EntityKind[] = ['adult', 'child', 'pet', 'vehicle', 'property', 'company', 'other']
 
 export function HouseholdScreen() {
@@ -62,7 +59,7 @@ function SettingsCard({ household: h, onSave }: { household: Household; onSave: 
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="s-locale">Number format</Label>
-          <NativeSelect id="s-locale" className="w-full" value={h.locale} onChange={(e) => onSave({ locale: e.target.value })}>{LOCALES.map((l) => <option key={l}>{l}</option>)}</NativeSelect>
+          <NativeSelect id="s-locale" className="w-full" value={h.locale} onChange={(e) => onSave({ locale: e.target.value })}>{LOCALES.map((l) => <option key={l} value={l}>{localeLabel(l)} — {localeExample(l)}</option>)}</NativeSelect>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="s-rule">Month-end rule</Label>
@@ -249,9 +246,10 @@ function AccountDialog({ account, entities, baseCurrency, locale, startMonth, on
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="acc-name">Name</Label><Input id="acc-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} /></div>
           <div className="space-y-1.5"><Label htmlFor="acc-type">Type</Label><NativeSelect id="acc-type" className="w-full" value={type} onChange={(e) => setType(e.target.value as AccountType)}>{ACCOUNT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</NativeSelect></div>
+          <p className="text-xs text-muted-foreground sm:col-span-2">{ACCOUNT_TYPES.find((t) => t.value === type)?.help}</p>
           <div className="space-y-1.5"><Label htmlFor="acc-ccy">Currency</Label><Input id="acc-ccy" value={currency} maxLength={3} onChange={(e) => setCurrency(e.target.value.toUpperCase())} /></div>
           <div className="space-y-1.5"><Label htmlFor="acc-open">Opening balance</Label><Input id="acc-open" inputMode="decimal" value={opening} onChange={(e) => setOpening(e.target.value)} /></div>
-          <div className="space-y-1.5"><Label htmlFor="acc-month">Opening month</Label><Input id="acc-month" type="month" value={openingMonth} onChange={(e) => setOpeningMonth(e.target.value)} /></div>
+          <div className="space-y-1.5"><Label htmlFor="acc-month">Opening month</Label><MonthField id="acc-month" label="Opening month" value={openingMonth} onChange={setOpeningMonth} locale={locale} /></div>
           <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="acc-owner">Owner</Label><NativeSelect id="acc-owner" className="w-full" value={owner} onChange={(e) => setOwner(e.target.value)}><option value="">Household / joint</option>{adults.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</NativeSelect></div>
         </div>
         <DialogFooter>

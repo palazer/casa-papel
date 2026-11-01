@@ -48,3 +48,19 @@ export function parseAmount(input: string, currency: string, locale: string): Mo
   if (!Number.isFinite(n)) return null
   return toMinor(n, currency)
 }
+
+/** "English (Ireland)" for en-IE; falls back to the code. */
+export function localeLabel(locale: string): string {
+  try {
+    return new Intl.DisplayNames(['en'], { type: 'language', languageDisplay: 'standard' }).of(locale) ?? locale
+  } catch {
+    return locale
+  }
+}
+
+/** How a number and a date look in this locale, e.g. "1,234,567.89 · 1 Nov 2026". */
+export function localeExample(locale: string): string {
+  const n = new Intl.NumberFormat(locale).format(1234567.89)
+  const d = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(2026, 10, 1))
+  return `${n} · ${d}`
+}
