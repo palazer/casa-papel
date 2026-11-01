@@ -6,7 +6,7 @@ Local-first household budgeting. Your money as a month-by-month grid that knows 
 - Installable as an app on phone and desktop, works offline.
 - Live: https://palazer.github.io/casa-papel/
 
-Status: Wave 0 (foundation). See the plan in the repo wiki once published.
+Status: Wave 0 (foundation) is live. Next: Wave 1a, the monthly grid with itemized cells.
 
 ## Develop
 
