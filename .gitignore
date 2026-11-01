@@ -1,0 +1,26 @@
+# Personal data — never commit
+private/
+*.xlsx
+*.numbers
+*.casapapel.json
+tests/private/
+
+# Dependencies / build
+node_modules/
+dist/
+dev-dist/
+coverage/
+playwright-report/
+test-results/
+
+# Env / OS / editor
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.local
+/e2e/output/

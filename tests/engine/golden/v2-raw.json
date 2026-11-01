@@ -1,0 +1,2364 @@
+{
+ "source": "home-accounting-v2.xlsx",
+ "extractedAt": "2026-11-01",
+ "public": true,
+ "sheets": {
+  "Flow": {
+   "months": [
+    "2026-10",
+    "2026-11",
+    "2026-12",
+    "2027-01",
+    "2027-02",
+    "2027-03",
+    "2027-04",
+    "2027-05",
+    "2027-06",
+    "2027-07",
+    "2027-08",
+    "2027-09",
+    "2027-10",
+    "2027-11",
+    "2027-12"
+   ],
+   "rows": [
+    {
+     "r": 2,
+     "a": {
+      "v": null
+     },
+     "b": {
+      "v": "Opening ₺"
+     },
+     "label": "BALANCES",
+     "cells": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 3,
+     "a": {
+      "v": null
+     },
+     "b": {
+      "v": 2100000
+     },
+     "label": "Savings Account",
+     "cells": [
+      {
+       "v": 2253120,
+       "f": "$B3-D24"
+      },
+      {
+       "v": 2527595.425,
+       "f": "D3-E24"
+      },
+      {
+       "v": 2428595.425,
+       "f": "E3-F24"
+      },
+      {
+       "v": 2404595.425,
+       "f": "shared:F3"
+      },
+      {
+       "v": 2404595.425,
+       "f": "shared:F3"
+      },
+      {
+       "v": 2404595.425,
+       "f": "shared:F3"
+      },
+      {
+       "v": 2404595.425,
+       "f": "shared:F3"
+      },
+      {
+       "v": 2404595.425,
+       "f": "shared:F3"
+      },
+      {
+       "v": 2404595.425,
+       "f": "shared:F3"
+      },
+      {
+       "v": 2404595.425,
+       "f": "shared:F3"
+      },
+      {
+       "v": 2404595.425,
+       "f": "shared:F3"
+      },
+      {
+       "v": 2404595.425,
+       "f": "shared:F3"
+      },
+      {
+       "v": 2404595.425,
+       "f": "shared:F3"
+      },
+      {
+       "v": 2404595.425,
+       "f": "shared:F3"
+      },
+      {
+       "v": 2404595.425,
+       "f": "shared:F3"
+      }
+     ]
+    },
+    {
+     "r": 4,
+     "a": {
+      "v": 0.03
+     },
+     "b": {
+      "v": 80000
+     },
+     "label": "Investments - Projection",
+     "cells": [
+      {
+       "v": 100197.3015817843,
+       "f": "IF(ISNUMBER(D5),D5,$B4*(1+$A$4)^(1/12)-D25-D20)"
+      },
+      {
+       "v": 100444.41515794185,
+       "f": "IF(ISNUMBER(E5),E5,D4*(1+$A$4)^(1/12)-E25-E20)"
+      },
+      {
+       "v": 100692.13818284261,
+       "f": "IF(ISNUMBER(F5),F5,E4*(1+$A$4)^(1/12)-F25-F20)"
+      },
+      {
+       "v": 100940.47215955157,
+       "f": "IF(ISNUMBER(G5),G5,F4*(1+$A$4)^(1/12)-G25-G20)"
+      },
+      {
+       "v": 101189.41859484074,
+       "f": "IF(ISNUMBER(H5),H5,G4*(1+$A$4)^(1/12)-H25-H20)"
+      },
+      {
+       "v": 101438.97899919818,
+       "f": "IF(ISNUMBER(I5),I5,H4*(1+$A$4)^(1/12)-I25-I20)"
+      },
+      {
+       "v": 101689.15488683725,
+       "f": "IF(ISNUMBER(J5),J5,I4*(1+$A$4)^(1/12)-J25-J20)"
+      },
+      {
+       "v": 101939.94777570576,
+       "f": "IF(ISNUMBER(K5),K5,J4*(1+$A$4)^(1/12)-K25-K20)"
+      },
+      {
+       "v": 102191.3591874952,
+       "f": "IF(ISNUMBER(L5),L5,K4*(1+$A$4)^(1/12)-L25-L20)"
+      },
+      {
+       "v": 102443.39064764994,
+       "f": "IF(ISNUMBER(M5),M5,L4*(1+$A$4)^(1/12)-M25-M20)"
+      },
+      {
+       "v": 102696.04368537654,
+       "f": "IF(ISNUMBER(N5),N5,M4*(1+$A$4)^(1/12)-N25-N20)"
+      },
+      {
+       "v": 102949.31983365296,
+       "f": "IF(ISNUMBER(O5),O5,N4*(1+$A$4)^(1/12)-O25-O20)"
+      },
+      {
+       "v": 103203.22062923793,
+       "f": "IF(ISNUMBER(P5),P5,O4*(1+$A$4)^(1/12)-P25-P20)"
+      },
+      {
+       "v": 103457.7476126802,
+       "f": "IF(ISNUMBER(Q5),Q5,P4*(1+$A$4)^(1/12)-Q25-Q20)"
+      },
+      {
+       "v": 103712.90232832798,
+       "f": "IF(ISNUMBER(R5),R5,Q4*(1+$A$4)^(1/12)-R25-R20)"
+      }
+     ]
+    },
+    {
+     "r": 5,
+     "a": {
+      "v": null
+     },
+     "b": {
+      "v": null
+     },
+     "label": "Investments - Actual",
+     "cells": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 6,
+     "a": {
+      "v": null
+     },
+     "b": {
+      "v": null
+     },
+     "label": "Credit Card - Paid this month",
+     "cells": [
+      {
+       "v": 50000
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 7,
+     "a": {
+      "v": null
+     },
+     "b": {
+      "v": 300000
+     },
+     "label": "Credit Card - Remaining Debt",
+     "cells": [
+      {
+       "v": 275000
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 8,
+     "a": {
+      "v": null
+     },
+     "b": {
+      "v": null
+     },
+     "label": "Credit Card - Spent this month",
+     "cells": [
+      {
+       "v": 25000,
+       "f": "IF(ISNUMBER(D7),D7-$B7+D6,\"\")"
+      },
+      {
+       "v": 0,
+       "f": "IF(ISNUMBER(E7),E7-D7+E6,\"\")"
+      },
+      {
+       "v": 0,
+       "f": "IF(ISNUMBER(F7),F7-E7+F6,\"\")"
+      },
+      {
+       "v": 0,
+       "f": "shared:F8"
+      },
+      {
+       "v": 0,
+       "f": "shared:F8"
+      },
+      {
+       "v": 0,
+       "f": "shared:F8"
+      },
+      {
+       "v": 0,
+       "f": "shared:F8"
+      },
+      {
+       "v": 0,
+       "f": "shared:F8"
+      },
+      {
+       "v": 0,
+       "f": "shared:F8"
+      },
+      {
+       "v": 0,
+       "f": "shared:F8"
+      },
+      {
+       "v": 0,
+       "f": "shared:F8"
+      },
+      {
+       "v": 0,
+       "f": "shared:F8"
+      },
+      {
+       "v": 0,
+       "f": "shared:F8"
+      },
+      {
+       "v": 0,
+       "f": "shared:F8"
+      },
+      {
+       "v": 0,
+       "f": "shared:F8"
+      }
+     ]
+    },
+    {
+     "r": 9,
+     "a": {
+      "v": null
+     },
+     "b": {
+      "v": 300000
+     },
+     "label": "Loans Outstanding",
+     "cells": [
+      {
+       "v": 275000,
+       "f": "$B9+D36+D41"
+      },
+      {
+       "v": 275000,
+       "f": "D9+E36+E41"
+      },
+      {
+       "v": 275000,
+       "f": "E9+F36+F41"
+      },
+      {
+       "v": 275000,
+       "f": "shared:F9"
+      },
+      {
+       "v": 275000,
+       "f": "shared:F9"
+      },
+      {
+       "v": 275000,
+       "f": "shared:F9"
+      },
+      {
+       "v": 275000,
+       "f": "shared:F9"
+      },
+      {
+       "v": 275000,
+       "f": "shared:F9"
+      },
+      {
+       "v": 275000,
+       "f": "shared:F9"
+      },
+      {
+       "v": 275000,
+       "f": "shared:F9"
+      },
+      {
+       "v": 275000,
+       "f": "shared:F9"
+      },
+      {
+       "v": 275000,
+       "f": "shared:F9"
+      },
+      {
+       "v": 275000,
+       "f": "shared:F9"
+      },
+      {
+       "v": 275000,
+       "f": "shared:F9"
+      },
+      {
+       "v": 275000,
+       "f": "shared:F9"
+      }
+     ]
+    },
+    {
+     "r": 10,
+     "a": {
+      "v": null
+     },
+     "b": {
+      "v": 300000
+     },
+     "label": "Company - Company Debt (known)",
+     "cells": [
+      {
+       "v": 300000,
+       "f": "$B10+D42"
+      },
+      {
+       "v": 300000,
+       "f": "D10+E42"
+      },
+      {
+       "v": 300000,
+       "f": "E10+F42"
+      },
+      {
+       "v": 300000,
+       "f": "F10+G42"
+      },
+      {
+       "v": 300000,
+       "f": "G10+H42"
+      },
+      {
+       "v": 300000,
+       "f": "H10+I42"
+      },
+      {
+       "v": 300000,
+       "f": "I10+J42"
+      },
+      {
+       "v": 300000,
+       "f": "J10+K42"
+      },
+      {
+       "v": 300000,
+       "f": "K10+L42"
+      },
+      {
+       "v": 300000,
+       "f": "L10+M42"
+      },
+      {
+       "v": 300000,
+       "f": "M10+N42"
+      },
+      {
+       "v": 300000,
+       "f": "N10+O42"
+      },
+      {
+       "v": 300000,
+       "f": "O10+P42"
+      },
+      {
+       "v": 300000,
+       "f": "P10+Q42"
+      },
+      {
+       "v": 300000,
+       "f": "Q10+R42"
+      }
+     ]
+    },
+    {
+     "r": 11,
+     "a": {
+      "v": null
+     },
+     "b": {
+      "v": null
+     },
+     "label": "Net Worth",
+     "cells": [
+      {
+       "v": 1778317.3015817842,
+       "f": "D3+D4-D9-D10"
+      },
+      {
+       "v": 2053039.8401579414,
+       "f": "E3+E4-E9-E10"
+      },
+      {
+       "v": 1954287.5631828425,
+       "f": "shared:E11"
+      },
+      {
+       "v": 1930535.8971595513,
+       "f": "shared:E11"
+      },
+      {
+       "v": 1930784.8435948407,
+       "f": "shared:E11"
+      },
+      {
+       "v": 1931034.4039991982,
+       "f": "shared:E11"
+      },
+      {
+       "v": 1931284.579886837,
+       "f": "shared:E11"
+      },
+      {
+       "v": 1931535.3727757055,
+       "f": "shared:E11"
+      },
+      {
+       "v": 1931786.7841874948,
+       "f": "shared:E11"
+      },
+      {
+       "v": 1932038.8156476496,
+       "f": "shared:E11"
+      },
+      {
+       "v": 1932291.4686853765,
+       "f": "shared:E11"
+      },
+      {
+       "v": 1932544.7448336529,
+       "f": "shared:E11"
+      },
+      {
+       "v": 1932798.6456292379,
+       "f": "shared:E11"
+      },
+      {
+       "v": 1933053.1726126801,
+       "f": "shared:E11"
+      },
+      {
+       "v": 1933308.3273283276,
+       "f": "shared:E11"
+      }
+     ]
+    },
+    {
+     "r": 13,
+     "a": {
+      "v": null
+     },
+     "b": {
+      "v": null
+     },
+     "label": "INCOMES",
+     "cells": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 14,
+     "a": {
+      "v": null
+     },
+     "b": {
+      "v": 10500,
+      "f": "SUM(D14:S14)"
+     },
+     "label": "Adult A - Salary (USD)",
+     "cells": [
+      {
+       "v": 4000
+      },
+      {
+       "v": 6500
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 15,
+     "a": {
+      "v": 0.7170835021488025,
+      "f": "IFERROR(B15/$B$22,0)"
+     },
+     "b": {
+      "v": 519595.425,
+      "f": "SUM(D15:S15)"
+     },
+     "label": "Adult A - Salary (TRY)",
+     "cells": [
+      {
+       "v": 196120,
+       "f": "D14*D$55"
+      },
+      {
+       "v": 323475.425,
+       "f": "E14*E$55"
+      },
+      {
+       "v": 0,
+       "f": "F14*F$55"
+      },
+      {
+       "v": 0,
+       "f": "G14*G$55"
+      },
+      {
+       "v": 0,
+       "f": "H14*H$55"
+      },
+      {
+       "v": 0,
+       "f": "I14*I$55"
+      },
+      {
+       "v": 0,
+       "f": "J14*J$55"
+      },
+      {
+       "v": 0,
+       "f": "K14*K$55"
+      },
+      {
+       "v": 0,
+       "f": "L14*L$55"
+      },
+      {
+       "v": 0,
+       "f": "M14*M$55"
+      },
+      {
+       "v": 0,
+       "f": "N14*N$55"
+      },
+      {
+       "v": 0,
+       "f": "O14*O$55"
+      },
+      {
+       "v": 0,
+       "f": "P14*P$55"
+      },
+      {
+       "v": 0,
+       "f": "Q14*Q$55"
+      },
+      {
+       "v": 0,
+       "f": "R14*R$55"
+      }
+     ]
+    },
+    {
+     "r": 16,
+     "a": {
+      "v": 0,
+      "f": "IFERROR(B16/$B$22,0)"
+     },
+     "b": {
+      "v": 0,
+      "f": "SUM(D16:S16)"
+     },
+     "label": "Adult A - Extra",
+     "cells": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 17,
+     "a": {
+      "v": 0.20701207159843715,
+      "f": "IFERROR(B17/$B$22,0)"
+     },
+     "b": {
+      "v": 150000,
+      "f": "shared:B16"
+     },
+     "label": "Adult B - Salary",
+     "cells": [
+      {
+       "v": 150000
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 18,
+     "a": {
+      "v": 0.07590442625276028,
+      "f": "IFERROR(B18/$B$22,0)"
+     },
+     "b": {
+      "v": 55000,
+      "f": "shared:B16"
+     },
+     "label": "Adult B - Extra",
+     "cells": [
+      {
+       "v": 5000
+      },
+      {
+       "v": 50000
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 19,
+     "a": {
+      "v": 0,
+      "f": "IFERROR(B19/$B$22,0)"
+     },
+     "b": {
+      "v": 0,
+      "f": "shared:B16"
+     },
+     "label": "Other Income",
+     "cells": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 20,
+     "a": {
+      "v": 0,
+      "f": "IFERROR(B20/$B$22,0)"
+     },
+     "b": {
+      "v": 0,
+      "f": "shared:B16"
+     },
+     "label": "From Investment",
+     "cells": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 21,
+     "a": {
+      "v": 0,
+      "f": "IFERROR(B21/$B$22,0)"
+     },
+     "b": {
+      "v": 0,
+      "f": "shared:B16"
+     },
+     "label": "⇧ Insert New ⇧",
+     "cells": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 22,
+     "a": {
+      "v": 1,
+      "f": "IFERROR(B22/$B$22,0)"
+     },
+     "b": {
+      "v": 724595.425,
+      "f": "SUM(B15:B21)"
+     },
+     "label": "Subtotal (incomes)",
+     "cells": [
+      {
+       "v": 351120,
+       "f": "SUM(D15:D21)"
+      },
+      {
+       "v": 373475.425,
+       "f": "SUM(E15:E21)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(F15:F21)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(G15:G21)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(H15:H21)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(I15:I21)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(J15:J21)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(K15:K21)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(L15:L21)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(M15:M21)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(N15:N21)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(O15:O21)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(P15:P21)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(Q15:Q21)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(R15:R21)"
+      }
+     ]
+    },
+    {
+     "r": 23,
+     "a": {
+      "v": null
+     },
+     "b": {
+      "v": null
+     },
+     "label": "EXPENSES",
+     "cells": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 24,
+     "a": {
+      "v": -0.4203661995243759,
+      "f": "IFERROR(B24/$B$22,0)"
+     },
+     "b": {
+      "v": -304595.425,
+      "f": "SUM(D24:S24)"
+     },
+     "label": "To Savings",
+     "cells": [
+      {
+       "v": -153120,
+       "f": "-(D22+SUM(D25:D52))"
+      },
+      {
+       "v": -274475.425,
+       "f": "-(E22+SUM(E25:E52))"
+      },
+      {
+       "v": 99000,
+       "f": "-(F22+SUM(F25:F52))"
+      },
+      {
+       "v": 24000,
+       "f": "-(G22+SUM(G25:G52))"
+      },
+      {
+       "v": 0,
+       "f": "-(H22+SUM(H25:H52))"
+      },
+      {
+       "v": 0,
+       "f": "-(I22+SUM(I25:I52))"
+      },
+      {
+       "v": 0,
+       "f": "-(J22+SUM(J25:J52))"
+      },
+      {
+       "v": 0,
+       "f": "-(K22+SUM(K25:K52))"
+      },
+      {
+       "v": 0,
+       "f": "-(L22+SUM(L25:L52))"
+      },
+      {
+       "v": 0,
+       "f": "-(M22+SUM(M25:M52))"
+      },
+      {
+       "v": 0,
+       "f": "-(N22+SUM(N25:N52))"
+      },
+      {
+       "v": 0,
+       "f": "-(O22+SUM(O25:O52))"
+      },
+      {
+       "v": 0,
+       "f": "-(P22+SUM(P25:P52))"
+      },
+      {
+       "v": 0,
+       "f": "-(Q22+SUM(Q25:Q52))"
+      },
+      {
+       "v": 0,
+       "f": "-(R22+SUM(R25:R52))"
+      }
+     ]
+    },
+    {
+     "r": 25,
+     "a": {
+      "v": -0.027601609546458284,
+      "f": "IFERROR(B25/$B$22,0)"
+     },
+     "b": {
+      "v": -20000,
+      "f": "SUM(D25:S25)"
+     },
+     "label": "To Investment",
+     "cells": [
+      {
+       "v": -20000
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 26,
+     "a": {
+      "v": -0.013800804773229142,
+      "f": "IFERROR(B26/$B$22,0)"
+     },
+     "b": {
+      "v": -10000,
+      "f": "shared:B25"
+     },
+     "label": "Pocket Money",
+     "cells": [
+      {
+       "v": -10000
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 27,
+     "a": {
+      "v": -0.034502011933072854,
+      "f": "IFERROR(B27/$B$22,0)"
+     },
+     "b": {
+      "v": -25000,
+      "f": "SUM(D27:S27)"
+     },
+     "label": "Groceries",
+     "cells": [
+      {
+       "v": -25000
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 28,
+     "a": {
+      "v": -0.2691156930779683,
+      "f": "IFERROR(B28/$B$22,0)"
+     },
+     "b": {
+      "v": -195000,
+      "f": "shared:B25"
+     },
+     "label": "Rent",
+     "cells": [
+      {
+       "v": -45000
+      },
+      {
+       "v": -75000
+      },
+      {
+       "v": -75000,
+       "f": "E28"
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 29,
+     "a": {
+      "v": -0.011040643818583315,
+      "f": "IFERROR(B29/$B$22,0)"
+     },
+     "b": {
+      "v": -8000,
+      "f": "shared:B25"
+     },
+     "label": "Utilities (Electric, Water, Gas, Building)",
+     "cells": [
+      {
+       "v": -8000
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 30,
+     "a": {
+      "v": -0.0055203219092916575,
+      "f": "IFERROR(B30/$B$22,0)"
+     },
+     "b": {
+      "v": -4000,
+      "f": "shared:B25"
+     },
+     "label": "Home Improvements",
+     "cells": [
+      {
+       "v": -4000
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 31,
+     "a": {
+      "v": -0.0034502011933072855,
+      "f": "IFERROR(B31/$B$22,0)"
+     },
+     "b": {
+      "v": -2500,
+      "f": "shared:B25"
+     },
+     "label": "Gym / Sports",
+     "cells": [
+      {
+       "v": -2500
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 32,
+     "a": {
+      "v": -0.006900402386614571,
+      "f": "IFERROR(B32/$B$22,0)"
+     },
+     "b": {
+      "v": -5000,
+      "f": "SUM(D32:S32)"
+     },
+     "label": "Hobbies",
+     "cells": [
+      {
+       "v": -5000
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 33,
+     "a": {
+      "v": -0.0027601609546458288,
+      "f": "IFERROR(B33/$B$22,0)"
+     },
+     "b": {
+      "v": -2000,
+      "f": "shared:B25"
+     },
+     "label": "Phone & Internet",
+     "cells": [
+      {
+       "v": -2000
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 34,
+     "a": {
+      "v": -0.0020701207159843716,
+      "f": "IFERROR(B34/$B$22,0)"
+     },
+     "b": {
+      "v": -1500,
+      "f": "shared:B25"
+     },
+     "label": "Subscriptions (Netflix etc…)",
+     "cells": [
+      {
+       "v": -1500
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 35,
+     "a": {
+      "v": -0.004140241431968743,
+      "f": "IFERROR(B35/$B$22,0)"
+     },
+     "b": {
+      "v": -3000,
+      "f": "shared:B25"
+     },
+     "label": "Insurance & Tax (DASK / BES)",
+     "cells": [
+      {
+       "v": -3000
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 36,
+     "a": {
+      "v": -0.034502011933072854,
+      "f": "IFERROR(B36/$B$22,0)"
+     },
+     "b": {
+      "v": -25000,
+      "f": "shared:B25"
+     },
+     "label": "Vehicle Loan",
+     "cells": [
+      {
+       "v": -25000
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 37,
+     "a": {
+      "v": 0,
+      "f": "IFERROR(B37/$B$22,0)"
+     },
+     "b": {
+      "v": 0,
+      "f": "SUM(D37:S37)"
+     },
+     "label": "Vehicle Rent / Lease",
+     "cells": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 38,
+     "a": {
+      "v": -0.0055203219092916575,
+      "f": "IFERROR(B38/$B$22,0)"
+     },
+     "b": {
+      "v": -4000,
+      "f": "shared:B25"
+     },
+     "label": "Vehicle Insurance (Kasko / Trafik)",
+     "cells": [
+      {
+       "v": -4000
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 39,
+     "a": {
+      "v": -0.0020701207159843716,
+      "f": "IFERROR(B39/$B$22,0)"
+     },
+     "b": {
+      "v": -1500,
+      "f": "shared:B25"
+     },
+     "label": "Vehicle Tax (MTV) & Inspection",
+     "cells": [
+      {
+       "v": -1500
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 40,
+     "a": {
+      "v": -0.01242072429590623,
+      "f": "IFERROR(B40/$B$22,0)"
+     },
+     "b": {
+      "v": -9000,
+      "f": "shared:B25"
+     },
+     "label": "Fuel & Parking",
+     "cells": [
+      {
+       "v": -9000
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 41,
+     "a": {
+      "v": 0,
+      "f": "IFERROR(B41/$B$22,0)"
+     },
+     "b": {
+      "v": 0,
+      "f": "SUM(D41:S41)"
+     },
+     "label": "Loan Installments (Taksit)",
+     "cells": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 42,
+     "a": {
+      "v": 0,
+      "f": "IFERROR(B42/$B$22,0)"
+     },
+     "b": {
+      "v": 0,
+      "f": "SUM(D42:S42)"
+     },
+     "label": "Company - Company Expenses",
+     "cells": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 43,
+     "a": {
+      "v": -0.05520321909291657,
+      "f": "IFERROR(B43/$B$22,0)"
+     },
+     "b": {
+      "v": -40000,
+      "f": "shared:B25"
+     },
+     "label": "Travel & Holiday ⇩",
+     "cells": [
+      {
+       "v": -10000
+      },
+      {
+       "v": -10000,
+       "f": "D43"
+      },
+      {
+       "v": -10000,
+       "f": "E43"
+      },
+      {
+       "v": -10000,
+       "f": "shared:F43"
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 44,
+     "a": {
+      "v": -0.033121931455749945,
+      "f": "IFERROR(B44/$B$22,0)"
+     },
+     "b": {
+      "v": -24000,
+      "f": "shared:B25"
+     },
+     "label": "Clothing & Other Shopping ⇩",
+     "cells": [
+      {
+       "v": -6000
+      },
+      {
+       "v": -6000,
+       "f": "D44"
+      },
+      {
+       "v": -6000,
+       "f": "shared:E44"
+      },
+      {
+       "v": -6000,
+       "f": "shared:E44"
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 45,
+     "a": {
+      "v": -0.04416257527433326,
+      "f": "IFERROR(B45/$B$22,0)"
+     },
+     "b": {
+      "v": -32000,
+      "f": "shared:B25"
+     },
+     "label": "Entertainment & Dining Out ⇩",
+     "cells": [
+      {
+       "v": -8000
+      },
+      {
+       "v": -8000,
+       "f": "shared:E44"
+      },
+      {
+       "v": -8000,
+       "f": "shared:E44"
+      },
+      {
+       "v": -8000,
+       "f": "shared:E44"
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 46,
+     "a": {
+      "v": 0,
+      "f": "IFERROR(B46/$B$22,0)"
+     },
+     "b": {
+      "v": 0,
+      "f": "shared:B25"
+     },
+     "label": "Pets",
+     "cells": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 47,
+     "a": {
+      "v": -0.004140241431968743,
+      "f": "IFERROR(B47/$B$22,0)"
+     },
+     "b": {
+      "v": -3000,
+      "f": "shared:B25"
+     },
+     "label": "Adult B - Personal",
+     "cells": [
+      {
+       "v": -3000
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 48,
+     "a": {
+      "v": -0.004140241431968743,
+      "f": "IFERROR(B48/$B$22,0)"
+     },
+     "b": {
+      "v": -3000,
+      "f": "shared:B25"
+     },
+     "label": "Adult A - Personal",
+     "cells": [
+      {
+       "v": -3000
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 49,
+     "a": {
+      "v": -0.0034502011933072855,
+      "f": "IFERROR(B49/$B$22,0)"
+     },
+     "b": {
+      "v": -2500,
+      "f": "shared:B25"
+     },
+     "label": "Health & Pharmacy",
+     "cells": [
+      {
+       "v": -2500
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 50,
+     "a": {
+      "v": 0,
+      "f": "IFERROR(B50/$B$22,0)"
+     },
+     "b": {
+      "v": 0,
+      "f": "shared:B25"
+     },
+     "label": "⇧ Insert New ⇧",
+     "cells": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 51,
+     "a": {
+      "v": 0,
+      "f": "IFERROR(B51/$B$22,0)"
+     },
+     "b": {
+      "v": 0,
+      "f": "shared:B25"
+     },
+     "label": "⇩ N/A ⇩",
+     "cells": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 52,
+     "a": {
+      "v": 0,
+      "f": "IFERROR(B52/$B$22,0)"
+     },
+     "b": {
+      "v": 0,
+      "f": "shared:B25"
+     },
+     "label": "not used items",
+     "cells": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 53,
+     "a": {
+      "v": 0,
+      "f": "IFERROR(B53/$B$22,0)"
+     },
+     "b": {
+      "v": 0,
+      "f": "SUM(D53:S53)"
+     },
+     "label": "Credit Card Payment",
+     "cells": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 54,
+     "a": {
+      "v": -1,
+      "f": "IFERROR(B54/$B$22,0)"
+     },
+     "b": {
+      "v": -724595.425,
+      "f": "SUM(B24:B52)"
+     },
+     "label": "Subtotal (expenses)",
+     "cells": [
+      {
+       "v": -351120,
+       "f": "SUM(D24:D52)"
+      },
+      {
+       "v": -373475.425,
+       "f": "SUM(E24:E52)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(F24:F52)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(G24:G52)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(H24:H52)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(I24:I52)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(J24:J52)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(K24:K52)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(L24:L52)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(M24:M52)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(N24:N52)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(O24:O52)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(P24:P52)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(Q24:Q52)"
+      },
+      {
+       "v": 0,
+       "f": "SUM(R24:R52)"
+      }
+     ]
+    },
+    {
+     "r": 55,
+     "a": {
+      "v": 0.015
+     },
+     "b": {
+      "v": null
+     },
+     "label": "USD/TRY (monthly drift % in col A)",
+     "cells": [
+      {
+       "v": 49.03
+      },
+      {
+       "v": 49.765449999999994,
+       "f": "D55*(1+$A$55)"
+      },
+      {
+       "v": 50.51193174999999,
+       "f": "E55*(1+$A$55)"
+      },
+      {
+       "v": 51.26961072624998,
+       "f": "shared:F55"
+      },
+      {
+       "v": 52.03865488714372,
+       "f": "shared:F55"
+      },
+      {
+       "v": 52.81923471045087,
+       "f": "shared:F55"
+      },
+      {
+       "v": 53.61152323110763,
+       "f": "shared:F55"
+      },
+      {
+       "v": 54.41569607957424,
+       "f": "shared:F55"
+      },
+      {
+       "v": 55.231931520767844,
+       "f": "shared:F55"
+      },
+      {
+       "v": 56.060410493579354,
+       "f": "shared:F55"
+      },
+      {
+       "v": 56.90131665098304,
+       "f": "shared:F55"
+      },
+      {
+       "v": 57.754836400747784,
+       "f": "shared:F55"
+      },
+      {
+       "v": 58.621158946758996,
+       "f": "shared:F55"
+      },
+      {
+       "v": 59.500476330960375,
+       "f": "shared:F55"
+      },
+      {
+       "v": 60.39298347592477,
+       "f": "shared:F55"
+      }
+     ]
+    },
+    {
+     "r": 56,
+     "a": {
+      "v": null
+     },
+     "b": {
+      "v": null
+     },
+     "label": "POOLS",
+     "cells": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ]
+    },
+    {
+     "r": 57,
+     "a": {
+      "v": null
+     },
+     "b": {
+      "v": null
+     },
+     "label": "Travel & Holiday ⇨  ",
+     "cells": [
+      {
+       "v": 10000,
+       "f": "-D43"
+      },
+      {
+       "v": 20000,
+       "f": "D57-E43"
+      },
+      {
+       "v": 30000,
+       "f": "E57-F43"
+      },
+      {
+       "v": 40000,
+       "f": "F57-G43"
+      },
+      {
+       "v": 40000,
+       "f": "G57-H43"
+      },
+      {
+       "v": 40000,
+       "f": "H57-I43"
+      },
+      {
+       "v": 40000,
+       "f": "I57-J43"
+      },
+      {
+       "v": 40000,
+       "f": "J57-K43"
+      },
+      {
+       "v": 40000,
+       "f": "K57-L43"
+      },
+      {
+       "v": 40000,
+       "f": "L57-M43"
+      },
+      {
+       "v": 40000,
+       "f": "M57-N43"
+      },
+      {
+       "v": 40000,
+       "f": "N57-O43"
+      },
+      {
+       "v": 40000,
+       "f": "O57-P43"
+      },
+      {
+       "v": 40000,
+       "f": "P57-Q43"
+      },
+      {
+       "v": 40000,
+       "f": "Q57-R43"
+      }
+     ]
+    },
+    {
+     "r": 58,
+     "a": {
+      "v": null
+     },
+     "b": {
+      "v": null
+     },
+     "label": "Clothing & Other Shopping ⇨  ",
+     "cells": [
+      {
+       "v": 6000,
+       "f": "-D44"
+      },
+      {
+       "v": 12000,
+       "f": "D58-E44"
+      },
+      {
+       "v": 18000,
+       "f": "E58-F44"
+      },
+      {
+       "v": 24000,
+       "f": "F58-G44"
+      },
+      {
+       "v": 24000,
+       "f": "G58-H44"
+      },
+      {
+       "v": 24000,
+       "f": "H58-I44"
+      },
+      {
+       "v": 24000,
+       "f": "I58-J44"
+      },
+      {
+       "v": 24000,
+       "f": "J58-K44"
+      },
+      {
+       "v": 24000,
+       "f": "K58-L44"
+      },
+      {
+       "v": 24000,
+       "f": "L58-M44"
+      },
+      {
+       "v": 24000,
+       "f": "M58-N44"
+      },
+      {
+       "v": 24000,
+       "f": "N58-O44"
+      },
+      {
+       "v": 24000,
+       "f": "O58-P44"
+      },
+      {
+       "v": 24000,
+       "f": "P58-Q44"
+      },
+      {
+       "v": 24000,
+       "f": "Q58-R44"
+      }
+     ]
+    },
+    {
+     "r": 59,
+     "a": {
+      "v": null
+     },
+     "b": {
+      "v": null
+     },
+     "label": "Entertainment & Dining Out ⇨  ",
+     "cells": [
+      {
+       "v": 8000,
+       "f": "-D45"
+      },
+      {
+       "v": 16000,
+       "f": "D59-E45"
+      },
+      {
+       "v": 24000,
+       "f": "E59-F45"
+      },
+      {
+       "v": 32000,
+       "f": "F59-G45"
+      },
+      {
+       "v": 32000,
+       "f": "G59-H45"
+      },
+      {
+       "v": 32000,
+       "f": "H59-I45"
+      },
+      {
+       "v": 32000,
+       "f": "I59-J45"
+      },
+      {
+       "v": 32000,
+       "f": "J59-K45"
+      },
+      {
+       "v": 32000,
+       "f": "K59-L45"
+      },
+      {
+       "v": 32000,
+       "f": "L59-M45"
+      },
+      {
+       "v": 32000,
+       "f": "M59-N45"
+      },
+      {
+       "v": 32000,
+       "f": "N59-O45"
+      },
+      {
+       "v": 32000,
+       "f": "O59-P45"
+      },
+      {
+       "v": 32000,
+       "f": "P59-Q45"
+      },
+      {
+       "v": 32000,
+       "f": "Q59-R45"
+      }
+     ]
+    }
+   ],
+   "hiddenRows": []
+  }
+ }
+}

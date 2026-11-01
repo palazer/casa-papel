@@ -1,0 +1,9 @@
+#!/bin/sh
+# Casa Papel data guard: refuse to commit personal data.
+blocked=$(git diff --cached --name-only --diff-filter=ACMR | grep -Ei '(^|/)private/|\.xlsx$|\.numbers$|\.casapapel\.json$|(^|/)tests/private/' || true)
+if [ -n "$blocked" ]; then
+  echo "pre-commit: refusing to commit personal data files:" >&2
+  echo "$blocked" | sed 's/^/  /' >&2
+  exit 1
+fi
+exit 0
