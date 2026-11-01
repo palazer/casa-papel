@@ -31,7 +31,12 @@ test.describe('wave 1b', () => {
     await page.getByLabel('Your own row name').fill('Garden')
     await page.getByRole('button', { name: 'Add row' }).click()
     await page.screenshot({ path: 'e2e/output/wizard-rows.png', fullPage: true })
-    for (const who of ['Ana', 'Ben', 'Cal', 'Rex']) {
+    // subject tabs jump straight to a person or thing; Next still walks them in order
+    await page.getByRole('tab', { name: /^Rex/ }).click()
+    await expect(page.getByRole('heading', { name: 'Rows for Rex' })).toBeVisible()
+    await page.getByRole('tab', { name: /^Ana/ }).click()
+    await expect(page.getByRole('heading', { name: 'Rows for Ana' })).toBeVisible()
+    for (const who of ['Ben', 'Cal', 'Rex']) {
       await page.getByRole('button', { name: 'Next' }).click()
       await expect(page.getByRole('heading', { name: `Rows for ${who}` })).toBeVisible()
     }

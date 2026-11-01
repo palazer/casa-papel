@@ -314,6 +314,25 @@ export function SetupWizard({ onCreated }: { onCreated: () => void }) {
 
         {step === 4 && s && (
           <div className="space-y-4">
+            <div role="tablist" aria-label="Who the rows are for" className="flex flex-wrap gap-1 border-b pb-2">
+              {subjects.map((sub, i) => {
+                const count = chosenFor(sub).size + d.customRows.filter((r) => r.subject === i).length
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    role="tab"
+                    aria-selected={i === subject}
+                    onClick={() => setSubject(i)}
+                    className={cn('flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm', i === subject ? 'bg-secondary font-medium' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}
+                  >
+                    {sub.kind ? sub.name : 'Household'}
+                    {sub.kind && <span className="text-xs text-muted-foreground">{ENTITY_KIND_LABEL[sub.kind]}</span>}
+                    <span className="rounded-full bg-muted px-1.5 text-xs tabular-nums">{count}</span>
+                  </button>
+                )
+              })}
+            </div>
             <div>
               <h3 className="font-medium">Rows for {s.name}</h3>
               <p className="text-sm text-muted-foreground">
