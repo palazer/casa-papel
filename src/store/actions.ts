@@ -1,0 +1,230 @@
+import { generateKeyBetween } from 'fractional-indexing'
+import { computeEngine, cellKey, sortRows, type EngineOutput } from '@/engine'
+import {
+  AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, RowSchema, addMonths, compareMonths, monthRange, newId,
+  type Account, type Cell, type CellItem, type Household, type ItemStatus, type Money, type MonthKey, type Row, type Tables,
+} from '@/model'
+import type { Mutation, Store } from './store'
+
+export type EditScope = 'this-month' | 'from-now-on'
+
+const now = () => Date.now()
+
+/** Read every data table once. Cheap at household scale. */
+export async function loadTables(store: Store): Promise<Tables> {
+  const out: Record<string, unknown[]> = {}
+  for (const t of store.db.dataTables) out[t] = await store.db.table(t).toArray()
+  return out as unknown as Tables
+}
+
+async function engineUpTo(store: Store, month: MonthKey): Promise<{ tables: Tables; engine: EngineOutput; household: Household }> {
+  const tables = await loadTables(store)
+  const household = tables.household.find((h) => !h.deletedAt)
+  if (!household) throw new Error('No household yet')
+  const start = compareMonths(household.startMonth, month) < 0 ? household.startMonth : month
+  const engine = computeEngine({ tables, months: monthRange(start, addMonths(month, 1)) })
+  return { tables, engine, household }
+}
+
+function assertOpen(tables: Tables, month: MonthKey): void {
+  if (tables.monthStates.find((s) => s.month === month)?.closed) throw new Error(`${month} is closed. Reopen it to edit.`)
+}
+
+function cellOf(tables: Tables, rowId: string, month: MonthKey): Cell | undefined {
+  return tables.cells.find((c) => c.rowId === rowId && c.month === month)
+}
+
+const putCell = (cell: Cell): Mutation => ({ op: 'put', table: 'cells', record: CellSchema.parse({ ...cell, updatedAt: now() }) })
+
+// ---------- cells ----------
+
+/**
+ * Set a plain value. `from-now-on` lets later inheriting months follow;
+ * `this-month` freezes the next month at the old value so the chain continues as before.
+ */
+/** When editing only this month, pin the following month at the old value if it was inheriting. */
+function freezeNext(tables: Tables, engine: EngineOutput, rowId: string, month: MonthKey): Mutation[] {
+  const next = addMonths(month, 1)
+  const nextCell = cellOf(tables, rowId, next)
+  const current = engine.cells[cellKey(rowId, month)]
+  if (!current || current.source === 'empty') return []
+  if (nextCell && nextCell.mode !== 'inherit') return []
+  return [putCell({ rowId, month: next, mode: 'value', value: current.value, items: [], note: null, currencyOverride: null, updatedAt: now() })]
+}
+
+export async function setCellValue(store: Store, rowId: string, month: MonthKey, value: Money, scope: EditScope): Promise<void> {
+  const { tables, engine } = await engineUpTo(store, month)
+  assertOpen(tables, month)
+  const mutations: Mutation[] = scope === 'this-month' ? freezeNext(tables, engine, rowId, month) : []
+  const existing = cellOf(tables, rowId, month)
+  mutations.push(putCell({ rowId, month, mode: 'value', value, items: [], note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, updatedAt: now() }))
+  await store.commit(mutations)
+}
+
+export async function setCellItems(store: Store, rowId: string, month: MonthKey, items: CellItem[], scope: EditScope = 'from-now-on'): Promise<void> {
+  const { tables, engine } = await engineUpTo(store, month)
+  assertOpen(tables, month)
+  const mutations: Mutation[] = scope === 'this-month' ? freezeNext(tables, engine, rowId, month) : []
+  const existing = cellOf(tables, rowId, month)
+  mutations.push(putCell({ rowId, month, mode: 'items', value: null, items, note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, updatedAt: now() }))
+  await store.commit(mutations)
+}
+
+/** Back to inheriting from the previous month. */
+export async function clearCell(store: Store, rowId: string, month: MonthKey): Promise<void> {
+  const tables = await loadTables(store)
+  assertOpen(tables, month)
+  if (!cellOf(tables, rowId, month)) return
+  await store.commit([{ op: 'delete', table: 'cells', key: [rowId, month] }])
+}
+
+/** Turn whatever the cell shows into an items list so single entries can be added. */
+export function itemsFromCurrent(engineCell: { source: string; value: Money; items: CellItem[] } | undefined, defaultFundedBy: CellItem['fundedBy'], defaultStatus: ItemStatus): CellItem[] {
+  if (!engineCell || engineCell.source === 'empty' || engineCell.source === 'archived') return []
+  if (engineCell.source === 'items') return engineCell.items.map(({ ...it }) => ({ ...it }))
+  if (engineCell.source === 'inherit') {
+    return [{ id: newId(), label: '', amount: 0, status: defaultStatus, fundedBy: defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'carry', skipped: false }]
+  }
+  return [{ id: newId(), label: '', amount: engineCell.value, status: defaultStatus, fundedBy: defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }]
+}
+
+export async function setItemStatus(store: Store, rowId: string, month: MonthKey, itemId: string, status: ItemStatus): Promise<void> {
+  const tables = await loadTables(store)
+  assertOpen(tables, month)
+  const cell = cellOf(tables, rowId, month)
+  if (!cell || cell.mode !== 'items') throw new Error('Cell has no items')
+  await store.commit([putCell({ ...cell, items: cell.items.map((it) => (it.id === itemId ? { ...it, status } : it)) })])
+}
+
+// ---------- rows ----------
+
+function neighbours(rows: Row[], section: Row['section']) {
+  return sortRows(rows.filter((r) => !r.deletedAt && r.section === section))
+}
+
+export async function addRow(store: Store, input: Partial<Row> & { name: string; section: Row['section'] }, afterRowId?: string): Promise<Row> {
+  const tables = await loadTables(store)
+  const list = neighbours(tables.rows, input.section)
+  let prev: string | null = list.length ? list[list.length - 1].order : null
+  let next: string | null = null
+  if (afterRowId) {
+    const i = list.findIndex((r) => r.id === afterRowId)
+    if (i >= 0) {
+      prev = list[i].order
+      next = list[i + 1]?.order ?? null
+    }
+  }
+  const ts = now()
+  const row = RowSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, ...input, order: generateKeyBetween(prev, next) })
+  await store.commit([{ op: 'put', table: 'rows', record: row }])
+  return row
+}
+
+export async function updateRow(store: Store, rowId: string, patch: Partial<Omit<Row, 'id' | 'createdAt'>>): Promise<void> {
+  const tables = await loadTables(store)
+  const row = tables.rows.find((r) => r.id === rowId)
+  if (!row) throw new Error('Row not found')
+  await store.commit([{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, ...patch, updatedAt: now() }) }])
+}
+
+export const renameRow = (store: Store, rowId: string, name: string) => updateRow(store, rowId, { name })
+export const archiveRow = (store: Store, rowId: string, month: MonthKey | null) => updateRow(store, rowId, { archivedMonth: month })
+export const deleteRow = (store: Store, rowId: string) => updateRow(store, rowId, { deletedAt: now() })
+
+export async function moveRow(store: Store, rowId: string, direction: 'up' | 'down'): Promise<void> {
+  const tables = await loadTables(store)
+  const row = tables.rows.find((r) => r.id === rowId)
+  if (!row) throw new Error('Row not found')
+  const list = neighbours(tables.rows, row.section)
+  const i = list.findIndex((r) => r.id === rowId)
+  const j = direction === 'up' ? i - 1 : i + 1
+  if (j < 0 || j >= list.length) return
+  // place between the neighbour on the far side and the neighbour we jump over
+  const far = direction === 'up' ? list[j - 1]?.order ?? null : list[j + 1]?.order ?? null
+  const order = direction === 'up' ? generateKeyBetween(far, list[j].order) : generateKeyBetween(list[j].order, far)
+  await store.commit([{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, order, updatedAt: now() }) }])
+}
+
+// ---------- months ----------
+
+/** Freeze a month: inherited values become explicit, items become done, settings are pinned. */
+export async function closeMonth(store: Store, month: MonthKey): Promise<void> {
+  const { tables, engine, household } = await engineUpTo(store, month)
+  const mutations: Mutation[] = []
+  for (const row of engine.rows) {
+    const c = engine.cells[cellKey(row.id, month)]
+    if (!c || c.source === 'derived' || c.source === 'archived' || c.source === 'empty') continue
+    if (c.source === 'inherit') {
+      mutations.push(putCell({ rowId: row.id, month, mode: 'value', value: c.value, items: [], note: null, currencyOverride: null, updatedAt: now() }))
+    } else if (c.source === 'items' && c.cell) {
+      if (c.cell.items.some((it) => it.status !== 'done' && !it.skipped)) {
+        mutations.push(putCell({ ...c.cell, items: c.cell.items.map((it) => (it.skipped ? it : { ...it, status: 'done' })) }))
+      }
+    }
+  }
+  const state = tables.monthStates.find((s) => s.month === month)
+  mutations.push({
+    op: 'put', table: 'monthStates',
+    record: MonthStateSchema.parse({
+      month, closed: true, closedAt: now(),
+      pocketTotalOverride: state?.pocketTotalOverride ?? household.pocketTotal,
+      cashBufferOverride: state?.cashBufferOverride ?? household.cashBuffer,
+      updatedAt: now(),
+    }),
+  })
+  await store.commit(mutations)
+}
+
+export async function reopenMonth(store: Store, month: MonthKey): Promise<void> {
+  const tables = await loadTables(store)
+  const state = tables.monthStates.find((s) => s.month === month)
+  if (!state?.closed) return
+  await store.commit([{ op: 'put', table: 'monthStates', record: MonthStateSchema.parse({ ...state, closed: false, closedAt: null, updatedAt: now() }) }])
+}
+
+// ---------- household ----------
+
+export interface QuickHousehold {
+  name: string
+  baseCurrency: string
+  locale: string
+  startMonth: MonthKey
+  closingRule?: Household['closingRule']
+}
+
+/** Minimal household: settings, one savings account, a handful of starter rows. */
+export async function quickCreateHousehold(store: Store, input: QuickHousehold): Promise<Household> {
+  const ts = now()
+  const household = HouseholdSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, ...input })
+  const savings: Account = AccountSchema.parse({
+    id: newId(), createdAt: ts, updatedAt: ts, name: 'Savings', type: 'savings', currency: input.baseCurrency,
+    openingBalance: 0, openingMonth: input.startMonth, tracked: true,
+  })
+  const starters: Array<Partial<Row> & { name: string; section: Row['section'] }> = [
+    { name: 'Salary', section: 'income', kind: 'salary', defaultStatus: 'committed', inShareBasis: true },
+    { name: 'Other income', section: 'income' },
+    { name: 'Rent', section: 'expense', defaultStatus: 'committed' },
+    { name: 'Groceries', section: 'expense' },
+    { name: 'Other', section: 'expense' },
+    { name: 'To savings', section: 'transfer', kind: 'to-savings', accountId: savings.id, defaultStatus: 'committed' },
+  ]
+  let prev: string | null = null
+  const rows = starters.map((s) => {
+    const order = generateKeyBetween(prev, null)
+    prev = order
+    return RowSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, ...s, order })
+  })
+  await store.commit([
+    { op: 'put', table: 'household', record: household },
+    { op: 'put', table: 'accounts', record: savings },
+    ...rows.map((r): Mutation => ({ op: 'put', table: 'rows', record: r })),
+  ])
+  return household
+}
+
+export async function updateHousehold(store: Store, patch: Partial<Omit<Household, 'id' | 'createdAt'>>): Promise<void> {
+  const tables = await loadTables(store)
+  const h = tables.household.find((x) => !x.deletedAt)
+  if (!h) throw new Error('No household yet')
+  await store.commit([{ op: 'put', table: 'household', record: HouseholdSchema.parse({ ...h, ...patch, updatedAt: now() }) }])
+}

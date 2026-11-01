@@ -1,3 +1,4 @@
+import { generateNKeysBetween } from 'fractional-indexing'
 import { TablesSchema, poolRef, type Tables } from '@/model'
 
 /**
@@ -27,7 +28,10 @@ const ID = {
 
 type Status = 'projected' | 'committed' | 'done'
 
-const base = (recordId: string, order: string) => ({ id: recordId, createdAt: T0, updatedAt: T0, deletedAt: null, order })
+const ORDER_KEYS = generateNKeysBetween(null, null, 200)
+let orderCursor = 0
+/** Sequential, valid fractional-index keys; the literal hints only document intent. */
+const base = (recordId: string, _hint: string) => ({ id: recordId, createdAt: T0, updatedAt: T0, deletedAt: null, order: ORDER_KEYS[orderCursor++ % ORDER_KEYS.length] })
 
 /** A plain value cell. Status is carried by the row default; items stay empty. */
 const value = (rowId: string, month: string, amount: number) => ({
@@ -49,6 +53,7 @@ function hash(s: string): number {
 }
 
 export function buildDemoTables(): Tables {
+  orderCursor = 0
   const rows = [
     // income
     { ...base(ID.rowSamSalary, 'a0'), name: 'Sam – Salary', section: 'income', kind: 'salary', scope: ID.sam, inShareBasis: true, defaultStatus: 'committed' },

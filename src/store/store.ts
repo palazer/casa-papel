@@ -16,13 +16,31 @@ export type Mutation =
  * themselves commits, so the event log stays append-only.
  */
 export class Store {
+  readonly db: CasaDb
   private undoStack: string[] = []
   private redoStack: string[] = []
-
-  readonly db: CasaDb
+  private listeners = new Set<() => void>()
+  private version = 0
 
   constructor(db: CasaDb) {
     this.db = db
+  }
+
+  /** Notified after every commit, undo or redo. */
+  subscribe(fn: () => void): () => void {
+    this.listeners.add(fn)
+    return () => {
+      this.listeners.delete(fn)
+    }
+  }
+
+  getVersion(): number {
+    return this.version
+  }
+
+  private notify(): void {
+    this.version += 1
+    for (const l of this.listeners) l()
   }
 
   /** Singleton meta row; created on first access with a fresh deviceId. */
@@ -47,6 +65,7 @@ export class Store {
     const txId = await this.write(mutations)
     this.undoStack.push(txId)
     this.redoStack = []
+    this.notify()
     return txId
   }
 
@@ -62,6 +81,7 @@ export class Store {
     )
     await this.write(inverse)
     this.redoStack.push(txId)
+    this.notify()
     return true
   }
 
@@ -77,6 +97,7 @@ export class Store {
     )
     const newTx = await this.write(forward)
     this.undoStack.push(newTx)
+    this.notify()
     return true
   }
 

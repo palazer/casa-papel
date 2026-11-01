@@ -1,0 +1,314 @@
+import {
+  compareMonths, monthRange, poolIdOf, scaleMoney,
+  type Account, type Cell, type Money, type MonthKey, type Row, type Section,
+} from '@/model'
+import { buildFxIndex, convertMoney } from './fx'
+import {
+  cellKey,
+  type AccountSeries, type CellResult, type CellStatus, type EngineInput, type EngineOutput,
+  type Funding, type MonthTotals, type PoolSeries, type ResolvedItem, type RowTotals,
+} from './types'
+
+const SECTION_ORDER: Record<Section, number> = { income: 0, expense: 1, transfer: 2 }
+
+export function sortRows(rows: Row[]): Row[] {
+  return [...rows].sort((a, b) => {
+    const s = SECTION_ORDER[a.section] - SECTION_ORDER[b.section]
+    if (s !== 0) return s
+    return a.order < b.order ? -1 : a.order > b.order ? 1 : 0
+  })
+}
+
+const zeroFunding = (): Funding => ({ cash: 0, savings: 0, pools: {} })
+
+function addFunding(f: Funding, fundedBy: string, amount: Money): void {
+  if (fundedBy === 'cash') f.cash += amount
+  else if (fundedBy === 'savings') f.savings += amount
+  else {
+    const pid = poolIdOf(fundedBy as `pool:${string}`)
+    if (pid) f.pools[pid] = (f.pools[pid] ?? 0) + amount
+    else f.cash += amount
+  }
+}
+
+function emptyOutput(months: MonthKey[]): EngineOutput {
+  return { months, rows: [], cells: {}, totals: {}, accounts: {}, pools: {}, rowTotals: {}, incomeTotal: 0, warnings: [] }
+}
+
+/**
+ * Recompute everything from the tables. Deterministic and allocation-light:
+ * a household of 60 rows × 60 months resolves in well under a millisecond.
+ */
+export function computeEngine(input: EngineInput): EngineOutput {
+  const { tables } = input
+  const household = tables.household.find((h) => !h.deletedAt)
+  if (!household || input.months.length === 0) return emptyOutput(input.months)
+
+  const requested = input.months
+  const first = compareMonths(household.startMonth, requested[0]) < 0 ? household.startMonth : requested[0]
+  const months = monthRange(first, requested[requested.length - 1])
+  const requestedSet = new Set(requested)
+  const base = household.baseCurrency
+  const warnings: string[] = []
+
+  const states = new Map(tables.monthStates.map((s) => [s.month, s]))
+  const isClosed = (m: MonthKey) => states.get(m)?.closed ?? false
+  const pocketTotalFor = (m: MonthKey) => states.get(m)?.pocketTotalOverride ?? household.pocketTotal
+  const bufferFor = (m: MonthKey) => states.get(m)?.cashBufferOverride ?? household.cashBuffer
+
+  const accounts = tables.accounts.filter((a) => !a.deletedAt)
+  const accountsById = new Map(accounts.map((a) => [a.id, a]))
+  const pools = tables.pools.filter((p) => !p.deletedAt)
+  const poolByAllocationRow = new Map(pools.filter((p) => p.allocationRowId).map((p) => [p.allocationRowId as string, p]))
+  const rows = sortRows(tables.rows.filter((r) => !r.deletedAt))
+  const fx = buildFxIndex(tables.fxRates)
+
+  const cellsByRow = new Map<string, Map<MonthKey, Cell>>()
+  for (const c of tables.cells) {
+    let m = cellsByRow.get(c.rowId)
+    if (!m) cellsByRow.set(c.rowId, (m = new Map()))
+    m.set(c.month, c)
+  }
+  const actuals = new Map(tables.accountMonths.map((a) => [`${a.accountId}|${a.month}`, a]))
+
+  const cells: Record<string, CellResult> = {}
+  const savingsPlug = household.closingRule === 'savings-plug'
+
+  // ---------- pass 1: user rows ----------
+  for (const row of rows) {
+    const derivedToSavings = row.kind === 'to-savings' && savingsPlug
+    const derivedPocket = row.kind === 'pocket-money' && row.pocketMode === 'share-of-pocket-total'
+    const rowCells = cellsByRow.get(row.id)
+    let prev: Money = 0
+    let everSet = false
+
+    for (const m of months) {
+      const archived = row.archivedMonth != null && compareMonths(m, row.archivedMonth) >= 0
+      const cell = rowCells?.get(m) ?? null
+      const currency = cell?.currencyOverride ?? row.currency ?? base
+      const closed = isClosed(m)
+      let value: Money = 0
+      let source: CellResult['source'] = 'empty'
+      let status: CellStatus = closed ? 'done' : row.defaultStatus
+      let items: ResolvedItem[] = []
+      const funding = zeroFunding()
+
+      if (derivedToSavings) {
+        source = 'derived'
+        status = 'derived'
+      } else if (archived) {
+        source = 'archived'
+        status = 'done'
+      } else if (derivedPocket) {
+        value = scaleMoney(pocketTotalFor(m), row.pocketShare ?? 0)
+        source = 'derived'
+        status = closed ? 'done' : 'derived'
+      } else if (!cell || cell.mode === 'inherit') {
+        value = prev
+        source = everSet ? 'inherit' : 'empty'
+        addFunding(funding, row.defaultFundedBy, value)
+      } else if (cell.mode === 'value') {
+        value = cell.value ?? 0
+        source = 'value'
+        everSet = true
+        addFunding(funding, row.defaultFundedBy, value)
+      } else {
+        source = 'items'
+        everSet = true
+        let anyProjected = false
+        let allDone = true
+        for (const it of cell.items) {
+          const effectiveAmount = it.kind === 'carry' ? prev : it.amount
+          items.push({ ...it, effectiveAmount })
+          if (it.skipped) continue
+          value += effectiveAmount
+          addFunding(funding, it.fundedBy, effectiveAmount)
+          if (it.status === 'projected') anyProjected = true
+          if (it.status !== 'done') allDone = false
+        }
+        const live = cell.items.filter((i) => !i.skipped)
+        status = live.length === 0 ? (closed ? 'done' : row.defaultStatus) : anyProjected ? 'projected' : allDone ? 'done' : 'committed'
+      }
+
+      const conv = convertMoney(fx, value, currency, base, m)
+      if (conv.missingRate) warnings.push(`No ${currency}→${base} rate for ${m} (${row.name})`)
+      // scale funding split into base currency proportionally
+      const fundingBase = zeroFunding()
+      if (value !== 0) {
+        const f = conv.value / value
+        fundingBase.cash = Math.round(funding.cash * f)
+        fundingBase.savings = Math.round(funding.savings * f)
+        for (const [pid, amt] of Object.entries(funding.pools)) fundingBase.pools[pid] = Math.round(amt * f)
+      }
+
+      cells[cellKey(row.id, m)] = {
+        rowId: row.id, month: m, value, valueBase: conv.value, currency, source, status, items,
+        funding: fundingBase, missingRate: conv.missingRate, cell,
+      }
+      if (!derivedToSavings && !archived) prev = value
+    }
+  }
+
+  // ---------- pass 2: month totals ----------
+  const totals: Record<MonthKey, MonthTotals> = {}
+  const toSavingsRows = rows.filter((r) => r.kind === 'to-savings')
+  for (const m of months) {
+    const t: MonthTotals = {
+      month: m, closed: isClosed(m), income: 0, cashExpense: 0, savingsFunded: 0, poolFunded: 0, poolFundedByPool: {},
+      allocations: 0, allocationsByPool: {}, toInvestment: 0, pocket: 0, pocketTotal: pocketTotalFor(m), debt: 0,
+      buffer: bufferFor(m), toSavings: 0, leftover: 0, fromSavingsDerived: 0, expensesTotal: 0, transfersTotal: 0,
+    }
+    let userToSavings = 0
+    for (const row of rows) {
+      const c = cells[cellKey(row.id, m)]
+      if (!c || c.source === 'archived') continue
+      const v = c.valueBase
+      if (row.section === 'income') {
+        t.income += v
+        continue
+      }
+      switch (row.kind) {
+        case 'to-savings':
+          userToSavings += v
+          break
+        case 'to-investment':
+          t.toInvestment += v
+          break
+        case 'pocket-money':
+          t.pocket += v
+          break
+        case 'pool-allocation': {
+          t.allocations += v
+          const pool = poolByAllocationRow.get(row.id)
+          if (pool) t.allocationsByPool[pool.id] = (t.allocationsByPool[pool.id] ?? 0) + v
+          break
+        }
+        case 'debt-payment':
+          t.debt += v
+          break
+        case 'card-payment': {
+          const acc = row.accountId ? accountsById.get(row.accountId) : undefined
+          if (!acc || acc.card?.cardMode !== 'itemized') t.debt += v
+          break
+        }
+        case 'from-investment':
+          // an inflow placed in the transfer section still counts as cash in
+          t.income += v
+          break
+        default: {
+          if (row.section === 'expense') {
+            t.cashExpense += c.funding.cash
+            t.savingsFunded += c.funding.savings
+            for (const [pid, amt] of Object.entries(c.funding.pools)) {
+              t.poolFunded += amt
+              t.poolFundedByPool[pid] = (t.poolFundedByPool[pid] ?? 0) + amt
+            }
+          } else {
+            // plain transfer rows behave like outflows the user controls
+            t.debt += 0
+            t.cashExpense += v
+          }
+        }
+      }
+    }
+    const outflows = t.cashExpense + t.allocations + t.toInvestment + t.pocket + t.debt
+    if (savingsPlug) {
+      t.toSavings = t.income - outflows - t.buffer
+      t.leftover = t.buffer
+    } else {
+      t.toSavings = userToSavings
+      t.leftover = t.income - outflows - userToSavings
+    }
+    t.fromSavingsDerived = t.savingsFunded + t.poolFunded
+    t.expensesTotal = t.cashExpense + t.savingsFunded + t.poolFunded + t.pocket + t.debt
+    t.transfersTotal = t.allocations + t.toInvestment + t.toSavings
+    totals[m] = t
+
+    if (savingsPlug) {
+      toSavingsRows.forEach((row, i) => {
+        const c = cells[cellKey(row.id, m)]
+        if (!c) return
+        const v = i === 0 ? t.toSavings : 0
+        c.value = v
+        c.valueBase = v
+      })
+      if (toSavingsRows.length > 1 && m === months[0]) warnings.push('More than one "to savings" row: the plug goes to the first one.')
+    }
+  }
+
+  // ---------- pools ----------
+  const poolSeries: Record<string, PoolSeries> = {}
+  for (const pool of pools) {
+    const series: PoolSeries = { poolId: pool.id, months: {} }
+    let bal = pool.openingBalance
+    for (const m of months) {
+      const allocation = totals[m].allocationsByPool[pool.id] ?? 0
+      const spend = totals[m].poolFundedByPool[pool.id] ?? 0
+      bal = bal + allocation - spend
+      series.months[m] = { balance: bal, allocation, spend }
+    }
+    poolSeries[pool.id] = series
+  }
+
+  // ---------- savings accounts ----------
+  const accountSeries: Record<string, AccountSeries> = {}
+  const primarySavingsId =
+    toSavingsRows.map((r) => r.accountId).find((id) => id && accountsById.get(id)?.type === 'savings') ??
+    accounts.find((a) => a.type === 'savings')?.id ?? null
+  for (const acc of accounts) {
+    if (acc.type !== 'savings' || !acc.tracked) continue
+    const series: AccountSeries = { accountId: acc.id, months: {} }
+    let prevBalance: Money | null = null
+    for (const m of months) {
+      if (compareMonths(m, acc.openingMonth) < 0) continue
+      const start: Money = prevBalance ?? acc.openingBalance
+      const inflow = savingsInflow(acc, m, rows, cells, pools, totals[m])
+      const outflow = savingsOutflow(acc, m, pools, totals[m], acc.id === primarySavingsId)
+      const computed: Money = start + inflow - outflow
+      const actual = actuals.get(`${acc.id}|${m}`)?.actualBalance ?? null
+      const balance: Money = actual ?? computed
+      series.months[m] = { computed, balance, adjustment: actual != null ? actual - computed : 0, inflow, outflow }
+      prevBalance = balance
+    }
+    accountSeries[acc.id] = series
+  }
+
+  // ---------- row totals ----------
+  const rowTotals: Record<string, RowTotals> = {}
+  let incomeTotal = 0
+  for (const m of requested) incomeTotal += totals[m]?.income ?? 0
+  for (const row of rows) {
+    let total = 0
+    for (const m of requested) total += cells[cellKey(row.id, m)]?.valueBase ?? 0
+    rowTotals[row.id] = { total, shareOfIncome: incomeTotal !== 0 ? total / incomeTotal : 0 }
+  }
+
+  // ---------- filter to requested months ----------
+  const outCells: Record<string, CellResult> = {}
+  for (const [k, c] of Object.entries(cells)) if (requestedSet.has(c.month)) outCells[k] = c
+  const outTotals: Record<MonthKey, MonthTotals> = {}
+  for (const m of requested) if (totals[m]) outTotals[m] = totals[m]
+  for (const s of Object.values(poolSeries)) for (const m of Object.keys(s.months)) if (!requestedSet.has(m)) delete s.months[m]
+  for (const s of Object.values(accountSeries)) for (const m of Object.keys(s.months)) if (!requestedSet.has(m)) delete s.months[m]
+
+  return { months: requested, rows, cells: outCells, totals: outTotals, accounts: accountSeries, pools: poolSeries, rowTotals, incomeTotal, warnings: dedupe(warnings) }
+}
+
+function savingsInflow(acc: Account, m: MonthKey, rows: Row[], cells: Record<string, CellResult>, pools: EngineInput['tables']['pools'], t: MonthTotals): Money {
+  let inflow = 0
+  for (const row of rows) {
+    if (row.kind === 'to-savings' && row.accountId === acc.id) inflow += cells[cellKey(row.id, m)]?.valueBase ?? 0
+  }
+  for (const pool of pools) if (pool.accountId === acc.id) inflow += t.allocationsByPool[pool.id] ?? 0
+  return inflow
+}
+
+function savingsOutflow(acc: Account, _m: MonthKey, pools: EngineInput['tables']['pools'], t: MonthTotals, isPrimary: boolean): Money {
+  let out = isPrimary ? t.savingsFunded : 0
+  for (const pool of pools) if (pool.accountId === acc.id) out += t.poolFundedByPool[pool.id] ?? 0
+  return out
+}
+
+function dedupe(list: string[]): string[] {
+  return [...new Set(list)]
+}
