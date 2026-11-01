@@ -1,5 +1,5 @@
 import {
-  AccountSchema, CellSchema, EntitySchema, FxRateSchema, HouseholdSchema, PoolSchema, RowSchema,
+  AccountMonthSchema, AccountSchema, CellSchema, EntitySchema, FxRateSchema, HouseholdSchema, PoolSchema, RowSchema,
   EMPTY_TABLES, newId, type Cell, type Row, type Tables,
 } from '@/model'
 import { byRow, isCarryFormula, minor, num, type RawFixture } from './rawFixture'
@@ -37,7 +37,11 @@ export function v2ToTables(fx: RawFixture) {
     investment: { projectionMode: 'fixed-rate', annualRate: num(rows.get(4)?.a), depositTiming: 'end', depositFxMode: 'monthly-rate', fixedRate: null },
   })
 
-  type Spec = { r: number; section: Row['section']; kind?: Row['kind']; currency?: string; scope?: string }
+  const loans = AccountSchema.parse({ ...base(), name: 'Loans', type: 'loan', currency: 'TRY', openingMonth: months[0], tracked: true, openingBalance: minor(num(rows.get(9)?.b)) })
+  const companyDebt = AccountSchema.parse({ ...base(), name: 'Company debt', type: 'loan', currency: 'TRY', openingMonth: months[0], tracked: true, openingBalance: minor(num(rows.get(10)?.b)) })
+  const card = AccountSchema.parse({ ...base(), name: 'Card', type: 'credit-card', currency: 'TRY', openingMonth: months[0], tracked: true, openingBalance: minor(num(rows.get(7)?.b)), card: { cardMode: 'itemized' } })
+
+  type Spec = { r: number; section: Row['section']; kind?: Row['kind']; currency?: string; scope?: string; accountId?: string }
   const specs: Spec[] = [
     { r: 14, section: 'income', kind: 'salary', currency: 'USD', scope: adultA.id },
     { r: 16, section: 'income', scope: adultA.id },
@@ -47,9 +51,10 @@ export function v2ToTables(fx: RawFixture) {
     { r: 20, section: 'income', kind: 'from-investment' },
     { r: 25, section: 'transfer', kind: 'to-investment' },
     { r: 26, section: 'transfer', kind: 'pocket-money' },
-    ...[27, 28, 29, 30, 31, 32, 33, 34, 35, 37, 38, 39, 40, 42, 46, 47, 48, 49].map((r): Spec => ({ r, section: 'expense' })),
-    { r: 36, section: 'expense', kind: 'debt-payment' },
-    { r: 41, section: 'expense', kind: 'debt-payment' },
+    ...[27, 28, 29, 30, 31, 32, 33, 34, 35, 37, 38, 39, 40, 46, 47, 48, 49].map((r): Spec => ({ r, section: 'expense' })),
+    { r: 36, section: 'expense', kind: 'debt-payment', accountId: loans.id },
+    { r: 41, section: 'expense', kind: 'debt-payment', accountId: loans.id },
+    { r: 42, section: 'expense', kind: 'debt-payment', accountId: companyDebt.id },
     { r: 43, section: 'transfer', kind: 'pool-allocation' },
     { r: 44, section: 'transfer', kind: 'pool-allocation' },
     { r: 45, section: 'transfer', kind: 'pool-allocation' },
@@ -61,7 +66,7 @@ export function v2ToTables(fx: RawFixture) {
   specs.forEach((s, i) => {
     const raw = rows.get(s.r)
     if (!raw) throw new Error(`fixture has no row ${s.r}`)
-    const accountId = s.kind === 'pool-allocation' ? savings.id : s.kind === 'to-investment' || s.kind === 'from-investment' ? investments.id : null
+    const accountId = s.accountId ?? (s.kind === 'pool-allocation' ? savings.id : s.kind === 'to-investment' || s.kind === 'from-investment' ? investments.id : null)
     const row = RowSchema.parse({
       ...base(), name: label(s.r), section: s.section, kind: s.kind ?? 'plain', currency: s.currency ?? null,
       scope: s.scope ?? 'shared', inShareBasis: s.kind === 'salary', order: String(i).padStart(3, '0'),
@@ -78,6 +83,17 @@ export function v2ToTables(fx: RawFixture) {
   })
   const toSavings = RowSchema.parse({ ...base(), name: label(24), section: 'transfer', kind: 'to-savings', accountId: savings.id, order: '900' })
   appRows.push(toSavings)
+  // card payment (row 6) sits in the balances block, outside the sheet's expense range; row 7 is the real remaining debt
+  const cardPayment = RowSchema.parse({ ...base(), name: label(6), section: 'transfer', kind: 'card-payment', accountId: card.id, order: '901' })
+  appRows.push(cardPayment)
+  months.forEach((m, mi) => {
+    const v = num(rows.get(6)?.cells[mi])
+    cells.push(CellSchema.parse({ rowId: cardPayment.id, month: m, mode: 'value', value: minor(v), items: [], updatedAt: T0 }))
+  })
+  const accountMonths = months.flatMap((m, mi) => {
+    const c = rows.get(7)?.cells[mi]
+    return c && typeof c.v === 'number' ? [AccountMonthSchema.parse({ accountId: card.id, month: m, actualBalance: minor(c.v), updatedAt: T0 })] : []
+  })
 
   const pools = [43, 44, 45].map((r) =>
     PoolSchema.parse({ ...base(), name: label(r).replace(/\s*⇩\s*$/, ''), accountId: savings.id, allocationRowId: rowIdBySheetRow.get(r), openingBalance: 0 }),
@@ -88,7 +104,7 @@ export function v2ToTables(fx: RawFixture) {
 
   const tables: Tables = {
     ...EMPTY_TABLES,
-    household: [household], entities: [adultA, adultB], accounts: [savings, investments], rows: appRows, cells, pools, fxRates,
+    household: [household], entities: [adultA, adultB], accounts: [savings, investments, loans, companyDebt, card], rows: appRows, cells, pools, fxRates, accountMonths,
   }
-  return { tables, months, rowIdBySheetRow, savingsId: savings.id, investmentsId: investments.id, poolIds: pools.map((p) => p.id), toSavingsId: toSavings.id }
+  return { tables, months, rowIdBySheetRow, savingsId: savings.id, investmentsId: investments.id, loansId: loans.id, companyDebtId: companyDebt.id, cardId: card.id, poolIds: pools.map((p) => p.id), toSavingsId: toSavings.id }
 }

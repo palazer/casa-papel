@@ -32,7 +32,7 @@ function addFunding(f: Funding, fundedBy: string, amount: Money): void {
 }
 
 function emptyOutput(months: MonthKey[]): EngineOutput {
-  return { months, rows: [], cells: {}, totals: {}, accounts: {}, pools: {}, rowTotals: {}, incomeTotal: 0, recurringRowIds: [], warnings: [] }
+  return { months, rows: [], cells: {}, totals: {}, accounts: {}, pools: {}, rowTotals: {}, incomeTotal: 0, netWorth: {}, recurringRowIds: [], warnings: [] }
 }
 
 /**
@@ -272,7 +272,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
     accounts.find((a) => a.type === 'savings')?.id ?? null
   for (const acc of accounts) {
     if (acc.type !== 'savings' || !acc.tracked) continue
-    const series: AccountSeries = { accountId: acc.id, currency: acc.currency, months: {} }
+    const series: AccountSeries = { accountId: acc.id, currency: acc.currency, liability: false, months: {} }
     let prevBalance: Money | null = null
     for (const m of months) {
       if (compareMonths(m, acc.openingMonth) < 0) continue
@@ -292,7 +292,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
   for (const acc of accounts) {
     if (acc.type !== 'investment' || !acc.tracked) continue
     const inv = acc.investment ?? { projectionMode: 'fixed-rate' as const, annualRate: 0, depositTiming: 'start' as const, depositFxMode: 'monthly-rate' as const, fixedRate: null }
-    const series: AccountSeries = { accountId: acc.id, currency: acc.currency, months: {} }
+    const series: AccountSeries = { accountId: acc.id, currency: acc.currency, liability: false, months: {} }
     const fixedMonthly = Math.pow(1 + (inv.annualRate ?? 0), 1 / 12) - 1
     const realised: number[] = []
     let prevValue: Money | null = null
@@ -338,6 +338,63 @@ export function computeEngine(input: EngineInput): EngineOutput {
     accountSeries[acc.id] = series
   }
 
+  // ---------- cards, loans, other assets ----------
+  /** A row's base-currency amount in the account's currency. */
+  const inAccountCurrency = (acc: Account, c: CellResult, m: MonthKey): Money => {
+    const conv = convertMoney(fx, c.value, c.currency, acc.currency, m)
+    if (conv.missingRate) warnings.push(`No ${c.currency}→${acc.currency} rate for ${m} (${acc.name})`)
+    return conv.value
+  }
+  for (const acc of accounts) {
+    if (!acc.tracked || !['credit-card', 'loan', 'other-asset'].includes(acc.type)) continue
+    const liability = acc.type !== 'other-asset'
+    const series: AccountSeries = { accountId: acc.id, currency: acc.currency, liability, months: {} }
+    let prevBalance: Money | null = null
+    for (const m of months) {
+      if (compareMonths(m, acc.openingMonth) < 0) continue
+      const prev: Money = prevBalance ?? acc.openingBalance
+      let inflow: Money = 0
+      let outflow: Money = 0
+      if (acc.type === 'credit-card') {
+        const itemized = (acc.card?.cardMode ?? 'itemized') === 'itemized'
+        for (const row of rows) {
+          if (row.accountId !== acc.id) continue
+          const c = cells[cellKey(row.id, m)]
+          if (!c || c.value === 0 || c.source === 'archived') continue
+          if (row.kind === 'card-payment') outflow += inAccountCurrency(acc, c, m)
+          else if (itemized && row.section === 'expense') inflow += inAccountCurrency(acc, c, m)
+        }
+      } else if (acc.type === 'loan') {
+        for (const row of rows) {
+          if (row.accountId !== acc.id || row.kind !== 'debt-payment') continue
+          const c = cells[cellKey(row.id, m)]
+          if (!c || c.value === 0 || c.source === 'archived') continue
+          outflow += inAccountCurrency(acc, c, m)
+        }
+      }
+      // owed grows with spending and shrinks with payments; an asset just carries until a real value is entered
+      const computed: Money = liability ? prev + inflow - outflow : prev
+      const actual = actuals.get(`${acc.id}|${m}`)?.actualBalance ?? null
+      const balance: Money = actual ?? computed
+      series.months[m] = { computed, balance, adjustment: actual != null ? actual - computed : 0, inflow, outflow, projected: actual == null }
+      prevBalance = balance
+    }
+    accountSeries[acc.id] = series
+  }
+
+  // ---------- net worth ----------
+  const netWorth: Record<MonthKey, Money> = {}
+  for (const m of months) {
+    let nw = 0
+    for (const s of Object.values(accountSeries)) {
+      const r = s.months[m]
+      if (!r) continue
+      const conv = convertMoney(fx, r.balance, s.currency, base, m)
+      nw += s.liability ? -conv.value : conv.value
+    }
+    netWorth[m] = nw
+  }
+
   // ---------- row totals ----------
   const rowTotals: Record<string, RowTotals> = {}
   let incomeTotal = 0
@@ -355,8 +412,10 @@ export function computeEngine(input: EngineInput): EngineOutput {
   for (const m of requested) if (totals[m]) outTotals[m] = totals[m]
   for (const s of Object.values(poolSeries)) for (const m of Object.keys(s.months)) if (!requestedSet.has(m)) delete s.months[m]
   for (const s of Object.values(accountSeries)) for (const m of Object.keys(s.months)) if (!requestedSet.has(m)) delete s.months[m]
+  const outNetWorth: Record<MonthKey, Money> = {}
+  for (const m of requested) if (netWorth[m] != null) outNetWorth[m] = netWorth[m]
 
-  return { months: requested, rows, cells: outCells, totals: outTotals, accounts: accountSeries, pools: poolSeries, rowTotals, incomeTotal, recurringRowIds: [...recurringRowIds], warnings: dedupe(warnings) }
+  return { months: requested, rows, cells: outCells, totals: outTotals, accounts: accountSeries, pools: poolSeries, rowTotals, incomeTotal, netWorth: outNetWorth, recurringRowIds: [...recurringRowIds], warnings: dedupe(warnings) }
 }
 
 function savingsInflow(acc: Account, m: MonthKey, rows: Row[], cells: Record<string, CellResult>, pools: EngineInput['tables']['pools'], t: MonthTotals): Money {

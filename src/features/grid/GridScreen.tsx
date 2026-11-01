@@ -205,12 +205,14 @@ export function GridScreen() {
                   derivedRow(`${acc.name} · return`, 'in', (m) => Math.round((s.months[m]?.totalReturn ?? 0) * 10000), { muted: true, format: (v) => (v === 0 ? '' : formatPercent(v / 10000, locale)) }),
                 ]
               }
-              return [derivedRow(acc.name, 'in', (m) => s.months[m]?.balance ?? 0, { strong: true, currency: s.currency, onClick: open, mark: marked })]
+              const label = acc.type === 'credit-card' ? `${acc.name} · owed` : acc.type === 'loan' ? `${acc.name} · outstanding` : acc.name
+              return [derivedRow(label, s.liability ? 'out' : 'in', (m) => s.months[m]?.balance ?? 0, { strong: true, currency: s.currency, onClick: open, mark: marked })]
             })}
             {Object.values(engine.pools).map((p) => {
               const pool = tables.pools.find((x) => x.id === p.poolId)
               return derivedRow(`Pool · ${pool?.name ?? ''}`, 'in', (m) => p.months[m]?.balance ?? 0)
             })}
+            {Object.keys(engine.accounts).length > 0 && derivedRow('Net worth', 'in', (m) => engine.netWorth[m] ?? 0, { strong: true })}
           </tbody>
         </table>
       </div>

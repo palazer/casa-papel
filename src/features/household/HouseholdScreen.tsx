@@ -1,6 +1,7 @@
 import { MonthField } from '@/components/MonthField'
 import { RecurringList } from '@/features/recurring/RecurringList'
 import { FxCard } from './FxCard'
+import { SharesCard } from './SharesCard'
 import { PoolsCard } from './PoolsCard'
 import { useMemo, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
@@ -38,6 +39,7 @@ export function HouseholdScreen() {
     <div className="mx-auto max-w-3xl space-y-6">
       {error && <p className="text-sm text-destructive">{error}</p>}
       <SettingsCard household={household} onSave={(p) => act(() => updateHousehold(store, p))} />
+      {household.moneyMode === 'proportional' && <SharesCard household={household} tables={tables} engine={engine} onError={setError} />}
       <EntitiesCard household={household} entities={tables.entities.filter((e) => !e.deletedAt && !e.archivedMonth)} onError={setError} />
       <AccountsCard household={household} accounts={tables.accounts.filter((a) => !a.deletedAt)} entities={tables.entities} engine={engine} months={months} onError={setError} />
       <PoolsCard household={household} tables={tables} engine={engine} onError={setError} />
@@ -84,7 +86,7 @@ function SettingsCard({ household: h, onSave }: { household: Household; onSave: 
           <Label htmlFor="s-mode">How you share money</Label>
           <NativeSelect id="s-mode" className="w-full" value={h.moneyMode} onChange={(e) => onSave({ moneyMode: e.target.value as Household['moneyMode'] })}>
             <option value="pooled">Pooled with pocket money</option>
-            <option value="proportional">Proportional contributions (split view arrives in a later wave)</option>
+            <option value="proportional">Proportional: each adult pays a share of shared costs</option>
           </NativeSelect>
         </div>
         <div className="space-y-1.5">
@@ -251,6 +253,7 @@ function AccountDialog({ account, entities, baseCurrency, locale, startMonth, on
   const [timing, setTiming] = useState<'start' | 'end'>(inv0?.depositTiming ?? 'start')
   const [fxMode, setFxMode] = useState<'monthly-rate' | 'fixed'>(inv0?.depositFxMode ?? 'monthly-rate')
   const [fixedRate, setFixedRate] = useState(inv0?.fixedRate ? String(inv0.fixedRate) : '')
+  const [cardMode, setCardMode] = useState<'itemized' | 'lump'>(account?.card?.cardMode ?? 'itemized')
   const [error, setError] = useState<string | null>(null)
   const adults = entities.filter((e) => e.kind === 'adult' && !e.deletedAt)
   const trackable = ['savings', 'investment', 'credit-card', 'loan', 'other-asset'].includes(type)
@@ -268,6 +271,7 @@ function AccountDialog({ account, entities, baseCurrency, locale, startMonth, on
       investment: type === 'investment'
         ? { projectionMode: projection, annualRate, depositTiming: timing, depositFxMode: ccy === baseCurrency ? 'monthly-rate' as const : fxMode, fixedRate: fxMode === 'fixed' && ccy !== baseCurrency ? fixed : null }
         : undefined,
+      card: type === 'credit-card' ? { cardMode } : undefined,
     }
     const p = account ? updateAccount(store, account.id, patch) : addAccount(store, patch)
     p.then(onClose).catch((e) => onError(e instanceof Error ? e.message : 'Failed'))
@@ -289,6 +293,19 @@ function AccountDialog({ account, entities, baseCurrency, locale, startMonth, on
             <div className="sm:col-span-2">
               <Check label="Track the balance month by month in the grid" checked={tracked} onChange={(e) => setTracked(e.target.checked)} />
             </div>
+          )}
+          {type === 'credit-card' && (
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="acc-card">How you record card spending</Label>
+              <NativeSelect id="acc-card" className="w-full" value={cardMode} onChange={(e) => setCardMode(e.target.value as typeof cardMode)}>
+                <option value="itemized">Purchases are expense rows paid from this card; the card payment is a transfer</option>
+                <option value="lump">Only the card payment is recorded, as an expense</option>
+              </NativeSelect>
+              <p className="text-xs text-muted-foreground">{cardMode === 'itemized' ? 'What is owed grows with rows that name this card as their account and shrinks with the payment row. The payment itself is not counted as spending, since the purchases already were.' : 'What is owed only comes from the real balances you enter. The payment counts as this month\'s spending.'} Opening balance is what you owed at the start.</p>
+            </div>
+          )}
+          {(type === 'loan' || type === 'other-asset') && (
+            <p className="text-xs text-muted-foreground sm:col-span-2">{type === 'loan' ? 'Opening balance is the amount still owed. Rows of kind "debt payment" that name this account bring it down.' : 'Opening balance is its value. Enter a real value from the grid whenever it changes.'}</p>
           )}
           {type === 'investment' && (
             <>

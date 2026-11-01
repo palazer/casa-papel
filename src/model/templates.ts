@@ -17,7 +17,7 @@ export interface RowTemplate {
   /** Pocket money row sharing the household pocket total. */
   pocket?: boolean
   /** Needs a destination account of this type. */
-  account?: 'savings' | 'investment'
+  account?: 'savings' | 'investment' | 'loan'
   /** Creates a pool with an allocation row; the row itself is the pool-funded spend. */
   pool?: boolean
   /** Pre-ticked in the wizard. */
@@ -60,7 +60,7 @@ export const ENTITY_TEMPLATES: Record<EntityKind, RowTemplate[]> = {
     { key: 'p.vet', title: 'Vet – {name}', description: 'Check-ups and treatment.', section: 'expense', tag: true },
   ],
   vehicle: [
-    { key: 'v.loan', title: 'Loan or lease – {name}', description: 'The monthly car loan or lease payment.', section: 'expense', kind: 'debt-payment', defaultStatus: 'committed', tag: true },
+    { key: 'v.loan', title: 'Loan or lease – {name}', description: 'The monthly car loan or lease payment. Linked to a loan account, it brings the outstanding amount down.', section: 'expense', kind: 'debt-payment', defaultStatus: 'committed', tag: true, account: 'loan' },
     { key: 'v.insurance', title: 'Insurance – {name}', description: 'Car insurance.', section: 'expense', defaultStatus: 'committed', tag: true, recommended: true },
     { key: 'v.tax', title: 'Tax & inspection – {name}', description: 'Road tax and the periodic inspection.', section: 'expense', defaultStatus: 'committed', tag: true },
     { key: 'v.fuel', title: 'Fuel & parking – {name}', description: 'Fuel or charging, parking, tolls.', section: 'expense', tag: true, recommended: true },
@@ -75,7 +75,7 @@ export const ENTITY_TEMPLATES: Record<EntityKind, RowTemplate[]> = {
   ],
   company: [
     { key: 'k.expenses', title: 'Company expenses – {name}', description: 'What the business costs you each month.', section: 'expense', tag: true, recommended: true },
-    { key: 'k.debt', title: 'Company debt payments – {name}', description: 'Repayments on money the company owes.', section: 'expense', kind: 'debt-payment', defaultStatus: 'committed', tag: true },
+    { key: 'k.debt', title: 'Company debt payments – {name}', description: 'Repayments on money the company owes. Linked to a loan account, it brings the debt down.', section: 'expense', kind: 'debt-payment', defaultStatus: 'committed', tag: true, account: 'loan' },
   ],
   other: [
     { key: 'o.costs', title: 'Costs – {name}', description: 'Running costs of this thing.', section: 'expense', tag: true, recommended: true },

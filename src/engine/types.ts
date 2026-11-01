@@ -83,6 +83,8 @@ export interface AccountMonthResult {
 export interface AccountSeries {
   accountId: string
   currency: string
+  /** Cards and loans: the balance is money owed. */
+  liability: boolean
   months: Record<MonthKey, AccountMonthResult>
 }
 
@@ -112,6 +114,8 @@ export interface EngineOutput {
   pools: Record<string, PoolSeries>
   rowTotals: Record<string, RowTotals>
   incomeTotal: Money
+  /** Tracked assets minus tracked debts, in the base currency. */
+  netWorth: Record<MonthKey, Money>
   /** Rows whose months are filled by recurring items instead of carry-forward. */
   recurringRowIds: string[]
   warnings: string[]

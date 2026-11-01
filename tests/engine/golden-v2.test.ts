@@ -9,7 +9,7 @@ const rows = byRow(fixture.sheets.Flow)
 const sheet = (r: number, i: number) => num(rows.get(r)?.cells[i])
 
 describe('golden: v2 template workbook', () => {
-  const { tables, months, rowIdBySheetRow, savingsId, investmentsId, poolIds } = v2ToTables(fixture)
+  const { tables, months, rowIdBySheetRow, savingsId, investmentsId, loansId, companyDebtId, cardId, poolIds } = v2ToTables(fixture)
   const out = computeEngine({ tables, months })
   const household = tables.household[0]
 
@@ -64,6 +64,30 @@ describe('golden: v2 template workbook', () => {
     })
     expect(series.months[months[0]].inflow).toBe(2000000)
     expect(series.months[months[0]].capital).toBe(minor(num(rows.get(4)?.b)) + 2000000)
+  })
+
+  it('loans (row 9) and company debt (row 10) come down with their payments', () => {
+    months.forEach((m, i) => {
+      expect(out.accounts[loansId].months[m].balance).toBe(minor(sheet(9, i)))
+      expect(out.accounts[companyDebtId].months[m].balance).toBe(minor(sheet(10, i)))
+    })
+  })
+
+  it('card: the real remaining debt pins the month and the gap is the implied spend (rows 6–8)', () => {
+    const s = out.accounts[cardId]
+    expect(s.liability).toBe(true)
+    expect(s.months[months[0]]).toMatchObject({ outflow: minor(sheet(6, 0)), balance: minor(sheet(7, 0)), adjustment: minor(sheet(8, 0)), projected: false })
+    expect(s.months[months[3]].balance).toBe(minor(sheet(7, 0)))
+    // the card payment is not part of the plug (the sheet keeps it outside the expense range too); the vehicle loan instalment (row 36) is
+    expect(out.totals[months[0]].debt).toBe(minor(sheet(36, 0)))
+  })
+
+  it('net worth (row 11) under app semantics: the sheet ignores the card and keeps pools outside savings', () => {
+    months.forEach((m, i) => {
+      const sheetPools = minor(sheet(57, i)) + minor(sheet(58, i)) + minor(sheet(59, i))
+      const expected = minor(sheet(11, i)) + sheetPools - out.accounts[cardId].months[m].balance
+      expect(Math.abs(out.netWorth[m] - expected)).toBeLessThanOrEqual(i + 4)
+    })
   })
 
   it('matches the share-of-income column for rent and the travel pool', () => {
