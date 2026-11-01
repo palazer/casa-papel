@@ -100,6 +100,8 @@ export interface EngineOutput {
   pools: Record<string, PoolSeries>
   rowTotals: Record<string, RowTotals>
   incomeTotal: Money
+  /** Rows whose months are filled by recurring items instead of carry-forward. */
+  recurringRowIds: string[]
   warnings: string[]
 }
 

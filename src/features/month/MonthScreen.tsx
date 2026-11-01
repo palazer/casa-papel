@@ -105,7 +105,7 @@ export function MonthScreen() {
         )}
       </div>
 
-      {row && <CellEditor tables={tables} engine={engine} household={household} row={row} month={m} onClose={() => setSelectedRow(null)} />}
+      {row && <CellEditor key={`${row.id}:${m}`} tables={tables} engine={engine} household={household} row={row} month={m} onClose={() => setSelectedRow(null)} />}
     </div>
   )
 }

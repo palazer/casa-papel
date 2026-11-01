@@ -2,13 +2,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { useStore } from '@/app/store'
 import { loadDemo } from '@/demo/loadDemo'
-import { QuickCreate } from './QuickCreate'
+import { SetupWizard } from '@/features/setup/SetupWizard'
 
 export function HomeScreen({ onOpenData, onCreated }: { onOpenData: () => void; onCreated: () => void }) {
   const store = useStore()
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <Card className="max-w-xl">
+    <div className="space-y-4">
+      <Card className="mx-auto max-w-2xl">
         <CardHeader>
           <CardTitle>Welcome to Casa Papel</CardTitle>
           <CardDescription>
@@ -20,7 +20,7 @@ export function HomeScreen({ onOpenData, onCreated }: { onOpenData: () => void; 
           <Button variant="outline" onClick={onOpenData}>Import a file</Button>
         </CardContent>
       </Card>
-      <QuickCreate onCreated={onCreated} />
+      <SetupWizard onCreated={onCreated} />
     </div>
   )
 }

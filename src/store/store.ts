@@ -69,6 +69,14 @@ export class Store {
     return txId
   }
 
+  /** Housekeeping writes (e.g. posting recurring items) that should not enter the undo history. */
+  async commitSystem(mutations: Mutation[]): Promise<string> {
+    if (mutations.length === 0) return ''
+    const txId = await this.write(mutations)
+    this.notify()
+    return txId
+  }
+
   /** Revert the most recent action. Recorded as a new transaction. */
   async undo(): Promise<boolean> {
     const txId = this.undoStack.pop()

@@ -228,3 +228,23 @@ export async function updateHousehold(store: Store, patch: Partial<Omit<Househol
   if (!h) throw new Error('No household yet')
   await store.commit([{ op: 'put', table: 'household', record: HouseholdSchema.parse({ ...h, ...patch, updatedAt: now() }) }])
 }
+
+/** Mark a whole cell done (or back to the row default). Plain values become a single item. */
+export async function setCellDone(store: Store, rowId: string, month: MonthKey, done: boolean): Promise<void> {
+  const { tables, engine } = await engineUpTo(store, month)
+  assertOpen(tables, month)
+  const row = tables.rows.find((r) => r.id === rowId)
+  if (!row) throw new Error('Row not found')
+  const current = engine.cells[cellKey(rowId, month)]
+  if (!current || current.source === 'derived' || current.source === 'archived') return
+  const existing = cellOf(tables, rowId, month)
+  const status = done ? 'done' : row.defaultStatus
+  const items: CellItem[] =
+    existing?.mode === 'items'
+      ? existing.items.map((it) => (it.skipped ? it : { ...it, status }))
+      : current.value === 0
+        ? []
+        : [{ id: newId(), label: '', amount: current.value, status, fundedBy: row.defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }]
+  if (items.length === 0 && !existing) return
+  await store.commit([putCell({ rowId, month, mode: 'items', value: null, items, note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, updatedAt: now() })])
+}

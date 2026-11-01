@@ -198,7 +198,7 @@ export function GridScreen() {
       </div>
 
       {selected && selectedRow && (
-        <CellEditor tables={tables} engine={engine} household={household} row={selectedRow} month={selected.month} onClose={() => setSelected(null)} />
+        <CellEditor key={`${selectedRow.id}:${selected.month}`} tables={tables} engine={engine} household={household} row={selectedRow} month={selected.month} onClose={() => setSelected(null)} />
       )}
     </div>
   )

@@ -175,3 +175,28 @@ describe('engine: currency and totals', () => {
     expect(out.incomeTotal).toBe(1200000)
   })
 })
+
+describe('engine: certainty carries forward', () => {
+  it('an estimate set this month and onwards stays an estimate in inheriting months', () => {
+    const h = household()
+    const rent = row({ name: 'Rent', section: 'expense', defaultStatus: 'committed' })
+    const cells = [
+      cellValue(rent.id, '2026-01', 150000),
+      cellItems(rent.id, '2026-02', [{ amount: 170000, status: 'projected' }]),
+    ]
+    const out = computeEngine({ tables: tables({ household: [h], rows: [rent], cells }), months: ['2026-01', '2026-02', '2026-03', '2026-04'] })
+    expect(out.cells[cellKey(rent.id, '2026-01')].status).toBe('committed')
+    expect(out.cells[cellKey(rent.id, '2026-02')].status).toBe('projected')
+    expect(out.cells[cellKey(rent.id, '2026-03')]).toMatchObject({ value: 170000, source: 'inherit', status: 'projected' })
+    expect(out.cells[cellKey(rent.id, '2026-04')].status).toBe('projected')
+  })
+
+  it('a paid month hands the row default to the next month; closed months show done', () => {
+    const h = household()
+    const rent = row({ name: 'Rent', section: 'expense', defaultStatus: 'committed' })
+    const cells = [cellItems(rent.id, '2026-01', [{ amount: 150000, status: 'done' }])]
+    const out = computeEngine({ tables: tables({ household: [h], rows: [rent], cells, monthStates: [closedMonth('2026-01')] }), months: ['2026-01', '2026-02'] })
+    expect(out.cells[cellKey(rent.id, '2026-01')].status).toBe('done')
+    expect(out.cells[cellKey(rent.id, '2026-02')].status).toBe('committed')
+  })
+})

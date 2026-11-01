@@ -1,0 +1,79 @@
+import { expect, test, type Page } from '@playwright/test'
+
+async function loadDemo(page: Page) {
+  await page.goto('?demo=1')
+  await page.getByRole('button', { name: 'Load the demo household' }).click()
+  await expect(page.getByRole('button', { name: /^Rent Nov 2026/ })).toBeVisible()
+}
+
+test.describe('wave 1b', () => {
+  test.use({ viewport: { width: 1400, height: 900 } })
+
+  test('setup wizard creates a household with people, things, accounts and suggested rows', async ({ page }) => {
+    await page.goto('/')
+    await page.getByLabel('Household name').fill('Testers')
+    await page.getByRole('button', { name: 'Next' }).click()
+    await page.getByLabel('Adult 1 name').fill('Ana')
+    await page.getByLabel('Adult 2 name').fill('Ben')
+    await page.getByRole('button', { name: 'Add child' }).click()
+    await page.getByLabel('Child name').fill('Cal')
+    await page.getByLabel('Paid by').selectOption({ label: 'Paid by Ben' })
+    await page.getByRole('button', { name: 'Next' }).click()
+    await page.getByRole('button', { name: 'Add pet' }).click()
+    await page.getByLabel('Name').fill('Rex')
+    await page.getByRole('button', { name: 'Next' }).click()
+    await page.getByLabel('Opening balance').nth(1).fill('5000')
+    await page.getByRole('button', { name: 'Next' }).click()
+    await expect(page.getByText('Rex (Pet)')).toBeVisible()
+    await page.screenshot({ path: 'e2e/output/wizard-rows.png', fullPage: true })
+    await page.getByRole('button', { name: 'Next' }).click()
+    await page.getByRole('button', { name: 'Create household' }).click()
+    await expect(page.getByRole('banner').getByText('Testers')).toBeVisible()
+    await expect(page.getByText('Pocket – Ana', { exact: true })).toBeVisible()
+    await expect(page.getByText('To savings', { exact: true })).toBeVisible()
+    for (const name of ['Ana – Salary', 'Ben – Salary', 'Child benefit – Cal', 'Food & supplies – Rex', 'Groceries', 'Travel']) {
+      await expect(page.getByRole('button', { name: new RegExp(`^${name} Nov 2026`) })).toBeVisible()
+    }
+    await page.getByRole('button', { name: 'Household' }).click()
+    await expect(page.getByLabel('Who pays for Cal').locator('option:checked')).toHaveText('Paid by Ben')
+    await page.getByRole('button', { name: 'Data' }).click()
+    await page.getByLabel('Type WIPE to confirm').fill('WIPE')
+    await page.getByRole('button', { name: 'Wipe this device' }).click()
+  })
+
+  test('recurring items post into due months only and can be ticked paid', async ({ page }) => {
+    await loadDemo(page)
+    // demo car insurance is quarterly from January: October yes, November no
+    await expect(page.getByRole('button', { name: /^Car insurance Oct 2026/ })).toContainText('210')
+    await expect(page.getByRole('button', { name: /^Car insurance Nov 2026: empty/ })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Register' }).click()
+    await page.getByRole('button', { name: 'Add recurring' }).click()
+    await page.getByLabel('Name', { exact: true }).fill('Water bill')
+    await page.getByLabel('Grid row').selectOption('__new__')
+    await page.getByLabel('New row name').fill('Water')
+    await page.getByLabel('Amount (EUR)').fill('90')
+    await page.getByLabel('How often').selectOption('3')
+    await page.getByLabel('Starting from which month of the year').selectOption({ label: 'Feb' })
+    await page.getByLabel('From month').fill('2026-11')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByRole('dialog')).toBeHidden()
+    await expect(page.getByRole('cell', { name: 'Every 3 months (Feb, May, Aug, Nov)' })).toBeVisible()
+    await page.screenshot({ path: 'e2e/output/register.png' })
+
+    await page.getByRole('button', { name: 'Grid' }).click()
+    await expect(page.getByRole('button', { name: /^Water Nov 2026/ })).toContainText('90')
+    await expect(page.getByRole('button', { name: /^Water Dec 2026: empty/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^Water Feb 2027/ })).toContainText('90')
+
+    await page.getByRole('button', { name: 'Moves' }).click()
+    await expect(page.getByText('Payments due')).toBeVisible()
+    await page.getByLabel('Rent paid').click()
+    await expect(page.getByLabel('Rent paid')).toBeChecked()
+    await page.screenshot({ path: 'e2e/output/moves.png', fullPage: true })
+    await page.getByRole('button', { name: 'Register' }).click()
+    await expect(page.getByLabel('Rent paid in Nov 2026')).toBeChecked()
+    await page.getByRole('button', { name: 'Grid' }).click()
+    await expect(page.getByRole('button', { name: /^Rent Nov 2026/ }).locator('svg')).toBeVisible()
+  })
+})

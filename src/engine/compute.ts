@@ -32,7 +32,7 @@ function addFunding(f: Funding, fundedBy: string, amount: Money): void {
 }
 
 function emptyOutput(months: MonthKey[]): EngineOutput {
-  return { months, rows: [], cells: {}, totals: {}, accounts: {}, pools: {}, rowTotals: {}, incomeTotal: 0, warnings: [] }
+  return { months, rows: [], cells: {}, totals: {}, accounts: {}, pools: {}, rowTotals: {}, incomeTotal: 0, recurringRowIds: [], warnings: [] }
 }
 
 /**
@@ -62,6 +62,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
   const poolByAllocationRow = new Map(pools.filter((p) => p.allocationRowId).map((p) => [p.allocationRowId as string, p]))
   const rows = sortRows(tables.rows.filter((r) => !r.deletedAt))
   const fx = buildFxIndex(tables.fxRates)
+  /** Rows driven by recurring items never carry forward: a month without items is 0. */
+  const recurringRowIds = new Set(tables.recurringItems.filter((r) => !r.deletedAt).map((r) => r.rowId))
 
   const cellsByRow = new Map<string, Map<MonthKey, Cell>>()
   for (const c of tables.cells) {
@@ -81,6 +83,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
     const rowCells = cellsByRow.get(row.id)
     let prev: Money = 0
     let everSet = false
+    /** Certainty carried into inheriting months; 'done' hands the row default forward. */
+    let prevBase: CellStatus = row.defaultStatus
 
     for (const m of months) {
       const archived = row.archivedMonth != null && compareMonths(m, row.archivedMonth) >= 0
@@ -89,24 +93,30 @@ export function computeEngine(input: EngineInput): EngineOutput {
       const closed = isClosed(m)
       let value: Money = 0
       let source: CellResult['source'] = 'empty'
-      let status: CellStatus = closed ? 'done' : row.defaultStatus
+      let baseStatus: CellStatus = row.defaultStatus
       let items: ResolvedItem[] = []
       const funding = zeroFunding()
 
       if (derivedToSavings) {
         source = 'derived'
-        status = 'derived'
+        baseStatus = 'derived'
       } else if (archived) {
         source = 'archived'
-        status = 'done'
+        baseStatus = 'done'
       } else if (derivedPocket) {
         value = scaleMoney(pocketTotalFor(m), row.pocketShare ?? 0)
         source = 'derived'
-        status = closed ? 'done' : 'derived'
+        baseStatus = 'derived'
       } else if (!cell || cell.mode === 'inherit') {
-        value = prev
-        source = everSet ? 'inherit' : 'empty'
-        addFunding(funding, row.defaultFundedBy, value)
+        if (recurringRowIds.has(row.id)) {
+          value = 0
+          source = 'empty'
+        } else {
+          value = prev
+          source = everSet ? 'inherit' : 'empty'
+          if (everSet) baseStatus = prevBase === 'done' ? row.defaultStatus : prevBase
+          addFunding(funding, row.defaultFundedBy, value)
+        }
       } else if (cell.mode === 'value') {
         value = cell.value ?? 0
         source = 'value'
@@ -127,8 +137,10 @@ export function computeEngine(input: EngineInput): EngineOutput {
           if (it.status !== 'done') allDone = false
         }
         const live = cell.items.filter((i) => !i.skipped)
-        status = live.length === 0 ? (closed ? 'done' : row.defaultStatus) : anyProjected ? 'projected' : allDone ? 'done' : 'committed'
+        baseStatus = live.length === 0 ? row.defaultStatus : anyProjected ? 'projected' : allDone ? 'done' : 'committed'
       }
+
+      const status: CellStatus = baseStatus === 'derived' ? (closed && derivedPocket ? 'done' : 'derived') : closed || archived ? 'done' : baseStatus
 
       const conv = convertMoney(fx, value, currency, base, m)
       if (conv.missingRate) warnings.push(`No ${currency}→${base} rate for ${m} (${row.name})`)
@@ -145,7 +157,10 @@ export function computeEngine(input: EngineInput): EngineOutput {
         rowId: row.id, month: m, value, valueBase: conv.value, currency, source, status, items,
         funding: fundingBase, missingRate: conv.missingRate, cell,
       }
-      if (!derivedToSavings && !archived) prev = value
+      if (!derivedToSavings && !archived) {
+        prev = value
+        if (baseStatus !== 'derived') prevBase = baseStatus
+      }
     }
   }
 
@@ -291,7 +306,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
   for (const s of Object.values(poolSeries)) for (const m of Object.keys(s.months)) if (!requestedSet.has(m)) delete s.months[m]
   for (const s of Object.values(accountSeries)) for (const m of Object.keys(s.months)) if (!requestedSet.has(m)) delete s.months[m]
 
-  return { months: requested, rows, cells: outCells, totals: outTotals, accounts: accountSeries, pools: poolSeries, rowTotals, incomeTotal, warnings: dedupe(warnings) }
+  return { months: requested, rows, cells: outCells, totals: outTotals, accounts: accountSeries, pools: poolSeries, rowTotals, incomeTotal, recurringRowIds: [...recurringRowIds], warnings: dedupe(warnings) }
 }
 
 function savingsInflow(acc: Account, m: MonthKey, rows: Row[], cells: Record<string, CellResult>, pools: EngineInput['tables']['pools'], t: MonthTotals): Money {

@@ -34,10 +34,12 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
   const currency = row.currency ?? household.baseCurrency
   const locale = household.locale
 
-  const [mode, setMode] = useState<Mode>(cell?.source === 'items' ? 'items' : 'value')
+  // "How sure" on a single amount is stored as one unlabelled item; keep showing it as a single amount
+  const soloItem = cell?.source === 'items' && cell.items.length === 1 && cell.items[0].kind === 'normal' && !cell.items[0].label && !cell.items[0].recurringItemId && !cell.items[0].skipped ? cell.items[0] : null
+  const [mode, setMode] = useState<Mode>(cell?.source === 'items' && !soloItem ? 'items' : 'value')
   const [text, setText] = useState(() => amountToInput(cell?.value ?? 0, currency, locale))
   const [scope, setScope] = useState<EditScope>(() => readPref<EditScope>('editScope', 'from-now-on'))
-  const [status, setStatus] = useState<StatusChoice>('default')
+  const [status, setStatus] = useState<StatusChoice>(soloItem ? soloItem.status : 'default')
   const [items, setItems] = useState<CellItem[]>(() => itemsFromCurrent(cell, row.defaultFundedBy, row.defaultStatus))
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -108,7 +110,7 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
   const sourceText =
     cell?.source === 'inherit' ? 'Carried from the previous month' :
     cell?.source === 'value' ? 'Set in this month' :
-    cell?.source === 'items' ? `${cell.items.length} item${cell.items.length === 1 ? '' : 's'}` :
+    cell?.source === 'items' ? (soloItem ? 'Set in this month' : `${cell.items.length} item${cell.items.length === 1 ? '' : 's'}`) :
     cell?.source === 'empty' ? 'Nothing yet' : ''
 
   return (

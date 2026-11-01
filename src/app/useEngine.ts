@@ -15,9 +15,15 @@ export function activeHousehold(tables: Tables | undefined): Household | undefin
 }
 
 /** From the household's start to a year past the latest of today and the last filled month. */
+/** Cells made only of recurring postings. They must not stretch the range: the poster fills whatever range
+ *  is shown, so counting them would push the range (and the postings) out by a year on every pass. */
+function isManagedOnly(c: Tables['cells'][number]): boolean {
+  return c.mode === 'items' && c.items.every((i) => i.recurringItemId != null)
+}
+
 export function defaultMonths(household: Household, tables: Tables, extra = 0): MonthKey[] {
   let last = monthOfDate()
-  for (const c of tables.cells) if (compareMonths(c.month, last) > 0) last = c.month
+  for (const c of tables.cells) if (!isManagedOnly(c) && compareMonths(c.month, last) > 0) last = c.month
   for (const s of tables.monthStates) if (s.closed && compareMonths(s.month, last) > 0) last = s.month
   const end = addMonths(last, 12 + extra)
   const start = compareMonths(household.startMonth, end) <= 0 ? household.startMonth : end
