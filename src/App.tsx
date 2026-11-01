@@ -14,13 +14,12 @@ import { HomeScreen } from '@/features/home/HomeScreen'
 import { HouseholdScreen } from '@/features/household/HouseholdScreen'
 import { MonthScreen } from '@/features/month/MonthScreen'
 import { MovesScreen } from '@/features/moves/MovesScreen'
-import { RegisterScreen } from '@/features/register/RegisterScreen'
 import { planRecurringPosts } from '@/store'
 
-type Screen = 'grid' | 'month' | 'moves' | 'register' | 'household' | 'data'
+type Screen = 'grid' | 'month' | 'moves' | 'household' | 'data'
 const SCREENS: Array<{ key: Screen; label: string }> = [
   { key: 'grid', label: 'Grid' }, { key: 'month', label: 'Month' }, { key: 'moves', label: 'Moves' },
-  { key: 'register', label: 'Register' }, { key: 'household', label: 'Household' }, { key: 'data', label: 'Data' },
+  { key: 'household', label: 'Household' }, { key: 'data', label: 'Data' },
 ]
 
 export default function App() {
@@ -93,7 +92,6 @@ function Shell() {
         ) : screen === 'data' ? <DataScreen />
           : screen === 'month' ? <MonthScreen />
           : screen === 'moves' ? <MovesScreen />
-          : screen === 'register' ? <RegisterScreen />
           : screen === 'household' ? <HouseholdScreen />
           : <GridScreen />}
       </main>

@@ -238,7 +238,7 @@ function GridRow({ row, rIndex, months, engine, ccy, locale, neg, onSelect, onEr
         if (!cell) return <td key={m} />
         const closed = engine.totals[m]?.closed
         const isDerived = cell.source === 'derived'
-        const isEmpty = cell.source === 'empty'
+        const isEmpty = cell.source === 'empty' || (cell.source === 'items' && cell.items.every((i) => i.skipped))
         const d = amountDisplay(cell.value, flow, rowCcy, locale, neg)
         return (
           <td key={m} className={cn('p-0', closed && 'bg-muted/60')}>

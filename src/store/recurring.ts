@@ -1,5 +1,5 @@
 import {
-  CellSchema, RecurringItemSchema, isDue, newId,
+  CellSchema, RecurringItemSchema, addMonths, compareMonths, isDue, newId,
   type Cell, type CellItem, type MonthKey, type RecurringItem, type Row, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
@@ -15,13 +15,13 @@ function managedItem(item: RecurringItem, row: Row): CellItem {
 }
 
 const sig = (items: CellItem[]) =>
-  JSON.stringify([...items].sort((a, b) => (a.id < b.id ? -1 : 1)).map((i) => [i.id, i.label, i.amount, i.status, i.fundedBy, i.recurringItemId, i.kind, i.skipped]))
+  JSON.stringify([...items].sort((a, b) => (a.id < b.id ? -1 : 1)).map((i) => [i.id, i.label, i.amount, i.status, i.fundedBy, i.recurringItemId, i.kind, i.skipped, i.pinned ?? false]))
 
 /**
  * Make every open month agree with the recurring register. Idempotent: running it
  * twice yields no mutations the second time. Closed months are never touched.
  * - due items missing from a cell are added as managed items
- * - managed items that are not done or skipped follow the register's amount, label and funding
+ * - managed items that are not done, skipped or pinned follow the register's amount, label and funding
  * - managed items whose register entry is no longer due are removed unless done
  * - a plain value or carried-forward cell becomes an items cell; a bare value equal
  *   to a managed amount is treated as the same payment and dropped
@@ -68,7 +68,7 @@ export function planRecurringPosts(tables: Tables, months: MonthKey[]): Mutation
             return stillDue && liveIds.has(i.recurringItemId)
           })
           .map((i) => {
-            if (!i.recurringItemId || i.status === 'done' || i.skipped) return i
+            if (!i.recurringItemId || i.status === 'done' || i.skipped || i.pinned) return i
             const src = due.find((d) => d.id === i.recurringItemId)
             return src ? { ...i, label: src.name, amount: src.amount, fundedBy: src.fundedBy } : i
           })
@@ -140,4 +140,64 @@ export function recurringStatus(tables: Tables, item: RecurringItem, month: Mont
   if (!posted) return 'due'
   if (posted.skipped) return 'skipped'
   return posted.status === 'done' ? 'paid' : 'due'
+}
+
+// ---- grid-side management: the cell editor asks "only this month / from now on / all", these do the work ----
+
+async function findLive(store: Store, id: string) {
+  const tables = await loadTables(store)
+  const item = tables.recurringItems.find((r) => r.id === id && !r.deletedAt)
+  if (!item) throw new Error('Recurring item not found')
+  return { tables, item }
+}
+
+/** Skip (or restore) one posted occurrence. The schedule keeps running in other months. */
+export async function skipRecurringMonth(store: Store, id: string, month: MonthKey, skipped: boolean): Promise<void> {
+  const { tables, item } = await findLive(store, id)
+  if (tables.monthStates.some((s) => s.month === month && s.closed)) throw new Error('Month is closed')
+  const cell = tables.cells.find((c) => c.rowId === item.rowId && c.month === month)
+  if (!cell) return
+  const items = cell.items.map((i) => (i.recurringItemId === id ? { ...i, skipped } : i))
+  await store.commit([{ op: 'put', table: 'cells', record: CellSchema.parse({ ...cell, items, updatedAt: now() }) }])
+}
+
+/** Stop the schedule from `month` on. Earlier months keep what was posted. */
+export async function endRecurringFrom(store: Store, id: string, month: MonthKey): Promise<void> {
+  const { item } = await findLive(store, id)
+  if (compareMonths(month, item.startMonth) <= 0) return deleteRecurringItem(store, id)
+  return endRecurringItem(store, id, addMonths(month, -1))
+}
+
+/**
+ * Change amount/funding/name from `month` on. Earlier months keep the old values: the old
+ * schedule ends the month before and a copy with the new values starts at `month`. Posted
+ * items from `month` on are re-pointed to the copy so paid marks survive and nothing posts twice.
+ * Returns the id of the schedule that now covers `month`.
+ */
+export async function changeRecurringFrom(store: Store, id: string, month: MonthKey, patch: Partial<Pick<RecurringItem, 'amount' | 'fundedBy' | 'name'>>): Promise<string> {
+  const { tables, item } = await findLive(store, id)
+  const ts = now()
+  const mutations: Mutation[] = []
+  let targetId = id
+  if (compareMonths(month, item.startMonth) <= 0) {
+    mutations.push({ op: 'put', table: 'recurringItems', record: RecurringItemSchema.parse({ ...item, ...patch, updatedAt: ts }) })
+  } else {
+    const fresh = RecurringItemSchema.parse({ ...item, ...patch, id: newId(), createdAt: ts, updatedAt: ts, startMonth: month, endMonth: item.endMonth })
+    targetId = fresh.id
+    mutations.push({ op: 'put', table: 'recurringItems', record: RecurringItemSchema.parse({ ...item, endMonth: addMonths(month, -1), updatedAt: ts }) })
+    mutations.push({ op: 'put', table: 'recurringItems', record: fresh })
+  }
+  const closed = new Set(tables.monthStates.filter((s) => s.closed).map((s) => s.month))
+  for (const cell of tables.cells) {
+    if (cell.rowId !== item.rowId || compareMonths(cell.month, month) < 0 || closed.has(cell.month)) continue
+    if (!cell.items.some((i) => i.recurringItemId === id)) continue
+    const items = cell.items.map((i) =>
+      i.recurringItemId !== id ? i
+        : i.pinned ? { ...i, recurringItemId: targetId }
+        : { ...i, recurringItemId: targetId, amount: patch.amount ?? i.amount, fundedBy: patch.fundedBy ?? i.fundedBy, label: patch.name ?? i.label },
+    )
+    mutations.push({ op: 'put', table: 'cells', record: CellSchema.parse({ ...cell, items, updatedAt: ts }) })
+  }
+  await store.commit(mutations)
+  return targetId
 }

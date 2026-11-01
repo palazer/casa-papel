@@ -12,7 +12,7 @@ import { describeCadence, monthOfDate, type MonthKey, type RecurringItem } from 
 import { deleteRecurringItem, endRecurringItem, recurringStatus, setRecurringPaid } from '@/store'
 import { RecurringDialog } from './RecurringDialog'
 
-export function RegisterScreen() {
+export function RecurringList() {
   const store = useStore()
   const tables = useTables()
   const household = activeHousehold(tables)
@@ -34,8 +34,7 @@ export function RegisterScreen() {
       {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
       <div className="flex items-start justify-between gap-4">
         <p className="text-sm text-muted-foreground">
-          Everything that repeats: rent, salary, insurance, subscriptions. Each item knows when it is due, lands in those months of the grid by itself,
-          shows up in the Moves checklist, and follows a changed amount into every open month. You can also start one from any cell with "Make recurring".
+          The full list. In the grid, open any posted item to change its amount for one month or from now on, skip a month, or end it; open any cell and choose "Make recurring" to start a new one.
         </p>
         <Button onClick={() => setEditing('new')}>Add recurring</Button>
       </div>

@@ -56,6 +56,7 @@ export function RecurringDialog({ tables, household, item, defaultMonth, prefill
   // wording follows the row: income arrives somewhere, spending leaves from somewhere and is funded by something
   const section: Section = rowId === '__new__' ? newRowSection : (rows.find((r) => r.id === rowId)?.section ?? 'expense')
   const accountLabel = section === 'income' ? 'Paid into' : section === 'transfer' ? 'From account' : 'Paid from'
+  const accountHelp = section === 'income' ? 'Which of your accounts receives it. For your overview only; the sums do not change.' : 'Which of your accounts the money leaves. For your overview only; the sums do not change.'
 
   async function save() {
     const minor = parseAmount(amount, baseCurrency, locale)
@@ -135,8 +136,9 @@ export function RecurringDialog({ tables, household, item, defaultMonth, prefill
             </fieldset>
           )}
           <div className="space-y-1.5"><Label htmlFor="rc-account">{accountLabel}</Label><NativeSelect id="rc-account" className="w-full" value={accountId} onChange={(e) => setAccountId(e.target.value)}><option value="">—</option>{tables.accounts.filter((a) => !a.deletedAt).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</NativeSelect></div>
+          <p className="-mt-2 text-xs text-muted-foreground sm:col-span-2">{accountHelp}</p>
           <div className="space-y-1.5"><Label htmlFor="rc-scope">Whose</Label><NativeSelect id="rc-scope" className="w-full" value={scope} onChange={(e) => setScope(e.target.value)}><option value="shared">Shared</option>{adults.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</NativeSelect></div>
-          {section === 'expense' && <div className="space-y-1.5"><Label htmlFor="rc-funded">Funded by</Label><NativeSelect id="rc-funded" className="w-full" value={fundedBy} onChange={(e) => setFundedBy(e.target.value)}><option value="cash">Cash (this month)</option><option value="savings">Savings</option>{pools.map((p) => <option key={p.id} value={poolRef(p.id)}>Pool: {p.name}</option>)}</NativeSelect></div>}
+          {section === 'expense' && <div className="space-y-1.5"><Label htmlFor="rc-funded">Comes out of</Label><NativeSelect id="rc-funded" className="w-full" value={fundedBy} onChange={(e) => setFundedBy(e.target.value)}><option value="cash">This month's income</option><option value="savings">Savings balance</option>{pools.map((p) => <option key={p.id} value={poolRef(p.id)}>Pool: {p.name}</option>)}</NativeSelect><p className="text-xs text-muted-foreground">Spending from savings or a pool does not reduce this month's leftover.</p></div>}
           <div className="space-y-1.5"><Label>From month</Label><MonthField label="From month" value={startMonth} onChange={setStartMonth} locale={locale} /></div>
           <div className="space-y-1.5"><Label>Until month (optional)</Label><MonthField label="Until month" value={endMonth} onChange={setEndMonth} locale={locale} allowEmpty /></div>
           <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="rc-notes">Notes</Label><Input id="rc-notes" value={notes} onChange={(e) => setNotes(e.target.value)} /></div>

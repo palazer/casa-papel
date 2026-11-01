@@ -156,6 +156,8 @@ export const CellItemSchema = z.object({
   /** 'carry' contributes the previous month's effective value. */
   kind: z.enum(['normal', 'carry']).default('normal'),
   skipped: z.boolean().default(false),
+  /** Amount/label/funding set by hand for this month; the recurring schedule leaves it alone. */
+  pinned: z.boolean().optional(),
 })
 
 export const CellModeSchema = z.enum(['inherit', 'value', 'items'])

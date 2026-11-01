@@ -372,7 +372,7 @@ export function SetupWizard({ onCreated }: { onCreated: () => void }) {
           <div className="space-y-2 text-sm">
             <p><strong>{d.name.trim() || 'Our household'}</strong> · {d.currency} · {localeLabel(d.locale)} · from {formatMonth(d.startMonth, d.locale, 'long')}</p>
             <p>{d.adults.filter((a) => a.name.trim()).length || 1} adult(s), {d.dependents.filter((x) => x.name.trim()).length} other member(s) or thing(s), {d.accounts.filter((a) => a.name.trim()).length} account(s).</p>
-            <p>{totalRows} rows will be created. Recurring payments such as rent or insurance can be added afterwards from the Register, or from any cell with "Make recurring".</p>
+            <p>{totalRows} rows will be created. Recurring payments such as rent or insurance are added afterwards from any grid cell with "Make recurring".</p>
           </div>
         )}
 

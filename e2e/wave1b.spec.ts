@@ -62,13 +62,13 @@ test.describe('wave 1b', () => {
     await expect(page.getByRole('button', { name: /^Car insurance Oct 2026/ })).toContainText('210')
     await expect(page.getByRole('button', { name: /^Car insurance Nov 2026: empty/ })).toBeVisible()
 
-    await page.getByRole('button', { name: 'Register' }).click()
+    await page.getByRole('button', { name: 'Household' }).click()
     await page.getByRole('button', { name: 'Add recurring' }).click()
     // an income row is paid into an account and has no funding source
     await page.getByLabel('Grid row').selectOption({ index: 0 })
     await expect(page.getByText('Paid into')).toBeVisible()
-    await expect(page.getByText('Funded by')).toHaveCount(0)
-    await page.getByLabel('Name', { exact: true }).fill('Water bill')
+    await expect(page.getByText('Comes out of')).toHaveCount(0)
+    await page.getByRole('dialog').last().getByLabel('Name', { exact: true }).fill('Water bill')
     await page.getByLabel('Grid row').selectOption('__new__')
     await page.getByLabel('New row name').fill('Water')
     await page.getByLabel('Amount (EUR)').fill('90')
@@ -87,10 +87,10 @@ test.describe('wave 1b', () => {
     await page.getByRole('button', { name: /^Groceries Nov 2026/ }).click()
     await page.getByRole('button', { name: 'Make recurring…' }).click()
     await expect(page.getByLabel('Amount (EUR)')).toHaveValue('700')
-    await page.getByLabel('Name', { exact: true }).fill('Weekly shop')
+    await page.getByRole('dialog').last().getByLabel('Name', { exact: true }).fill('Weekly shop')
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByRole('dialog')).toBeHidden()
-    await page.getByRole('button', { name: 'Register' }).click()
+    await page.getByRole('button', { name: 'Household' }).click()
     await expect(page.getByRole('cell', { name: 'Weekly shop', exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'Grid' }).click()
     await expect(page.getByRole('button', { name: /^Water Dec 2026: empty/ })).toBeVisible()
@@ -101,9 +101,65 @@ test.describe('wave 1b', () => {
     await page.getByLabel('Rent paid').click()
     await expect(page.getByLabel('Rent paid')).toBeChecked()
     await page.screenshot({ path: 'e2e/output/moves.png', fullPage: true })
-    await page.getByRole('button', { name: 'Register' }).click()
+    await page.getByRole('button', { name: 'Household' }).click()
     await expect(page.getByLabel('Rent paid in Nov 2026')).toBeChecked()
     await page.getByRole('button', { name: 'Grid' }).click()
     await expect(page.getByRole('button', { name: /^Rent Nov 2026/ }).locator('svg')).toBeVisible()
+  })
+})
+
+test.describe('recurring from the grid', () => {
+  test.use({ viewport: { width: 1400, height: 900 } })
+
+  test('change for one month or from now on, skip a month, end a schedule', async ({ page }) => {
+    await loadDemo(page)
+    const rent = (m: string) => page.getByRole('button', { name: new RegExp(`^Rent ${m}`) })
+
+    // amount change from November on: October keeps the old amount
+    await rent('Nov 2026').click()
+    await expect(page.getByText('Posted from a schedule')).toBeVisible()
+    await page.getByLabel('Item amount').fill('1700')
+    await page.getByRole('radio', { name: 'This and following months' }).click()
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByRole('dialog')).toBeHidden()
+    await expect(rent('Oct 2026')).toContainText('1,650')
+    await expect(rent('Nov 2026')).toContainText('1,700')
+    await expect(rent('Dec 2026')).toContainText('1,700')
+    await expect(rent('Mar 2027')).toContainText('1,700')
+
+    // only this month on December (the default choice)
+    await rent('Dec 2026').click()
+    await page.getByLabel('Item amount').fill('1800')
+    await expect(page.getByRole('radio', { name: 'Only this month' })).toHaveAttribute('aria-checked', 'true')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByRole('dialog')).toBeHidden()
+    await expect(rent('Dec 2026')).toContainText('1,800')
+    await expect(rent('Jan 2027')).toContainText('1,700')
+
+    // skip January only
+    await rent('Jan 2027').click()
+    await page.getByRole('button', { name: 'Remove item' }).click()
+    await page.getByRole('button', { name: 'Only this month' }).click()
+    await expect(page.getByText('Skipped this month')).toBeVisible()
+    await page.screenshot({ path: 'e2e/output/recurring-skip.png' })
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog')).toBeHidden()
+    await expect(page.getByRole('button', { name: /^Rent Jan 2027: empty/ })).toBeVisible()
+    await expect(rent('Feb 2027')).toContainText('1,700')
+
+    // end car insurance for good: due months empty out, nothing comes back
+    await page.getByRole('button', { name: /^Car insurance Oct 2026/ }).click()
+    await page.getByRole('button', { name: 'Remove item' }).click()
+    await page.getByRole('button', { name: 'All occurrences' }).click()
+    await expect(page.getByRole('dialog')).toBeHidden()
+    await expect(page.getByRole('button', { name: /^Car insurance Oct 2026: empty/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^Car insurance Jan 2027: empty/ })).toBeVisible()
+
+    // the list under Household reflects it
+    await page.getByRole('button', { name: 'Household' }).click()
+    await expect(page.getByRole('cell', { name: 'Car insurance', exact: true })).toHaveCount(0)
+    // the schedule was split: the old one ended in October, the new one runs from November
+    await expect(page.getByText('(ended Oct 2026)')).toBeVisible()
+    await expect(page.getByRole('cell', { name: 'Rent', exact: true })).toHaveCount(3)
   })
 })

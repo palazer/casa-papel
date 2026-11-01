@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { RecurringDialog } from '@/features/register/RecurringDialog'
-import { Trash2 } from 'lucide-react'
+import { Repeat, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -10,8 +9,12 @@ import { amountToInput, formatAmount, formatMonth, parseAmount } from '@/app/for
 import { readPref, writePref } from '@/app/prefs'
 import { useStore } from '@/app/store'
 import { cellKey, type EngineOutput } from '@/engine'
-import { newId, poolRef, type CellItem, type Household, type ItemStatus, type MonthKey, type Row, type Tables } from '@/model'
-import { clearCell, itemsFromCurrent, reopenMonth, setCellItems, setCellValue, type EditScope } from '@/store'
+import { RecurringDialog } from '@/features/recurring/RecurringDialog'
+import { describeCadence, newId, poolRef, type CellItem, type Household, type ItemStatus, type MonthKey, type Row, type Tables } from '@/model'
+import {
+  changeRecurringFrom, clearCell, deleteRecurringItem, endRecurringFrom, itemsFromCurrent, reopenMonth, setCellItems, setCellValue, skipRecurringMonth,
+  type EditScope,
+} from '@/store'
 import { NativeSelect } from './NativeSelect'
 
 interface Props {
@@ -25,7 +28,6 @@ interface Props {
 
 type Mode = 'value' | 'items'
 type StatusChoice = 'default' | ItemStatus
-
 const STATUS_LABEL: Record<ItemStatus, string> = { projected: 'Estimate', committed: 'Certain', done: 'Done' }
 
 export function CellEditor({ tables, engine, household, row, month, onClose }: Props) {
@@ -34,23 +36,30 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
   const closed = engine.totals[month]?.closed ?? false
   const currency = row.currency ?? household.baseCurrency
   const locale = household.locale
+  /** Rows driven by a schedule: no carry-forward, no single amount; the posted items are the content. */
+  const isRecurringRow = engine.recurringRowIds.includes(row.id)
 
   // "How sure" on a single amount is stored as one unlabelled item; keep showing it as a single amount
   const soloItem = cell?.source === 'items' && cell.items.length === 1 && cell.items[0].kind === 'normal' && !cell.items[0].label && !cell.items[0].recurringItemId && !cell.items[0].skipped ? cell.items[0] : null
-  const [mode, setMode] = useState<Mode>(cell?.source === 'items' && !soloItem ? 'items' : 'value')
+  const [mode, setMode] = useState<Mode>(isRecurringRow || (cell?.source === 'items' && !soloItem) ? 'items' : 'value')
   const [text, setText] = useState(() => amountToInput(cell?.value ?? 0, currency, locale))
   const [scope, setScope] = useState<EditScope>(() => readPref<EditScope>('editScope', 'from-now-on'))
   const [status, setStatus] = useState<StatusChoice>(soloItem ? soloItem.status : 'default')
   const [items, setItems] = useState<CellItem[]>(() => itemsFromCurrent(cell, row.defaultFundedBy, row.defaultStatus))
+  /** For edited scheduled items: does the change apply only here or from this month on? */
+  const [applyTo, setApplyTo] = useState<Record<string, EditScope>>({})
+  const [removing, setRemoving] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [recurring, setRecurring] = useState(false)
 
+  const original = useMemo(() => new Map((cell?.items ?? []).map((i) => [i.id, i])), [cell])
+  const schedules = useMemo(() => new Map(tables.recurringItems.map((r) => [r.id, r])), [tables.recurringItems])
   const pools = useMemo(() => tables.pools.filter((p) => !p.deletedAt), [tables.pools])
   const fundingOptions = useMemo(
     () => [
-      { value: 'cash', label: 'Cash (this month)' },
-      { value: 'savings', label: 'Savings' },
+      { value: 'cash', label: "This month's income" },
+      { value: 'savings', label: 'Savings balance' },
       ...pools.map((p) => ({ value: poolRef(p.id), label: `Pool: ${p.name}` })),
     ],
     [pools],
@@ -68,12 +77,12 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
     return engine.cells[cellKey(row.id, engine.months[idx - 1])]?.value ?? 0
   }
 
-  async function run(fn: () => Promise<void>) {
+  async function run(fn: () => Promise<void>, close = true) {
     setBusy(true)
     setError(null)
     try {
       await fn()
-      onClose()
+      if (close) onClose()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save.')
     } finally {
@@ -92,9 +101,27 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
     void run(() => setCellItems(store, row.id, month, [single], scope))
   }
 
+  /** A scheduled item whose amount or funding was edited here. */
+  const changedScheduled = (it: CellItem) => {
+    const o = original.get(it.id)
+    return !!it.recurringItemId && !!o && (o.amount !== it.amount || o.fundedBy !== it.fundedBy)
+  }
+
   function saveItems() {
     for (const it of items) if (it.kind === 'normal' && !Number.isFinite(it.amount)) return setError('Every item needs an amount.')
-    void run(() => setCellItems(store, row.id, month, items, scope))
+    void run(async () => {
+      let next = items
+      for (const it of items) {
+        if (!changedScheduled(it) || !it.recurringItemId) continue
+        if ((applyTo[it.id] ?? 'this-month') === 'from-now-on') {
+          const newId_ = await changeRecurringFrom(store, it.recurringItemId, month, { amount: it.amount, fundedBy: it.fundedBy })
+          next = next.map((x) => (x.id === it.id ? { ...x, recurringItemId: newId_, pinned: false } : x))
+        } else {
+          next = next.map((x) => (x.id === it.id ? { ...x, pinned: true } : x))
+        }
+      }
+      await setCellItems(store, row.id, month, next, isRecurringRow ? 'this-month' : scope)
+    })
   }
 
   function updateItem(id: string, patch: Partial<CellItem>) {
@@ -108,12 +135,37 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
     ])
   }
 
+  function removePlain(id: string) {
+    setItems((l) => l.filter((x) => x.id !== id))
+  }
+
+  /** Scheduled items are removed through the store so the schedule does not post them straight back. */
+  function removeScheduled(it: CellItem, how: 'this-month' | 'from-now-on' | 'all') {
+    const scheduleId = it.recurringItemId!
+    setRemoving(null)
+    if (how === 'this-month') {
+      void run(async () => {
+        await skipRecurringMonth(store, scheduleId, month, true)
+        updateItem(it.id, { skipped: true })
+      }, false)
+    } else {
+      void run(() => (how === 'all' ? deleteRecurringItem(store, scheduleId) : endRecurringFrom(store, scheduleId, month)))
+    }
+  }
+
+  function restoreScheduled(it: CellItem) {
+    void run(async () => {
+      await skipRecurringMonth(store, it.recurringItemId!, month, false)
+      updateItem(it.id, { skipped: false })
+    }, false)
+  }
+
   const title = `${row.name} · ${formatMonth(month, locale, 'long')}`
   const sourceText =
     cell?.source === 'inherit' ? 'Carried from the previous month' :
     cell?.source === 'value' ? 'Set in this month' :
-    cell?.source === 'items' ? (soloItem ? 'Set in this month' : `${cell.items.length} item${cell.items.length === 1 ? '' : 's'}`) :
-    cell?.source === 'empty' ? 'Nothing yet' : ''
+    cell?.source === 'items' ? (soloItem ? 'Set in this month' : isRecurringRow ? 'Posted from a schedule' : `${cell.items.length} item${cell.items.length === 1 ? '' : 's'}`) :
+    cell?.source === 'empty' ? (isRecurringRow ? 'Nothing due this month' : 'Nothing yet') : ''
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
@@ -132,10 +184,12 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="inline-flex rounded-md border p-0.5 text-sm" role="tablist">
-              <button role="tab" aria-selected={mode === 'value'} className={cn('rounded px-3 py-1', mode === 'value' && 'bg-muted font-medium')} onClick={() => setMode('value')}>Single amount</button>
-              <button role="tab" aria-selected={mode === 'items'} className={cn('rounded px-3 py-1', mode === 'items' && 'bg-muted font-medium')} onClick={() => setMode('items')}>Itemized</button>
-            </div>
+            {!isRecurringRow && (
+              <div className="inline-flex rounded-md border p-0.5 text-sm" role="tablist">
+                <button role="tab" aria-selected={mode === 'value'} className={cn('rounded px-3 py-1', mode === 'value' && 'bg-muted font-medium')} onClick={() => setMode('value')}>Single amount</button>
+                <button role="tab" aria-selected={mode === 'items'} className={cn('rounded px-3 py-1', mode === 'items' && 'bg-muted font-medium')} onClick={() => setMode('items')}>Itemized</button>
+              </div>
+            )}
 
             {mode === 'value' ? (
               <div className="space-y-3">
@@ -167,46 +221,94 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
             ) : (
               <div className="space-y-2">
                 {items.length === 0 && <p className="text-sm text-muted-foreground">No items yet.</p>}
-                {items.map((it) =>
-                  it.kind === 'carry' ? (
-                    <div key={it.id} className="flex items-center gap-2 rounded-md border border-dashed px-2 py-1.5 text-sm">
-                      <span className="flex-1 text-muted-foreground">Carried from previous month</span>
-                      <span className="tabular-nums">{formatAmount(prevValue(), currency, locale)}</span>
-                      <Button size="icon" variant="ghost" aria-label="Remove carried amount" onClick={() => setItems((l) => l.filter((x) => x.id !== it.id))}><Trash2 /></Button>
+                {items.map((it) => {
+                  if (it.kind === 'carry') {
+                    return (
+                      <div key={it.id} className="flex items-center gap-2 rounded-md border border-dashed px-2 py-1.5 text-sm">
+                        <span className="flex-1 text-muted-foreground">Carried from previous month</span>
+                        <span className="tabular-nums">{formatAmount(prevValue(), currency, locale)}</span>
+                        <Button size="icon" variant="ghost" aria-label="Remove carried amount" onClick={() => removePlain(it.id)}><Trash2 /></Button>
+                      </div>
+                    )
+                  }
+                  const schedule = it.recurringItemId ? schedules.get(it.recurringItemId) : undefined
+                  if (it.skipped && schedule) {
+                    return (
+                      <div key={it.id} className="flex items-center gap-2 rounded-md border border-dashed px-2 py-1.5 text-sm text-muted-foreground">
+                        <Repeat className="size-3.5" aria-hidden />
+                        <span className="flex-1"><s>{it.label}</s> · Skipped this month</span>
+                        <Button size="xs" variant="outline" onClick={() => restoreScheduled(it)} disabled={busy}>Restore</Button>
+                      </div>
+                    )
+                  }
+                  const edited = changedScheduled(it)
+                  return (
+                    <div key={it.id} className={cn('space-y-2 rounded-md border p-2', schedule && 'border-sky-200 dark:border-sky-900')}>
+                      <div className="grid grid-cols-[1fr_7rem] gap-2 sm:grid-cols-[1fr_7rem_7rem_9rem_2rem]">
+                        {schedule ? (
+                          <div className="flex min-w-0 items-center gap-1.5 text-sm" title={`Repeats: ${describeCadence(schedule, locale)}`}>
+                            <Repeat className="size-3.5 shrink-0 text-sky-600 dark:text-sky-400" aria-hidden />
+                            <span className="truncate">{it.label}</span>
+                            <span className="truncate text-xs text-muted-foreground">{describeCadence(schedule, locale)}</span>
+                          </div>
+                        ) : (
+                          <Input aria-label="Item label" placeholder="What" value={it.label} onChange={(e) => updateItem(it.id, { label: e.target.value })} />
+                        )}
+                        <Input
+                          aria-label="Item amount" inputMode="decimal" placeholder="0"
+                          defaultValue={amountToInput(it.amount, currency, locale)}
+                          onChange={(e) => { const v = parseAmount(e.target.value, currency, locale); updateItem(it.id, { amount: v ?? 0 }) }}
+                        />
+                        <NativeSelect aria-label="Item status" value={it.status} onChange={(e) => updateItem(it.id, { status: e.target.value as ItemStatus })}>
+                          {(['projected', 'committed', 'done'] as ItemStatus[]).map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+                        </NativeSelect>
+                        <NativeSelect aria-label="Comes out of" value={it.fundedBy} onChange={(e) => updateItem(it.id, { fundedBy: e.target.value as CellItem['fundedBy'] })} disabled={row.section !== 'expense'}>
+                          {fundingOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </NativeSelect>
+                        <Button size="icon" variant="ghost" aria-label="Remove item" onClick={() => (schedule ? setRemoving(removing === it.id ? null : it.id) : removePlain(it.id))}><Trash2 /></Button>
+                      </div>
+                      {schedule && edited && (
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <span className="text-muted-foreground">Apply the change to</span>
+                          <Segmented
+                            value={applyTo[it.id] ?? 'this-month'}
+                            onChange={(v) => setApplyTo((a) => ({ ...a, [it.id]: v as EditScope }))}
+                            options={[{ value: 'this-month', label: 'Only this month' }, { value: 'from-now-on', label: 'This and following months' }]}
+                          />
+                        </div>
+                      )}
+                      {schedule && removing === it.id && (
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <span className="text-muted-foreground">Remove "{it.label}":</span>
+                          <Button size="xs" variant="outline" onClick={() => removeScheduled(it, 'this-month')} disabled={busy}>Only this month</Button>
+                          <Button size="xs" variant="outline" onClick={() => removeScheduled(it, 'from-now-on')} disabled={busy}>This and following months</Button>
+                          <Button size="xs" variant="outline" onClick={() => removeScheduled(it, 'all')} disabled={busy}>All occurrences</Button>
+                          <Button size="xs" variant="ghost" onClick={() => setRemoving(null)}>Cancel</Button>
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <div key={it.id} className="grid grid-cols-[1fr_7rem] gap-2 rounded-md border p-2 sm:grid-cols-[1fr_7rem_7rem_9rem_2rem]">
-                      <Input aria-label="Item label" placeholder="What" value={it.label} onChange={(e) => updateItem(it.id, { label: e.target.value })} />
-                      <Input
-                        aria-label="Item amount" inputMode="decimal" placeholder="0"
-                        defaultValue={amountToInput(it.amount, currency, locale)}
-                        onChange={(e) => { const v = parseAmount(e.target.value, currency, locale); updateItem(it.id, { amount: v ?? 0 }) }}
-                      />
-                      <NativeSelect aria-label="Item status" value={it.status} onChange={(e) => updateItem(it.id, { status: e.target.value as ItemStatus })}>
-                        {(['projected', 'committed', 'done'] as ItemStatus[]).map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-                      </NativeSelect>
-                      <NativeSelect aria-label="Funded by" value={it.fundedBy} onChange={(e) => updateItem(it.id, { fundedBy: e.target.value as CellItem['fundedBy'] })} disabled={row.section !== 'expense'}>
-                        {fundingOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                      </NativeSelect>
-                      <Button size="icon" variant="ghost" aria-label="Remove item" onClick={() => setItems((l) => l.filter((x) => x.id !== it.id))}><Trash2 /></Button>
-                    </div>
-                  ),
-                )}
+                  )
+                })}
                 <div className="flex items-center justify-between">
                   <Button size="sm" variant="outline" onClick={addItem}>Add item</Button>
                   <span className="text-sm tabular-nums">Total {formatAmount(itemsTotal, currency, locale)}</span>
                 </div>
-                <Segmented value={scope} onChange={(v) => setScope(v as EditScope)} options={[{ value: 'from-now-on', label: 'This month and onwards' }, { value: 'this-month', label: 'Only this month' }]} />
+                {row.section === 'expense' && (
+                  <p className="text-xs text-muted-foreground">"Comes out of" is the budget side: this month's income (the normal case), the savings balance, or a pool. Savings and pools do not reduce this month's leftover.</p>
+                )}
+                {!isRecurringRow && (
+                  <Segmented value={scope} onChange={(v) => setScope(v as EditScope)} options={[{ value: 'from-now-on', label: 'This month and onwards' }, { value: 'this-month', label: 'Only this month' }]} />
+                )}
               </div>
             )}
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
           </div>
         )}
 
         {!closed && (
           <DialogFooter className="flex-row flex-wrap gap-2 sm:justify-between">
             <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => void run(() => clearCell(store, row.id, month))} disabled={busy || !cell?.cell}>Clear (inherit)</Button>
+              {!isRecurringRow && <Button variant="ghost" onClick={() => void run(() => clearCell(store, row.id, month))} disabled={busy || !cell?.cell}>Clear (inherit)</Button>}
               <Button variant="ghost" onClick={() => setRecurring(true)} disabled={busy}>Make recurring…</Button>
             </div>
             <div className="flex gap-2">

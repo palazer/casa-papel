@@ -1,4 +1,5 @@
 import { MonthField } from '@/components/MonthField'
+import { RecurringList } from '@/features/recurring/RecurringList'
 import { useMemo, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -37,6 +38,13 @@ export function HouseholdScreen() {
       <SettingsCard household={household} onSave={(p) => act(() => updateHousehold(store, p))} />
       <EntitiesCard household={household} entities={tables.entities.filter((e) => !e.deletedAt && !e.archivedMonth)} onError={setError} />
       <AccountsCard household={household} accounts={tables.accounts.filter((a) => !a.deletedAt)} entities={tables.entities} engine={engine} months={months} onError={setError} />
+      <Card>
+        <CardHeader>
+          <CardTitle>Recurring payments and incomes</CardTitle>
+          <CardDescription>Rent, salary, insurance, subscriptions: anything on a schedule. They land in the grid by themselves and show up in Moves when due.</CardDescription>
+        </CardHeader>
+        <CardContent><RecurringList /></CardContent>
+      </Card>
     </div>
   )
 }
