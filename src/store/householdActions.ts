@@ -1,7 +1,7 @@
 import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing'
 import {
-  AccountMonthSchema, AccountSchema, EntitySchema, HouseholdSchema, PoolSchema, RowSchema,
-  ENTITY_TEMPLATES, HOUSEHOLD_TEMPLATES, newId, poolRef, templateTitle,
+  AccountMonthSchema, AccountSchema, CellSchema, EntitySchema, HouseholdSchema, PoolSchema, RowSchema,
+  ENTITY_TEMPLATES, HOUSEHOLD_TEMPLATES, monthOfDate, newId, poolRef, templateTitle,
   type Account, type Entity, type EntityKind, type Household, type MonthKey, type Pool, type Row, type RowTemplate, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
@@ -181,4 +181,50 @@ export async function createHouseholdFromSetup(store: Store, input: SetupInput):
   const { mutations, household } = buildSetupMutations(input)
   await store.commit(mutations)
   return household
+}
+
+// ---------- pools ----------
+
+export interface PoolInput {
+  name: string
+  /** Savings account that holds the envelope. */
+  accountId: string
+  openingBalance?: number
+  /** Monthly amount set aside, written into the allocation row from `fromMonth` on. */
+  monthlyAllocation?: number | null
+  fromMonth?: MonthKey
+  /** Also create an expense row that spends from the pool. */
+  createSpendRow?: boolean
+}
+
+/** A pool, its allocation row (transfer) and optionally a spend row funded by it. */
+export async function addPool(store: Store, input: PoolInput): Promise<Pool> {
+  const tables = await loadTables(store)
+  const ts = now()
+  const lastPool = tables.pools.filter((p) => !p.deletedAt).map((p) => p.order).sort().at(-1) ?? null
+  const lastRow = tables.rows.filter((r) => !r.deletedAt).map((r) => r.order).sort().at(-1) ?? null
+  const [allocOrder, spendOrder] = generateNKeysBetween(lastRow, null, 2)
+  const pool: Pool = PoolSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, name: input.name.trim(), accountId: input.accountId, openingBalance: input.openingBalance ?? 0, order: generateKeyBetween(lastPool, null) })
+  const alloc = RowSchema.parse({
+    id: newId(), createdAt: ts, updatedAt: ts, name: `${pool.name} pool`, section: 'transfer', kind: 'pool-allocation',
+    accountId: input.accountId, defaultStatus: 'committed', order: allocOrder,
+  })
+  pool.allocationRowId = alloc.id
+  const mutations: Mutation[] = [{ op: 'put', table: 'pools', record: pool }, { op: 'put', table: 'rows', record: alloc }]
+  if (input.createSpendRow) {
+    mutations.push({ op: 'put', table: 'rows', record: RowSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, name: pool.name, section: 'expense', defaultFundedBy: poolRef(pool.id), defaultStatus: 'projected', order: spendOrder }) })
+  }
+  if (input.monthlyAllocation != null && input.monthlyAllocation > 0) {
+    const month = input.fromMonth ?? monthOfDate()
+    mutations.push({ op: 'put', table: 'cells', record: CellSchema.parse({ rowId: alloc.id, month, mode: 'value', value: input.monthlyAllocation, items: [], updatedAt: ts }) })
+  }
+  await store.commit(mutations)
+  return pool
+}
+
+export async function updatePool(store: Store, id: string, patch: Partial<Pick<Pool, 'name' | 'accountId' | 'openingBalance'>>): Promise<void> {
+  const tables = await loadTables(store)
+  const p = tables.pools.find((x) => x.id === id)
+  if (!p) throw new Error('Pool not found')
+  await store.commit([{ op: 'put', table: 'pools', record: PoolSchema.parse({ ...p, ...patch, updatedAt: now() }) }])
 }

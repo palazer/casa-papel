@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { computeEngine } from '@/engine'
+import { buildFxIndex, computeEngine, rateFor } from '@/engine'
 import { byRow, minor, num, type RawFixture } from './fixtures/rawFixture'
 import { v2ToTables } from './fixtures/v2Adapter'
 
@@ -9,12 +9,21 @@ const rows = byRow(fixture.sheets.Flow)
 const sheet = (r: number, i: number) => num(rows.get(r)?.cells[i])
 
 describe('golden: v2 template workbook', () => {
-  const { tables, months, rowIdBySheetRow, savingsId, poolIds } = v2ToTables(fixture)
+  const { tables, months, rowIdBySheetRow, savingsId, investmentsId, poolIds } = v2ToTables(fixture)
   const out = computeEngine({ tables, months })
+  const household = tables.household[0]
 
   it('has no warnings and covers every month', () => {
     expect(out.warnings).toEqual([])
     expect(out.months).toEqual(months)
+  })
+
+  it('projects the USD/TRY chain (row 55) from one known rate with the sheet\'s monthly drift', () => {
+    const fx = buildFxIndex(tables.fxRates, { driftMode: 'fixed', fixedDrift: household.fxDriftDefault })
+    months.forEach((m, i) => {
+      expect(rateFor(fx, 'USD', 'TRY', m)!).toBeCloseTo(sheet(55, i), 6)
+    })
+    expect(rateFor(fx, 'USD', 'TRY', months[months.length - 1])!).toBeCloseTo(60.393, 3)
   })
 
   it('reproduces the income subtotal, including the USD salary converted at the monthly rate', () => {
@@ -44,6 +53,17 @@ describe('golden: v2 template workbook', () => {
       const sheetPools = minor(sheet(57, i)) + minor(sheet(58, i)) + minor(sheet(59, i))
       expect(Math.abs(out.accounts[savingsId].months[m].balance - (sheetSavings + sheetPools))).toBeLessThanOrEqual(2)
     })
+  })
+
+  it('reproduces the investment projection (row 4): grow at 3% a year, then add the deposit', () => {
+    const series = out.accounts[investmentsId]
+    months.forEach((m, i) => {
+      // the sheet keeps float cents; the app rounds every month, so allow a cent per month
+      expect(Math.abs(series.months[m].balance - minor(sheet(4, i)))).toBeLessThanOrEqual(i + 1)
+      expect(series.months[m].projected).toBe(true)
+    })
+    expect(series.months[months[0]].inflow).toBe(2000000)
+    expect(series.months[months[0]].capital).toBe(minor(num(rows.get(4)?.b)) + 2000000)
   })
 
   it('matches the share-of-income column for rent and the travel pool', () => {

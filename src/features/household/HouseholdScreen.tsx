@@ -1,5 +1,7 @@
 import { MonthField } from '@/components/MonthField'
 import { RecurringList } from '@/features/recurring/RecurringList'
+import { FxCard } from './FxCard'
+import { PoolsCard } from './PoolsCard'
 import { useMemo, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -38,6 +40,8 @@ export function HouseholdScreen() {
       <SettingsCard household={household} onSave={(p) => act(() => updateHousehold(store, p))} />
       <EntitiesCard household={household} entities={tables.entities.filter((e) => !e.deletedAt && !e.archivedMonth)} onError={setError} />
       <AccountsCard household={household} accounts={tables.accounts.filter((a) => !a.deletedAt)} entities={tables.entities} engine={engine} months={months} onError={setError} />
+      <PoolsCard household={household} tables={tables} engine={engine} onError={setError} />
+      <FxCard household={household} tables={tables} months={months} onError={setError} />
       <Card>
         <CardHeader>
           <CardTitle>Recurring payments and incomes</CardTitle>
@@ -194,7 +198,7 @@ function AccountsCard({ household, accounts, entities, engine, months, onError }
                 <span className="font-medium">{a.name}</span>
                 <span className="text-muted-foreground">{a.currency}{a.ownerEntityId ? ` · ${entities.find((e) => e.id === a.ownerEntityId)?.name ?? ''}` : ''} · opening {formatAmount(a.openingBalance, a.currency, locale)} in {formatMonth(a.openingMonth, locale)}</span>
                 <span className="ml-auto flex gap-1">
-                  {a.type === 'savings' && a.tracked && <Button size="xs" variant="outline" onClick={() => setActualsFor(actualsFor === a.id ? null : a.id)}>Real balances</Button>}
+                  {(a.type === 'savings' || a.type === 'investment') && a.tracked && <Button size="xs" variant="outline" onClick={() => setActualsFor(actualsFor === a.id ? null : a.id)}>Real balances</Button>}
                   <Button size="xs" variant="ghost" onClick={() => setEditing(a)}>Edit</Button>
                 </span>
               </div>
@@ -240,26 +244,94 @@ function AccountDialog({ account, entities, baseCurrency, locale, startMonth, on
   const [opening, setOpening] = useState(account ? amountToInput(account.openingBalance, account.currency, locale) : '')
   const [openingMonth, setOpeningMonth] = useState(account?.openingMonth ?? startMonth)
   const [owner, setOwner] = useState(account?.ownerEntityId ?? '')
+  const [tracked, setTracked] = useState(account?.tracked ?? true)
+  const inv0 = account?.investment
+  const [annual, setAnnual] = useState(inv0 ? String(Math.round(inv0.annualRate * 10000) / 100) : '5')
+  const [projection, setProjection] = useState<'fixed-rate' | 'historical-average'>(inv0?.projectionMode ?? 'fixed-rate')
+  const [timing, setTiming] = useState<'start' | 'end'>(inv0?.depositTiming ?? 'start')
+  const [fxMode, setFxMode] = useState<'monthly-rate' | 'fixed'>(inv0?.depositFxMode ?? 'monthly-rate')
+  const [fixedRate, setFixedRate] = useState(inv0?.fixedRate ? String(inv0.fixedRate) : '')
+  const [error, setError] = useState<string | null>(null)
   const adults = entities.filter((e) => e.kind === 'adult' && !e.deletedAt)
+  const trackable = ['savings', 'investment', 'credit-card', 'loan', 'other-asset'].includes(type)
+  const ccy = currency.toUpperCase()
+
   function save() {
-    const openingBalance = opening.trim() ? parseAmount(opening, currency, locale) ?? 0 : 0
-    const patch = { name: name.trim(), type, currency: currency.toUpperCase(), openingBalance, openingMonth, ownerEntityId: owner || null }
+    const openingBalance = opening.trim() ? parseAmount(opening, ccy, locale) : 0
+    if (openingBalance == null) return setError('Opening balance is not a number I can read.')
+    const annualRate = Number(annual.replace(',', '.')) / 100
+    if (type === 'investment' && !Number.isFinite(annualRate)) return setError('Growth per year is not a number.')
+    const fixed = Number(fixedRate.replace(',', '.'))
+    if (type === 'investment' && fxMode === 'fixed' && !(fixed > 0)) return setError('Give the fixed rate as a positive number.')
+    const patch = {
+      name: name.trim(), type, currency: ccy, openingBalance, openingMonth, ownerEntityId: owner || null, tracked: trackable ? tracked : false,
+      investment: type === 'investment'
+        ? { projectionMode: projection, annualRate, depositTiming: timing, depositFxMode: ccy === baseCurrency ? 'monthly-rate' as const : fxMode, fixedRate: fxMode === 'fixed' && ccy !== baseCurrency ? fixed : null }
+        : undefined,
+    }
     const p = account ? updateAccount(store, account.id, patch) : addAccount(store, patch)
     p.then(onClose).catch((e) => onError(e instanceof Error ? e.message : 'Failed'))
   }
+
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
+      <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
         <DialogHeader><DialogTitle>{account ? 'Edit account' : 'New account'}</DialogTitle></DialogHeader>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="acc-name">Name</Label><Input id="acc-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} /></div>
           <div className="space-y-1.5"><Label htmlFor="acc-type">Type</Label><NativeSelect id="acc-type" className="w-full" value={type} onChange={(e) => setType(e.target.value as AccountType)}>{ACCOUNT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</NativeSelect></div>
-          <p className="text-xs text-muted-foreground sm:col-span-2">{ACCOUNT_TYPES.find((t) => t.value === type)?.help}</p>
           <div className="space-y-1.5"><Label htmlFor="acc-ccy">Currency</Label><Input id="acc-ccy" value={currency} maxLength={3} onChange={(e) => setCurrency(e.target.value.toUpperCase())} /></div>
+          <p className="-mt-1 text-xs text-muted-foreground sm:col-span-2">{ACCOUNT_TYPES.find((t) => t.value === type)?.help}{ccy !== baseCurrency && ccy.length === 3 ? ` Amounts are shown in ${ccy}; the Currency rates card converts them.` : ''}</p>
           <div className="space-y-1.5"><Label htmlFor="acc-open">Opening balance</Label><Input id="acc-open" inputMode="decimal" value={opening} onChange={(e) => setOpening(e.target.value)} /></div>
           <div className="space-y-1.5"><Label htmlFor="acc-month">Opening month</Label><MonthField id="acc-month" label="Opening month" value={openingMonth} onChange={setOpeningMonth} locale={locale} /></div>
           <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="acc-owner">Owner</Label><NativeSelect id="acc-owner" className="w-full" value={owner} onChange={(e) => setOwner(e.target.value)}><option value="">Household / joint</option>{adults.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</NativeSelect></div>
+          {trackable && (
+            <div className="sm:col-span-2">
+              <Check label="Track the balance month by month in the grid" checked={tracked} onChange={(e) => setTracked(e.target.checked)} />
+            </div>
+          )}
+          {type === 'investment' && (
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="acc-growth">Growth per year (%)</Label>
+                <Input id="acc-growth" inputMode="decimal" value={annual} onChange={(e) => setAnnual(e.target.value)} />
+                <p className="text-xs text-muted-foreground">Projects months without a real value. 5 means 5% a year, applied month by month.</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="acc-proj">Projection</Label>
+                <NativeSelect id="acc-proj" className="w-full" value={projection} onChange={(e) => setProjection(e.target.value as typeof projection)}>
+                  <option value="fixed-rate">Use the yearly growth</option>
+                  <option value="historical-average">Average of the real returns I enter</option>
+                </NativeSelect>
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="acc-timing">Deposits count</Label>
+                <NativeSelect id="acc-timing" className="w-full" value={timing} onChange={(e) => setTiming(e.target.value as typeof timing)}>
+                  <option value="start">At the start of the month (they grow this month too)</option>
+                  <option value="end">At the end of the month (they grow from next month)</option>
+                </NativeSelect>
+              </div>
+              {ccy !== baseCurrency && ccy.length === 3 && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="acc-fxmode">Convert deposits</Label>
+                    <NativeSelect id="acc-fxmode" className="w-full" value={fxMode} onChange={(e) => setFxMode(e.target.value as typeof fxMode)}>
+                      <option value="monthly-rate">At that month's rate</option>
+                      <option value="fixed">At a fixed rate</option>
+                    </NativeSelect>
+                  </div>
+                  {fxMode === 'fixed' && (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="acc-fixed">1 {baseCurrency} = ? {ccy}</Label>
+                      <Input id="acc-fixed" inputMode="decimal" value={fixedRate} onChange={(e) => setFixedRate(e.target.value)} placeholder="e.g. 1.10" />
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
         </div>
+        {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button disabled={!name.trim() || currency.length !== 3} onClick={save}>Save</Button>

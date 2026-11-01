@@ -16,9 +16,12 @@ Try it without touching your own data: https://palazer.github.io/casa-papel/?dem
 - **Recurring**: rent, salary, insurance, subscriptions, with monthly, quarterly, half-yearly, yearly or custom-month schedules. They land in their due months by themselves. Managed from the grid: change an amount for one month or from now on, skip a month, end the schedule. The full list lives under Household.
 - **This month's moves**: the transfers and payments to make this month, as a checklist.
 - **Money modes**: pooled income with pocket money per adult. Income-proportional contributions follow in a later wave.
+- **Pools**: set money aside every month inside a savings account (travel, clothes, gifts) and spend from it without touching the month's leftover.
+- **Balances**: savings and investment accounts get a running balance in the grid. Investments grow at a yearly rate you set, or at the average of the real returns you enter; click any balance to pin what the account really held.
+- **Currencies**: rows and accounts can be in another currency. Past month rates come from the European Central Bank (only currency codes and dates leave your device), future months are projected with a drift you control, any month can be overridden by hand.
 - **Data**: export and import as a single JSON file; merge from another device; wipe.
 
-Status: Waves 0, 1a and 1b are live. Next: Wave 1c, pools, investment tracking and currency rates.
+Status: Waves 0, 1a, 1b and 1c are live. Next: Wave 1d, income-proportional contributions, credit cards, loans and net worth.
 
 ## Develop
 

@@ -12,6 +12,7 @@ import { cellKey, type EngineOutput } from '@/engine'
 import { monthOfDate, type Money, type MonthKey, type Row, type Section } from '@/model'
 import { closeMonth, reopenMonth } from '@/store'
 import { AddRowInline } from './AddRowInline'
+import { BalanceDialog } from './BalanceDialog'
 import { CellEditor } from './CellEditor'
 import { RowMenu } from './RowMenu'
 import { amountDisplay, flowOf, statusClass, toneClass, type Flow } from './display'
@@ -31,6 +32,7 @@ export function GridScreen() {
   const engine = useEngine(tables, months)
   const [collapsed, setCollapsed] = useState<Set<Section>>(() => new Set())
   const [selected, setSelected] = useState<{ rowId: string; month: MonthKey } | null>(null)
+  const [balanceSel, setBalanceSel] = useState<{ accountId: string; month: MonthKey } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   if (!tables || !household || !engine) return null
@@ -73,17 +75,28 @@ export function GridScreen() {
 
   const act = (fn: () => Promise<unknown>) => void fn().catch((err) => setError(err instanceof Error ? err.message : 'Action failed'))
 
-  const derivedRow = (label: string, flow: Flow, pick: (m: MonthKey) => Money, opts: { strong?: boolean; muted?: boolean } = {}): ReactNode => (
+  const derivedRow = (
+    label: string, flow: Flow, pick: (m: MonthKey) => Money,
+    opts: { strong?: boolean; muted?: boolean; currency?: string; format?: (v: Money, m: MonthKey) => string; onClick?: (m: MonthKey) => void; mark?: (m: MonthKey) => boolean } = {},
+  ): ReactNode => (
     <tr key={label} className={cn('bg-muted/40', opts.strong && 'font-medium')}>
       <th scope="row" className={cn('sticky left-0 z-10 bg-muted/90 px-3 py-1 text-left text-sm backdrop-blur', opts.muted && 'text-muted-foreground text-xs')}>
         {label}
       </th>
       {months.map((m) => {
         const v = pick(m)
-        const d = amountDisplay(v, flow, ccy, locale, neg)
+        const d = amountDisplay(v, flow, opts.currency ?? ccy, locale, neg)
+        const text = opts.format ? opts.format(v, m) : d.text
+        const marked = opts.mark?.(m) ?? false
         return (
-          <td key={m} className={cn('px-2 py-1 text-right text-sm tabular-nums', toneClass[d.tone], opts.muted && 'text-xs', engine.totals[m]?.closed && 'bg-muted/60')}>
-            {v === 0 && opts.muted ? '' : d.text}
+          <td key={m} className={cn('p-0 text-right text-sm tabular-nums', toneClass[d.tone], opts.muted && 'text-xs', engine.totals[m]?.closed && 'bg-muted/60')}>
+            {opts.onClick ? (
+              <button type="button" aria-label={`${label} ${formatMonth(m, locale)}: ${text}`} onClick={() => opts.onClick!(m)} className={cn('w-full px-2 py-1 text-right hover:bg-accent', marked && 'underline decoration-dotted underline-offset-4')}>
+                {text}
+              </button>
+            ) : (
+              <span className="block px-2 py-1">{v === 0 && opts.muted ? '' : text}</span>
+            )}
           </td>
         )
       })}
@@ -180,9 +193,19 @@ export function GridScreen() {
                 <td colSpan={months.length} className="border-t" />
               </tr>
             )}
-            {Object.values(engine.accounts).map((s) => {
+            {Object.values(engine.accounts).flatMap((s) => {
               const acc = tables.accounts.find((a) => a.id === s.accountId)
-              return derivedRow(acc?.name ?? 'Account', 'in', (m) => s.months[m]?.balance ?? 0, { strong: true })
+              if (!acc) return []
+              const open = (m: MonthKey) => setBalanceSel({ accountId: acc.id, month: m })
+              const marked = (m: MonthKey) => (s.months[m]?.adjustment ?? 0) !== 0 || s.months[m]?.projected === false
+              if (acc.type === 'investment') {
+                return [
+                  derivedRow(`${acc.name} · value`, 'in', (m) => s.months[m]?.balance ?? 0, { strong: true, currency: s.currency, onClick: open, mark: marked }),
+                  derivedRow(`${acc.name} · deposited`, 'in', (m) => s.months[m]?.capital ?? 0, { muted: true, currency: s.currency }),
+                  derivedRow(`${acc.name} · return`, 'in', (m) => Math.round((s.months[m]?.totalReturn ?? 0) * 10000), { muted: true, format: (v) => (v === 0 ? '' : formatPercent(v / 10000, locale)) }),
+                ]
+              }
+              return [derivedRow(acc.name, 'in', (m) => s.months[m]?.balance ?? 0, { strong: true, currency: s.currency, onClick: open, mark: marked })]
             })}
             {Object.values(engine.pools).map((p) => {
               const pool = tables.pools.find((x) => x.id === p.poolId)
@@ -197,6 +220,11 @@ export function GridScreen() {
         <span>Click a cell to edit. Arrow keys move, Enter opens. Click a month name to close or reopen it.</span>
       </div>
 
+      {balanceSel && (() => {
+        const acc = tables.accounts.find((a) => a.id === balanceSel.accountId)
+        const res = engine.accounts[balanceSel.accountId]?.months[balanceSel.month]
+        return acc && res ? <BalanceDialog key={`${acc.id}:${balanceSel.month}`} account={acc} month={balanceSel.month} result={res} locale={locale} closed={engine.totals[balanceSel.month]?.closed ?? false} onClose={() => setBalanceSel(null)} /> : null
+      })()}
       {selected && selectedRow && (
         <CellEditor key={`${selectedRow.id}:${selected.month}`} tables={tables} engine={engine} household={household} row={selectedRow} month={selected.month} onClose={() => setSelected(null)} />
       )}

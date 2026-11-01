@@ -50,6 +50,10 @@ export const HouseholdSchema = BaseRecord.extend({
   /** Default monthly FX drift (fraction) for projected rates. */
   fxDriftDefault: z.number().default(0),
   fxMonthRate: FxMonthRateSchema.default('last'),
+  /** How future rates are projected: a fixed monthly drift, or the average month-over-month change of the last year. */
+  fxDriftMode: z.enum(['fixed', 'average']).default('fixed'),
+  /** Per-pair monthly drift overrides, e.g. { 'EUR/TRY': 0.015 }. */
+  fxPairDrift: z.record(z.string(), z.number()).default({}),
 })
 
 // ---------- entities ----------
@@ -295,6 +299,7 @@ export type RecurringItem = z.infer<typeof RecurringItemSchema>
 export type Cadence = z.infer<typeof CadenceSchema>
 export type Pool = z.infer<typeof PoolSchema>
 export type FxRate = z.infer<typeof FxRateSchema>
+export type FxMonthRate = z.infer<typeof FxMonthRateSchema>
 export type MonthState = z.infer<typeof MonthStateSchema>
 export type TableName = z.infer<typeof TableNameSchema>
 export type StoreEvent = z.infer<typeof EventSchema>

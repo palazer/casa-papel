@@ -10,6 +10,8 @@ const base = () => ({ id: newId(), createdAt: T0, updatedAt: T0, deletedAt: null
 /**
  * Map the v2 template workbook onto the app model. Row numbers are the
  * spreadsheet's; see plan §1 for what each one is.
+ * - savings (row 3) and investments (row 4: grow at A4 per year, then add the deposit) are tracked accounts
+ * - the USD/TRY chain (row 55) is one known rate plus the sheet's fixed monthly drift (A55)
  */
 export function v2ToTables(fx: RawFixture) {
   const flow = fx.sheets.Flow
@@ -17,15 +19,22 @@ export function v2ToTables(fx: RawFixture) {
   const months = flow.months
   const label = (r: number) => String(rows.get(r)?.label ?? `row ${r}`)
 
+  const fxRow = rows.get(55)
   const household = HouseholdSchema.parse({
     ...base(), name: 'Template', baseCurrency: 'TRY', locale: 'tr-TR', startMonth: months[0],
     closingRule: 'savings-plug', cashBuffer: 0, pocketTotal: 0,
+    fxDriftMode: 'fixed', fxDriftDefault: num(fxRow?.a),
   })
   const adultA = EntitySchema.parse({ ...base(), kind: 'adult', name: 'Adult A' })
   const adultB = EntitySchema.parse({ ...base(), kind: 'adult', name: 'Adult B' })
   const savings = AccountSchema.parse({
     ...base(), name: 'Savings', type: 'savings', currency: 'TRY', openingMonth: months[0], tracked: true,
     openingBalance: minor(num(rows.get(3)?.b)),
+  })
+  const investments = AccountSchema.parse({
+    ...base(), name: 'Investments', type: 'investment', currency: 'TRY', openingMonth: months[0], tracked: true,
+    openingBalance: minor(num(rows.get(4)?.b)),
+    investment: { projectionMode: 'fixed-rate', annualRate: num(rows.get(4)?.a), depositTiming: 'end', depositFxMode: 'monthly-rate', fixedRate: null },
   })
 
   type Spec = { r: number; section: Row['section']; kind?: Row['kind']; currency?: string; scope?: string }
@@ -52,11 +61,12 @@ export function v2ToTables(fx: RawFixture) {
   specs.forEach((s, i) => {
     const raw = rows.get(s.r)
     if (!raw) throw new Error(`fixture has no row ${s.r}`)
+    const accountId = s.kind === 'pool-allocation' ? savings.id : s.kind === 'to-investment' || s.kind === 'from-investment' ? investments.id : null
     const row = RowSchema.parse({
       ...base(), name: label(s.r), section: s.section, kind: s.kind ?? 'plain', currency: s.currency ?? null,
       scope: s.scope ?? 'shared', inShareBasis: s.kind === 'salary', order: String(i).padStart(3, '0'),
       pocketMode: s.kind === 'pocket-money' ? 'fixed' : null,
-      accountId: s.kind === 'pool-allocation' || s.kind === 'to-investment' ? savings.id : null,
+      accountId,
     })
     appRows.push(row)
     rowIdBySheetRow.set(s.r, row.id)
@@ -73,12 +83,12 @@ export function v2ToTables(fx: RawFixture) {
     PoolSchema.parse({ ...base(), name: label(r).replace(/\s*⇩\s*$/, ''), accountId: savings.id, allocationRowId: rowIdBySheetRow.get(r), openingBalance: 0 }),
   )
 
-  const fxRow = rows.get(55)
-  const fxRates = months.map((m, i) => FxRateSchema.parse({ pair: 'USD/TRY', month: m, rate: num(fxRow?.cells[i]), source: 'manual', updatedAt: T0 }))
+  // only the first month is a known rate; the rest is projected with the drift
+  const fxRates = [FxRateSchema.parse({ pair: 'USD/TRY', month: months[0], rate: num(fxRow?.cells[0]), source: 'manual', updatedAt: T0 })]
 
   const tables: Tables = {
     ...EMPTY_TABLES,
-    household: [household], entities: [adultA, adultB], accounts: [savings], rows: appRows, cells, pools, fxRates,
+    household: [household], entities: [adultA, adultB], accounts: [savings, investments], rows: appRows, cells, pools, fxRates,
   }
-  return { tables, months, rowIdBySheetRow, savingsId: savings.id, poolIds: pools.map((p) => p.id), toSavingsId: toSavings.id }
+  return { tables, months, rowIdBySheetRow, savingsId: savings.id, investmentsId: investments.id, poolIds: pools.map((p) => p.id), toSavingsId: toSavings.id }
 }

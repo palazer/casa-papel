@@ -57,7 +57,7 @@ export function MonthScreen() {
           <Stat label="To savings" value={formatAmount(t.toSavings, ccy, locale, { sign: 'exceptZero' })} tone={t.toSavings < 0 ? 'draw' : 'neutral'} />
           <Stat label={household.closingRule === 'savings-plug' ? 'Kept in account' : 'Leftover'} value={formatAmount(t.leftover, ccy, locale)} />
           {Object.values(engine.accounts).map((s) => (
-            <Stat key={s.accountId} label={tables.accounts.find((a) => a.id === s.accountId)?.name ?? 'Account'} value={formatAmount(s.months[m]?.balance ?? 0, ccy, locale)} />
+            <Stat key={s.accountId} label={tables.accounts.find((a) => a.id === s.accountId)?.name ?? 'Account'} value={formatAmount(s.months[m]?.balance ?? 0, s.currency, locale)} />
           ))}
           {Object.values(engine.pools).map((p) => (
             <Stat key={p.poolId} label={`Pool · ${tables.pools.find((x) => x.id === p.poolId)?.name ?? ''}`} value={formatAmount(p.months[m]?.balance ?? 0, ccy, locale)} />

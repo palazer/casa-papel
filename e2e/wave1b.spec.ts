@@ -67,7 +67,7 @@ test.describe('wave 1b', () => {
     // an income row is paid into an account and has no funding source
     await page.getByLabel('Grid row').selectOption({ index: 0 })
     await expect(page.getByText('Paid into')).toBeVisible()
-    await expect(page.getByText('Comes out of')).toHaveCount(0)
+    await expect(page.getByRole('dialog').getByText('Comes out of')).toHaveCount(0)
     await page.getByRole('dialog').last().getByLabel('Name', { exact: true }).fill('Water bill')
     await page.getByLabel('Grid row').selectOption('__new__')
     await page.getByLabel('New row name').fill('Water')

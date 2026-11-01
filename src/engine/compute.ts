@@ -1,5 +1,5 @@
 import {
-  compareMonths, monthRange, poolIdOf, scaleMoney,
+  compareMonths, fromMinor, monthRange, poolIdOf, scaleMoney, toMinor,
   type Account, type Cell, type Money, type MonthKey, type Row, type Section,
 } from '@/model'
 import { buildFxIndex, convertMoney } from './fx'
@@ -61,7 +61,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
   const pools = tables.pools.filter((p) => !p.deletedAt)
   const poolByAllocationRow = new Map(pools.filter((p) => p.allocationRowId).map((p) => [p.allocationRowId as string, p]))
   const rows = sortRows(tables.rows.filter((r) => !r.deletedAt))
-  const fx = buildFxIndex(tables.fxRates)
+  const fx = buildFxIndex(tables.fxRates, { driftMode: household.fxDriftMode ?? 'fixed', fixedDrift: household.fxDriftDefault ?? 0, pairDrift: household.fxPairDrift ?? {} })
   /** Rows driven by recurring items never carry forward: a month without items is 0. */
   const recurringRowIds = new Set(tables.recurringItems.filter((r) => !r.deletedAt).map((r) => r.rowId))
 
@@ -155,7 +155,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
 
       cells[cellKey(row.id, m)] = {
         rowId: row.id, month: m, value, valueBase: conv.value, currency, source, status, items,
-        funding: fundingBase, missingRate: conv.missingRate, cell,
+        funding: fundingBase, missingRate: conv.missingRate, rateProjected: conv.projected, cell,
       }
       if (!derivedToSavings && !archived) {
         prev = value
@@ -272,7 +272,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
     accounts.find((a) => a.type === 'savings')?.id ?? null
   for (const acc of accounts) {
     if (acc.type !== 'savings' || !acc.tracked) continue
-    const series: AccountSeries = { accountId: acc.id, months: {} }
+    const series: AccountSeries = { accountId: acc.id, currency: acc.currency, months: {} }
     let prevBalance: Money | null = null
     for (const m of months) {
       if (compareMonths(m, acc.openingMonth) < 0) continue
@@ -284,6 +284,56 @@ export function computeEngine(input: EngineInput): EngineOutput {
       const balance: Money = actual ?? computed
       series.months[m] = { computed, balance, adjustment: actual != null ? actual - computed : 0, inflow, outflow }
       prevBalance = balance
+    }
+    accountSeries[acc.id] = series
+  }
+
+  // ---------- investment accounts ----------
+  for (const acc of accounts) {
+    if (acc.type !== 'investment' || !acc.tracked) continue
+    const inv = acc.investment ?? { projectionMode: 'fixed-rate' as const, annualRate: 0, depositTiming: 'start' as const, depositFxMode: 'monthly-rate' as const, fixedRate: null }
+    const series: AccountSeries = { accountId: acc.id, currency: acc.currency, months: {} }
+    const fixedMonthly = Math.pow(1 + (inv.annualRate ?? 0), 1 / 12) - 1
+    const realised: number[] = []
+    let prevValue: Money | null = null
+    let capital: Money = acc.openingBalance
+    /** Row amount in the account's currency: at the month's rate, or at the account's fixed rate from the base currency. */
+    const toAccountCurrency = (c: CellResult, m: MonthKey): Money => {
+      if (inv.depositFxMode === 'fixed' && inv.fixedRate) return toMinor(fromMinor(c.valueBase, base) * inv.fixedRate, acc.currency)
+      const conv = convertMoney(fx, c.value, c.currency, acc.currency, m)
+      if (conv.missingRate) warnings.push(`No ${c.currency}→${acc.currency} rate for ${m} (${acc.name})`)
+      return conv.value
+    }
+    for (const m of months) {
+      if (compareMonths(m, acc.openingMonth) < 0) continue
+      const prev: Money = prevValue ?? acc.openingBalance
+      const am = actuals.get(`${acc.id}|${m}`)
+      let deposit: Money = 0
+      let withdrawal: Money = 0
+      for (const row of rows) {
+        if (row.accountId !== acc.id) continue
+        const c = cells[cellKey(row.id, m)]
+        if (!c || c.value === 0) continue
+        if (row.kind === 'to-investment') deposit += toAccountCurrency(c, m)
+        else if (row.kind === 'from-investment') withdrawal += toAccountCurrency(c, m)
+      }
+      if (am?.actualDeposit != null) deposit = am.actualDeposit
+      const rate = inv.projectionMode === 'historical-average' && realised.length > 0 ? realised.reduce((a, b) => a + b, 0) / realised.length : fixedMonthly
+      const startValue: Money = inv.depositTiming === 'start' ? prev + deposit - withdrawal : prev
+      const grown = Math.round(startValue * (1 + rate))
+      const computed: Money = inv.depositTiming === 'start' ? grown : grown + deposit - withdrawal
+      const actual = am?.actualBalance ?? null
+      const balance: Money = actual ?? computed
+      capital = capital + deposit - withdrawal
+      const monthlyReturn = inv.depositTiming === 'start'
+        ? (startValue !== 0 ? balance / startValue - 1 : 0)
+        : (prev !== 0 ? (balance - deposit + withdrawal) / prev - 1 : 0)
+      if (actual != null) realised.push(monthlyReturn)
+      series.months[m] = {
+        computed, balance, adjustment: actual != null ? actual - computed : 0, inflow: deposit, outflow: withdrawal,
+        capital, startValue, monthlyReturn, totalReturn: capital !== 0 ? balance / capital - 1 : 0, projected: actual == null,
+      }
+      prevValue = balance
     }
     accountSeries[acc.id] = series
   }

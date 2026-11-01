@@ -34,6 +34,8 @@ export interface CellResult {
   /** Base-currency split of an expense by where the cash comes from. */
   funding: Funding
   missingRate: boolean
+  /** The base-currency value used a projected (drifted) rate. */
+  rateProjected: boolean
   cell: Cell | null
 }
 
@@ -62,15 +64,25 @@ export interface MonthTotals {
 }
 
 export interface AccountMonthResult {
+  /** What the engine expects at month end, in the account's currency. */
   computed: Money
+  /** Real balance when one was entered, else computed. */
   balance: Money
   adjustment: Money
   inflow: Money
   outflow: Money
+  /** Investment accounts only. */
+  capital?: Money
+  startValue?: Money
+  monthlyReturn?: number
+  totalReturn?: number
+  /** No real value entered for this month: the number is a projection. */
+  projected?: boolean
 }
 
 export interface AccountSeries {
   accountId: string
+  currency: string
   months: Record<MonthKey, AccountMonthResult>
 }
 
