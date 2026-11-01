@@ -64,6 +64,10 @@ test.describe('wave 1b', () => {
 
     await page.getByRole('button', { name: 'Register' }).click()
     await page.getByRole('button', { name: 'Add recurring' }).click()
+    // an income row is paid into an account and has no funding source
+    await page.getByLabel('Grid row').selectOption({ index: 0 })
+    await expect(page.getByText('Paid into')).toBeVisible()
+    await expect(page.getByText('Funded by')).toHaveCount(0)
     await page.getByLabel('Name', { exact: true }).fill('Water bill')
     await page.getByLabel('Grid row').selectOption('__new__')
     await page.getByLabel('New row name').fill('Water')

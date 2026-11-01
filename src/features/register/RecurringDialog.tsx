@@ -53,6 +53,9 @@ export function RecurringDialog({ tables, household, item, defaultMonth, prefill
   const [notes, setNotes] = useState(item?.notes ?? '')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // wording follows the row: income arrives somewhere, spending leaves from somewhere and is funded by something
+  const section: Section = rowId === '__new__' ? newRowSection : (rows.find((r) => r.id === rowId)?.section ?? 'expense')
+  const accountLabel = section === 'income' ? 'Paid into' : section === 'transfer' ? 'From account' : 'Paid from'
 
   async function save() {
     const minor = parseAmount(amount, baseCurrency, locale)
@@ -73,7 +76,7 @@ export function RecurringDialog({ tables, household, item, defaultMonth, prefill
         name: name.trim(), rowId: targetRow, amount: minor, currency: null,
         cadence: cadence === 'months' ? null : { intervalMonths: Number(cadence) as 1 | 2 | 3 | 6 | 12, anchorMonth: cadence === '1' ? 1 : anchor },
         dueMonths: cadence === 'months' ? [...dueMonths] : null,
-        accountId: accountId || null, scope, fundedBy: fundedBy as RecurringInput['fundedBy'],
+        accountId: accountId || null, scope, fundedBy: section === 'expense' ? (fundedBy as RecurringInput['fundedBy']) : 'cash',
         startMonth, endMonth: endMonth || null, notes,
       }
       if (item) await updateRecurringItem(store, item.id, base)
@@ -131,9 +134,9 @@ export function RecurringDialog({ tables, household, item, defaultMonth, prefill
               {MONTH_NAMES.map((n, i) => <Check key={n} label={n} checked={dueMonths.has(i + 1)} onChange={(e) => { const s = new Set(dueMonths); if (e.target.checked) s.add(i + 1); else s.delete(i + 1); setDueMonths(s) }} />)}
             </fieldset>
           )}
-          <div className="space-y-1.5"><Label htmlFor="rc-account">Paid from</Label><NativeSelect id="rc-account" className="w-full" value={accountId} onChange={(e) => setAccountId(e.target.value)}><option value="">—</option>{tables.accounts.filter((a) => !a.deletedAt).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</NativeSelect></div>
+          <div className="space-y-1.5"><Label htmlFor="rc-account">{accountLabel}</Label><NativeSelect id="rc-account" className="w-full" value={accountId} onChange={(e) => setAccountId(e.target.value)}><option value="">—</option>{tables.accounts.filter((a) => !a.deletedAt).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</NativeSelect></div>
           <div className="space-y-1.5"><Label htmlFor="rc-scope">Whose</Label><NativeSelect id="rc-scope" className="w-full" value={scope} onChange={(e) => setScope(e.target.value)}><option value="shared">Shared</option>{adults.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</NativeSelect></div>
-          <div className="space-y-1.5"><Label htmlFor="rc-funded">Funded by</Label><NativeSelect id="rc-funded" className="w-full" value={fundedBy} onChange={(e) => setFundedBy(e.target.value)}><option value="cash">Cash (this month)</option><option value="savings">Savings</option>{pools.map((p) => <option key={p.id} value={poolRef(p.id)}>Pool: {p.name}</option>)}</NativeSelect></div>
+          {section === 'expense' && <div className="space-y-1.5"><Label htmlFor="rc-funded">Funded by</Label><NativeSelect id="rc-funded" className="w-full" value={fundedBy} onChange={(e) => setFundedBy(e.target.value)}><option value="cash">Cash (this month)</option><option value="savings">Savings</option>{pools.map((p) => <option key={p.id} value={poolRef(p.id)}>Pool: {p.name}</option>)}</NativeSelect></div>}
           <div className="space-y-1.5"><Label>From month</Label><MonthField label="From month" value={startMonth} onChange={setStartMonth} locale={locale} /></div>
           <div className="space-y-1.5"><Label>Until month (optional)</Label><MonthField label="Until month" value={endMonth} onChange={setEndMonth} locale={locale} allowEmpty /></div>
           <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="rc-notes">Notes</Label><Input id="rc-notes" value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
