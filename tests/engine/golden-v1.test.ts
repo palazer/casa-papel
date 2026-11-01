@@ -15,7 +15,9 @@ const PATH = new URL('../private/v1-raw.json', import.meta.url)
 const present = existsSync(PATH)
 
 describe.skipIf(!present)('golden: v1 household workbook (private)', () => {
-  const fixture = present ? (JSON.parse(readFileSync(PATH, 'utf8')) as RawFixture) : null!
+  // skipIf still collects the suite body, so bail out before touching the file
+  if (!present) return
+  const fixture = JSON.parse(readFileSync(PATH, 'utf8')) as RawFixture
   const flow = fixture.sheets.Flow
   const rows = byRow(flow)
   const months = flow.months
