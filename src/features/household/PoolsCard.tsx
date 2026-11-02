@@ -12,6 +12,7 @@ import { useStore } from '@/app/store'
 import type { EngineOutput } from '@/engine'
 import { monthOfDate, type Account, type Household, type Pool, type Tables } from '@/model'
 import { addPool, updatePool } from '@/store'
+import { HUES, cardBar } from '@/app/hues'
 
 export function PoolsCard({ household, tables, engine, onError }: { household: Household; tables: Tables; engine: EngineOutput | null; onError: (m: string) => void }) {
   const [editing, setEditing] = useState<Pool | 'new' | null>(null)
@@ -20,7 +21,7 @@ export function PoolsCard({ household, tables, engine, onError }: { household: H
   const m = monthOfDate()
   const { locale, baseCurrency } = household
   return (
-    <Card>
+    <Card className={cardBar(HUES.pool)}>
       <CardHeader>
         <CardTitle>Pool accounts</CardTitle>
         <CardDescription>

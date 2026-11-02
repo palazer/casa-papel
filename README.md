@@ -21,6 +21,8 @@ Try it without touching your own data: https://palazer.github.io/casa-papel/?dem
 - **Balances**: savings and investment accounts get a running balance in the grid. Investments grow at a yearly rate you set, or at the average of the real returns you enter; click any balance to pin what the account really held.
 - **Currencies**: rows and accounts can be in another currency. Past month rates come from the European Central Bank (only currency codes and dates leave your device), future months are projected with a drift you control, any month can be overridden by hand.
 - **Data**: export and import as a single JSON file; merge from another device; wipe.
+- **Goals**: a balance to reach on an account or pool account, a card or loan to clear, or a net worth target, each with an optional target month. Measured against the plan in the grid, so the bar moves as the plan changes.
+- **Colour**: every kind of money has one hue: income, expenses, transfers, balances, pool accounts. Goals are the one thing in gold.
 
 Status: Wave 1 is complete (0, 1a, 1b, 1c, 1d). Next: Wave 2, charts, CSV and PDF export, file-based sync, translations.
 

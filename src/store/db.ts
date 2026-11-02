@@ -1,6 +1,6 @@
 import Dexie, { type Table } from 'dexie'
 import type {
-  Account, AccountMonth, Category, Cell, Entity, FxRate, Household, Meta, MonthState, Pool,
+  Account, AccountMonth, Category, Cell, Entity, FxRate, Goal, Household, Meta, MonthState, Pool,
   RecurringItem, Row, StoreEvent, TableName,
 } from '@/model'
 
@@ -23,6 +23,7 @@ export class CasaDb extends Dexie {
   pools!: Table<Pool, string>
   fxRates!: Table<FxRate, [string, string]>
   monthStates!: Table<MonthState, string>
+  goals!: Table<Goal, string>
   events!: Table<StoreEvent, string>
   meta!: Table<Meta, string>
 
@@ -43,13 +44,30 @@ export class CasaDb extends Dexie {
       events: 'id, ts, txId',
       meta: 'key',
     })
+    // v2: goals
+    this.version(2).stores({
+      household: 'id',
+      entities: 'id, kind',
+      accounts: 'id, type',
+      accountMonths: '[accountId+month], accountId, month',
+      categories: 'id, section',
+      rows: 'id, section, kind',
+      cells: '[rowId+month], rowId, month',
+      recurringItems: 'id, rowId',
+      pools: 'id, accountId',
+      fxRates: '[pair+month], pair',
+      monthStates: 'month',
+      goals: 'id',
+      events: 'id, ts, txId',
+      meta: 'key',
+    })
   }
 
   /** The data tables (everything except events and meta). */
   get dataTables(): TableName[] {
     return [
       'household', 'entities', 'accounts', 'accountMonths', 'categories', 'rows',
-      'cells', 'recurringItems', 'pools', 'fxRates', 'monthStates',
+      'cells', 'recurringItems', 'pools', 'fxRates', 'monthStates', 'goals',
     ]
   }
 }

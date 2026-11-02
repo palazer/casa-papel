@@ -11,6 +11,7 @@ import { NativeSelect } from '@/features/grid/NativeSelect'
 import { decimalSeparator, formatMonth, localeExample, localeLabel, parseAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import { cn } from '@/lib/utils'
+import { HUES } from '@/app/hues'
 import {
   ACCOUNT_TYPE_INFO, ENTITY_KIND_HELP, ENTITY_KIND_LABEL, ENTITY_TEMPLATES, HOUSEHOLD_TEMPLATES, SECTION_INFO, monthOfDate, templateTitle,
   type AccountType, type EntityKind, type Household, type RowTemplate, type Section,
@@ -23,7 +24,7 @@ const DEPENDENT_KINDS: Array<Exclude<EntityKind, 'adult'>> = ['child', 'pet', 'v
 const WIZARD_ACCOUNT_TYPES = ACCOUNT_TYPE_INFO.filter((t) => t.value !== 'other-asset')
 const STEPS = ['Basics', 'People', 'Things', 'Accounts', 'Rows', 'Finish']
 const SECTIONS: Section[] = ['income', 'expense', 'transfer']
-const SECTION_DOT: Record<Section, string> = { income: 'bg-emerald-500', expense: 'bg-rose-500', transfer: 'bg-sky-500' }
+const SECTION_DOT: Record<Section, string> = { income: HUES.income.fill, expense: HUES.expense.fill, transfer: HUES.transfer.fill }
 const RULE_HELP: Record<Household['closingRule'], string> = {
   'savings-plug': 'Income minus spending minus pocket money is moved to savings. You never type "To savings".',
   'leftover-plug': 'You type how much goes to savings. What remains is shown as leftover.',

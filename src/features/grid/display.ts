@@ -22,8 +22,8 @@ export function amountDisplay(minor: Money, flow: Flow, currency: string, locale
 
 export const toneClass: Record<Tone, string> = {
   in: '',
-  out: 'text-red-700 dark:text-red-400',
-  draw: 'text-amber-700 dark:text-amber-400',
+  out: 'text-expense',
+  draw: 'text-draw',
   neutral: '',
 }
 

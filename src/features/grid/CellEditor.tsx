@@ -243,11 +243,11 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
                   }
                   const edited = changedScheduled(it)
                   return (
-                    <div key={it.id} className={cn('space-y-2 rounded-md border p-2', schedule && 'border-sky-200 dark:border-sky-900')}>
+                    <div key={it.id} className={cn('space-y-2 rounded-md border p-2', schedule && 'border-transfer/40')}>
                       <div className="grid grid-cols-[1fr_7rem] gap-2 sm:grid-cols-[1fr_7rem_7rem_9rem_2rem]">
                         {schedule ? (
                           <div className="flex min-w-0 items-center gap-1.5 text-sm" title={`Repeats: ${describeCadence(schedule, locale)}`}>
-                            <Repeat className="size-3.5 shrink-0 text-sky-600 dark:text-sky-400" aria-hidden />
+                            <Repeat className="size-3.5 shrink-0 text-transfer" aria-hidden />
                             <span className="truncate">{it.label}</span>
                             <span className="truncate text-xs text-muted-foreground">{describeCadence(schedule, locale)}</span>
                           </div>

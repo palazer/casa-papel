@@ -8,7 +8,11 @@ import { SCHEMA_VERSION } from './schema'
 type Step = (raw: unknown) => unknown
 
 const STEPS: Record<number, Step> = {
-  // 1 → 2: add here when SCHEMA_VERSION becomes 2
+  // 1 → 2: goals table
+  1: (raw) => {
+    const obj = raw as { tables?: Record<string, unknown> }
+    return { ...obj, tables: { ...(obj.tables ?? {}), goals: obj.tables?.goals ?? [] } }
+  },
 }
 
 export function migrateExport(raw: unknown): unknown {

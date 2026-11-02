@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { formatAmount, formatMonth, formatPercent } from '@/app/format'
+import { HUES, SECTION_HUE, type Hue } from '@/app/hues'
 import { readPref, writePref } from '@/app/prefs'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
@@ -77,10 +78,10 @@ export function GridScreen() {
 
   const derivedRow = (
     label: string, flow: Flow, pick: (m: MonthKey) => Money,
-    opts: { strong?: boolean; muted?: boolean; currency?: string; format?: (v: Money, m: MonthKey) => string; onClick?: (m: MonthKey) => void; mark?: (m: MonthKey) => boolean } = {},
+    opts: { strong?: boolean; muted?: boolean; currency?: string; hue?: Hue; band?: boolean; format?: (v: Money, m: MonthKey) => string; onClick?: (m: MonthKey) => void; mark?: (m: MonthKey) => boolean } = {},
   ): ReactNode => (
-    <tr key={label} className={cn('bg-muted/40', opts.strong && 'font-medium')}>
-      <th scope="row" className={cn('sticky left-0 z-10 bg-muted/90 px-3 py-1 text-left text-sm backdrop-blur', opts.muted && 'text-muted-foreground text-xs')}>
+    <tr key={label} className={cn(opts.band && (opts.hue ? opts.hue.tint : 'bg-muted/40'), opts.strong && 'font-medium')}>
+      <th scope="row" className={cn('sticky left-0 z-10 px-3 py-1 text-left text-sm', opts.band ? (opts.hue ? opts.hue.tint : 'bg-muted/90 backdrop-blur') : 'bg-background', opts.hue ? opts.hue.text : 'text-muted-foreground', opts.muted && 'text-xs')}>
         {label}
       </th>
       {months.map((m) => {
@@ -165,8 +166,8 @@ export function GridScreen() {
               const isCollapsed = collapsed.has(key)
               return [
                 <tr key={`${key}-head`} className="bg-background">
-                  <th scope="row" className="sticky left-0 z-10 border-t bg-background px-2 py-1.5 text-left">
-                    <button className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground" onClick={() => toggle(key)} aria-expanded={!isCollapsed}>
+                  <th scope="row" className={cn('sticky left-0 z-10 border-t bg-background px-2 py-1.5 text-left', SECTION_HUE[key].bar)}>
+                    <button className={cn('inline-flex items-center gap-1 text-sm font-semibold', SECTION_HUE[key].text)} onClick={() => toggle(key)} aria-expanded={!isCollapsed}>
                       {isCollapsed ? <ChevronRight className="size-3.5" /> : <ChevronDown className="size-3.5" />}
                       {title}
                     </button>
@@ -180,16 +181,16 @@ export function GridScreen() {
                     <td colSpan={months.length} />
                   </tr>
                 ),
-                key === 'income' && derivedRow('Income total', 'in', (m) => engine.totals[m].income, { strong: true }),
-                key === 'expense' && derivedRow('Expenses total', 'out', (m) => engine.totals[m].expensesTotal, { strong: true }),
-                key === 'expense' && months.some((m) => engine.totals[m].fromSavingsDerived !== 0) && derivedRow('of which from savings & pool accounts', 'in', (m) => engine.totals[m].fromSavingsDerived, { muted: true }),
-                key === 'transfer' && derivedRow(household.closingRule === 'savings-plug' ? 'Kept in account' : 'Leftover', 'in', (m) => engine.totals[m].leftover, { strong: true }),
+                key === 'income' && derivedRow('Income total', 'in', (m) => engine.totals[m].income, { strong: true, hue: HUES.income, band: true }),
+                key === 'expense' && derivedRow('Expenses total', 'out', (m) => engine.totals[m].expensesTotal, { strong: true, hue: HUES.expense, band: true }),
+                key === 'expense' && months.some((m) => engine.totals[m].fromSavingsDerived !== 0) && derivedRow('of which from savings & pool accounts', 'in', (m) => engine.totals[m].fromSavingsDerived, { muted: true, hue: HUES.pool }),
+                key === 'transfer' && derivedRow(household.closingRule === 'savings-plug' ? 'Kept in account' : 'Leftover', 'in', (m) => engine.totals[m].leftover, { strong: true, hue: HUES.transfer, band: true }),
               ]
             })}
 
             {(Object.keys(engine.accounts).length > 0 || Object.keys(engine.pools).length > 0) && (
               <tr>
-                <th scope="row" className="sticky left-0 z-10 border-t bg-background px-2 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Balances</th>
+                <th scope="row" className={cn('sticky left-0 z-10 border-t bg-background px-2 py-1.5 text-left text-sm font-semibold', HUES.worth.bar, HUES.worth.text)}>Balances</th>
                 <td colSpan={months.length} className="border-t" />
               </tr>
             )}
@@ -200,19 +201,19 @@ export function GridScreen() {
               const marked = (m: MonthKey) => (s.months[m]?.adjustment ?? 0) !== 0 || s.months[m]?.projected === false
               if (acc.type === 'investment') {
                 return [
-                  derivedRow(`${acc.name} · value`, 'in', (m) => s.months[m]?.balance ?? 0, { strong: true, currency: s.currency, onClick: open, mark: marked }),
-                  derivedRow(`${acc.name} · deposited`, 'in', (m) => s.months[m]?.capital ?? 0, { muted: true, currency: s.currency }),
-                  derivedRow(`${acc.name} · return`, 'in', (m) => Math.round((s.months[m]?.totalReturn ?? 0) * 10000), { muted: true, format: (v) => (v === 0 ? '' : formatPercent(v / 10000, locale)) }),
+                  derivedRow(`${acc.name} · value`, 'in', (m) => s.months[m]?.balance ?? 0, { strong: true, currency: s.currency, onClick: open, mark: marked, hue: HUES.worth }),
+                  derivedRow(`${acc.name} · deposited`, 'in', (m) => s.months[m]?.capital ?? 0, { muted: true, currency: s.currency, hue: HUES.worth }),
+                  derivedRow(`${acc.name} · return`, 'in', (m) => Math.round((s.months[m]?.totalReturn ?? 0) * 10000), { muted: true, hue: HUES.worth, format: (v) => (v === 0 ? '' : formatPercent(v / 10000, locale)) }),
                 ]
               }
               const label = acc.type === 'credit-card' ? `${acc.name} · owed` : acc.type === 'loan' ? `${acc.name} · outstanding` : acc.name
-              return [derivedRow(label, s.liability ? 'out' : 'in', (m) => s.months[m]?.balance ?? 0, { strong: true, currency: s.currency, onClick: open, mark: marked })]
+              return [derivedRow(label, s.liability ? 'out' : 'in', (m) => s.months[m]?.balance ?? 0, { strong: true, currency: s.currency, onClick: open, mark: marked, hue: HUES.worth })]
             })}
             {Object.values(engine.pools).map((p) => {
               const pool = tables.pools.find((x) => x.id === p.poolId)
-              return derivedRow(`Pool account · ${pool?.name ?? ''}`, 'in', (m) => p.months[m]?.balance ?? 0)
+              return derivedRow(`Pool account · ${pool?.name ?? ''}`, 'in', (m) => p.months[m]?.balance ?? 0, { hue: HUES.pool })
             })}
-            {Object.keys(engine.accounts).length > 0 && derivedRow('Net worth', 'in', (m) => engine.netWorth[m] ?? 0, { strong: true })}
+            {Object.keys(engine.accounts).length > 0 && derivedRow('Net worth', 'in', (m) => engine.netWorth[m] ?? 0, { strong: true, hue: HUES.worth, band: true })}
           </tbody>
         </table>
       </div>
@@ -252,7 +253,7 @@ function GridRow({ row, rIndex, months, engine, ccy, locale, neg, onSelect, onEr
   const rowCcy = row.currency ?? ccy
   return (
     <tr className="group">
-      <th scope="row" className="sticky left-0 z-10 bg-background px-2 py-0.5 text-left font-normal">
+      <th scope="row" className={cn('sticky left-0 z-10 bg-background px-2 py-0.5 text-left font-normal', SECTION_HUE[row.section].edge)}>
         <div className="flex items-center gap-1">
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm">{row.name}{row.currency && row.currency !== ccy ? <span className="ml-1 text-xs text-muted-foreground">{row.currency}</span> : null}</div>

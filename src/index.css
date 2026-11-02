@@ -6,6 +6,20 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+    /* kinds of money: hue encodes what a number is, never decoration */
+    --color-income: var(--income);
+    --color-expense: var(--expense);
+    --color-transfer: var(--transfer);
+    --color-worth: var(--worth);
+    --color-pool: var(--pool);
+    --color-goal: var(--goal);
+    --color-draw: var(--draw);
+    --color-income-tint: var(--income-tint);
+    --color-expense-tint: var(--expense-tint);
+    --color-transfer-tint: var(--transfer-tint);
+    --color-worth-tint: var(--worth-tint);
+    --color-pool-tint: var(--pool-tint);
+    --color-goal-tint: var(--goal-tint);
     --font-heading: var(--font-sans);
     --font-sans: 'Geist Variable', sans-serif;
     --color-sidebar-ring: var(--sidebar-ring);
@@ -49,6 +63,19 @@
 }
 
 :root {
+    --income: oklch(0.52 0.13 150);
+    --expense: oklch(0.52 0.17 25);
+    --transfer: oklch(0.50 0.13 255);
+    --worth: oklch(0.48 0.14 310);
+    --pool: oklch(0.55 0.10 195);
+    --goal: oklch(0.70 0.15 72);
+    --draw: oklch(0.60 0.15 70);
+    --income-tint: color-mix(in oklch, var(--income) 9%, white);
+    --expense-tint: color-mix(in oklch, var(--expense) 9%, white);
+    --transfer-tint: color-mix(in oklch, var(--transfer) 9%, white);
+    --worth-tint: color-mix(in oklch, var(--worth) 9%, white);
+    --pool-tint: color-mix(in oklch, var(--pool) 9%, white);
+    --goal-tint: color-mix(in oklch, var(--goal) 14%, white);
     --background: oklch(1 0 0);
     --foreground: oklch(0.145 0 0);
     --card: oklch(1 0 0);
@@ -84,6 +111,19 @@
 }
 
 .dark {
+    --income: oklch(0.76 0.14 150);
+    --expense: oklch(0.74 0.16 22);
+    --transfer: oklch(0.74 0.12 255);
+    --worth: oklch(0.74 0.13 310);
+    --pool: oklch(0.76 0.10 195);
+    --goal: oklch(0.82 0.14 78);
+    --draw: oklch(0.80 0.14 75);
+    --income-tint: color-mix(in oklch, var(--income) 16%, oklch(0.145 0 0));
+    --expense-tint: color-mix(in oklch, var(--expense) 16%, oklch(0.145 0 0));
+    --transfer-tint: color-mix(in oklch, var(--transfer) 16%, oklch(0.145 0 0));
+    --worth-tint: color-mix(in oklch, var(--worth) 16%, oklch(0.145 0 0));
+    --pool-tint: color-mix(in oklch, var(--pool) 16%, oklch(0.145 0 0));
+    --goal-tint: color-mix(in oklch, var(--goal) 20%, oklch(0.145 0 0));
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);
     --card: oklch(0.205 0 0);

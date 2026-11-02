@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CellSchema, RowSchema, newId, type Row } from '@/model'
+import { CellSchema, RowSchema, SCHEMA_VERSION, newId, type Row } from '@/model'
 import { CasaDb, Store } from '@/store'
 
 function fresh() {
@@ -16,7 +16,7 @@ describe('store', () => {
     const a = await s.meta()
     const b = await s.meta()
     expect(a.deviceId).toBe(b.deviceId)
-    expect(a.schemaVersion).toBe(1)
+    expect(a.schemaVersion).toBe(SCHEMA_VERSION)
   })
 
   it('commits puts and records events with inverses', async () => {

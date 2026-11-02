@@ -10,6 +10,8 @@ import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useE
 import { cellKey, computeContributions, computePersonBudgets, type EngineOutput } from '@/engine'
 import { isDue, monthOfDate, type Household, type MonthKey, type Tables } from '@/model'
 import { closeMonth, recurringStatus, reopenMonth, setCellDone, setRecurringPaid } from '@/store'
+import { HUES, cardBar, type Hue } from '@/app/hues'
+import { GoalsCard } from '@/features/goals/GoalsCard'
 
 export function MovesScreen() {
   const store = useStore()
@@ -40,17 +42,19 @@ export function MovesScreen() {
 
       <Card>
         <CardContent className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-5">
-          <Stat label="Income" value={formatAmount(t.income, ccy, locale)} />
-          <Stat label="Expenses" value={formatAmount(t.expensesTotal, ccy, locale)} />
-          <Stat label="To savings" value={formatAmount(t.toSavings, ccy, locale, { sign: 'exceptZero' })} />
-          <Stat label="Net worth" value={formatAmount(engine.netWorth[m] ?? 0, ccy, locale)} />
+          <Stat label="Income" value={formatAmount(t.income, ccy, locale)} hue={HUES.income} />
+          <Stat label="Expenses" value={formatAmount(t.expensesTotal, ccy, locale)} hue={HUES.expense} />
+          <Stat label="To savings" value={formatAmount(t.toSavings, ccy, locale, { sign: 'exceptZero' })} hue={HUES.transfer} />
+          <Stat label="Net worth" value={formatAmount(engine.netWorth[m] ?? 0, ccy, locale)} hue={HUES.worth} />
           <Stat label={openCount === 0 ? 'All moves done' : 'Moves left'} value={String(openCount)} />
         </CardContent>
       </Card>
 
+      <GoalsCard household={household} tables={tables} engine={engine} month={m} />
+
       {household.moneyMode === 'proportional' ? <WhoPaysWhat household={household} tables={tables} engine={engine} month={m} /> : <PerPerson household={household} tables={tables} engine={engine} month={m} />}
 
-      <Card>
+      <Card className={cardBar(HUES.transfer)}>
         <CardHeader>
           <CardTitle>Transfers to make</CardTitle>
           <CardDescription>Money that leaves the main account this month on purpose. Tick when transferred.</CardDescription>
@@ -65,13 +69,13 @@ export function MovesScreen() {
                 <Check label="" aria-label={`${row.name} transferred`} className="w-24" checked={cell.status === 'done'} disabled={t.closed} onChange={(e) => act(() => setCellDone(store, row.id, m, e.target.checked))} />
               )}
               <span className="flex-1">{row.name}{row.accountId && <span className="text-muted-foreground"> → {accountName(row.accountId)}</span>}</span>
-              <span className={`tabular-nums ${cell.value < 0 ? 'text-amber-700 dark:text-amber-400' : ''}`}>{formatAmount(Math.abs(cell.value), ccy, locale)}{cell.value < 0 ? ' back' : ''}</span>
+              <span className={`tabular-nums ${cell.value < 0 ? 'text-draw' : ''}`}>{formatAmount(Math.abs(cell.value), ccy, locale)}{cell.value < 0 ? ' back' : ''}</span>
             </div>
           ))}
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className={cardBar(HUES.expense)}>
         <CardHeader>
           <CardTitle>Payments due</CardTitle>
           <CardDescription>Recurring items that fall in {formatMonth(m, locale)}.</CardDescription>
@@ -138,7 +142,7 @@ function WhoPaysWhat({ household, tables, engine, month }: { household: Househol
           </table>
         </div>
         <div>
-          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Transfers per person</p>
+          <p className="mb-1 text-sm font-medium">Transfers per person</p>
           <table className="w-full text-sm">
             <tbody className="divide-y">
               {destinations.map((d) => (
@@ -183,10 +187,10 @@ function PerPerson({ household, tables, engine, month }: { household: Household;
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, hue }: { label: string; value: string; hue?: Hue }) {
   return (
     <div>
-      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className={hue ? `text-xs ${hue.text}` : 'text-xs text-muted-foreground'}>{label}</div>
       <div className="tabular-nums">{value}</div>
     </div>
   )

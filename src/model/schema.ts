@@ -4,7 +4,7 @@ import { MONTH_PATTERN } from './month'
 import { FUNDED_BY_PATTERN } from './fundedBy'
 
 /** Bump when the shape of stored data changes; add a migration in migrations.ts. */
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 
 // ---------- primitives ----------
 export const IdSchema = z.string().regex(ID_PATTERN, 'expected ULID')
@@ -228,9 +228,29 @@ export const MonthStateSchema = z.object({
 })
 
 // ---------- events & meta ----------
+// ---------- goals ----------
+export const GoalKindSchema = z.enum(['account-balance', 'pool-balance', 'pay-off', 'net-worth'])
+
+/** A finish line: grow an account or pool account to an amount, clear a debt, or reach a net worth. */
+export const GoalSchema = BaseRecord.extend({
+  name: z.string().min(1),
+  kind: GoalKindSchema,
+  /** account-balance and pay-off: the account watched. */
+  accountId: IdSchema.nullable().default(null),
+  /** pool-balance: the pool account watched. */
+  poolId: IdSchema.nullable().default(null),
+  /** Minor units in the account's currency (account kinds) or the base currency (pool, net worth). 0 for pay-off. */
+  target: MoneySchema.default(0),
+  /** Month the goal was set; pay-off progress counts down from what was owed then. */
+  startMonth: MonthKeySchema,
+  targetMonth: MonthKeySchema.nullable().default(null),
+  notes: z.string().default(''),
+  order: z.string().default('a0'),
+})
+
 export const TableNameSchema = z.enum([
   'household', 'entities', 'accounts', 'accountMonths', 'categories', 'rows',
-  'cells', 'recurringItems', 'pools', 'fxRates', 'monthStates',
+  'cells', 'recurringItems', 'pools', 'fxRates', 'monthStates', 'goals',
 ])
 
 /** Every mutation is a put (full record) or a delete (by key). `inverse` is the previous record, null if none. */
@@ -270,6 +290,7 @@ export const TablesSchema = z.object({
   pools: z.array(PoolSchema),
   fxRates: z.array(FxRateSchema),
   monthStates: z.array(MonthStateSchema),
+  goals: z.array(GoalSchema).default([]),
 })
 
 export const ExportFileSchema = z.object({
@@ -299,6 +320,8 @@ export type RecurringItem = z.infer<typeof RecurringItemSchema>
 export type Cadence = z.infer<typeof CadenceSchema>
 export type Pool = z.infer<typeof PoolSchema>
 export type FxRate = z.infer<typeof FxRateSchema>
+export type Goal = z.infer<typeof GoalSchema>
+export type GoalKind = z.infer<typeof GoalKindSchema>
 export type FxMonthRate = z.infer<typeof FxMonthRateSchema>
 export type MonthState = z.infer<typeof MonthStateSchema>
 export type TableName = z.infer<typeof TableNameSchema>
@@ -320,6 +343,7 @@ export type TableRecord = {
   pools: Pool
   fxRates: FxRate
   monthStates: MonthState
+  goals: Goal
 }
 
 export const TABLE_SCHEMAS = {
@@ -334,9 +358,10 @@ export const TABLE_SCHEMAS = {
   pools: PoolSchema,
   fxRates: FxRateSchema,
   monthStates: MonthStateSchema,
+  goals: GoalSchema,
 } as const
 
 export const EMPTY_TABLES: Tables = {
   household: [], entities: [], accounts: [], accountMonths: [], categories: [], rows: [],
-  cells: [], recurringItems: [], pools: [], fxRates: [], monthStates: [],
+  cells: [], recurringItems: [], pools: [], fxRates: [], monthStates: [], goals: [],
 }

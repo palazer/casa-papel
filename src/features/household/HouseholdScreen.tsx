@@ -2,6 +2,7 @@ import { MonthField } from '@/components/MonthField'
 import { RecurringList } from '@/features/recurring/RecurringList'
 import { FxCard } from './FxCard'
 import { SharesCard } from './SharesCard'
+import { HUES, cardBar } from '@/app/hues'
 import { PoolsCard } from './PoolsCard'
 import { useMemo, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
@@ -44,7 +45,7 @@ export function HouseholdScreen() {
       <AccountsCard household={household} accounts={tables.accounts.filter((a) => !a.deletedAt)} entities={tables.entities} engine={engine} months={months} onError={setError} />
       <PoolsCard household={household} tables={tables} engine={engine} onError={setError} />
       <FxCard household={household} tables={tables} months={months} onError={setError} />
-      <Card>
+      <Card className={cardBar(HUES.transfer)}>
         <CardHeader>
           <CardTitle>Recurring payments and incomes</CardTitle>
           <CardDescription>Rent, salary, insurance, subscriptions: anything on a schedule. They land in the grid by themselves and show up in Moves when due.</CardDescription>
@@ -219,7 +220,7 @@ function AccountsCard({ household, accounts, entities, engine, months, onError }
   const [actualsFor, setActualsFor] = useState<string | null>(null)
   const { locale, baseCurrency } = household
   return (
-    <Card>
+    <Card className={cardBar(HUES.worth)}>
       <CardHeader>
         <CardTitle>Accounts</CardTitle>
         <CardDescription>Savings accounts get a running balance from your grid. Enter the real balance any month to keep it honest.</CardDescription>
