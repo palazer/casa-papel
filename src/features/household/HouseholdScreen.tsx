@@ -41,7 +41,7 @@ export function HouseholdScreen() {
       {error && <p className="text-sm text-destructive">{error}</p>}
       <SettingsCard household={household} tables={tables} onSave={(p) => act(() => updateHousehold(store, p))} onMonthly={(key, value, scope) => act(() => setMonthlyDefault(store, key, value, scope, monthOfDate()))} />
       {household.moneyMode === 'proportional' && <SharesCard household={household} tables={tables} engine={engine} onError={setError} />}
-      <EntitiesCard household={household} entities={tables.entities.filter((e) => !e.deletedAt && !e.archivedMonth)} onError={setError} />
+      <EntitiesCard household={household} entities={tables.entities.filter((e) => !e.deletedAt)} onError={setError} />
       <AccountsCard household={household} accounts={tables.accounts.filter((a) => !a.deletedAt)} entities={tables.entities} engine={engine} months={months} onError={setError} />
       <PoolsCard household={household} tables={tables} engine={engine} onError={setError} />
       <FxCard household={household} tables={tables} months={months} onError={setError} />
@@ -122,12 +122,15 @@ function SettingsCard({ household: h, tables, onSave, onMonthly }: { household: 
   )
 }
 
-function EntitiesCard({ household, entities, onError }: { household: Household; entities: Entity[]; onError: (m: string) => void }) {
+function EntitiesCard({ household, entities: allEntities, onError }: { household: Household; entities: Entity[]; onError: (m: string) => void }) {
   const store = useStore()
   const [kind, setKind] = useState<EntityKind>('adult')
   const [name, setName] = useState('')
   const [paidBy, setPaidBy] = useState('')
   const [templatesFor, setTemplatesFor] = useState<Entity | null>(null)
+  const [archiving, setArchiving] = useState<string | null>(null)
+  const entities = allEntities.filter((e) => !e.archivedMonth)
+  const archived = allEntities.filter((e) => e.archivedMonth)
   const adults = entities.filter((e) => e.kind === 'adult')
   const act = (fn: () => Promise<unknown>) => void fn().catch((e) => onError(e instanceof Error ? e.message : 'Action failed'))
   const add = () => {
@@ -155,12 +158,37 @@ function EntitiesCard({ household, entities, onError }: { household: Household; 
               )}
               <span className="ml-auto flex gap-1">
                 <Button size="xs" variant="outline" onClick={() => setTemplatesFor(e)}>Suggested rows…</Button>
-                <Button size="xs" variant="ghost" onClick={() => act(() => updateEntity(store, e.id, { archivedMonth: monthOfDate() }))}>Archive</Button>
+                {archiving === e.id ? (
+                  <>
+                    <Button size="xs" variant="destructive" onClick={() => { setArchiving(null); act(() => updateEntity(store, e.id, { archivedMonth: monthOfDate() })) }}>Really archive</Button>
+                    <Button size="xs" variant="ghost" onClick={() => setArchiving(null)}>Cancel</Button>
+                  </>
+                ) : (
+                  <Button size="xs" variant="ghost" onClick={() => setArchiving(e.id)}>Archive</Button>
+                )}
               </span>
+              {archiving === e.id && (
+                <p className="basis-full text-xs text-muted-foreground">Archiving hides {e.name} from this list from {formatMonth(monthOfDate(), household.locale)} on. Rows and past months stay as they are. Restore any time from the archived list below.</p>
+              )}
             </li>
           ))}
           {entities.length === 0 && <li className="px-3 py-2 text-sm text-muted-foreground">Nobody yet.</li>}
         </ul>
+        {archived.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground">Archived</p>
+            <ul className="divide-y rounded-md border">
+              {archived.map((e) => (
+                <li key={e.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+                  <Badge variant="outline">{ENTITY_KIND_LABEL[e.kind]}</Badge>
+                  <span>{e.name}</span>
+                  <span className="text-xs">since {formatMonth(e.archivedMonth!, household.locale)}</span>
+                  <Button size="xs" variant="outline" className="ml-auto" onClick={() => act(() => updateEntity(store, e.id, { archivedMonth: null }))}>Restore</Button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2">
             {KINDS.map((k) => (

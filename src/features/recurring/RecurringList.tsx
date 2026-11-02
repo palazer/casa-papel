@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { MoreHorizontal } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,7 @@ export function RecurringList() {
   const [month, setMonth] = useState<MonthKey>(() => monthOfDate())
   const [editing, setEditing] = useState<RecurringItem | 'new' | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
   if (!tables || !household) return null
   const { locale, baseCurrency } = household
   const m = months.includes(month) ? month : months[months.length - 1]
@@ -48,7 +49,8 @@ export function RecurringList() {
               const status = recurringStatus(tables, it, m)
               const ended = it.endMonth != null && it.endMonth < m
               return (
-                <tr key={it.id} className={ended ? 'text-muted-foreground' : ''}>
+                <Fragment key={it.id}>
+                <tr className={ended ? 'text-muted-foreground' : ''}>
                   <td className="px-3 py-2 font-medium">{it.name}{ended && <span className="ml-1 text-xs font-normal">(ended {formatMonth(it.endMonth!, locale)})</span>}</td>
                   <td className="px-3 py-2">{rowName(it.rowId)}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{formatAmount(it.amount, it.currency ?? baseCurrency, locale)}</td>
@@ -74,11 +76,23 @@ export function RecurringList() {
                         ) : (
                           <DropdownMenuItem onClick={() => act(() => endRecurringItem(store, it.id, m))}>End after {formatMonth(m, locale)}</DropdownMenuItem>
                         )}
-                        <DropdownMenuItem onClick={() => act(() => deleteRecurringItem(store, it.id))}>Delete</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setDeleting(it.id)}>Delete…</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>
                 </tr>
+                {deleting === it.id && (
+                  <tr>
+                    <td colSpan={7} className="px-3 py-2">
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="text-muted-foreground">Delete "{it.name}" for good? Nothing more will be posted; amounts already in the grid stay. To stop it from a month on instead, use "End after".</span>
+                        <Button size="xs" variant="destructive" onClick={() => { setDeleting(null); act(() => deleteRecurringItem(store, it.id)) }}>Really delete</Button>
+                        <Button size="xs" variant="ghost" onClick={() => setDeleting(null)}>Cancel</Button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               )
             })}
             {items.length === 0 && <tr><td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">Nothing recurring yet. Rent, salary, insurance, subscriptions all belong here.</td></tr>}
