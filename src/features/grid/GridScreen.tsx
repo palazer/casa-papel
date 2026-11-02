@@ -16,7 +16,8 @@ import { AddRowInline } from './AddRowInline'
 import { BalanceDialog } from './BalanceDialog'
 import { CellEditor } from './CellEditor'
 import { RowMenu } from './RowMenu'
-import { amountDisplay, flowOf, statusClass, toneClass, type Flow } from './display'
+import { amountDisplay, doneLabel, doneness, flowOf, statusClass, toneClass, type Flow } from './display'
+import { DoneDot } from './DoneDot'
 
 const SECTIONS: Array<{ key: Section; title: string }> = [
   { key: 'income', title: 'Income' },
@@ -221,6 +222,9 @@ export function GridScreen() {
       <div className="flex items-center gap-3 text-xs text-muted-foreground">
         <Button size="xs" variant="outline" onClick={() => { const n = extra + 12; setExtra(n); writePref('horizonExtra', n) }}>Show 12 more months</Button>
         <span>Click a cell to edit. Arrow keys move, Enter opens. Click a month name to close or reopen it.</span>
+        <span className="inline-flex flex-wrap items-center gap-x-1.5">
+          <span className="italic underline decoration-dashed decoration-partial underline-offset-4">Italic</span> = estimate · <Check className="size-3 text-done" aria-hidden /> = done · this month: <DoneDot done={0} total={1} state="none" /> not yet, <DoneDot done={1} total={2} state="partial" /> partly, <DoneDot done={1} total={1} state="all" /> done.
+        </span>
       </div>
 
       {balanceSel && (() => {
@@ -267,10 +271,12 @@ function GridRow({ row, rIndex, months, engine, ccy, locale, neg, onSelect, onEr
       {months.map((m, c) => {
         const cell = engine.cells[cellKey(row.id, m)]
         if (!cell) return <td key={m} />
+        const today = monthOfDate()
         const closed = engine.totals[m]?.closed
         const isDerived = cell.source === 'derived'
         const isEmpty = cell.source === 'empty' || (cell.source === 'items' && cell.items.every((i) => i.skipped))
         const d = amountDisplay(cell.value, flow, rowCcy, locale, neg)
+        const dot = m === today && !closed && !isDerived && !isEmpty ? doneness(cell) : null
         return (
           <td key={m} className={cn('p-0', closed && 'bg-muted/60')}>
             {cell.source === 'archived' ? null : isDerived ? (
@@ -280,15 +286,17 @@ function GridRow({ row, rIndex, months, engine, ccy, locale, neg, onSelect, onEr
                 type="button"
                 data-cell={`${rIndex},${c}`}
                 tabIndex={rIndex === 0 && c === 0 ? 0 : -1}
-                aria-label={`${row.name} ${formatMonth(m, locale)}: ${isEmpty ? 'empty' : d.text}`}
+                aria-label={`${row.name} ${formatMonth(m, locale)}: ${isEmpty ? 'empty' : d.text}${dot ? `, ${doneLabel(dot)}` : ''}`}
                 onClick={() => onSelect(m)}
                 className={cn(
-                  'flex w-full items-center justify-end gap-1 px-2 py-1 text-right tabular-nums outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring',
+                  'relative flex w-full items-center justify-end gap-1 px-2 py-1 text-right tabular-nums outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring',
+                  dot && 'pr-3.5',
                   isEmpty ? 'text-muted-foreground/40' : toneClass[d.tone],
                   !isEmpty && statusClass[cell.status],
                 )}
               >
-                {cell.status === 'done' && !isEmpty && <Check className="size-3 text-muted-foreground" aria-hidden />}
+                {dot && <DoneDot {...dot} className="absolute right-1 top-1" />}
+                {cell.status === 'done' && !isEmpty && <Check className="size-3 text-done" aria-hidden />}
                 {isEmpty ? '·' : d.text}
               </button>
             )}

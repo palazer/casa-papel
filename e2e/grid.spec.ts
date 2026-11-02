@@ -41,7 +41,7 @@ test.describe('grid', () => {
     await page.getByRole('radio', { name: 'Done' }).click()
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByRole('dialog')).toBeHidden()
-    await expect(page.getByRole('button', { name: /^Utilities Jan 2027/ }).locator('svg')).toBeVisible()
+    await expect(page.getByRole('button', { name: /^Utilities Jan 2027/ }).locator('svg.lucide-check')).toBeVisible()
     await page.getByRole('button', { name: /^Utilities Jan 2027/ }).click()
     await expect(page.getByRole('tab', { name: 'Single amount' })).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByRole('radio', { name: 'Done' })).toBeChecked()

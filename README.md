@@ -11,7 +11,7 @@ Try it without touching your own data: https://palazer.github.io/casa-papel/?dem
 ## What it does today
 
 - **Grid**: months across, rows down. A cell is a single amount or a list of items; amounts carry forward until you change them, for this month only or from this month on.
-- **Certainty**: every amount is an estimate, certain, or done. It changes how things look, never how they add up. Closing a month marks everything done and locks it.
+- **Certainty**: every amount is an estimate, certain, or done. It changes how things look, never how they add up: estimates are italic with an amber dashed underline, done amounts get a green tick, and in the current month each cell carries a dot (red nothing done yet, amber partly, green all done). Itemized cells can be marked done one item at a time or all at once. Closing a month marks everything done and locks it.
 - **Household setup**: adults, children, pets, vehicles, home, company, accounts. Each one suggests the rows it usually needs.
 - **Recurring**: rent, salary, insurance, subscriptions, with monthly, quarterly, half-yearly, yearly or custom-month schedules. They land in their due months by themselves. Managed from the grid: change an amount for one month or from now on, skip a month, end the schedule. The full list lives under Household.
 - **This month's moves**: the transfers and payments to make this month, as a checklist.

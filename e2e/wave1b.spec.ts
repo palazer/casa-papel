@@ -104,7 +104,7 @@ test.describe('wave 1b', () => {
     await page.getByRole('button', { name: 'Household' }).click()
     await expect(page.getByLabel('Rent paid in Nov 2026')).toBeChecked()
     await page.getByRole('button', { name: 'Grid' }).click()
-    await expect(page.getByRole('button', { name: /^Rent Nov 2026/ }).locator('svg')).toBeVisible()
+    await expect(page.getByRole('button', { name: /^Rent Nov 2026/ }).locator('svg.lucide-check')).toBeVisible()
   })
 })
 

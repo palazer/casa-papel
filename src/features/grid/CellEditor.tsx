@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Repeat, Trash2 } from 'lucide-react'
+import { Check, Repeat, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -126,6 +126,12 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
 
   function updateItem(id: string, patch: Partial<CellItem>) {
     setItems((list) => list.map((it) => (it.id === id ? { ...it, ...patch } : it)))
+  }
+
+  const liveItems = items.filter((i) => !i.skipped)
+  const doneCount = liveItems.filter((i) => i.status === 'done').length
+  function markAllDone() {
+    setItems((list) => list.map((it) => (it.skipped ? it : { ...it, status: 'done' })))
   }
 
   function addItem() {
@@ -289,10 +295,16 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
                     </div>
                   )
                 })}
-                <div className="flex items-center justify-between">
-                  <Button size="sm" variant="outline" onClick={addItem}>Add item</Button>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button size="sm" variant="outline" onClick={addItem}>Add item</Button>
+                    {liveItems.length > 0 && doneCount < liveItems.length && <Button size="sm" variant="outline" onClick={markAllDone}>Mark all done</Button>}
+                    {liveItems.length > 0 && doneCount === liveItems.length && <span className="inline-flex items-center gap-1 text-sm text-done"><Check className="size-3.5" aria-hidden />All done</span>}
+                    {doneCount > 0 && doneCount < liveItems.length && <span className="text-xs text-muted-foreground">{doneCount} of {liveItems.length} done</span>}
+                  </div>
                   <span className="text-sm tabular-nums">Total {formatAmount(itemsTotal, currency, locale)}</span>
                 </div>
+                <p className="text-xs text-muted-foreground">Set an item to Done when it is paid or received. In the current month the cell shows a dot: red nothing done yet, amber partly, green all done.</p>
                 {row.section === 'expense' && (
                   <p className="text-xs text-muted-foreground">"Comes out of" is the budget side: this month's income (the normal case), the savings balance, or a pool account. Savings and pool accounts do not reduce this month's leftover.</p>
                 )}

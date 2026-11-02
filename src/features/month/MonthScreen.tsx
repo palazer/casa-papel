@@ -13,7 +13,8 @@ import { cellKey } from '@/engine'
 import { monthOfDate, type MonthKey, type Section } from '@/model'
 import { closeMonth, reopenMonth } from '@/store'
 import { CellEditor } from '@/features/grid/CellEditor'
-import { amountDisplay, flowOf, statusClass, toneClass } from '@/features/grid/display'
+import { amountDisplay, doneLabel, doneness, flowOf, statusClass, toneClass } from '@/features/grid/display'
+import { DoneDot } from '@/features/grid/DoneDot'
 
 const SECTIONS: Array<{ key: Section; title: string }> = [
   { key: 'income', title: 'Income' },
@@ -82,16 +83,18 @@ export function MonthScreen() {
                 if (!c || c.source === 'archived') return null
                 const d = amountDisplay(c.value, flowOf(r), r.currency ?? ccy, locale, neg)
                 const derived = c.source === 'derived'
+                const dot = !derived && c.source !== 'empty' && m === monthOfDate() && !engine.totals[m]?.closed ? doneness(c) : null
                 return (
                   <button
                     key={r.id} type="button" disabled={derived}
                     className={cn('flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm', !derived && 'hover:bg-accent', derived && 'bg-muted/40')}
                     onClick={() => setSelectedRow(r.id)}
-                    aria-label={`${r.name}: ${d.text}`}
+                    aria-label={`${r.name}: ${d.text}${dot ? `, ${doneLabel(dot)}` : ''}`}
                   >
                     <span className="truncate">{r.name}</span>
                     <span className={cn('flex items-center gap-1 tabular-nums', toneClass[d.tone], c.source === 'empty' ? 'text-muted-foreground/40' : statusClass[c.status])}>
-                      {c.status === 'done' && c.source !== 'empty' && <Check className="size-3 text-muted-foreground" />}
+                      {dot && <DoneDot {...dot} className="mr-0.5" />}
+                      {c.status === 'done' && c.source !== 'empty' && <Check className="size-3 text-done" aria-hidden />}
                       {c.source === 'empty' ? '·' : d.text}
                     </span>
                   </button>
