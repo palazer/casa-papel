@@ -296,7 +296,7 @@ function GridRow({ row, rIndex, months, engine, ccy, locale, neg, onSelect, onEr
                 )}
               >
                 {dot && <DoneDot {...dot} className="absolute right-1 top-1" />}
-                {cell.status === 'done' && !isEmpty && <Check className="size-3 text-done" aria-hidden />}
+                {cell.status === 'done' && !isEmpty && !dot && <Check className="size-3 text-done" aria-hidden />}
                 {isEmpty ? '·' : d.text}
               </button>
             )}

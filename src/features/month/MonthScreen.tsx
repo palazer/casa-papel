@@ -94,7 +94,7 @@ export function MonthScreen() {
                     <span className="truncate">{r.name}</span>
                     <span className={cn('flex items-center gap-1 tabular-nums', toneClass[d.tone], c.source === 'empty' ? 'text-muted-foreground/40' : statusClass[c.status])}>
                       {dot && <DoneDot {...dot} className="mr-0.5" />}
-                      {c.status === 'done' && c.source !== 'empty' && <Check className="size-3 text-done" aria-hidden />}
+                      {c.status === 'done' && c.source !== 'empty' && !dot && <Check className="size-3 text-done" aria-hidden />}
                       {c.source === 'empty' ? '·' : d.text}
                     </span>
                   </button>
