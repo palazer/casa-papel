@@ -34,7 +34,7 @@ test.describe('wave 1c', () => {
     await page.screenshot({ path: 'e2e/output/fx-card.png', fullPage: true })
 
     // a pool with a monthly amount and a spending row
-    await page.getByRole('button', { name: 'Add pool' }).click()
+    await page.getByRole('button', { name: 'Add pool account' }).click()
     await page.getByRole('dialog').getByLabel('Name', { exact: true }).fill('Gifts')
     await page.getByRole('dialog').getByLabel(/^Set aside each month/).fill('50')
     await page.getByRole('dialog').getByRole('button', { name: 'Save' }).click()
@@ -43,7 +43,7 @@ test.describe('wave 1c', () => {
 
     // grid: balances show the broker and the pool; pin a real value and watch December project from it
     await page.getByRole('button', { name: 'Grid' }).click()
-    await expect(page.getByText('Pool · Gifts')).toBeVisible()
+    await expect(page.getByText('Pool account · Gifts')).toBeVisible()
     await expect(page.getByRole('button', { name: /^Gifts pool Nov 2026/ })).toContainText('50')
     const brokerNov = page.getByRole('button', { name: /^Broker · value Nov 2026/ })
     await expect(brokerNov).toBeVisible()

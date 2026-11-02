@@ -182,7 +182,7 @@ export function GridScreen() {
                 ),
                 key === 'income' && derivedRow('Income total', 'in', (m) => engine.totals[m].income, { strong: true }),
                 key === 'expense' && derivedRow('Expenses total', 'out', (m) => engine.totals[m].expensesTotal, { strong: true }),
-                key === 'expense' && months.some((m) => engine.totals[m].fromSavingsDerived !== 0) && derivedRow('of which from savings & pools', 'in', (m) => engine.totals[m].fromSavingsDerived, { muted: true }),
+                key === 'expense' && months.some((m) => engine.totals[m].fromSavingsDerived !== 0) && derivedRow('of which from savings & pool accounts', 'in', (m) => engine.totals[m].fromSavingsDerived, { muted: true }),
                 key === 'transfer' && derivedRow(household.closingRule === 'savings-plug' ? 'Kept in account' : 'Leftover', 'in', (m) => engine.totals[m].leftover, { strong: true }),
               ]
             })}
@@ -210,7 +210,7 @@ export function GridScreen() {
             })}
             {Object.values(engine.pools).map((p) => {
               const pool = tables.pools.find((x) => x.id === p.poolId)
-              return derivedRow(`Pool · ${pool?.name ?? ''}`, 'in', (m) => p.months[m]?.balance ?? 0)
+              return derivedRow(`Pool account · ${pool?.name ?? ''}`, 'in', (m) => p.months[m]?.balance ?? 0)
             })}
             {Object.keys(engine.accounts).length > 0 && derivedRow('Net worth', 'in', (m) => engine.netWorth[m] ?? 0, { strong: true })}
           </tbody>

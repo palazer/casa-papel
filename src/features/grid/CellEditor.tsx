@@ -60,7 +60,7 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
     () => [
       { value: 'cash', label: "This month's income" },
       { value: 'savings', label: 'Savings balance' },
-      ...pools.map((p) => ({ value: poolRef(p.id), label: `Pool: ${p.name}` })),
+      ...pools.map((p) => ({ value: poolRef(p.id), label: `Pool account: ${p.name}` })),
     ],
     [pools],
   )
@@ -294,7 +294,7 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
                   <span className="text-sm tabular-nums">Total {formatAmount(itemsTotal, currency, locale)}</span>
                 </div>
                 {row.section === 'expense' && (
-                  <p className="text-xs text-muted-foreground">"Comes out of" is the budget side: this month's income (the normal case), the savings balance, or a pool. Savings and pools do not reduce this month's leftover.</p>
+                  <p className="text-xs text-muted-foreground">"Comes out of" is the budget side: this month's income (the normal case), the savings balance, or a pool account. Savings and pool accounts do not reduce this month's leftover.</p>
                 )}
                 {!isRecurringRow && (
                   <Segmented value={scope} onChange={(v) => setScope(v as EditScope)} options={[{ value: 'from-now-on', label: 'This month and onwards' }, { value: 'this-month', label: 'Only this month' }]} />

@@ -7,8 +7,8 @@ import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/features/grid/NativeSelect'
 import { formatMonth } from '@/app/format'
 import { useStore } from '@/app/store'
-import { buildFxIndex, rateInfo } from '@/engine'
-import { monthOfDate, type FxMonthRate, type Household, type MonthKey, type Tables } from '@/model'
+import { buildFxIndex, driftFor, rateInfo } from '@/engine'
+import { addMonths, compareMonths, monthOfDate, type FxMonthRate, type Household, type MonthKey, type Tables } from '@/model'
 import { fetchEcbRates, neededPairs, setFxSettings, setManualRate } from '@/store'
 
 export function FxCard({ household, tables, months, onError }: { household: Household; tables: Tables; months: MonthKey[]; onError: (m: string) => void }) {
@@ -23,14 +23,27 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
     [tables.fxRates, driftMode, household.fxDriftDefault, household.fxPairDrift],
   )
   const stored = useMemo(() => new Map(tables.fxRates.map((r) => [`${r.pair}|${r.month}`, r])), [tables.fxRates])
+  // what the known history says about the monthly change, per pair
+  const history = useMemo(() => buildFxIndex(tables.fxRates, { driftMode: 'average' }), [tables.fxRates])
+  const suggestions = pairs.map((p) => ({ pair: p, known: history.pairs.get(p)?.length ?? 0, drift: driftFor(history, p), override: household.fxPairDrift?.[p] }))
+  const pct = (d: number) => `${d > 0 ? '+' : ''}${(d * 100).toFixed(2)}%`
+  const setPairDrift = (pair: string, value: number | null) => {
+    const next = { ...(household.fxPairDrift ?? {}) }
+    if (value == null) delete next[pair]
+    else next[pair] = value
+    act(() => setFxSettings(store, { fxPairDrift: next }))
+  }
   const act = (fn: () => Promise<unknown>) => void fn().catch((e) => onError(e instanceof Error ? e.message : 'Action failed'))
 
   async function fetchNow() {
     setBusy(true)
     setNote(null)
     try {
-      const res = await fetchEcbRates(store, { base: household.baseCurrency, symbols: pairs.map((p) => p.split('/')[1]), from: household.startMonth, to: monthOfDate(), policy: household.fxMonthRate })
-      setNote(`Stored ${res.written} month rate${res.written === 1 ? '' : 's'} from the ECB.${res.unsupported.length ? ` Not published by the ECB: ${res.unsupported.join(', ')}; enter those by hand.` : ''}`)
+      // a year before the first month too, so the average change has something to work with
+      const yearAgo = addMonths(monthOfDate(), -13)
+      const from = compareMonths(yearAgo, household.startMonth) < 0 ? yearAgo : household.startMonth
+      const res = await fetchEcbRates(store, { base: household.baseCurrency, symbols: pairs.map((p) => p.split('/')[1]), from, to: monthOfDate(), policy: household.fxMonthRate })
+      setNote(`Stored ${res.written} month rate${res.written === 1 ? '' : 's'} from the ECB.${res.unsupported.length ? ` Not published by the ECB: ${res.unsupported.join(', ')}; enter those by hand.` : ''} The average change per month is shown under the drift setting.`)
     } catch (e) {
       onError(e instanceof Error ? e.message : 'Could not fetch rates')
     } finally {
@@ -74,6 +87,28 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
                   onBlur={() => { const v = Number(drift.replace(',', '.')); if (Number.isFinite(v)) act(() => setFxSettings(store, { fxDriftDefault: v / 100 })); else onError('Drift is not a number.') }}
                 />
                 <p className="text-xs text-muted-foreground">1.5 means the rate rises 1.5% every month after the last known one. 0 keeps it flat.</p>
+              </div>
+            )}
+            {driftMode === 'fixed' && (
+              <div className="space-y-1 text-xs sm:col-span-3">
+                {suggestions.map((s) => (
+                  <div key={s.pair} className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{s.pair}</span>
+                    {s.known >= 2 ? (
+                      <span className="text-muted-foreground">ECB history, {s.known} months: {pct(s.drift)} per month on average</span>
+                    ) : (
+                      <span className="text-muted-foreground">fetch ECB rates to get a suggestion from the last year</span>
+                    )}
+                    {s.override != null ? (
+                      <>
+                        <Badge variant="secondary">using {pct(s.override)}</Badge>
+                        <Button size="xs" variant="ghost" onClick={() => setPairDrift(s.pair, null)}>Back to the default</Button>
+                      </>
+                    ) : (
+                      s.known >= 2 && <Button size="xs" variant="outline" onClick={() => setPairDrift(s.pair, s.drift)}>Use for {s.pair}</Button>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>

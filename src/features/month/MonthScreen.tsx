@@ -61,7 +61,7 @@ export function MonthScreen() {
           ))}
           {Object.keys(engine.accounts).length > 0 && <Stat label="Net worth" value={formatAmount(engine.netWorth[m] ?? 0, ccy, locale)} />}
           {Object.values(engine.pools).map((p) => (
-            <Stat key={p.poolId} label={`Pool · ${tables.pools.find((x) => x.id === p.poolId)?.name ?? ''}`} value={formatAmount(p.months[m]?.balance ?? 0, ccy, locale)} />
+            <Stat key={p.poolId} label={`Pool account · ${tables.pools.find((x) => x.id === p.poolId)?.name ?? ''}`} value={formatAmount(p.months[m]?.balance ?? 0, ccy, locale)} />
           ))}
         </CardContent>
       </Card>

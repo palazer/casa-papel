@@ -18,6 +18,16 @@ test.describe('wave 1d', () => {
     await expect(page.getByRole('cell', { name: 'Leaves for the household' })).toBeVisible()
     await expect(page.getByText('Net worth', { exact: true })).toBeVisible()
 
+    // pocket money from this month on: October keeps 500 each, November shows 750 each
+    await page.getByRole('button', { name: 'Household' }).click()
+    const pocket = page.getByLabel(/^Pocket money per month, all adults/)
+    await pocket.fill('1500')
+    await pocket.press('Tab')
+    await page.getByRole('button', { name: 'Grid' }).click()
+    const samPocket = page.getByRole('row', { name: /^Pocket – Sam/ })
+    await expect(samPocket).toContainText('€500.00')
+    await expect(samPocket).toContainText('€750.00')
+
     // switch to proportional contributions
     await page.getByRole('button', { name: 'Household' }).click()
     await page.getByLabel('How you share money').selectOption('proportional')

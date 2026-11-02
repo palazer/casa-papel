@@ -248,3 +248,45 @@ export async function setCellDone(store: Store, rowId: string, month: MonthKey, 
   if (items.length === 0 && !existing) return
   await store.commit([putCell({ rowId, month, mode: 'items', value: null, items, note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, updatedAt: now() })])
 }
+
+// ---------- monthly defaults with a scope ----------
+
+export type MonthlyDefaultScope = 'from-now-on' | 'this-month' | 'all-open'
+
+/**
+ * Change the pocket money total or the cash buffer. Closed months are never touched.
+ * - 'this-month': an override for that month only; the default stays
+ * - 'from-now-on': earlier open months are frozen at what they show now, the default changes
+ * - 'all-open': every open month follows the new default (overrides dropped)
+ */
+export async function setMonthlyDefault(store: Store, key: 'pocketTotal' | 'cashBuffer', value: Money, scope: MonthlyDefaultScope, month: MonthKey): Promise<void> {
+  const tables = await loadTables(store)
+  const household = tables.household.find((h) => !h.deletedAt)
+  if (!household) throw new Error('No household yet')
+  const overrideKey = key === 'pocketTotal' ? 'pocketTotalOverride' : 'cashBufferOverride'
+  const states = new Map(tables.monthStates.map((s) => [s.month, s]))
+  const ts = now()
+  const mutations: Mutation[] = []
+  const putState = (m: MonthKey, override: Money | null) => {
+    const prev = states.get(m)
+    mutations.push({ op: 'put', table: 'monthStates', record: MonthStateSchema.parse({ month: m, closed: false, closedAt: null, ...prev, [overrideKey]: override, updatedAt: ts }) })
+  }
+  if (scope === 'this-month') {
+    if (states.get(month)?.closed) throw new Error('Month is closed')
+    putState(month, value)
+  } else {
+    if (scope === 'from-now-on' && compareMonths(month, household.startMonth) > 0) {
+      for (const m of monthRange(household.startMonth, addMonths(month, -1))) {
+        const s = states.get(m)
+        if (s?.closed || s?.[overrideKey] != null) continue
+        putState(m, household[key])
+      }
+    }
+    for (const s of tables.monthStates) {
+      if (s.closed || s[overrideKey] == null) continue
+      if (scope === 'all-open' || compareMonths(s.month, month) >= 0) putState(s.month, null)
+    }
+    mutations.push({ op: 'put', table: 'household', record: HouseholdSchema.parse({ ...household, [key]: value, updatedAt: ts }) })
+  }
+  await store.commit(mutations)
+}

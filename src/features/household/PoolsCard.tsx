@@ -22,9 +22,9 @@ export function PoolsCard({ household, tables, engine, onError }: { household: H
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Pools</CardTitle>
+        <CardTitle>Pool accounts</CardTitle>
         <CardDescription>
-          A pool sets money aside every month inside a savings account, for travel, clothes, gifts. Spending that "comes out of" a pool draws it down and leaves the month's leftover alone.
+          A pool account is an envelope inside a savings account: a monthly amount is set aside for travel, clothes, gifts, and spending that "comes out of" it draws it down without touching the month's leftover.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -46,9 +46,9 @@ export function PoolsCard({ household, tables, engine, onError }: { household: H
           </ul>
         )}
         {savings.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Add a savings account first; pools live inside one.</p>
+          <p className="text-sm text-muted-foreground">Add a savings account first; pool accounts live inside one.</p>
         ) : (
-          <Button variant="outline" size="sm" onClick={() => setEditing('new')}>Add pool</Button>
+          <Button variant="outline" size="sm" onClick={() => setEditing('new')}>Add pool account</Button>
         )}
         {editing && <PoolDialog pool={editing === 'new' ? null : editing} savings={savings} baseCurrency={baseCurrency} locale={locale} onClose={() => setEditing(null)} onError={onError} />}
       </CardContent>
@@ -78,17 +78,17 @@ function PoolDialog({ pool, savings, baseCurrency, locale, onClose, onError }: {
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>{pool ? 'Edit pool' : 'New pool'}</DialogTitle>
-          <DialogDescription>{pool ? 'The monthly amount lives in the pool\'s row in the grid.' : 'Creates a transfer row that fills the pool each month and, if you like, a spending row that draws from it.'}</DialogDescription>
+          <DialogTitle>{pool ? 'Edit pool account' : 'New pool account'}</DialogTitle>
+          <DialogDescription>{pool ? 'The monthly amount lives in the pool account\'s row in the grid.' : 'Creates a transfer row that fills the pool account each month and, if you like, a spending row that draws from it.'}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-3">
           <div className="space-y-1.5"><Label htmlFor="pool-name">Name</Label><Input id="pool-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Gifts" /></div>
           <div className="space-y-1.5"><Label htmlFor="pool-acc">Held in</Label><NativeSelect id="pool-acc" className="w-full" value={accountId} onChange={(e) => setAccountId(e.target.value)}>{savings.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</NativeSelect></div>
-          <div className="space-y-1.5"><Label htmlFor="pool-open">Already in the pool ({baseCurrency})</Label><Input id="pool-open" inputMode="decimal" value={opening} onChange={(e) => setOpening(e.target.value)} placeholder="0" /></div>
+          <div className="space-y-1.5"><Label htmlFor="pool-open">Already in it ({baseCurrency})</Label><Input id="pool-open" inputMode="decimal" value={opening} onChange={(e) => setOpening(e.target.value)} placeholder="0" /></div>
           {!pool && (
             <>
               <div className="space-y-1.5"><Label htmlFor="pool-monthly">Set aside each month ({baseCurrency})</Label><Input id="pool-monthly" inputMode="decimal" value={monthly} onChange={(e) => setMonthly(e.target.value)} placeholder="optional, from this month on" /></div>
-              <Check label={`Also add a spending row "${name.trim() || 'Pool'}" that comes out of this pool`} checked={spendRow} onChange={(e) => setSpendRow(e.target.checked)} />
+              <Check label={`Also add a spending row "${name.trim() || 'Pool account'}" that comes out of it`} checked={spendRow} onChange={(e) => setSpendRow(e.target.checked)} />
             </>
           )}
         </div>

@@ -17,9 +17,9 @@ import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import {
   ENTITY_KIND_LABEL, ENTITY_TEMPLATES, monthOfDate, templateTitle,
-  ACCOUNT_TYPE_INFO, type Account, type AccountType, type Entity, type EntityKind, type Household,
+  ACCOUNT_TYPE_INFO, ENTITY_KIND_HELP, type Account, type AccountType, type Entity, type EntityKind, type Household, type Tables,
 } from '@/model'
-import { addAccount, addEntity, applyTemplates, setAccountActual, updateAccount, updateEntity, updateHousehold } from '@/store'
+import { addAccount, addEntity, applyTemplates, setAccountActual, setMonthlyDefault, updateAccount, updateEntity, updateHousehold, type MonthlyDefaultScope } from '@/store'
 
 const LOCALES = ['en-IE', 'en-GB', 'en-US', 'de-DE', 'de-AT', 'tr-TR', 'fr-FR', 'es-ES', 'nl-NL', 'it-IT', 'pt-PT', 'sv-SE']
 const ACCOUNT_TYPES = ACCOUNT_TYPE_INFO
@@ -38,7 +38,7 @@ export function HouseholdScreen() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       {error && <p className="text-sm text-destructive">{error}</p>}
-      <SettingsCard household={household} onSave={(p) => act(() => updateHousehold(store, p))} />
+      <SettingsCard household={household} tables={tables} onSave={(p) => act(() => updateHousehold(store, p))} onMonthly={(key, value, scope) => act(() => setMonthlyDefault(store, key, value, scope, monthOfDate()))} />
       {household.moneyMode === 'proportional' && <SharesCard household={household} tables={tables} engine={engine} onError={setError} />}
       <EntitiesCard household={household} entities={tables.entities.filter((e) => !e.deletedAt && !e.archivedMonth)} onError={setError} />
       <AccountsCard household={household} accounts={tables.accounts.filter((a) => !a.deletedAt)} entities={tables.entities} engine={engine} months={months} onError={setError} />
@@ -55,16 +55,20 @@ export function HouseholdScreen() {
   )
 }
 
-function SettingsCard({ household: h, onSave }: { household: Household; onSave: (p: Partial<Household>) => void }) {
+function SettingsCard({ household: h, tables, onSave, onMonthly }: { household: Household; tables: Tables; onSave: (p: Partial<Household>) => void; onMonthly: (key: 'pocketTotal' | 'cashBuffer', value: number, scope: MonthlyDefaultScope) => void }) {
+  const thisMonth = monthOfDate()
+  const state = tables.monthStates.find((s) => s.month === thisMonth)
+  const effective = (key: 'pocketTotal' | 'cashBuffer') => (key === 'pocketTotal' ? state?.pocketTotalOverride : state?.cashBufferOverride) ?? h[key]
   const [name, setName] = useState(h.name)
-  const [pocket, setPocket] = useState(amountToInput(h.pocketTotal, h.baseCurrency, h.locale))
-  const [buffer, setBuffer] = useState(amountToInput(h.cashBuffer, h.baseCurrency, h.locale))
+  const [scope, setScope] = useState<MonthlyDefaultScope>('from-now-on')
+  const [pocket, setPocket] = useState(amountToInput(effective('pocketTotal'), h.baseCurrency, h.locale))
+  const [buffer, setBuffer] = useState(amountToInput(effective('cashBuffer'), h.baseCurrency, h.locale))
   const money = (s: string) => (s.trim() ? parseAmount(s, h.baseCurrency, h.locale) ?? 0 : 0)
   return (
     <Card>
       <CardHeader>
         <CardTitle>Settings</CardTitle>
-        <CardDescription>Changes apply to open months. Closed months keep the values they were closed with.</CardDescription>
+        <CardDescription>Closed months keep the values they were closed with.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
@@ -89,13 +93,24 @@ function SettingsCard({ household: h, onSave }: { household: Household; onSave: 
             <option value="proportional">Proportional: each adult pays a share of shared costs</option>
           </NativeSelect>
         </div>
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label htmlFor="s-scope">Pocket money and cash buffer changes apply to</Label>
+          <NativeSelect id="s-scope" className="w-full" value={scope} onChange={(e) => setScope(e.target.value as MonthlyDefaultScope)}>
+            <option value="from-now-on">This month and onwards (earlier months keep what they show)</option>
+            <option value="this-month">Only this month</option>
+            <option value="all-open">Every open month</option>
+          </NativeSelect>
+          <p className="text-xs text-muted-foreground">Closed months are never changed. "This month" is {formatMonth(thisMonth, h.locale)}.</p>
+        </div>
         <div className="space-y-1.5">
           <Label htmlFor="s-pocket">Pocket money per month, all adults ({h.baseCurrency})</Label>
-          <Input id="s-pocket" inputMode="decimal" value={pocket} onChange={(e) => setPocket(e.target.value)} onBlur={() => onSave({ pocketTotal: money(pocket) })} />
+          <Input id="s-pocket" inputMode="decimal" value={pocket} onChange={(e) => setPocket(e.target.value)} onBlur={() => { const v = money(pocket); if (v !== effective('pocketTotal')) onMonthly('pocketTotal', v, scope) }} />
+          {effective('pocketTotal') !== h.pocketTotal && <p className="text-xs text-muted-foreground">This month {formatAmount(effective('pocketTotal'), h.baseCurrency, h.locale)} · default {formatAmount(h.pocketTotal, h.baseCurrency, h.locale)}</p>}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="s-buffer">Cash kept in the account at month end ({h.baseCurrency})</Label>
-          <Input id="s-buffer" inputMode="decimal" value={buffer} onChange={(e) => setBuffer(e.target.value)} onBlur={() => onSave({ cashBuffer: money(buffer) })} />
+          <Input id="s-buffer" inputMode="decimal" value={buffer} onChange={(e) => setBuffer(e.target.value)} onBlur={() => { const v = money(buffer); if (v !== effective('cashBuffer')) onMonthly('cashBuffer', v, scope) }} />
+          {effective('cashBuffer') !== h.cashBuffer && <p className="text-xs text-muted-foreground">This month {formatAmount(effective('cashBuffer'), h.baseCurrency, h.locale)} · default {formatAmount(h.cashBuffer, h.baseCurrency, h.locale)}</p>}
         </div>
         <div className="sm:col-span-2">
           <Check label="Show expenses as negative red numbers" checked={h.displayExpensesNegative} onChange={(e) => onSave({ displayExpensesNegative: e.target.checked })} />
@@ -110,9 +125,14 @@ function EntitiesCard({ household, entities, onError }: { household: Household; 
   const store = useStore()
   const [kind, setKind] = useState<EntityKind>('adult')
   const [name, setName] = useState('')
+  const [paidBy, setPaidBy] = useState('')
   const [templatesFor, setTemplatesFor] = useState<Entity | null>(null)
   const adults = entities.filter((e) => e.kind === 'adult')
   const act = (fn: () => Promise<unknown>) => void fn().catch((e) => onError(e instanceof Error ? e.message : 'Action failed'))
+  const add = () => {
+    act(() => addEntity(store, { kind, name: name.trim(), paidBy: kind === 'adult' ? null : paidBy || null }))
+    setName('')
+  }
 
   return (
     <Card>
@@ -140,16 +160,29 @@ function EntitiesCard({ household, entities, onError }: { household: Household; 
           ))}
           {entities.length === 0 && <li className="px-3 py-2 text-sm text-muted-foreground">Nobody yet.</li>}
         </ul>
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="space-y-1">
-            <Label htmlFor="e-kind">Kind</Label>
-            <NativeSelect id="e-kind" value={kind} onChange={(e) => setKind(e.target.value as EntityKind)}>{KINDS.map((k) => <option key={k} value={k}>{ENTITY_KIND_LABEL[k]}</option>)}</NativeSelect>
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            {KINDS.map((k) => (
+              <Button key={k} size="sm" variant={kind === k ? 'secondary' : 'outline'} aria-pressed={kind === k} title={ENTITY_KIND_HELP[k]} onClick={() => setKind(k)}>Add {ENTITY_KIND_LABEL[k].toLowerCase()}</Button>
+            ))}
           </div>
-          <div className="space-y-1">
-            <Label htmlFor="e-name">Name</Label>
-            <Input id="e-name" className="w-44" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) { act(() => addEntity(store, { kind, name: name.trim() })); setName('') } }} />
+          <p className="text-xs text-muted-foreground">{ENTITY_KIND_HELP[kind]}</p>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="space-y-1">
+              <Label htmlFor="e-name">{ENTITY_KIND_LABEL[kind]} name</Label>
+              <Input id="e-name" className="w-44" value={name} placeholder={kind === 'property' ? 'e.g. Flat, Elm Street' : 'Name'} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) add() }} />
+            </div>
+            {kind !== 'adult' && (
+              <div className="space-y-1">
+                <Label htmlFor="e-paidby">Who pays</Label>
+                <NativeSelect id="e-paidby" value={paidBy} onChange={(e) => setPaidBy(e.target.value)}>
+                  <option value="">Costs shared</option>
+                  {adults.map((a) => <option key={a.id} value={a.id}>Paid by {a.name}</option>)}
+                </NativeSelect>
+              </div>
+            )}
+            <Button disabled={!name.trim()} onClick={add}>Add</Button>
           </div>
-          <Button disabled={!name.trim()} onClick={() => { act(() => addEntity(store, { kind, name: name.trim() })); setName('') }}>Add</Button>
         </div>
         {templatesFor && <TemplatesDialog household={household} entity={templatesFor} onClose={() => setTemplatesFor(null)} onError={onError} />}
       </CardContent>

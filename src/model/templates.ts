@@ -33,9 +33,9 @@ export const HOUSEHOLD_TEMPLATES: RowTemplate[] = [
   { key: 'h.gym', title: 'Gym & sports', description: 'Memberships and sports.', section: 'expense' },
   { key: 'h.insurance', title: 'Insurance & tax', description: 'Liability and household insurance, taxes not tied to a car or home.', section: 'expense', defaultStatus: 'committed', recommended: true },
   { key: 'h.other', title: 'Other', description: 'Whatever fits nowhere else. Treated as an estimate.', section: 'expense', recommended: true },
-  { key: 'h.poolTravel', title: 'Travel', description: 'Pool: set aside a monthly amount in savings, spend it when you travel.', section: 'expense', pool: true, recommended: true },
-  { key: 'h.poolClothing', title: 'Clothing', description: 'Pool: a monthly amount set aside for clothes.', section: 'expense', pool: true },
-  { key: 'h.poolFun', title: 'Entertainment & dining out', description: 'Pool: a monthly amount set aside for going out.', section: 'expense', pool: true },
+  { key: 'h.poolTravel', title: 'Travel', description: 'Pool account: set aside a monthly amount in savings, spend it when you travel.', section: 'expense', pool: true, recommended: true },
+  { key: 'h.poolClothing', title: 'Clothing', description: 'Pool account: a monthly amount set aside for clothes.', section: 'expense', pool: true },
+  { key: 'h.poolFun', title: 'Entertainment & dining out', description: 'Pool account: a monthly amount set aside for going out.', section: 'expense', pool: true },
   { key: 'h.toSavings', title: 'To savings', description: 'What is left at month end moves to savings. Filled in automatically unless your month-end rule says you decide it.', section: 'transfer', kind: 'to-savings', defaultStatus: 'committed', account: 'savings', recommended: true },
   { key: 'h.toInvestments', title: 'To investments', description: 'A fixed monthly deposit into an investment account.', section: 'transfer', kind: 'to-investment', defaultStatus: 'committed', account: 'investment' },
 ]
@@ -109,7 +109,7 @@ export const SECTION_INFO: Record<Section, { label: string; blurb: string }> = {
 export const ACCOUNT_TYPE_INFO: Array<{ value: AccountType; label: string; help: string }> = [
   { value: 'checking', label: 'Current account', help: 'Where salary lands and bills leave. Day-to-day money; its balance is not tracked.' },
   { value: 'joint', label: 'Joint account', help: 'A shared account partners pay into for shared bills. Pick this when a fixed amount moves there every month.' },
-  { value: 'savings', label: 'Savings', help: 'Where the month\'s leftover goes. The balance is tracked month by month, and pools live inside it.' },
+  { value: 'savings', label: 'Savings', help: 'Where the month\'s leftover goes. The balance is tracked month by month, and pool accounts live inside it.' },
   { value: 'investment', label: 'Investments', help: 'Broker, fund or pension account. Deposits and value are tracked.' },
   { value: 'credit-card', label: 'Credit card', help: 'Spend now, pay later. The open balance is tracked.' },
   { value: 'loan', label: 'Loan', help: 'Money you owe. Payments bring the outstanding amount down.' },
