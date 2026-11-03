@@ -79,10 +79,12 @@ export function GridScreen() {
 
   const derivedRow = (
     label: string, flow: Flow, pick: (m: MonthKey) => Money,
-    opts: { strong?: boolean; muted?: boolean; currency?: string; hue?: Hue; band?: boolean; format?: (v: Money, m: MonthKey) => string; onClick?: (m: MonthKey) => void; mark?: (m: MonthKey) => boolean } = {},
+    /** `sub`: a detail line under the named parent row; indented and faded, with the parent's name read out but not shown. */
+    opts: { strong?: boolean; muted?: boolean; currency?: string; hue?: Hue; band?: boolean; sub?: string; format?: (v: Money, m: MonthKey) => string; onClick?: (m: MonthKey) => void; mark?: (m: MonthKey) => boolean } = {},
   ): ReactNode => (
-    <tr key={label} className={cn(opts.band && (opts.hue ? opts.hue.tint : 'bg-muted/40'), opts.strong && 'font-medium')}>
-      <th scope="row" className={cn('sticky left-0 z-10 px-3 py-1 text-left text-sm', opts.band ? (opts.hue ? opts.hue.tint : 'bg-muted/90 backdrop-blur') : 'bg-background', opts.hue ? opts.hue.text : 'text-muted-foreground', opts.muted && 'text-xs')}>
+    <tr key={opts.sub ? `${opts.sub} · ${label}` : label} className={cn(opts.band && (opts.hue ? opts.hue.tint : 'bg-muted/40'), opts.strong && 'font-medium')}>
+      <th scope="row" className={cn('sticky left-0 z-10 px-3 py-1 text-left text-sm', opts.band ? (opts.hue ? opts.hue.tint : 'bg-muted/90 backdrop-blur') : 'bg-background', opts.hue && !opts.sub ? opts.hue.text : 'text-muted-foreground', opts.muted && 'text-xs', opts.sub && 'pl-7 font-normal')}>
+        {opts.sub && <span className="sr-only">{opts.sub} · </span>}
         {label}
       </th>
       {months.map((m) => {
@@ -91,7 +93,7 @@ export function GridScreen() {
         const text = opts.format ? opts.format(v, m) : d.text
         const marked = opts.mark?.(m) ?? false
         return (
-          <td key={m} className={cn('p-0 text-right text-sm tabular-nums', toneClass[d.tone], opts.muted && 'text-xs', engine.totals[m]?.closed && 'bg-muted/60')}>
+          <td key={m} className={cn('p-0 text-right text-sm tabular-nums', toneClass[d.tone], opts.muted && 'text-xs', opts.sub && 'text-muted-foreground', engine.totals[m]?.closed && 'bg-muted/60')}>
             {opts.onClick ? (
               <button type="button" aria-label={`${label} ${formatMonth(m, locale)}: ${text}`} onClick={() => opts.onClick!(m)} className={cn('w-full px-2 py-1 text-right hover:bg-accent', marked && 'underline decoration-dotted underline-offset-4')}>
                 {text}
@@ -203,8 +205,8 @@ export function GridScreen() {
               if (acc.type === 'investment') {
                 return [
                   derivedRow(`${acc.name} · value`, 'in', (m) => s.months[m]?.balance ?? 0, { strong: true, currency: s.currency, onClick: open, mark: marked, hue: HUES.worth }),
-                  derivedRow(`${acc.name} · deposited`, 'in', (m) => s.months[m]?.capital ?? 0, { muted: true, currency: s.currency, hue: HUES.worth }),
-                  derivedRow(`${acc.name} · return`, 'in', (m) => Math.round((s.months[m]?.totalReturn ?? 0) * 10000), { muted: true, hue: HUES.worth, format: (v) => (v === 0 ? '' : formatPercent(v / 10000, locale)) }),
+                  derivedRow('Deposited', 'in', (m) => s.months[m]?.capital ?? 0, { muted: true, sub: acc.name, currency: s.currency }),
+                  derivedRow('Return', 'in', (m) => Math.round((s.months[m]?.totalReturn ?? 0) * 10000), { muted: true, sub: acc.name, format: (v) => (v === 0 ? '' : formatPercent(v / 10000, locale)) }),
                 ]
               }
               const label = acc.type === 'credit-card' ? `${acc.name} · owed` : acc.type === 'loan' ? `${acc.name} · outstanding` : acc.name
