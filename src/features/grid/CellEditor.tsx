@@ -4,18 +4,20 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Segmented } from '@/components/Segmented'
 import { cn } from '@/lib/utils'
 import { amountToInput, formatAmount, formatMonth, parseAmount } from '@/app/format'
 import { readPref, writePref } from '@/app/prefs'
 import { useStore } from '@/app/store'
 import { cellKey, type EngineOutput } from '@/engine'
 import { RecurringDialog } from '@/features/recurring/RecurringDialog'
-import { describeCadence, newId, poolRef, type CellItem, type Household, type ItemStatus, type MonthKey, type Row, type Tables } from '@/model'
+import { describeCadence, newId, type CellItem, type Household, type ItemStatus, type MonthKey, type Row, type Tables } from '@/model'
 import {
   changeRecurringFrom, clearCell, deleteRecurringItem, endRecurringFrom, itemsFromCurrent, reopenMonth, setCellItems, setCellValue, skipRecurringMonth,
   type EditScope,
 } from '@/store'
 import { NativeSelect } from './NativeSelect'
+import { SOURCE_HELP, fundingOptions as buildFundingOptions } from './funding'
 
 interface Props {
   tables: Tables
@@ -45,6 +47,7 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
   const [text, setText] = useState(() => amountToInput(cell?.value ?? 0, currency, locale))
   const [scope, setScope] = useState<EditScope>(() => readPref<EditScope>('editScope', 'from-now-on'))
   const [status, setStatus] = useState<StatusChoice>(soloItem ? soloItem.status : 'default')
+  const [fundedBy, setFundedBy] = useState<CellItem['fundedBy']>(soloItem ? soloItem.fundedBy : row.defaultFundedBy)
   const [items, setItems] = useState<CellItem[]>(() => itemsFromCurrent(cell, row.defaultFundedBy, row.defaultStatus))
   /** For edited scheduled items: does the change apply only here or from this month on? */
   const [applyTo, setApplyTo] = useState<Record<string, EditScope>>({})
@@ -55,15 +58,7 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
 
   const original = useMemo(() => new Map((cell?.items ?? []).map((i) => [i.id, i])), [cell])
   const schedules = useMemo(() => new Map(tables.recurringItems.map((r) => [r.id, r])), [tables.recurringItems])
-  const pools = useMemo(() => tables.pools.filter((p) => !p.deletedAt), [tables.pools])
-  const fundingOptions = useMemo(
-    () => [
-      { value: 'cash', label: "This month's income" },
-      { value: 'savings', label: 'Savings balance' },
-      ...pools.map((p) => ({ value: poolRef(p.id), label: `Pool account: ${p.name}` })),
-    ],
-    [pools],
-  )
+  const fundingOptions = useMemo(() => buildFundingOptions(tables.pools), [tables.pools])
 
   useEffect(() => {
     writePref('editScope', scope)
@@ -96,8 +91,9 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
       setError('That is not a number I can read.')
       return
     }
-    if (status === 'default') return void run(() => setCellValue(store, row.id, month, minor, scope))
-    const single: CellItem = { id: newId(), label: '', amount: minor, status, fundedBy: row.defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }
+    // A plain value takes the row's defaults; any other certainty or source is stored as one unlabelled item.
+    if (status === 'default' && fundedBy === row.defaultFundedBy) return void run(() => setCellValue(store, row.id, month, minor, scope))
+    const single: CellItem = { id: newId(), label: '', amount: minor, status: status === 'default' ? row.defaultStatus : status, fundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }
     void run(() => setCellItems(store, row.id, month, [single], scope))
   }
 
@@ -223,6 +219,15 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
                     ]}
                   />
                 </fieldset>
+                {row.section === 'expense' && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="cell-source">Comes out of</Label>
+                    <NativeSelect id="cell-source" className="w-full" value={fundedBy} onChange={(e) => setFundedBy(e.target.value as CellItem['fundedBy'])}>
+                      {fundingOptions.map((o) => <option key={o.value} value={o.value}>{o.label}{o.value === row.defaultFundedBy ? ' (row default)' : ''}</option>)}
+                    </NativeSelect>
+                    <p className="text-xs text-muted-foreground">{SOURCE_HELP}</p>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-2">
@@ -306,7 +311,7 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
                 </div>
                 <p className="text-xs text-muted-foreground">Set an item to Done when it is paid or received. In the current month the cell shows a dot: red nothing done yet, amber partly, green all done.</p>
                 {row.section === 'expense' && (
-                  <p className="text-xs text-muted-foreground">"Comes out of" is the budget side: this month's income (the normal case), the savings balance, or a pool account. Savings and pool accounts do not reduce this month's leftover.</p>
+                  <p className="text-xs text-muted-foreground">{SOURCE_HELP}</p>
                 )}
                 {!isRecurringRow && (
                   <Segmented value={scope} onChange={(v) => setScope(v as EditScope)} options={[{ value: 'from-now-on', label: 'This month and onwards' }, { value: 'this-month', label: 'Only this month' }]} />
@@ -342,21 +347,5 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
         />
       )}
     </Dialog>
-  )
-}
-
-function Segmented({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: Array<{ value: string; label: string }> }) {
-  return (
-    <div className="flex flex-wrap gap-1" role="radiogroup">
-      {options.map((o) => (
-        <button
-          key={o.value} type="button" role="radio" aria-checked={value === o.value}
-          className={cn('rounded-md border px-2.5 py-1 text-xs', value === o.value ? 'border-foreground bg-foreground text-background' : 'hover:bg-muted')}
-          onClick={() => onChange(o.value)}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
   )
 }

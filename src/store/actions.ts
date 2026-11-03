@@ -1,8 +1,8 @@
 import { generateKeyBetween } from 'fractional-indexing'
 import { computeEngine, cellKey, sortRows, type EngineOutput } from '@/engine'
 import {
-  AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, RowSchema, addMonths, compareMonths, monthRange, newId,
-  type Account, type Cell, type CellItem, type Household, type ItemStatus, type Money, type MonthKey, type Row, type Tables,
+  ACCOUNT_TYPE_INFO, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, RowSchema, addMonths, compareMonths, monthRange, newId, poolIdOf,
+  type Account, type Cell, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Row, type RowKind, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
 
@@ -289,4 +289,99 @@ export async function setMonthlyDefault(store: Store, key: 'pocketTotal' | 'cash
     mutations.push({ op: 'put', table: 'household', record: HouseholdSchema.parse({ ...household, [key]: value, updatedAt: ts }) })
   }
   await store.commit(mutations)
+}
+
+// ---------- row sources, accounts and followers ----------
+
+export type RowSourceScope = { from: MonthKey } | 'all-months'
+
+/**
+ * Change where a row's single amounts come out of. With `{ from }`, every earlier month that showed
+ * an amount is pinned to the old source (as one unlabelled item), so past savings and pool balances stay put.
+ */
+export async function setRowFundedBy(store: Store, rowId: string, fundedBy: FundedBy, scope: RowSourceScope): Promise<void> {
+  const tables = await loadTables(store)
+  const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
+  if (!row) throw new Error('Row not found')
+  if (row.section !== 'expense') throw new Error('Only spending rows have a source.')
+  const poolId = poolIdOf(fundedBy)
+  if (poolId && !tables.pools.some((p) => p.id === poolId && !p.deletedAt)) throw new Error('That pool account no longer exists.')
+  const mutations: Mutation[] = []
+  if (scope !== 'all-months' && fundedBy !== row.defaultFundedBy) {
+    const household = tables.household.find((h) => !h.deletedAt)
+    if (!household) throw new Error('No household yet')
+    if (compareMonths(household.startMonth, scope.from) < 0) {
+      // Compute with closed flags lifted so the certainty we store is the real one, not "done because closed".
+      const open: Tables = { ...tables, monthStates: tables.monthStates.map((s) => ({ ...s, closed: false })) }
+      const months = monthRange(household.startMonth, addMonths(scope.from, -1))
+      const engine = computeEngine({ tables: open, months })
+      for (const m of months) {
+        const c = engine.cells[cellKey(rowId, m)]
+        if (!c || (c.source !== 'value' && c.source !== 'inherit') || c.value === 0) continue
+        const existing = cellOf(tables, rowId, m)
+        const item: CellItem = {
+          id: newId(), label: '', amount: c.value, status: c.status === 'derived' ? row.defaultStatus : c.status, fundedBy: row.defaultFundedBy,
+          date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false,
+        }
+        mutations.push(putCell({ rowId, month: m, mode: 'items', value: null, items: [item], note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, updatedAt: now() }))
+      }
+    }
+  }
+  mutations.push({ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, defaultFundedBy: fundedBy, updatedAt: now() }) })
+  await store.commit(mutations)
+}
+
+/** Why a row has no amount of its own to mirror or replace, or null when it is an ordinary row. */
+export function derivedRowReason(row: Row, closingRule: Household['closingRule']): string | null {
+  if (row.kind === 'to-savings' && closingRule === 'savings-plug') return `"${row.name}" is worked out by the app from the rest of the month.`
+  if (row.kind === 'pocket-money' && row.pocketMode === 'share-of-pocket-total') return `"${row.name}" is a share of the pocket total.`
+  return null
+}
+
+/** Make a row mirror another row's amount month by month, or stop with `null`. The row's own cells are kept. */
+export async function followRow(store: Store, rowId: string, targetId: string | null): Promise<void> {
+  const tables = await loadTables(store)
+  const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
+  if (!row) throw new Error('Row not found')
+  if (targetId) {
+    const household = tables.household.find((h) => !h.deletedAt)
+    const rule = household?.closingRule ?? 'savings-plug'
+    const own = derivedRowReason(row, rule)
+    if (own) throw new Error(`${own} It cannot follow another row.`)
+    if (targetId === rowId) throw new Error('A row cannot follow itself.')
+    const target = tables.rows.find((r) => r.id === targetId && !r.deletedAt)
+    if (!target) throw new Error('Pick a row to follow.')
+    const why = derivedRowReason(target, rule)
+    if (why) throw new Error(`${why} It cannot be followed.`)
+    if (target.followsRowId) throw new Error(`"${target.name}" follows another row itself. Follow that row instead.`)
+    if (target.archivedMonth) throw new Error(`"${target.name}" is archived.`)
+    if (tables.rows.some((r) => !r.deletedAt && r.followsRowId === rowId)) throw new Error(`Another row already follows "${row.name}". Chains are not supported.`)
+  }
+  await store.commit([{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, followsRowId: targetId, updatedAt: now() }) }])
+}
+
+const ACCOUNT_TYPE_FOR_KIND: Partial<Record<RowKind, Account['type']>> = {
+  'to-savings': 'savings', 'to-investment': 'investment', 'from-investment': 'investment', 'debt-payment': 'loan', 'card-payment': 'credit-card',
+}
+
+/** The account type a row of this kind must point at, or null when any account (or none) will do. */
+export function accountTypeForRow(row: Pick<Row, 'kind'>): Account['type'] | null {
+  return ACCOUNT_TYPE_FOR_KIND[row.kind] ?? null
+}
+
+/** Point a row at an account: destination for transfers, the card or loan it pays, the paying account otherwise. */
+export async function setRowAccount(store: Store, rowId: string, accountId: string | null): Promise<void> {
+  const tables = await loadTables(store)
+  const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
+  if (!row) throw new Error('Row not found')
+  const need = accountTypeForRow(row)
+  const label = (t: Account['type']) => ACCOUNT_TYPE_INFO.find((i) => i.value === t)?.label ?? t
+  if (accountId) {
+    const acc = tables.accounts.find((a) => a.id === accountId && !a.deletedAt)
+    if (!acc) throw new Error('That account no longer exists.')
+    if (need && acc.type !== need) throw new Error(`"${row.name}" needs an account of type ${label(need)}, and "${acc.name}" is of type ${label(acc.type)}.`)
+  } else if (need) {
+    throw new Error(`"${row.name}" needs an account of type ${label(need)}.`)
+  }
+  await updateRow(store, rowId, { accountId })
 }

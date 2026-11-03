@@ -61,6 +61,9 @@ export function computeEngine(input: EngineInput): EngineOutput {
   const pools = tables.pools.filter((p) => !p.deletedAt)
   const poolByAllocationRow = new Map(pools.filter((p) => p.allocationRowId).map((p) => [p.allocationRowId as string, p]))
   const rows = sortRows(tables.rows.filter((r) => !r.deletedAt))
+  const rowsById = new Map(rows.map((r) => [r.id, r]))
+  /** Rows that follow another row mirror its cells, so they are computed after everything else. */
+  const pass1Order = [...rows.filter((r) => !r.followsRowId), ...rows.filter((r) => r.followsRowId)]
   const fx = buildFxIndex(tables.fxRates, { driftMode: household.fxDriftMode ?? 'fixed', fixedDrift: household.fxDriftDefault ?? 0, pairDrift: household.fxPairDrift ?? {} })
   /** Rows driven by recurring items never carry forward: a month without items is 0. */
   const recurringRowIds = new Set(tables.recurringItems.filter((r) => !r.deletedAt).map((r) => r.rowId))
@@ -77,9 +80,11 @@ export function computeEngine(input: EngineInput): EngineOutput {
   const savingsPlug = household.closingRule === 'savings-plug'
 
   // ---------- pass 1: user rows ----------
-  for (const row of rows) {
+  for (const row of pass1Order) {
     const derivedToSavings = row.kind === 'to-savings' && savingsPlug
     const derivedPocket = row.kind === 'pocket-money' && row.pocketMode === 'share-of-pocket-total'
+    const follows = row.followsRowId && !derivedToSavings ? row.followsRowId : null
+    if (follows && !rowsById.has(follows)) warnings.push(`"${row.name}" follows a row that no longer exists.`)
     const rowCells = cellsByRow.get(row.id)
     let prev: Money = 0
     let everSet = false
@@ -89,7 +94,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
     for (const m of months) {
       const archived = row.archivedMonth != null && compareMonths(m, row.archivedMonth) >= 0
       const cell = rowCells?.get(m) ?? null
-      const currency = cell?.currencyOverride ?? row.currency ?? base
+      let currency = cell?.currencyOverride ?? row.currency ?? base
       const closed = isClosed(m)
       let value: Money = 0
       let source: CellResult['source'] = 'empty'
@@ -103,6 +108,13 @@ export function computeEngine(input: EngineInput): EngineOutput {
       } else if (archived) {
         source = 'archived'
         baseStatus = 'done'
+      } else if (follows) {
+        const target = cells[cellKey(follows, m)]
+        value = target?.value ?? 0
+        if (target) currency = target.currency
+        source = 'derived'
+        baseStatus = 'derived'
+        addFunding(funding, row.defaultFundedBy, value)
       } else if (derivedPocket) {
         value = scaleMoney(pocketTotalFor(m), row.pocketShare ?? 0)
         source = 'derived'
@@ -140,7 +152,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
         baseStatus = live.length === 0 ? row.defaultStatus : anyProjected ? 'projected' : allDone ? 'done' : 'committed'
       }
 
-      const status: CellStatus = baseStatus === 'derived' ? (closed && derivedPocket ? 'done' : 'derived') : closed || archived ? 'done' : baseStatus
+      const status: CellStatus = baseStatus === 'derived' ? (closed && (derivedPocket || follows) ? 'done' : 'derived') : closed || archived ? 'done' : baseStatus
 
       const conv = convertMoney(fx, value, currency, base, m)
       if (conv.missingRate) warnings.push(`No ${currency}→${base} rate for ${m} (${row.name})`)

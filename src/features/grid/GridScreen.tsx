@@ -10,7 +10,7 @@ import { readPref, writePref } from '@/app/prefs'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { cellKey, type EngineOutput } from '@/engine'
-import { monthOfDate, type Money, type MonthKey, type Row, type Section } from '@/model'
+import { monthOfDate, type Household, type Money, type MonthKey, type Row, type Section, type Tables } from '@/model'
 import { closeMonth, reopenMonth } from '@/store'
 import { AddRowInline } from './AddRowInline'
 import { BalanceDialog } from './BalanceDialog'
@@ -175,7 +175,7 @@ export function GridScreen() {
                   </th>
                   <td colSpan={months.length} className="border-t" />
                 </tr>,
-                ...(isCollapsed ? [] : rows.map((row) => <GridRow key={row.id} row={row} rIndex={editableIndex++} months={months} engine={engine} ccy={ccy} locale={locale} neg={neg} onSelect={(m) => setSelected({ rowId: row.id, month: m })} onError={setError} />)),
+                ...(isCollapsed ? [] : rows.map((row) => <GridRow key={row.id} row={row} rIndex={editableIndex++} months={months} engine={engine} tables={tables} household={household} ccy={ccy} locale={locale} neg={neg} onSelect={(m) => setSelected({ rowId: row.id, month: m })} onError={setError} />)),
                 !isCollapsed && (
                   <tr key={`${key}-add`}>
                     <td className="sticky left-0 z-10 bg-background px-1 py-0.5"><AddRowInline section={key} onError={setError} /></td>
@@ -244,6 +244,8 @@ interface GridRowProps {
   rIndex: number
   months: MonthKey[]
   engine: EngineOutput
+  tables: Tables
+  household: Household
   ccy: string
   locale: string
   neg: boolean
@@ -251,21 +253,25 @@ interface GridRowProps {
   onError: (msg: string) => void
 }
 
-function GridRow({ row, rIndex, months, engine, ccy, locale, neg, onSelect, onError }: GridRowProps) {
+function GridRow({ row, rIndex, months, engine, tables, household, ccy, locale, neg, onSelect, onError }: GridRowProps) {
   const totals = engine.rowTotals[row.id]
   const flow = flowOf(row)
   const rowCcy = row.currency ?? ccy
+  const followed = row.followsRowId ? tables.rows.find((r) => r.id === row.followsRowId) : undefined
   return (
     <tr className="group">
       <th scope="row" className={cn('sticky left-0 z-10 bg-background px-2 py-0.5 text-left font-normal', SECTION_HUE[row.section].edge)}>
         <div className="flex items-center gap-1">
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm">{row.name}{row.currency && row.currency !== ccy ? <span className="ml-1 text-xs text-muted-foreground">{row.currency}</span> : null}</div>
+            <div className="truncate text-sm">
+              {row.name}{row.currency && row.currency !== ccy ? <span className="ml-1 text-xs text-muted-foreground">{row.currency}</span> : null}
+              {followed ? <span className="ml-1 text-xs text-muted-foreground" title={`Same amount as ${followed.name}`}>= {followed.name}</span> : null}
+            </div>
             <div className="truncate text-[11px] text-muted-foreground tabular-nums">
               Σ {formatAmount(totals?.total ?? 0, ccy, locale, { compact: true })}{row.section !== 'income' && totals?.shareOfIncome ? ` · ${formatPercent(totals.shareOfIncome, locale)} of income` : ''}
             </div>
           </div>
-          <RowMenu row={row} onError={onError} />
+          <RowMenu row={row} tables={tables} household={household} onError={onError} />
         </div>
       </th>
       {months.map((m, c) => {

@@ -91,7 +91,7 @@ export function MonthScreen() {
                     onClick={() => setSelectedRow(r.id)}
                     aria-label={`${r.name}: ${d.text}${dot ? `, ${doneLabel(dot)}` : ''}`}
                   >
-                    <span className="truncate">{r.name}</span>
+                    <span className="truncate">{r.name}{r.followsRowId ? <span className="ml-1 text-xs text-muted-foreground">= {engine.rows.find((x) => x.id === r.followsRowId)?.name ?? ''}</span> : null}</span>
                     <span className={cn('flex items-center gap-1 tabular-nums', toneClass[d.tone], c.source === 'empty' ? 'text-muted-foreground/40' : statusClass[c.status])}>
                       {dot && <DoneDot {...dot} className="mr-0.5" />}
                       {c.status === 'done' && c.source !== 'empty' && !dot && <Check className="size-3 text-done" aria-hidden />}

@@ -143,6 +143,8 @@ export const RowSchema = BaseRecord.extend({
   defaultStatus: DefaultStatusSchema.default('projected'),
   pocketMode: z.enum(['fixed', 'share-of-pocket-total']).nullable().default(null),
   pocketShare: FractionSchema.nullable().default(null),
+  /** Mirror another row's amount every month; this row's own cells are ignored while set. */
+  followsRowId: IdSchema.nullable().default(null),
   archivedMonth: MonthKeySchema.nullable().default(null),
   order: z.string().default('a0'),
 })
