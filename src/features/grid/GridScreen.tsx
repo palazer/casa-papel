@@ -1,5 +1,5 @@
 import { useMemo, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { Check, ChevronDown, ChevronRight, Lock } from 'lucide-react'
+import { ChevronDown, ChevronRight, Lock } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -225,7 +225,7 @@ export function GridScreen() {
         <Button size="xs" variant="outline" onClick={() => { const n = extra + 12; setExtra(n); writePref('horizonExtra', n) }}>Show 12 more months</Button>
         <span>Click a cell to edit. Arrow keys move, Enter opens. Click a month name to close or reopen it.</span>
         <span className="inline-flex flex-wrap items-center gap-x-1.5">
-          <span className="italic underline decoration-dashed decoration-partial underline-offset-4">Italic</span> = estimate · <Check className="size-3 text-done" aria-hidden /> = done · this month: <DoneDot done={0} total={1} state="none" /> not yet, <DoneDot done={1} total={2} state="partial" /> partly, <DoneDot done={1} total={1} state="all" /> done.
+          <span className="italic underline decoration-dashed decoration-partial underline-offset-4">Italic</span> = estimate · <DoneDot done={1} total={1} state="all" /> = done · this month also: <DoneDot done={0} total={1} state="none" /> nothing done yet, <DoneDot done={1} total={2} state="partial" /> partly done.
         </span>
       </div>
 
@@ -284,7 +284,8 @@ function GridRow({ row, rIndex, months, engine, tables, household, ccy, locale, 
         const isDerived = cell.source === 'derived'
         const isEmpty = cell.source === 'empty' || (cell.source === 'items' && cell.items.every((i) => i.skipped))
         const d = amountDisplay(cell.value, flow, rowCcy, locale, neg)
-        const dot = m === today && !closed && !isDerived && !isEmpty ? doneness(cell) : null
+        // One mark only: a green dot for done in any month; the current month also shows red (nothing yet) and amber (partly).
+        const dot = !isDerived && !isEmpty && ((m === today && !closed) || cell.status === 'done') ? doneness(cell) : null
         return (
           <td key={m} className={cn('p-0', closed && 'bg-muted/60')}>
             {cell.source === 'archived' ? null : isDerived ? (
@@ -304,7 +305,6 @@ function GridRow({ row, rIndex, months, engine, tables, household, ccy, locale, 
                 )}
               >
                 {dot && <DoneDot {...dot} className="absolute right-1 top-1" />}
-                {cell.status === 'done' && !isEmpty && !dot && <Check className="size-3 text-done" aria-hidden />}
                 {isEmpty ? '·' : d.text}
               </button>
             )}

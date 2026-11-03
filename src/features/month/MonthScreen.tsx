@@ -1,7 +1,7 @@
 import { GoalsCard } from '@/features/goals/GoalsCard'
 import { HUES, SECTION_HUE, type Hue } from '@/app/hues'
 import { useMemo, useState } from 'react'
-import { Check, ChevronLeft, ChevronRight, Lock } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Lock } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -83,7 +83,7 @@ export function MonthScreen() {
                 if (!c || c.source === 'archived') return null
                 const d = amountDisplay(c.value, flowOf(r), r.currency ?? ccy, locale, neg)
                 const derived = c.source === 'derived'
-                const dot = !derived && c.source !== 'empty' && m === monthOfDate() && !engine.totals[m]?.closed ? doneness(c) : null
+                const dot = !derived && c.source !== 'empty' && ((m === monthOfDate() && !engine.totals[m]?.closed) || c.status === 'done') ? doneness(c) : null
                 return (
                   <button
                     key={r.id} type="button" disabled={derived}
@@ -94,7 +94,6 @@ export function MonthScreen() {
                     <span className="truncate">{r.name}{r.followsRowId ? <span className="ml-1 text-xs text-muted-foreground">= {engine.rows.find((x) => x.id === r.followsRowId)?.name ?? ''}</span> : null}</span>
                     <span className={cn('flex items-center gap-1 tabular-nums', toneClass[d.tone], c.source === 'empty' ? 'text-muted-foreground/40' : statusClass[c.status])}>
                       {dot && <DoneDot {...dot} className="mr-0.5" />}
-                      {c.status === 'done' && c.source !== 'empty' && !dot && <Check className="size-3 text-done" aria-hidden />}
                       {c.source === 'empty' ? '·' : d.text}
                     </span>
                   </button>

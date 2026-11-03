@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Check, Repeat, Trash2 } from 'lucide-react'
+import { Repeat, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -16,6 +16,7 @@ import {
   changeRecurringFrom, clearCell, deleteRecurringItem, endRecurringFrom, itemsFromCurrent, reopenMonth, setCellItems, setCellValue, skipRecurringMonth,
   type EditScope,
 } from '@/store'
+import { DoneDot } from './DoneDot'
 import { NativeSelect } from './NativeSelect'
 import { SOURCE_HELP, fundingOptions as buildFundingOptions } from './funding'
 
@@ -304,12 +305,12 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
                   <div className="flex flex-wrap items-center gap-2">
                     <Button size="sm" variant="outline" onClick={addItem}>Add item</Button>
                     {liveItems.length > 0 && doneCount < liveItems.length && <Button size="sm" variant="outline" onClick={markAllDone}>Mark all done</Button>}
-                    {liveItems.length > 0 && doneCount === liveItems.length && <span className="inline-flex items-center gap-1 text-sm text-done"><Check className="size-3.5" aria-hidden />All done</span>}
+                    {liveItems.length > 0 && doneCount === liveItems.length && <span className="inline-flex items-center gap-1.5 text-sm text-done"><DoneDot done={1} total={1} state="all" /><span>All done</span></span>}
                     {doneCount > 0 && doneCount < liveItems.length && <span className="text-xs text-muted-foreground">{doneCount} of {liveItems.length} done</span>}
                   </div>
                   <span className="text-sm tabular-nums">Total {formatAmount(itemsTotal, currency, locale)}</span>
                 </div>
-                <p className="text-xs text-muted-foreground">Set an item to Done when it is paid or received. In the current month the cell shows a dot: red nothing done yet, amber partly, green all done.</p>
+                <p className="text-xs text-muted-foreground">Set an item to Done when it is paid or received. A done cell shows a green dot; in the current month the dot also shows red for nothing done yet and amber for partly done.</p>
                 {row.section === 'expense' && (
                   <p className="text-xs text-muted-foreground">{SOURCE_HELP}</p>
                 )}

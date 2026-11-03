@@ -13,8 +13,8 @@ test.describe('done dots', () => {
     await loadDemo(page)
     const rent = page.getByRole('button', { name: /^Rent Nov 2026/ })
     await expect(rent.getByRole('img', { name: 'Not done yet' })).toBeVisible()
-    // closed and future months carry no dot
-    await expect(page.getByRole('button', { name: /^Rent Sept 2026/ }).getByRole('img')).toHaveCount(0)
+    // a closed month is done, so it carries the green dot; future months carry none
+    await expect(page.getByRole('button', { name: /^Rent Sept 2026/ }).getByRole('img', { name: 'Done' })).toBeVisible()
     await expect(page.getByRole('button', { name: /^Rent Dec 2026/ }).getByRole('img')).toHaveCount(0)
 
     const groceries = page.getByRole('button', { name: /^Groceries Nov 2026/ })
