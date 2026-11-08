@@ -1,10 +1,11 @@
 import { generateKeyBetween } from 'fractional-indexing'
 import { computeEngine, cellKey, sortRows, type EngineOutput } from '@/engine'
 import {
-  ACCOUNT_TYPE_INFO, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, RowSchema, addMonths, compareMonths, monthRange, newId, poolIdOf,
+  ACCOUNT_TYPE_INFO, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, RowSchema, addMonths, compareMonths, monthKey, monthOfDate, monthRange, newId, parseMonth, poolIdOf,
   type Account, type Cell, type CellInput, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Row, type RowKind, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
+import { planEnd } from './months'
 
 export type EditScope = 'this-month' | 'from-now-on'
 
@@ -241,6 +242,16 @@ export async function updateHousehold(store: Store, patch: Partial<Omit<Househol
   const h = tables.household.find((x) => !x.deletedAt)
   if (!h) throw new Error('No household yet')
   await store.commit([{ op: 'put', table: 'household', record: HouseholdSchema.parse({ ...h, ...patch, updatedAt: now() }) }])
+}
+
+/** "Add <year>": plan one more calendar year after the last one shown. Stored on the household, so every screen and device shows it. */
+export async function addPlanYear(store: Store, today: MonthKey = monthOfDate()): Promise<MonthKey> {
+  const tables = await loadTables(store)
+  const household = tables.household.find((h) => !h.deletedAt)
+  if (!household) throw new Error('No household yet')
+  const planUntil = monthKey(parseMonth(planEnd(household, tables, today)).year + 1, 12)
+  await store.commit([{ op: 'put', table: 'household', record: HouseholdSchema.parse({ ...household, planUntil, updatedAt: now() }) }])
+  return planUntil
 }
 
 /** Mark a whole cell done (or back to the row default). Plain values become a single item. */

@@ -29,6 +29,10 @@ describe('schemas', () => {
     expect(CellSchema.parse({ rowId: newId(), month: '2026-11', updatedAt: now }).markedDone).toBe(false)
     expect(PoolSchema.parse({ id: newId(), createdAt: now, updatedAt: now, name: 'Travel', accountId: newId() }).archivedMonth).toBeNull()
   })
+  it('fills in the v4 fields: no extra year planned yet', () => {
+    const h = HouseholdSchema.parse({ id: newId(), createdAt: now, updatedAt: now, name: 'Demo', baseCurrency: 'EUR', locale: 'de-DE', startMonth: '2026-11' })
+    expect(h.planUntil).toBeNull()
+  })
   it('accepts a put event', () => {
     const e = EventSchema.parse({ id: newId(), ts: now, deviceId: 'dev', schemaVersion: 1, txId: newId(), type: 'put', table: 'rows', key: 'abc', record: {}, inverse: null })
     expect(e.table).toBe('rows')

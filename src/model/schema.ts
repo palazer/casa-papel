@@ -4,7 +4,7 @@ import { MONTH_PATTERN } from './month'
 import { FUNDED_BY_PATTERN } from './fundedBy'
 
 /** Bump when the shape of stored data changes; add a migration in migrations.ts. */
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 
 // ---------- primitives ----------
 export const IdSchema = z.string().regex(ID_PATTERN, 'expected ULID')
@@ -54,6 +54,8 @@ export const HouseholdSchema = BaseRecord.extend({
   fxDriftMode: z.enum(['fixed', 'average']).default('fixed'),
   /** Per-pair monthly drift overrides, e.g. { 'EUR/TRY': 0.015 }. */
   fxPairDrift: z.record(z.string(), z.number()).default({}),
+  /** "Add <year>": the plan reaches at least this December. null = the calendar rule alone decides (see store/months.ts). */
+  planUntil: MonthKeySchema.nullable().default(null),
 })
 
 // ---------- entities ----------

@@ -19,15 +19,15 @@ describe('describeRemoval', () => {
     const t = buildDemoTables()
     const groceries = describeRemoval(t, { kind: 'row', id: idOf(t, 'rows', 'Groceries') }, OPTS)
     expect(groceries).toMatchObject({ kindLabel: 'Row', subject: 'Groceries', closedHistory: 'Sept 2026', closedUntil: '2026-09', canDelete: false, canArchive: true, archiveNotBefore: '2026-10', archiveFrom: '2026-11' })
-    expect(groceries.archiveChanges).toEqual(['Hidden from Nov 2026 on; its amounts in 13 later months no longer count'])
+    expect(groceries.archiveChanges).toEqual(['Hidden from Nov 2026 on; its amounts in 14 later months no longer count'])
 
     const other = describeRemoval(t, { kind: 'row', id: idOf(t, 'rows', 'Other income') }, OPTS)
     expect(other.closedHistory).toBeNull()
     expect(other.canDelete).toBe(true)
-    expect(other.loses).toEqual(['Its amounts in 13 months (Nov 2026 – Nov 2027)'])
+    expect(other.loses).toEqual(['Its amounts in 14 months (Nov 2026 – Dec 2027)'])
     expect(other.changes).toEqual([])
     // an earlier archive month is described from that month
-    expect(describeRemoval(t, { kind: 'row', id: idOf(t, 'rows', 'Other income') }, { ...OPTS, archiveFrom: '2027-01' }).archiveChanges[0]).toBe('Hidden from Jan 2027 on; its amounts in 11 later months no longer count')
+    expect(describeRemoval(t, { kind: 'row', id: idOf(t, 'rows', 'Other income') }, { ...OPTS, archiveFrom: '2027-01' }).archiveChanges[0]).toBe('Hidden from Jan 2027 on; its amounts in 12 later months no longer count')
   })
 
   it('a row names its schedules, its followers and the pool account it fills', () => {

@@ -46,7 +46,7 @@ export const HELP = {
 
   // The cell editor
   'cell.howSure': { title: 'How sure', text: 'An estimate is a guess (italic, dashed underline). Certain means you know the amount. Done means the money has moved; done cells get a green dot and count towards the month\'s progress.' },
-  'cell.appliesTo': { title: 'Applies to', text: '"This month and onwards" changes this month and every later month that still follows this row. "Only this month" changes one month; the next month keeps the old amount.' },
+  'cell.appliesTo': { title: 'Applies to', text: '"This month and onwards" changes this month and every later month that still follows this row. "Only this month" changes one month; the next month keeps the old amount. Done in a December, it pins January, so the grid shows the next year.' },
   'cell.comesOutOf': { title: 'Comes out of', text: 'The budget side of an expense: this month\'s income (the normal case), the savings balance, or a pool account. Savings and pool accounts do not reduce this month\'s leftover.' },
 
   // Household settings

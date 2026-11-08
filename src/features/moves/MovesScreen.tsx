@@ -12,7 +12,7 @@ import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { cellKey, computeContributions, computePersonBudgets, type EngineOutput } from '@/engine'
 import { isDue, monthOfDate, type Household, type MonthKey, type Tables } from '@/model'
-import { closeMonth, recurringStatus, reopenMonth, scheduleLive, setCellDone, setRecurringPaid } from '@/store'
+import { addPlanYear, closeMonth, recurringStatus, reopenMonth, scheduleLive, setCellDone, setRecurringPaid } from '@/store'
 import { HUES } from '@/app/hues'
 import { GoalsCard } from '@/features/goals/GoalsCard'
 
@@ -44,7 +44,7 @@ export function MovesScreen() {
   return (
     <div className="mx-auto max-w-3xl space-y-4 text-sm md:text-xs">
       <PageHeader title="Moves" subline={<>{household.name}{t.closed && <> · <Chip tone="zinc"><Lock aria-hidden /> closed</Chip></>}</>}>
-        <MonthPicker months={months} month={m} onChange={setMonth} locale={locale} />
+        <MonthPicker months={months} month={m} onChange={setMonth} locale={locale} onAddYear={() => act(() => addPlanYear(store))} />
         {t.closed ? (
           <Button size="sm" variant="outline" onClick={() => act(() => reopenMonth(store, m))}>Reopen month</Button>
         ) : (
@@ -57,7 +57,7 @@ export function MovesScreen() {
         <StatTile label="Income" help="derived.incomeTotal" value={formatAmount(t.income, ccy, locale)} tone={HUES.income} />
         <StatTile label="Expenses" help="derived.expensesTotal" value={formatAmount(t.expensesTotal, ccy, locale)} tone={HUES.expense} />
         <StatTile label="To savings" help="stat.toSavings" value={formatAmount(t.toSavings, ccy, locale, { sign: 'exceptZero' })} tone={HUES.transfer} />
-        <StatTile label="Net worth" help="derived.netWorth" value={formatAmount(engine.netWorth[m] ?? 0, ccy, locale)} tone={HUES.worth} />
+        <StatTile label="Net worth" help="derived.netWorth" value={<span className={(engine.netWorth[m] ?? 0) < 0 ? 'text-expense' : undefined}>{formatAmount(engine.netWorth[m] ?? 0, ccy, locale)}</span>} tone={HUES.worth} />
         <StatTile label={openCount === 0 ? 'All moves done' : 'Moves left'} help="stat.movesLeft" value={String(openCount)} />
       </div>
 

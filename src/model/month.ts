@@ -40,6 +40,11 @@ export function monthDiff(a: MonthKey, b: MonthKey): number {
   return (pb.year - pa.year) * 12 + (pb.month - pa.month)
 }
 
+/** The December of a month's year. */
+export function decemberOf(m: MonthKey): MonthKey {
+  return monthKey(parseMonth(m).year, 12)
+}
+
 export function monthOfDate(d: Date = new Date()): MonthKey {
   return monthKey(d.getFullYear(), d.getMonth() + 1)
 }

@@ -16,7 +16,7 @@ import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { cellKey, groupRowsByCategory, type CellResult } from '@/engine'
 import { monthOfDate, type MonthKey, type Row, type Section } from '@/model'
-import { closeMonth, derivedRowReason, reopenMonth, setCellDone, setDerivedDone, setItemStatus } from '@/store'
+import { addPlanYear, closeMonth, derivedRowReason, reopenMonth, setCellDone, setDerivedDone, setItemStatus } from '@/store'
 import { CellEditor } from '@/features/grid/CellEditor'
 import { doneness } from '@/features/grid/display'
 import { GoalsCard } from '@/features/goals/GoalsCard'
@@ -89,7 +89,7 @@ export function MonthScreen() {
   return (
     <div className="mx-auto max-w-xl space-y-4">
       <PageHeader title="Month" subline={<>{household.name}{closed && <> · <Chip tone="zinc"><Lock aria-hidden /> closed</Chip></>}</>}>
-        <MonthPicker months={months} month={m} onChange={setMonth} locale={locale} />
+        <MonthPicker months={months} month={m} onChange={setMonth} locale={locale} onAddYear={() => act(() => addPlanYear(store))} />
         {closed ? (
           <Button size="sm" variant="outline" onClick={() => act(() => reopenMonth(store, m))}>Reopen month</Button>
         ) : (
@@ -109,11 +109,11 @@ export function MonthScreen() {
         {/* an account or pool account archived by this month has no balance to show */}
         {Object.values(engine.accounts).filter((s) => s.months[m]).map((s) => {
           const acc = tables.accounts.find((a) => a.id === s.accountId)
-          return <Stat key={s.accountId} label={acc?.name ?? 'Account'} help={balanceHelp(acc?.type)} value={formatAmount(s.months[m].balance, s.currency, locale)} hue={HUES.worth} />
+          return <Stat key={s.accountId} label={acc?.name ?? 'Account'} help={balanceHelp(acc?.type)} value={formatAmount(s.months[m].balance, s.currency, locale)} tone={s.months[m].balance < 0 ? 'out' : 'neutral'} hue={HUES.worth} />
         })}
-        {Object.values(engine.accounts).some((s) => s.months[m]) && <Stat label="Net worth" help="derived.netWorth" value={formatAmount(engine.netWorth[m] ?? 0, ccy, locale)} hue={HUES.worth} />}
+        {Object.values(engine.accounts).some((s) => s.months[m]) && <Stat label="Net worth" help="derived.netWorth" value={formatAmount(engine.netWorth[m] ?? 0, ccy, locale)} tone={(engine.netWorth[m] ?? 0) < 0 ? 'out' : 'neutral'} hue={HUES.worth} />}
         {Object.values(engine.pools).filter((p) => p.months[m]).map((p) => (
-          <Stat key={p.poolId} label={`Pool account · ${tables.pools.find((x) => x.id === p.poolId)?.name ?? ''}`} help="balance.pool" value={formatAmount(p.months[m].balance, ccy, locale)} hue={HUES.pool} />
+          <Stat key={p.poolId} label={`Pool account · ${tables.pools.find((x) => x.id === p.poolId)?.name ?? ''}`} help="balance.pool" value={formatAmount(p.months[m].balance, ccy, locale)} tone={p.months[m].balance < 0 ? 'out' : 'neutral'} hue={HUES.pool} />
         ))}
       </Island>
 

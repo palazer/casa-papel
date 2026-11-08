@@ -22,7 +22,7 @@ async function demo() {
   await loadDemo(store)
   const t = await loadTables(store)
   const household = t.household[0]
-  const months = defaultMonths(household, t, 0, TODAY)
+  const months = defaultMonths(household, t, TODAY)
   await postRecurring(store, months)
   return { store, months, tables: () => loadTables(store), engine: async () => computeEngine({ tables: await loadTables(store), months }) }
 }

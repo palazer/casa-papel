@@ -118,7 +118,7 @@ function context(tables: Tables, opts: ImpactOptions): Ctx {
   const household = tables.household.find((h) => !h.deletedAt)
   if (!household) throw new Error('No household yet')
   const today = opts.today ?? monthOfDate()
-  const months = defaultMonths(household, tables, 0, today)
+  const months = defaultMonths(household, tables, today)
   const live = <T extends { deletedAt: number | null }>(list: T[]) => list.filter((x) => !x.deletedAt)
   return {
     tables, household, locale: opts.locale ?? household.locale, today, months,

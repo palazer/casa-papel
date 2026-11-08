@@ -9,12 +9,11 @@ import { cn } from '@/lib/utils'
 import { formatAmount, formatMonth, formatPercent } from '@/app/format'
 import { balanceHelp, type HelpKey } from '@/app/help'
 import { HUES, SECTION_HUE, type Hue } from '@/app/hues'
-import { readPref, writePref } from '@/app/prefs'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { cellKey, groupRowsByCategory, type EngineOutput } from '@/engine'
-import { monthOfDate, type Household, type Money, type MonthKey, type Row, type Section, type Tables } from '@/model'
-import { closeMonth, derivedRowReason, reopenMonth } from '@/store'
+import { monthOfDate, parseMonth, type Household, type Money, type MonthKey, type Row, type Section, type Tables } from '@/model'
+import { addPlanYear, closeMonth, derivedRowReason, reopenMonth } from '@/store'
 import { AddRowInline } from './AddRowInline'
 import { BalanceDialog } from './BalanceDialog'
 import { CellEditor } from './CellEditor'
@@ -32,8 +31,7 @@ export function GridScreen() {
   const store = useStore()
   const tables = useTables()
   const household = activeHousehold(tables)
-  const [extra, setExtra] = useState(() => readPref('horizonExtra', 0))
-  const months = useMemo(() => (household && tables ? defaultMonths(household, tables, extra) : []), [household, tables, extra])
+  const months = useMemo(() => (household && tables ? defaultMonths(household, tables) : []), [household, tables])
   const engine = useEngine(tables, months)
   const [collapsed, setCollapsed] = useState<Set<Section>>(() => new Set())
   const [selected, setSelected] = useState<{ rowId: string; month: MonthKey } | null>(null)
@@ -122,7 +120,7 @@ export function GridScreen() {
   return (
     <div className="space-y-4">
       <PageHeader title="Grid" subline={`${household.name} · ${formatMonth(months[0], locale)} – ${formatMonth(months[months.length - 1], locale)}`}>
-        <Button size="xs" variant="outline" onClick={() => { const n = extra + 12; setExtra(n); writePref('horizonExtra', n) }}>Show 12 more months</Button>
+        <Button size="xs" variant="outline" onClick={() => act(() => addPlanYear(store))}>Add {parseMonth(months[months.length - 1]).year + 1}</Button>
         <span className="text-muted-foreground">Click a cell to edit · arrows move · Enter opens · click a month name to close or reopen it</span>
         <MarksLegend neg={neg} />
         {engine.warnings.length > 0 && <p role="alert" className="basis-full text-amber-700 dark:text-amber-400">{engine.warnings.join(' · ')}</p>}

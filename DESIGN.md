@@ -56,7 +56,7 @@ Phone list       mx-auto max-w-xl space-y-4 of dense islands, rows text-sm and m
   it is a utility, so a fresh visit opens the household (or the welcome screen when there is none).
 - **Page header** (`src/components/PageHeader.tsx`): every screen opens with it. The H1 is the screen's name (the rail's
   label); the subline names the frame of reference (`The Demo Household · Sep 2026 – Nov 2027`, `· closed` as a chip).
-  The toolbar holds Undo and Redo first, then the controls (`MonthPicker`, Close month, Show 12 more months), then the
+  The toolbar holds Undo and Redo first, then the controls (`MonthPicker`, Close month, Add <year>), then the
   sync cloud. Errors and warnings are `basis-full` lines: destructive for an action that failed, `text-amber-700` for a
   warning the engine raises.
 - Nothing floats over the content except popovers, menus and dialogs (`z-50`); the rail and tabs are `z-40`.
@@ -104,7 +104,8 @@ Truncation idiom: a `min-w-0` parent, `truncate` on the name, `shrink-0` on sibl
 
 - **Kinds of money** (tokens, §1): section titles and total-row labels in the hue; total rows on their `tint`; spending
   amounts in the expense hue when "show expenses as negative" is on; money taken back out of savings in `--draw`. Numbers
-  otherwise stay ink, so the grid never becomes a heat map.
+  otherwise stay ink, so the grid never becomes a heat map. A balance below zero (an overdrawn pool account, savings in the
+  red, negative net worth) is in the expense hue whatever the negatives setting: it is a warning, not spending.
 - **Certainty**: an estimate is italic with a dashed `decoration-partial` underline; certain and done are plain.
 - **Done**: one mark only, the `DoneDot` (8 px): a green disc for done in any month; in the current open month also a
   red ring for nothing done and an amber half disc for partly done.
@@ -167,7 +168,9 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   toggles, `ghost` for quiet actions (Edit, Cancel), `destructive` for the irreversible. Toggle idiom:
   `variant={active ? 'default' : 'outline'}` (the entity-kind picker under People & things).
 - `MonthPicker`: two `icon-xs outline` buttons around the month as an `h2 text-sm font-medium`; lives in the page
-  header's toolbar (Month, Moves) or an island's first line (Schedules).
+  header's toolbar (Month, Moves) or an island's first line (Schedules). At the last planned month the Next button gives
+  way to an `xs outline` `Add <year>`, the Grid toolbar's action: the plan always ends in a December and grows a calendar
+  year at a time (`planEnd` in `src/store/months.ts`; this year's December, next year's from October on).
 - `TabBar` switches an island's view (`src/components/ui/tab-bar.tsx`); `ViewToggle` filters a list
   (`src/components/ui/view-toggle.tsx`); `Segmented` stays for a form field with a few options (certainty, applies to).
 - Native `<select>` through `NativeSelect` for form fields; `MonthField` for months (Safari has no month input).

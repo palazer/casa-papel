@@ -56,6 +56,7 @@ export function MarksLegend({ neg }: { neg: boolean }) {
             <Mark sample={<span className="flex gap-1"><DoneDot done={0} total={1} state="none" /><DoneDot done={1} total={2} state="partial" /></span>}>This month only: nothing done yet, partly done</Mark>
             {neg && <Mark sample={<span className={HUES.expense.text}>-€210.00</span>}>Spending, shown as a negative number</Mark>}
             <Mark sample={<span className="text-draw">+€120.00</span>}>Drawn from savings this month</Mark>
+            <Mark sample={<span className={HUES.expense.text}>-€80.00</span>}>A balance below zero: a pool account or savings in the red</Mark>
             <Mark sample={<span className="underline decoration-dotted underline-offset-4">€8,000.00</span>}>A balance you entered yourself</Mark>
             <Mark sample={<span className="flex items-center gap-1 rounded bg-muted/60 px-1.5 py-0.5 text-muted-foreground"><Lock className="size-3" aria-hidden />Sept</span>}>A closed month: locked, all of it counts as done</Mark>
             <Mark sample={<span className={cn('block h-4 w-14 rounded-sm ring-1 ring-border', HUES.expense.band)} aria-hidden />}>A faint band: the rows of one category</Mark>

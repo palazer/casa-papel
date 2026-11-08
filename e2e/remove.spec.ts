@@ -14,7 +14,7 @@ test.describe('archive or delete', () => {
     await page.getByRole('button', { name: 'Row menu for Other income' }).click()
     await page.getByRole('menuitem', { name: 'Archive or delete…' }).click()
     await expect(dlg.getByRole('heading', { name: 'Row "Other income"' })).toBeVisible()
-    await expect(dlg.getByText('Its amounts in 13 months (Nov 2026 – Nov 2027)')).toBeVisible()
+    await expect(dlg.getByText('Its amounts in 14 months (Nov 2026 – Dec 2027)')).toBeVisible()
     await expect(dlg.getByRole('button', { name: 'Archive from Nov 2026' })).toBeVisible()
     await page.screenshot({ path: 'e2e/output/remove-row.png' })
     await dlg.getByRole('button', { name: 'Delete', exact: true }).click()
