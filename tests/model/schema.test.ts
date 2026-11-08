@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CellSchema, EventSchema, HouseholdSchema, PoolSchema, RowSchema, newId, poolIdOf, poolRef } from '@/model'
+import { CellSchema, EventSchema, FxRateSchema, HouseholdSchema, PoolSchema, RowSchema, newId, poolIdOf, poolRef } from '@/model'
 
 const now = Date.now()
 
@@ -29,9 +29,11 @@ describe('schemas', () => {
     expect(CellSchema.parse({ rowId: newId(), month: '2026-11', updatedAt: now }).markedDone).toBe(false)
     expect(PoolSchema.parse({ id: newId(), createdAt: now, updatedAt: now, name: 'Travel', accountId: newId() }).archivedMonth).toBeNull()
   })
-  it('fills in the v4 fields: no extra year planned yet', () => {
+  it('fills in the v4 fields: no extra year planned, first-day month rates, undated manual rates', () => {
     const h = HouseholdSchema.parse({ id: newId(), createdAt: now, updatedAt: now, name: 'Demo', baseCurrency: 'EUR', locale: 'de-DE', startMonth: '2026-11' })
     expect(h.planUntil).toBeNull()
+    expect(h.fxMonthRate).toBe('first')
+    expect(FxRateSchema.parse({ pair: 'EUR/USD', month: '2026-11', rate: 1.1, source: 'manual', updatedAt: now }).date).toBeNull()
   })
   it('accepts a put event', () => {
     const e = EventSchema.parse({ id: newId(), ts: now, deviceId: 'dev', schemaVersion: 1, txId: newId(), type: 'put', table: 'rows', key: 'abc', record: {}, inverse: null })

@@ -224,12 +224,16 @@ export function GridScreen() {
               if (acc.type === 'investment') {
                 return [
                   derivedRow(`${acc.name} · value`, 'in', (m) => s.months[m]?.balance ?? null, { strong: true, currency: s.currency, onClick: open, mark: marked, hue: HUES.worth, help: 'balance.investmentValue' }),
+                  ...(s.currency !== ccy ? [derivedRow(`in ${ccy}`, 'in', (m) => s.months[m]?.balanceBase ?? null, { muted: true, sub: acc.name, help: 'balance.inBase' })] : []),
                   derivedRow('Deposited', 'in', (m) => s.months[m]?.capital ?? null, { muted: true, sub: acc.name, currency: s.currency, help: 'balance.deposited' }),
                   derivedRow('Return', 'in', (m) => (s.months[m] ? Math.round((s.months[m].totalReturn ?? 0) * 10000) : null), { muted: true, sub: acc.name, format: (v) => (v === 0 ? '' : formatPercent(v / 10000, locale)), help: 'balance.return' }),
                 ]
               }
               const label = acc.type === 'credit-card' ? `${acc.name} · owed` : acc.type === 'loan' ? `${acc.name} · outstanding` : acc.name
-              return [derivedRow(label, s.liability ? 'out' : 'in', (m) => s.months[m]?.balance ?? null, { strong: true, currency: s.currency, onClick: open, mark: marked, hue: HUES.worth, help: balanceHelp(acc.type) })]
+              return [
+                derivedRow(label, s.liability ? 'out' : 'in', (m) => s.months[m]?.balance ?? null, { strong: true, currency: s.currency, onClick: open, mark: marked, hue: HUES.worth, help: balanceHelp(acc.type) }),
+                ...(s.currency !== ccy ? [derivedRow(`in ${ccy}`, s.liability ? 'out' : 'in', (m) => s.months[m]?.balanceBase ?? null, { muted: true, sub: acc.name, help: 'balance.inBase' })] : []),
+              ]
             })}
             {poolSeries.map((p) => {
               const pool = tables.pools.find((x) => x.id === p.poolId)
@@ -271,8 +275,9 @@ interface GridRowProps {
 function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, locale, neg, onSelect, onError }: GridRowProps) {
   const totals = engine.rowTotals[row.id]
   const flow = flowOf(row)
-  const rowCcy = row.currency ?? ccy
   const followed = row.followsRowId ? tables.rows.find((r) => r.id === row.followsRowId) : undefined
+  /** The code after the name: this row's own currency, or the followed row's (a follower takes its target's). */
+  const tagCcy = row.currency ?? followed?.currency ?? null
   const automatic = derivedRowReason(row, household.closingRule) !== null
   return (
     <tr className={cn('group', band)}>
@@ -280,7 +285,7 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
         <div className="flex items-center gap-1">
           <div className="min-w-0 flex-1">
             <div className="truncate text-xs font-medium">
-              {row.name}{row.currency && row.currency !== ccy ? <span className="ml-1 text-[10px] font-normal text-muted-foreground">{row.currency}</span> : null}
+              {row.name}{tagCcy && tagCcy !== ccy ? <span className="ml-1 text-[10px] font-normal text-muted-foreground">{tagCcy}</span> : null}
               {followed ? <span className="ml-1 text-[10px] font-normal text-muted-foreground" title={`Same amount as ${followed.name}`}>= {followed.name}</span> : null}
             </div>
             <div className="truncate text-[10px] leading-3 text-muted-foreground tabular-nums">
@@ -299,32 +304,37 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
         const closed = engine.totals[m]?.closed
         const isDerived = cell.source === 'derived'
         const isEmpty = cell.source === 'empty' || (cell.source === 'items' && cell.items.every((i) => i.skipped))
-        const d = amountDisplay(cell.value, flow, rowCcy, locale, neg)
+        const d = amountDisplay(cell.value, flow, cell.currency, locale, neg)
+        // a second, muted line: the household-currency value of an amount typed in another currency
+        const about = !isEmpty && cell.currency !== ccy ? formatAmount(cell.valueBase, ccy, locale, { compact: true }) : null
+        const sub = about ? { text: `≈ ${about}`, label: `about ${about}` } : null
         // One mark only: a green dot for done in any month; the current month also shows red (nothing yet) and amber (partly).
         const dot = !isEmpty && (!isDerived || cell.value !== 0) && ((m === today && !closed) || cell.status === 'done') ? doneness(cell) : null
         return (
           <td key={m} className={cn('p-0', closed && 'bg-muted/60')}>
             {cell.source === 'archived' ? null : isDerived ? (
-              <div className={cn('relative px-1.5 py-0.5 text-right tabular-nums', dot && 'pr-3', toneClass[d.tone], statusClass.derived)}>
+              <div className={cn('relative flex flex-col items-end px-1.5 py-0.5 text-right tabular-nums', dot && 'pr-3', toneClass[d.tone])}>
                 {dot && <DoneDot {...dot} className="absolute right-0.5 top-0.5" />}
-                {d.text}
+                <span className={statusClass.derived}>{d.text}</span>
+                {sub && <span className="whitespace-nowrap text-[10px] font-normal leading-3 text-muted-foreground">{sub.text}</span>}
               </div>
             ) : (
               <button
                 type="button"
                 data-cell={`${rIndex},${c}`}
                 tabIndex={rIndex === 0 && c === 0 ? 0 : -1}
-                aria-label={`${row.name} ${formatMonth(m, locale)}: ${isEmpty ? 'empty' : d.text}${dot ? `, ${doneLabel(dot)}` : ''}`}
+                aria-label={`${row.name} ${formatMonth(m, locale)}: ${isEmpty ? 'empty' : d.text}${sub ? `, ${sub.label}` : ''}${dot ? `, ${doneLabel(dot)}` : ''}`}
                 onClick={() => onSelect(m)}
                 className={cn(
-                  'relative flex w-full items-center justify-end gap-1 px-1.5 py-0.5 text-right tabular-nums outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+                  'relative flex w-full justify-end px-1.5 py-0.5 text-right tabular-nums outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+                  sub ? 'flex-col items-end' : 'items-center gap-1',
                   dot && 'pr-3',
                   isEmpty ? 'text-muted-foreground/40' : toneClass[d.tone],
-                  !isEmpty && statusClass[cell.status],
                 )}
               >
                 {dot && <DoneDot {...dot} className="absolute right-0.5 top-0.5" />}
-                {isEmpty ? '·' : d.text}
+                <span className={cn(!isEmpty && statusClass[cell.status])}>{isEmpty ? '·' : d.text}</span>
+                {sub && <span className="whitespace-nowrap text-[10px] font-normal leading-3 text-muted-foreground">{sub.text}</span>}
               </button>
             )}
           </td>

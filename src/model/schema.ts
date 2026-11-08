@@ -49,7 +49,8 @@ export const HouseholdSchema = BaseRecord.extend({
   displayExpensesNegative: z.boolean().default(true),
   /** Default monthly FX drift (fraction) for projected rates. */
   fxDriftDefault: z.number().default(0),
-  fxMonthRate: FxMonthRateSchema.default('last'),
+  /** Which day's ECB rate stands for a month: the first business day by default (decided 2026-11-08), the last, or the average. */
+  fxMonthRate: FxMonthRateSchema.default('first'),
   /** How future rates are projected: a fixed monthly drift, or the average month-over-month change of the last year. */
   fxDriftMode: z.enum(['fixed', 'average']).default('fixed'),
   /** Per-pair monthly drift overrides, e.g. { 'EUR/TRY': 0.015 }. */
@@ -222,6 +223,8 @@ export const FxRateSchema = z.object({
   month: MonthKeySchema,
   rate: z.number().positive(),
   source: z.enum(['api', 'manual', 'projected']),
+  /** For a fetched rate: the day it was taken on (the month-rate policy's day). null for manual rates and averages. */
+  date: IsoDateSchema.nullable().default(null),
   updatedAt: TimestampSchema,
 })
 

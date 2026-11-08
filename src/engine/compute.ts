@@ -105,7 +105,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
   const rowsById = new Map(rows.map((r) => [r.id, r]))
   /** Rows that follow another row mirror its cells, so they are computed after everything else. */
   const pass1Order = [...rows.filter((r) => !r.followsRowId), ...rows.filter((r) => r.followsRowId)]
-  const fx = buildFxIndex(tables.fxRates, { driftMode: household.fxDriftMode ?? 'fixed', fixedDrift: household.fxDriftDefault ?? 0, pairDrift: household.fxPairDrift ?? {} })
+  const fx = buildFxIndex(tables.fxRates, { driftMode: household.fxDriftMode ?? 'fixed', fixedDrift: household.fxDriftDefault ?? 0, pairDrift: household.fxPairDrift ?? {}, base })
   /** Rows driven by recurring items never carry forward: a month without items is 0. */
   const recurringRowIds = new Set(tables.recurringItems.filter((r) => !r.deletedAt).map((r) => r.rowId))
 
@@ -321,6 +321,13 @@ export function computeEngine(input: EngineInput): EngineOutput {
     poolSeries[pool.id] = series
   }
 
+  /** A balance in the base currency; a missing rate leaves it 1:1 and warns the way rows do. */
+  const inBase = (acc: Account, balance: Money, m: MonthKey): { balanceBase: Money; missingRate: boolean } => {
+    const conv = convertMoney(fx, balance, acc.currency, base, m)
+    if (conv.missingRate) warnings.push(`No ${acc.currency}→${base} rate for ${m} (${acc.name})`)
+    return { balanceBase: conv.value, missingRate: conv.missingRate }
+  }
+
   // ---------- savings accounts ----------
   const accountSeries: Record<string, AccountSeries> = {}
   const primarySavingsId =
@@ -339,7 +346,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
       const computed: Money = start + inflow - outflow
       const actual = actuals.get(`${acc.id}|${m}`)?.actualBalance ?? null
       const balance: Money = actual ?? computed
-      series.months[m] = { computed, balance, adjustment: actual != null ? actual - computed : 0, inflow, outflow }
+      series.months[m] = { computed, balance, adjustment: actual != null ? actual - computed : 0, inflow, outflow, ...inBase(acc, balance, m) }
       prevBalance = balance
     }
     accountSeries[acc.id] = series
@@ -389,7 +396,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
       if (actual != null) realised.push(monthlyReturn)
       series.months[m] = {
         computed, balance, adjustment: actual != null ? actual - computed : 0, inflow: deposit, outflow: withdrawal,
-        capital, startValue, monthlyReturn, totalReturn: capital !== 0 ? balance / capital - 1 : 0, projected: actual == null,
+        capital, startValue, monthlyReturn, totalReturn: capital !== 0 ? balance / capital - 1 : 0, projected: actual == null, ...inBase(acc, balance, m),
       }
       prevValue = balance
     }
@@ -435,7 +442,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
       const computed: Money = liability ? prev + inflow - outflow : prev
       const actual = actuals.get(`${acc.id}|${m}`)?.actualBalance ?? null
       const balance: Money = actual ?? computed
-      series.months[m] = { computed, balance, adjustment: actual != null ? actual - computed : 0, inflow, outflow, projected: actual == null }
+      series.months[m] = { computed, balance, adjustment: actual != null ? actual - computed : 0, inflow, outflow, projected: actual == null, ...inBase(acc, balance, m) }
       prevBalance = balance
     }
     accountSeries[acc.id] = series
@@ -448,8 +455,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
     for (const s of Object.values(accountSeries)) {
       const r = s.months[m]
       if (!r) continue
-      const conv = convertMoney(fx, r.balance, s.currency, base, m)
-      nw += s.liability ? -conv.value : conv.value
+      nw += s.liability ? -r.balanceBase : r.balanceBase
     }
     netWorth[m] = nw
   }

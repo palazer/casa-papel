@@ -28,6 +28,7 @@ export const HELP = {
   'row.follows': { title: 'Follows another row', text: 'This row copies another row\'s amount every month, like a child\'s savings following the child benefit. Edit the row it follows; this one has no amount of its own.' },
   'row.category': { title: 'Category', text: 'A named group inside the section, like Housing or Transport. Rows sort by category in the grid and share a faint band, so related lines sit together. Categories are managed under Household.' },
   'row.automatic': { title: 'Automatic', text: 'The app works this amount out from the rest of the month, so there is nothing to type. Tick it once the money has actually moved; the amount keeps following the plan.' },
+  'row.currency': { title: 'Currency of this row', text: 'Amounts in this row are typed in this currency and shown in the household currency beneath, converted at each month\'s rate. Numbers already typed keep their digits and are read in the new currency; the rates live under Household.' },
   'month.progress': { title: 'Progress', text: 'Every line with an amount counts once; an itemized line counts each item. Still to pay adds up the open spending and transfers, to come in the open income, both in your base currency.' },
 
   // Balances
@@ -39,6 +40,7 @@ export const HELP = {
   'balance.loanOutstanding': { title: 'Loan outstanding', text: 'What is still owed. Each instalment brings it down; interest is not modelled, so enter the real balance now and then to keep it honest.' },
   'balance.otherAsset': { title: 'Other asset', text: 'Something you own with a value, like a rental deposit. The balance only changes when you enter a new value; it counts towards net worth.' },
   'balance.pool': { title: 'Pool account', text: 'Money set aside inside a savings account for one purpose: what goes in every month minus the spending that comes out of it. The savings balance already includes it.' },
+  'balance.inBase': { title: 'In the household currency', text: 'The balance converted at the month\'s rate, so it can be compared with the other balances and counted in net worth. The line above is in the account\'s own currency.' },
 
   // Stats on Month and Moves
   'stat.toSavings': { title: 'To savings', text: 'How much the month moves into savings, pool accounts included. Negative means the month draws on savings instead.' },
@@ -48,6 +50,7 @@ export const HELP = {
   'cell.howSure': { title: 'How sure', text: 'An estimate is a guess (italic, dashed underline). Certain means you know the amount. Done means the money has moved; done cells get a green dot and count towards the month\'s progress.' },
   'cell.appliesTo': { title: 'Applies to', text: '"This month and onwards" changes this month and every later month that still follows this row. "Only this month" changes one month; the next month keeps the old amount. Done in a December, it pins January, so the grid shows the next year.' },
   'cell.comesOutOf': { title: 'Comes out of', text: 'The budget side of an expense: this month\'s income (the normal case), the savings balance, or a pool account. Savings and pool accounts do not reduce this month\'s leftover.' },
+  'cell.rate': { title: 'This month\'s rate', text: 'How this amount becomes the household currency. An ECB rate is the European Central Bank\'s for the day the Month rate setting under Household picks, the first business day by default. A manual rate is yours and applies to every row in that currency that month. Projected and carried rates are estimates.' },
 
   // Household settings
   'household.closingRule': { title: 'Month-end rule', text: 'What happens to the money left at the end of the month. Savings plug: the leftover moves to savings automatically and you never type "To savings". Leftover plug: you type what goes to savings and the rest is shown as leftover.' },

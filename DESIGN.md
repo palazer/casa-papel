@@ -137,6 +137,10 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   total and the share of income), the row menu (`…`) at the right, revealed on hover of the `group` row.
 - Month columns `min-w-24`; today's header on `bg-muted` with the month in `font-semibold`; cells `px-1.5 py-0.5` (about
   22 px rows), amounts right-aligned, the done dot in the top-right corner. An empty cell shows a faint `·`.
+- A cell in another currency is two lines: the typed amount over a `text-[10px] leading-3` muted `≈ €3,120` in the household
+  currency at that month's rate (the cell button becomes `flex-col items-end`; the certainty styling stays on the amount
+  line; the `aria-label` says `, about €3,120`). The label keeps the currency code, a follower's too. A foreign account's
+  balance row has a muted `in EUR` sub-row like `Deposited`; the Month view's stat shows `≈ €…` after the balance.
 - Section header rows: the chevron and the title in `text-xs font-semibold` in the section's hue; no bar, no fill.
 - Categories (`groupRowsByCategory`): inside a section rows sort by category, then by their own order; rows without
   one come last. When the section has categories, each group opens with a label row (`text-[10px] font-semibold
@@ -159,7 +163,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 - **Stat tiles** (`src/components/ui/stat-tile.tsx`): a small-caps label (in a kind-of-money hue when the number is one)
   over `text-sm font-semibold tabular-nums`, in `rounded-md border` boxes laid out `grid grid-cols-2 gap-2 sm:grid-cols-5`.
 - **Month lines** (`src/features/month/MonthLine.tsx`): `grid grid-cols-[minmax(0,1fr)_2.75rem]`, a `min-h-11 px-3
-  py-2 text-sm` body (the name, a muted subline for `= Followed`, `automatic` or `2 of 3 done`, the amount at the end)
+  py-2 text-sm` body (the name, a muted subline for `= Followed`, `automatic`, `2 of 3 done` or `≈ €3,120`, the amount at the end)
   and the `Tick` in the right column. The body of an itemized line opens its items as an accordion (`aria-expanded`,
   items on `bg-muted/20` indented `pl-9`, a `Repeat` icon for scheduled ones, each with its own tick); any other body
   opens the Paid sheet; an automatic line's body is plain text with an (i). Above the islands, `ProgressLine`: an
@@ -178,6 +182,12 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   header's toolbar (Month, Moves) or an island's first line (Schedules). At the last planned month the Next button gives
   way to an `xs outline` `Add <year>`, the Grid toolbar's action: the plan always ends in a December and grows a calendar
   year at a time (`planEnd` in `src/store/months.ts`; this year's December, next year's from October on).
+- Rates are always spelled with both codes in the orientation whose number is ≥ 1 (`1 EUR = 1.08 USD`, `1 USD = 48.58 TRY`;
+  `readableRate` in `src/features/household/fxDisplay.ts`); the rates table's columns read `1 EUR in USD` and store
+  `base/foreign`. The cell editor's rate line (`src/features/grid/RateLine.tsx`) sits under an amount in another currency:
+  `≈ €3,120.00 · 1 EUR = 1.084 USD · [ECB] 2 Nov 2026` with the table's chip tones, a ghost `xs` "Change this month's
+  rate…" that reveals an inline input (one rate per currency per month), and "Use the ECB rate again" while the rate is
+  manual. The ECB day is the Month rate setting's, the first business day by default.
 - `TabBar` switches an island's view (`src/components/ui/tab-bar.tsx`); `ViewToggle` filters a list
   (`src/components/ui/view-toggle.tsx`); `Segmented` stays for a form field with a few options (certainty, applies to).
 - Native `<select>` through `NativeSelect` for form fields; `MonthField` for months (Safari has no month input).
@@ -211,7 +221,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   found with `getByLabel(name, { exact: true })`, since the (i)'s name contains the field's): `TipLabel` pairs a form label with one,
   `Island`, `StatTile`, the Month view's `Stat` and the grid's `derivedRow` take a `help` key, the grid's row label puts
   it between the name and the row menu. Where it goes: section titles, every total and balance the app works out,
-  automatic and following rows, stat labels, the cell editor's "Applies to", "How sure" and "Comes out of", the
+  automatic and following rows, stat labels, the cell editor's "Applies to", "How sure", "Comes out of" and its rate line, a row's currency, the `in EUR` balance line, the
   household settings, "Track the balance", the Archived list, Goals and the schedules' status column.
 - Every text lives in `src/app/help.ts`: `HELP[key] = { title, text }`, keys `area.name`, titles up to 40 characters,
   texts two or three plain sentences up to 360 characters in the app's own words (pool accounts, people & things,

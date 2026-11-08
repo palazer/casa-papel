@@ -75,7 +75,11 @@ export function MovesScreen() {
                 {cell.source === 'derived' && <Chip tone="zinc">automatic</Chip>}
               </span>
               <span className="min-w-0 flex-1 truncate">{row.name}{row.accountId && <span className="text-muted-foreground"> → {accountName(row.accountId)}</span>}</span>
-              <span className={`tabular-nums ${cell.value < 0 ? 'text-draw' : ''}`}>{formatAmount(Math.abs(cell.value), ccy, locale)}{cell.value < 0 ? ' back' : ''}</span>
+              <span className={`tabular-nums ${cell.value < 0 ? 'text-draw' : ''}`}>
+                {formatAmount(Math.abs(cell.value), cell.currency, locale)}
+                {cell.currency !== ccy && <span className="ml-1 text-muted-foreground">≈ {formatAmount(Math.abs(cell.valueBase), ccy, locale, { compact: true })}</span>}
+                {cell.value < 0 ? ' back' : ''}
+              </span>
             </div>
           ))}
         </div>

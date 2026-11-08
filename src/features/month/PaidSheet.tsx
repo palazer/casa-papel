@@ -38,7 +38,7 @@ export const SHEET_CLASS = 'max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm
 export function PaidSheet({ household, row, cell, month, itemId, onClose, onOpenEditor }: Props) {
   const store = useStore()
   const { locale } = household
-  const currency = row.currency ?? household.baseCurrency
+  const currency = cell.currency
   const item = itemId ? cell.items.find((i) => i.id === itemId) ?? null : null
   const current = item ? item.effectiveAmount : cell.value
   const [amount, setAmount] = useState(() => amountToInput(current, currency, locale))

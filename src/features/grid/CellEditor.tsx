@@ -19,6 +19,7 @@ import {
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
 import { DoneDot } from './DoneDot'
 import { NativeSelect } from './NativeSelect'
+import { RateLine } from './RateLine'
 import { fundingOptions as buildFundingOptions } from './funding'
 import { HELP } from '@/app/help'
 import { InfoTip, TipLabel } from '@/components/InfoTip'
@@ -40,7 +41,8 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
   const store = useStore()
   const cell = engine.cells[cellKey(row.id, month)]
   const closed = engine.totals[month]?.closed ?? false
-  const currency = row.currency ?? household.baseCurrency
+  // the engine's currency: a follower takes its target's
+  const currency = cell?.currency ?? row.currency ?? household.baseCurrency
   const locale = household.locale
   /** Rows driven by a schedule: no carry-forward, no single amount; the posted items are the content. */
   const isRecurringRow = engine.recurringRowIds.includes(row.id)
@@ -206,6 +208,7 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
                 <div className="space-y-1.5">
                   <Label htmlFor="cell-amount">Amount in {currency}</Label>
                   <Input id="cell-amount" autoFocus inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') saveValue() }} placeholder="0" />
+                  {currency !== household.baseCurrency && <RateLine tables={tables} household={household} month={month} currency={currency} amount={parseAmount(text, currency, locale) ?? 0} />}
                 </div>
                 <fieldset className="space-y-1.5">
                   <legend className="text-sm font-medium"><span className="inline-flex items-center gap-1">Applies to <InfoTip help="cell.appliesTo" /></span></legend>
@@ -314,7 +317,10 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
                     {liveItems.length > 0 && doneCount === liveItems.length && <span className="inline-flex items-center gap-1.5 text-sm text-done"><DoneDot done={1} total={1} state="all" /><span>All done</span></span>}
                     {doneCount > 0 && doneCount < liveItems.length && <span className="text-xs text-muted-foreground">{doneCount} of {liveItems.length} done</span>}
                   </div>
-                  <span className="text-sm tabular-nums">Total {formatAmount(itemsTotal, currency, locale)}</span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-sm tabular-nums">Total {formatAmount(itemsTotal, currency, locale)}</span>
+                    {currency !== household.baseCurrency && <RateLine tables={tables} household={household} month={month} currency={currency} amount={itemsTotal} />}
+                  </div>
                 </div>
                 <p className="text-xs text-muted-foreground">Set an item to Done when it is paid or received. A done cell shows a green dot; in the current month the dot also shows red for nothing done yet and amber for partly done.</p>
                 {row.section === 'expense' && (

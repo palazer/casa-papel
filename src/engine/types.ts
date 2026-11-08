@@ -69,6 +69,9 @@ export interface AccountMonthResult {
   /** Real balance when one was entered, else computed. */
   balance: Money
   adjustment: Money
+  /** `balance` in the household base currency at the month's rate; equals `balance` (and warns) when the rate is missing. */
+  balanceBase: Money
+  missingRate: boolean
   inflow: Money
   outflow: Money
   /** Investment accounts only. */

@@ -8,12 +8,15 @@ export interface FxOptions {
   /** Monthly drift as a fraction, e.g. 0.015. */
   fixedDrift?: number
   pairDrift?: Record<string, number>
+  /** The household's base currency: a pair known only against it is crossed through it (USD→TRY via EUR/USD and EUR/TRY). */
+  base?: string
 }
 
 export interface FxIndex {
   /** pair → known entries (api or manual) sorted by month ascending */
   pairs: Map<string, Entry[]>
-  opts: Required<FxOptions>
+  opts: Required<Omit<FxOptions, 'base'>>
+  base: string | null
 }
 
 export interface RateInfo {
@@ -36,7 +39,7 @@ export function buildFxIndex(rates: FxRate[], opts: FxOptions = {}): FxIndex {
     pairs.set(r.pair, list)
   }
   for (const list of pairs.values()) list.sort((a, b) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0))
-  return { pairs, opts: { driftMode: opts.driftMode ?? 'fixed', fixedDrift: opts.fixedDrift ?? 0, pairDrift: opts.pairDrift ?? {} } }
+  return { pairs, opts: { driftMode: opts.driftMode ?? 'fixed', fixedDrift: opts.fixedDrift ?? 0, pairDrift: opts.pairDrift ?? {} }, base: opts.base ?? null }
 }
 
 /** Monthly drift used to extrapolate `pair` past its last known month. */
@@ -75,14 +78,27 @@ function lookup(fx: FxIndex, pair: string, month: MonthKey): RateInfo | null {
   return { rate: best ?? list[0].rate, projected: false }
 }
 
-/** How many `to` units one `from` unit buys in `month`. Known months use the nearest earlier rate; later months are drifted; the inverse pair is a fallback. */
-export function rateInfo(fx: FxIndex, from: string, to: string, month: MonthKey): RateInfo | null {
-  if (from === to) return { rate: 1, projected: false }
+/** A known pair or its inverse, nothing else. */
+function pairInfo(fx: FxIndex, from: string, to: string, month: MonthKey): RateInfo | null {
   const direct = lookup(fx, `${from}/${to}`, month)
   if (direct != null) return direct
   const inverse = lookup(fx, `${to}/${from}`, month)
   if (inverse != null && inverse.rate !== 0) return { rate: 1 / inverse.rate, projected: inverse.projected }
   return null
+}
+
+/** How many `to` units one `from` unit buys in `month`. Known months use the nearest earlier rate; later months are drifted;
+ *  the inverse pair is a fallback, and a pair known only against the base currency is crossed through it (from→base→to),
+ *  projected when either leg is. */
+export function rateInfo(fx: FxIndex, from: string, to: string, month: MonthKey): RateInfo | null {
+  if (from === to) return { rate: 1, projected: false }
+  const pair = pairInfo(fx, from, to, month)
+  if (pair) return pair
+  const via = fx.base
+  if (!via || via === from || via === to) return null
+  const a = pairInfo(fx, from, via, month)
+  const b = pairInfo(fx, via, to, month)
+  return a && b ? { rate: a.rate * b.rate, projected: a.projected || b.projected } : null
 }
 
 export function rateFor(fx: FxIndex, from: string, to: string, month: MonthKey): number | null {

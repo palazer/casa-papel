@@ -109,7 +109,7 @@ export function MonthScreen() {
         {/* an account or pool account archived by this month has no balance to show */}
         {Object.values(engine.accounts).filter((s) => s.months[m]).map((s) => {
           const acc = tables.accounts.find((a) => a.id === s.accountId)
-          return <Stat key={s.accountId} label={acc?.name ?? 'Account'} help={balanceHelp(acc?.type)} value={formatAmount(s.months[m].balance, s.currency, locale)} tone={s.months[m].balance < 0 ? 'out' : 'neutral'} hue={HUES.worth} />
+          return <Stat key={s.accountId} label={acc?.name ?? 'Account'} help={balanceHelp(acc?.type)} value={formatAmount(s.months[m].balance, s.currency, locale)} sub={s.currency !== ccy ? `≈ ${formatAmount(s.months[m].balanceBase, ccy, locale)}` : undefined} tone={s.months[m].balance < 0 ? 'out' : 'neutral'} hue={HUES.worth} />
         })}
         {Object.values(engine.accounts).some((s) => s.months[m]) && <Stat label="Net worth" help="derived.netWorth" value={formatAmount(engine.netWorth[m] ?? 0, ccy, locale)} tone={(engine.netWorth[m] ?? 0) < 0 ? 'out' : 'neutral'} hue={HUES.worth} />}
         {Object.values(engine.pools).filter((p) => p.months[m]).map((p) => (
@@ -173,14 +173,18 @@ export function MonthScreen() {
   )
 }
 
-function Stat({ label, value, tone = 'neutral', hue, help }: { label: string; value: string; tone?: 'neutral' | 'out' | 'draw'; hue?: Hue; help?: HelpKey }) {
+/** `sub` is a muted equivalent after the value: a foreign account's balance in the household currency. */
+function Stat({ label, value, sub, tone = 'neutral', hue, help }: { label: string; value: string; sub?: string; tone?: 'neutral' | 'out' | 'draw'; hue?: Hue; help?: HelpKey }) {
   return (
     <>
       <span className={cn('flex min-w-0 items-center gap-1 text-muted-foreground', hue?.text)}>
         <span className="truncate">{label}</span>
         {help && <InfoTip help={help} />}
       </span>
-      <span className={cn('text-right tabular-nums', tone === 'out' && 'text-expense', tone === 'draw' && 'text-draw')}>{value}</span>
+      <span className={cn('text-right tabular-nums', tone === 'out' && 'text-expense', tone === 'draw' && 'text-draw')}>
+        {value}
+        {sub && <span className="ml-1 text-xs text-muted-foreground">{sub}</span>}
+      </span>
     </>
   )
 }

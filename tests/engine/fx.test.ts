@@ -35,3 +35,17 @@ describe('fx index', () => {
     expect(convertMoney(fx, 10000, 'EUR', 'GBP', '2026-01')).toEqual({ value: 10000, missingRate: true, projected: false })
   })
 })
+
+describe('fx cross rates', () => {
+  it('crosses through the base currency when a pair is only known against it', () => {
+    const fx = buildFxIndex([rate('EUR/USD', '2026-01', 1.25), rate('EUR/TRY', '2026-01', 50)], { base: 'EUR' })
+    expect(rateInfo(fx, 'USD', 'TRY', '2026-01')).toEqual({ rate: expect.closeTo(40, 9), projected: false })
+    expect(rateFor(fx, 'TRY', 'USD', '2026-01')!).toBeCloseTo(0.025, 12)
+    expect(convertMoney(fx, 10000, 'USD', 'TRY', '2026-01').value).toBe(400000)
+    // one drifted leg makes the cross a projection
+    const drifting = buildFxIndex([rate('EUR/USD', '2026-01', 1.25), rate('EUR/TRY', '2026-01', 50), rate('EUR/TRY', '2026-03', 50)], { base: 'EUR', fixedDrift: 0.02 })
+    expect(rateInfo(drifting, 'USD', 'TRY', '2026-03')?.projected).toBe(true)
+    // without a base currency there is nothing to cross through
+    expect(rateInfo(buildFxIndex([rate('EUR/USD', '2026-01', 1.25), rate('EUR/TRY', '2026-01', 50)]), 'USD', 'TRY', '2026-01')).toBeNull()
+  })
+})

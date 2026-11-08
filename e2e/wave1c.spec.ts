@@ -26,8 +26,8 @@ test.describe('wave 1c', () => {
     await expect(dlg).toBeHidden()
 
     // the rates card now needs EUR/USD; November gets a manual rate
-    await expect(page.getByRole('columnheader', { name: 'EUR/USD' })).toBeVisible()
-    const nov = page.getByLabel('EUR/USD rate for Nov 2026')
+    await expect(page.getByRole('columnheader', { name: '1 EUR in USD' })).toBeVisible()
+    const nov = page.getByLabel('1 EUR in USD for Nov 2026')
     await nov.fill('1.10')
     await nov.press('Tab')
     await expect(page.getByText('manual', { exact: true }).first()).toBeVisible()

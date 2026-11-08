@@ -107,7 +107,7 @@ export function buildDemoTables(): Tables {
     household: [{
       ...base(ID.household, 'a0'), name: 'Demo household', baseCurrency: 'EUR', locale: 'en-IE', startMonth: '2026-09',
       closingRule: 'savings-plug', pocketTotal: 100000, cashBuffer: 0, moneyMode: 'pooled', shareBasis: 'basis-rows',
-      manualShares: {}, displayExpensesNegative: true, fxDriftDefault: 0, fxMonthRate: 'last',
+      manualShares: {}, displayExpensesNegative: true, fxDriftDefault: 0, fxMonthRate: 'first',
     }],
     entities: [
       { ...base(ID.sam, 'a0'), kind: 'adult', name: 'Sam', attributes: {}, paidBy: null },

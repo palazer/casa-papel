@@ -10,11 +10,11 @@ import { useStore } from '@/app/store'
 import type { Household, Row, Tables } from '@/model'
 import { derivedRowReason, moveRow, renameRow, restoreRow, updateRow } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
-import { RowAccountDialog, RowFollowDialog, RowSourceDialog } from './RowDialogs'
+import { RowAccountDialog, RowCurrencyDialog, RowFollowDialog, RowSourceDialog } from './RowDialogs'
 import { RowCategoryDialog } from './RowCategoryDialog'
 import { accountVerb } from './rowAccount'
 
-type Open = 'rename' | 'category' | 'source' | 'account' | 'follow' | 'remove' | null
+type Open = 'rename' | 'category' | 'currency' | 'source' | 'account' | 'follow' | 'remove' | null
 
 export function RowMenu({ row, tables, household, onError }: { row: Row; tables: Tables; household: Household; onError: (msg: string) => void }) {
   const store = useStore()
@@ -38,6 +38,7 @@ export function RowMenu({ row, tables, household, onError }: { row: Row; tables:
           <DropdownMenuItem onClick={act(() => moveRow(store, row.id, 'up'))}>Move up</DropdownMenuItem>
           <DropdownMenuItem onClick={act(() => moveRow(store, row.id, 'down'))}>Move down</DropdownMenuItem>
           <DropdownMenuItem onClick={() => setOpen('category')}>Category…</DropdownMenuItem>
+          {canFollow && !followed && <DropdownMenuItem onClick={() => setOpen('currency')}>Currency…</DropdownMenuItem>}
           <DropdownMenuSeparator />
           {!followed && (
             <DropdownMenuItem onClick={act(() => updateRow(store, row.id, { defaultStatus: row.defaultStatus === 'committed' ? 'projected' : 'committed' }))}>
@@ -67,6 +68,7 @@ export function RowMenu({ row, tables, household, onError }: { row: Row; tables:
         </DialogContent>
       </Dialog>
       {open === 'category' && <RowCategoryDialog row={row} tables={tables} onClose={close} />}
+      {open === 'currency' && <RowCurrencyDialog row={row} tables={tables} household={household} onClose={close} />}
       {open === 'source' && <RowSourceDialog row={row} tables={tables} household={household} onClose={close} />}
       {open === 'account' && <RowAccountDialog row={row} tables={tables} household={household} onClose={close} />}
       {open === 'follow' && <RowFollowDialog row={row} tables={tables} household={household} onClose={close} />}

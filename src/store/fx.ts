@@ -24,21 +24,35 @@ export function neededPairs(tables: Tables): string[] {
   return base ? neededCurrencies(tables).map((c) => `${base}/${c}`) : []
 }
 
-/** Daily rates → one rate per month and symbol, by the household's month-rate policy. */
-export function monthRates(daily: Record<string, Record<string, number>>, policy: FxMonthRate): Record<MonthKey, Record<string, number>> {
-  const buckets: Record<MonthKey, Record<string, number[]>> = {}
+export interface MonthRate { rate: number; date: string | null }
+
+/** Daily rates → one rate per month and symbol, by the household's month-rate policy, with the day it was taken on
+ *  (the first or last business day the ECB published; none for an average). */
+export function monthRatesWithDates(daily: Record<string, Record<string, number>>, policy: FxMonthRate): Record<MonthKey, Record<string, MonthRate>> {
+  const buckets: Record<MonthKey, Record<string, Array<{ date: string; rate: number }>>> = {}
   for (const date of Object.keys(daily).sort()) {
     const m = date.slice(0, 7)
     const b = (buckets[m] ??= {})
-    for (const [sym, rate] of Object.entries(daily[date])) (b[sym] ??= []).push(rate)
+    for (const [sym, rate] of Object.entries(daily[date])) (b[sym] ??= []).push({ date, rate })
   }
-  const out: Record<MonthKey, Record<string, number>> = {}
+  const out: Record<MonthKey, Record<string, MonthRate>> = {}
   for (const [m, syms] of Object.entries(buckets)) {
     out[m] = {}
     for (const [sym, list] of Object.entries(syms)) {
-      out[m][sym] = policy === 'first' ? list[0] : policy === 'average' ? list.reduce((a, b) => a + b, 0) / list.length : list[list.length - 1]
+      const first = list[0]
+      const last = list[list.length - 1]
+      out[m][sym] = policy === 'first' ? { rate: first.rate, date: first.date }
+        : policy === 'average' ? { rate: list.reduce((a, b) => a + b.rate, 0) / list.length, date: null }
+        : { rate: last.rate, date: last.date }
     }
   }
+  return out
+}
+
+/** Daily rates → one rate per month and symbol (the number alone). */
+export function monthRates(daily: Record<string, Record<string, number>>, policy: FxMonthRate): Record<MonthKey, Record<string, number>> {
+  const out: Record<MonthKey, Record<string, number>> = {}
+  for (const [m, syms] of Object.entries(monthRatesWithDates(daily, policy))) out[m] = Object.fromEntries(Object.entries(syms).map(([s, r]) => [s, r.rate]))
   return out
 }
 
@@ -86,15 +100,15 @@ export async function fetchEcbRates(
 
   const tables = await loadTables(store)
   const manual = new Set(tables.fxRates.filter((r) => r.source === 'manual').map((r) => `${r.pair}|${r.month}`))
-  const byMonth = monthRates(daily, opts.policy)
+  const byMonth = monthRatesWithDates(daily, opts.policy)
   const ts = now()
   const mutations: Mutation[] = []
   const months = new Set<MonthKey>()
   for (const [m, syms] of Object.entries(byMonth)) {
-    for (const [sym, rate] of Object.entries(syms)) {
+    for (const [sym, { rate, date }] of Object.entries(syms)) {
       const pair = `${opts.base}/${sym}`
       if (manual.has(`${pair}|${m}`)) continue
-      mutations.push({ op: 'put', table: 'fxRates', record: FxRateSchema.parse({ pair, month: m, rate, source: 'api', updatedAt: ts }) })
+      mutations.push({ op: 'put', table: 'fxRates', record: FxRateSchema.parse({ pair, month: m, rate, date, source: 'api', updatedAt: ts }) })
       months.add(m)
     }
   }
@@ -102,7 +116,7 @@ export async function fetchEcbRates(
   return { written: mutations.length, months: [...months].sort(), unsupported }
 }
 
-/** Set a rate by hand (wins over fetched rates); null removes whatever is stored for that month. */
+/** Set a rate by hand (wins over fetched rates); null removes whatever is stored for that month, a manual or a fetched rate alike. */
 export async function setManualRate(store: Store, pair: string, month: MonthKey, rate: number | null): Promise<void> {
   if (rate == null) {
     await store.commit([{ op: 'delete', table: 'fxRates', key: [pair, month] }])
@@ -110,6 +124,20 @@ export async function setManualRate(store: Store, pair: string, month: MonthKey,
   }
   if (!(rate > 0)) throw new Error('A rate must be a positive number.')
   await store.commit([{ op: 'put', table: 'fxRates', record: FxRateSchema.parse({ pair, month, rate, source: 'manual', updatedAt: now() }) }])
+}
+
+/**
+ * "Use the ECB rate again": drop what is stored for one month of one pair (your rate, or a stale fetched one) and fetch
+ * that month from the ECB with the household's month-rate policy. A future month has nothing to fetch and is projected again.
+ */
+export async function restoreEcbRate(store: Store, pair: string, month: MonthKey, fetchFn: typeof fetch = fetch): Promise<FetchResult> {
+  const tables = await loadTables(store)
+  const household = tables.household.find((h) => !h.deletedAt)
+  if (!household) throw new Error('No household yet')
+  const [base, symbol] = pair.split('/')
+  if (base !== household.baseCurrency) throw new Error(`Rates are fetched against ${household.baseCurrency}; ${pair} is not one of its pairs.`)
+  if (tables.fxRates.some((r) => r.pair === pair && r.month === month)) await setManualRate(store, pair, month, null)
+  return fetchEcbRates(store, { base, symbols: [symbol], from: month, to: month, policy: household.fxMonthRate }, fetchFn)
 }
 
 export const setFxSettings = (store: Store, patch: Partial<Pick<Household, 'fxDriftMode' | 'fxDriftDefault' | 'fxPairDrift' | 'fxMonthRate'>>) => updateHousehold(store, patch)

@@ -7,10 +7,12 @@ import { formatMonth } from '@/app/format'
 import { useStore } from '@/app/store'
 import { sortRows } from '@/engine'
 import { monthOfDate, type FundedBy, type Household, type Row, type Section, type Tables } from '@/model'
-import { accountTypeForRow, derivedRowReason, followRow, setRowAccount, setRowFundedBy } from '@/store'
+import { accountTypeForRow, derivedRowReason, followRow, setRowAccount, setRowFundedBy, updateRow } from '@/store'
 import { NativeSelect } from './NativeSelect'
 import { fundingOptions } from './funding'
+import { CURRENCIES } from '@/app/currencies'
 import { HELP } from '@/app/help'
+import { TipLabel } from '@/components/InfoTip'
 import { accountHelp, accountVerb } from './rowAccount'
 
 interface Base {
@@ -174,6 +176,40 @@ export function RowFollowDialog({ row, tables, household, onClose }: Base) {
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
           <Button onClick={() => void save(() => followRow(store, row.id, targetId || null))} disabled={busy}>Save</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** The currency this row's amounts are typed in; the grid shows the household-currency value beneath each one. */
+export function RowCurrencyDialog({ row, household, onClose }: Base) {
+  const store = useStore()
+  const base = household.baseCurrency
+  const codes = [base, ...CURRENCIES.filter((c) => c !== base), ...(row.currency && row.currency !== base && !CURRENCIES.includes(row.currency) ? [row.currency] : [])]
+  const [ccy, setCcy] = useState(row.currency ?? base)
+  const { error, busy, save } = useSave(onClose)
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Currency</DialogTitle>
+          <DialogDescription>Row "{row.name}"</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <TipLabel htmlFor="row-currency" help="row.currency">Amounts in this row are in</TipLabel>
+            <NativeSelect id="row-currency" className="w-full" value={ccy} onChange={(e) => setCcy(e.target.value)}>
+              {codes.map((c) => <option key={c} value={c}>{c === base ? `${c} (household currency)` : c}</option>)}
+            </NativeSelect>
+            <p className="text-xs text-muted-foreground">{HELP['row.currency'].text}</p>
+          </div>
+          {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button onClick={() => void save(() => updateRow(store, row.id, { currency: ccy === base ? null : ccy }))} disabled={busy}>Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

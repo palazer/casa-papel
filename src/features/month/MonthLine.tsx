@@ -5,6 +5,7 @@ import { Tick } from '@/components/Tick'
 import { cn } from '@/lib/utils'
 import type { CellResult, ResolvedItem } from '@/engine'
 import type { Row } from '@/model'
+import { formatAmount } from '@/app/format'
 import { amountDisplay, doneLabel, doneness, flowOf, statusClass, toneClass, type DoneState, type Flow } from '@/features/grid/display'
 
 interface Props {
@@ -32,7 +33,7 @@ const BODY = 'flex min-h-11 min-w-0 items-center gap-2 px-3 py-2 text-left text-
  * accordion with a tick per item; any other line opens the Paid sheet; an automatic line is plain text with an (i).
  */
 export function MonthLine({ row, cell, locale, ccy, neg, closed, automatic, followedName, expanded, onExpand, onOpen, onTick, busy }: Props) {
-  const currency = row.currency ?? ccy
+  const currency = cell.currency
   const flow = flowOf(row)
   const d = amountDisplay(cell.value, flow, currency, locale, neg)
   const live = cell.items.filter((i) => !i.skipped)
@@ -45,12 +46,15 @@ export function MonthLine({ row, cell, locale, ccy, neg, closed, automatic, foll
   const subtitle = itemized
     ? dn.done > 0 && dn.done < dn.total ? `${dn.done} of ${dn.total} done` : `${live.length} items`
     : followedName ? `= ${followedName}` : automatic ? 'automatic' : null
+  // an amount in another currency carries its household-currency value in the subline
+  const about = !empty && currency !== ccy ? formatAmount(cell.valueBase, ccy, locale, { compact: true }) : null
+  const subline = [subtitle, about ? `≈ ${about}` : null].filter(Boolean).join(' · ') || null
   const amount = (
     <span className={cn('shrink-0 tabular-nums', toneClass[d.tone], empty ? 'text-muted-foreground/40' : derived ? statusClass.derived : statusClass[cell.status])}>
       {empty ? '·' : d.text}
     </span>
   )
-  const label = `${row.name}: ${empty ? 'empty' : d.text}${tickable ? `, ${doneLabel(dn)}` : ''}`
+  const label = `${row.name}: ${empty ? 'empty' : d.text}${about ? `, about ${about}` : ''}${tickable ? `, ${doneLabel(dn)}` : ''}`
 
   return (
     <li>
@@ -59,9 +63,9 @@ export function MonthLine({ row, cell, locale, ccy, neg, closed, automatic, foll
           <div className="flex min-h-11 min-w-0 items-center gap-2 px-3 py-2 text-sm">
             <span className="min-w-0 flex-1">
               <span className="block truncate">{row.name}</span>
-              {subtitle && (
+              {subline && (
                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                  {subtitle}
+                  {subline}
                   <InfoTip help={followedName ? 'row.follows' : 'row.automatic'} />
                 </span>
               )}
@@ -76,7 +80,7 @@ export function MonthLine({ row, cell, locale, ccy, neg, closed, automatic, foll
             {itemized && <ChevronRight className={cn('size-3.5 shrink-0 text-muted-foreground transition-transform', expanded && 'rotate-90')} aria-hidden />}
             <span className="min-w-0 flex-1">
               <span className="block truncate">{row.name}</span>
-              {subtitle && <span className="block text-xs text-muted-foreground">{subtitle}</span>}
+              {subline && <span className="block text-xs text-muted-foreground">{subline}</span>}
             </span>
             {amount}
           </button>
