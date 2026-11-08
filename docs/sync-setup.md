@@ -9,7 +9,7 @@ About fifteen minutes, once.
 ## 1. Create the project
 
 1. Sign in at supabase.com and create a **New project** in your free organisation.
-2. Name `casa-papel`, region **Frankfurt (eu-central-1)**, and a strong database password. Keep that
+2. Name `casa-papel`, an **EU region** (Ireland or Frankfurt), and a strong database password. Keep that
    password somewhere safe; only the CLI asks for it.
 
 ## 2. Auth settings
@@ -55,10 +55,15 @@ The anon key is meant to be public. Row-level security decides what it can read:
 
 ## 6. First sign-in
 
-On the device that holds the real household: **Data → Sign in** with your email and the temporary
-password. The app asks you to set the household password, shows the recovery code once (store it
-somewhere safe, it is the only way back in without the password), creates the household on the
-server and uploads the encrypted copy. From then on **Data → Invite someone** gives you links to send.
+On the device that holds the real household: **Data → Sign in → "First time, temporary password"**.
+Enter your email, the temporary password from step 3, and the household password you want. The app
+signs in once with the temporary password, replaces it with the key derived from the household
+password, shows the recovery code once (store it somewhere safe, it is the only way back in without
+the password), creates the household on the server and uploads the encrypted copy. From then on
+**Data → Invite someone** gives you links to send.
+
+Optional: **Authentication → URL Configuration → Site URL** = `https://palazer.github.io/casa-papel/`.
+The app sends no emails, but any link the dashboard itself sends would otherwise point at localhost.
 
 ## Limits worth knowing
 

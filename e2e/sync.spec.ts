@@ -27,9 +27,12 @@ test.describe('cloud sync', () => {
     const owner = server.addUser('erkin@example.test')
     server.admins.add(owner.id)
 
-    // ----- device A: sign in from the home screen, load the demo as its data, invite someone -----
+    // ----- device A: load the demo as its data, sign in from the Data screen, invite someone -----
     const a = await device(browser, server)
     await a.goto('./')
+    await a.getByRole('button', { name: 'Load the demo household' }).click()
+    await expect(a.getByRole('button', { name: /^Rent Nov 2026/ })).toBeVisible()
+    await a.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Data' }).click()
     await a.getByRole('button', { name: 'Sign in' }).click()
     const dlgA = a.getByRole('dialog')
     await dlgA.getByLabel('Email').fill('Erkin@Example.test')
@@ -38,13 +41,8 @@ test.describe('cloud sync', () => {
     await expect(dlgA.getByRole('heading', { name: 'Your recovery code' })).toBeVisible({ timeout: 20_000 })
     const recoveryCode = await storeRecoveryCode(a)
     expect(server.members).toHaveLength(1)
-
-    await a.getByRole('button', { name: 'Load the demo household' }).click()
-    await expect(a.getByRole('button', { name: /^Rent Nov 2026/ })).toBeVisible()
     await expect(a.getByRole('button', { name: /^Sync: Synced/ })).toBeVisible({ timeout: 15_000 })
     expect(server.snapshots.size).toBe(1)
-
-    await a.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Data' }).click()
     await expect(a.getByTestId('sync-status')).toHaveText(/Synced/)
     await a.getByRole('button', { name: 'Invite someone' }).first().click()
     const link = await a.getByTestId('invite-link').innerText()

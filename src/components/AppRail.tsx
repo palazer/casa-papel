@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { isDemoMode } from '@/app/store'
+import { isDemoMode, leaveDemoSandbox } from '@/app/store'
 import { SCREENS, screenHref, useScreen, type Screen, type ScreenDef } from '@/app/screens'
 import { Chip } from '@/components/ui/chip'
 import { follow, labelClass, monogram, tileClass } from './railStyles'
@@ -34,7 +34,11 @@ export const AppRail = memo(function AppRail({ householdName }: { householdName?
       >
         {monogram(householdName ?? 'Casa Papel')}
       </a>
-      {isDemoMode() && <Chip tone="amber" className="-mt-2">demo</Chip>}
+      {isDemoMode() && (
+        <button type="button" onClick={leaveDemoSandbox} title="Back to your own household" className="-mt-2 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Chip tone="amber">demo</Chip>
+        </button>
+      )}
       {SCREENS.map((it) => (
         <RailLink key={it.key} item={it} active={screen === it.key} go={go} />
       ))}

@@ -1,5 +1,5 @@
 import {
-  ExportFileSchema, SCHEMA_VERSION, TABLE_SCHEMAS, migrateExport,
+  ExportFileSchema, SCHEMA_VERSION, TABLE_SCHEMAS, migrateExport, newId,
   type ExportFile, type StoreEvent, type Tables,
 } from '@/model'
 import type { CasaDb } from './db'
@@ -56,7 +56,11 @@ export async function importReplace(store: Store, file: ExportFile): Promise<voi
     await db.events.clear()
     await db.events.bulkPut(file.events)
     const meta = await store.meta()
-    await db.meta.put({ ...meta, schemaVersion: SCHEMA_VERSION, lastExportAt: file.exportedAt, eventsSinceExport: 0, localRevision: meta.localRevision + 1 })
+    // writes after the import must stay above what it brought in, as after a merge
+    let newest = 0
+    for (const t of db.dataTables) for (const r of file.tables[t] as Array<{ updatedAt: number }>) newest = Math.max(newest, r.updatedAt)
+    for (const e of file.events) newest = Math.max(newest, e.ts)
+    await db.meta.put({ ...meta, schemaVersion: SCHEMA_VERSION, lastExportAt: file.exportedAt, eventsSinceExport: 0, localRevision: meta.localRevision + 1, clockFloor: Math.max(meta.clockFloor, newest) })
   })
 }
 
@@ -76,8 +80,10 @@ export interface MergeResult {
  * `deletedAt`, so they take part in the same rule. Events: unseen ids are appended; delete events
  * apply when the local record is not newer than the deletion. Raises the clock floor to the newest
  * timestamp seen, so later local writes stay later.
+ * `synced`: the incoming copy is the cloud state, so when nothing of ours was waiting the result counts
+ * as pushed. Decided inside the transaction, so a commit landing at the same moment stays pending.
  */
-export async function mergeTables(store: Store, tables: Tables, events: StoreEvent[]): Promise<MergeResult> {
+export async function mergeTables(store: Store, tables: Tables, events: StoreEvent[], opts: { synced?: boolean } = {}): Promise<MergeResult> {
   const db = store.db
   const result: MergeResult = { applied: 0, kept: 0, newEvents: 0 }
   let newest = 0
@@ -116,9 +122,11 @@ export async function mergeTables(store: Store, tables: Tables, events: StoreEve
     }
     const meta = await store.meta()
     const changed = result.applied > 0 || result.newEvents > 0
+    const localRevision = changed ? meta.localRevision + 1 : meta.localRevision
     await db.meta.update('meta', {
       clockFloor: Math.max(meta.clockFloor, newest),
-      localRevision: changed ? meta.localRevision + 1 : meta.localRevision,
+      localRevision,
+      ...(opts.synced && meta.localRevision === meta.pushedRevision ? { pushedRevision: localRevision } : {}),
     })
   })
   return result
@@ -129,14 +137,17 @@ export function importMerge(store: Store, file: ExportFile): Promise<MergeResult
   return mergeTables(store, file.tables, file.events)
 }
 
-/** Remove all household data and events. Meta (device id, sync state) is kept; callers sign out first when synced. */
+/**
+ * Remove all household data and events. Sync state is kept (callers sign out first when synced), but the device
+ * gets a new id: it no longer holds what the old id uploaded, so a later pull must not skip its own snapshot.
+ */
 export async function wipeAll(store: Store): Promise<void> {
   const db = store.db
   await db.transaction('rw', db.tables, async () => {
     for (const t of db.dataTables) await db.table(t).clear()
     await db.events.clear()
     const meta = await store.meta()
-    await db.meta.put({ ...meta, eventsSinceExport: 0, localRevision: meta.localRevision + 1 })
+    await db.meta.put({ ...meta, deviceId: newId(), eventsSinceExport: 0, localRevision: meta.localRevision + 1 })
   })
 }
 

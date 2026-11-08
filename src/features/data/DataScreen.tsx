@@ -6,7 +6,7 @@ import { Chip } from '@/components/ui/chip'
 import { Input } from '@/components/ui/input'
 import { Island } from '@/components/ui/island'
 import { PageHeader } from '@/components/PageHeader'
-import { isDemoMode, useStore } from '@/app/store'
+import { isDemoMode, leaveDemoSandbox, openDemoSandbox, useStore } from '@/app/store'
 import { loadDemo } from '@/demo/loadDemo'
 import type { ExportFile } from '@/model'
 import { exportFileName, exportSnapshot, importMerge, importReplace, parseExportFile, wipeAll } from '@/store'
@@ -214,8 +214,13 @@ export function DataScreen() {
           : 'Loads a fictional household into this store, replacing what is here. Prefer the sandbox at ?demo=1.'}
       >
         <div className="space-y-2">
-          <Button size="sm" variant={isDemoMode() ? 'default' : 'outline'} onClick={() => void loadDemo(store)} disabled={signedIn}>Load demo household</Button>
-          {signedIn && <p className="text-muted-foreground">Sign out first: loading the demo here would upload it to your household's cloud copy.</p>}
+          <div className="flex flex-wrap gap-2">
+            {signedIn
+              ? <Button size="sm" variant="outline" onClick={openDemoSandbox}>Open the demo sandbox</Button>
+              : <Button size="sm" variant={isDemoMode() ? 'default' : 'outline'} onClick={() => void loadDemo(store)}>Load demo household</Button>}
+            {isDemoMode() && <Button size="sm" variant="outline" onClick={leaveDemoSandbox} title="Back to your own household">Leave the demo</Button>}
+          </div>
+          {signedIn && <p className="text-muted-foreground">While signed in, the demo opens in its own sandbox so it never lands in your household's cloud copy.</p>}
         </div>
       </Island>
 

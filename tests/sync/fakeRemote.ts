@@ -32,6 +32,7 @@ export class FakeRemote implements SyncRemote {
   }
 
   async currentUser() {
+    if (this.offline) throw new OfflineError()
     return this.user
   }
 

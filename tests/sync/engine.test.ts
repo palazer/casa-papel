@@ -188,6 +188,17 @@ describe('sync engine', () => {
     const b = device(server)
     expect((await b.engine.signIn('sam@example.com', 'new password for sam')).kind).toBe('locked')
     expect(b.engine.getView().status).toBe('locked')
+    expect(b.engine.needsPasswordToUnlock()).toBe(false)
+    // after a reload the key derived at sign-in is gone: the password is asked again and checked before anything is re-wrapped
+    const b2 = new SyncEngine(b.store, b.remote, { debounceMs: 0, pollMs: 0, kdfIterations: FAST })
+    await b2.start()
+    expect(b2.getView().status).toBe('locked')
+    expect(b2.needsPasswordToUnlock()).toBe(true)
+    await expect(b2.unlockWithRecovery(recoveryCode)).rejects.toThrow(/password/)
+    await expect(b2.unlockWithRecovery(recoveryCode, 'not the right password')).rejects.toThrow(/Invalid login/)
+    await b2.unlockWithRecovery(recoveryCode, 'new password for sam')
+    expect(b2.getView().status).toBe('idle')
+    b2.stop()
     await expect(b.engine.unlockWithRecovery('AAAAA-AAAAA-AAAAA-AAAAA-AAAAAA')).rejects.toThrow(/does not open/)
     await b.engine.unlockWithRecovery(recoveryCode)
     expect(b.engine.getView().status).toBe('idle')
@@ -218,6 +229,11 @@ describe('sync engine', () => {
     await a.engine.signIn('sam@example.com', PW)
     await a.engine.signOut({ wipe: true })
     expect((await loadTables(a.store)).rows).toHaveLength(0)
+    // the same browser signs in again: a wiped device is a new device, so its own old snapshot comes back down
+    expect((await a.engine.signIn('sam@example.com', PW)).kind).toBe('ok')
+    expect((await loadTables(a.store)).household[0]?.name).toBe('Palace')
+    expect((await loadTables(a.store)).rows.length).toBeGreaterThan(0)
+    a.engine.stop()
 
     const b = device(server)
     await b.engine.signIn('sam@example.com', PW)
@@ -226,6 +242,80 @@ describe('sync engine', () => {
     await b.engine.syncNow()
     expect(b.engine.getView().status).toBe('stale')
     b.engine.stop()
+  })
+
+  it('an offline start keeps the sync link; a vanished session drops it and keeps the data', async () => {
+    const server = new FakeServer()
+    server.addUser('sam@example.com', (await deriveKeys('sam@example.com', PW, FAST)).authKey)
+    const a = await withHousehold(server)
+    await a.engine.signIn('sam@example.com', PW)
+    a.engine.stop()
+    // the app opens with no network and a token it cannot refresh: the session cannot be checked, nothing is forgotten
+    a.remote.offline = true
+    const again = new SyncEngine(a.store, a.remote, { debounceMs: 0, pollMs: 0, kdfIterations: FAST })
+    await again.start()
+    await again.syncNow()
+    expect(again.getView().status).toBe('offline')
+    expect((await a.store.meta()).sync).not.toBeNull()
+    a.remote.offline = false
+    await again.syncNow()
+    expect(again.getView().status).toBe('idle')
+    again.stop()
+    // the session is really gone (signed out elsewhere, storage cleared): the link goes, the data stays
+    await a.remote.signOut()
+    const later = new SyncEngine(a.store, a.remote, { debounceMs: 0, pollMs: 0, kdfIterations: FAST })
+    await later.start()
+    expect(later.getView().status).toBe('off')
+    expect((await a.store.meta()).sync).toBeNull()
+    expect((await loadTables(a.store)).rows.length).toBeGreaterThan(0)
+    later.stop()
+  })
+
+  it('bootstrap: a dashboard-created user signs in with the temporary password and gets the household password', async () => {
+    const server = new FakeServer()
+    server.addUser('sam@example.com', 'temporary-123')
+    const a = await withHousehold(server)
+    await expect(a.engine.bootstrap('sam@example.com', 'wrong temp', PW)).rejects.toThrow(/Invalid login/)
+    await expect(a.engine.bootstrap('sam@example.com', 'temporary-123', 'short')).rejects.toThrow(/12 characters/)
+    const { recoveryCode } = await a.engine.bootstrap('sam@example.com', 'temporary-123', PW)
+    expect(recoveryCode).toMatch(/-/)
+    expect(server.users.get('sam@example.com')!.authKey).toBe((await deriveKeys('sam@example.com', PW, FAST)).authKey)
+    expect(server.snapshots.size).toBe(1)
+    expect(a.engine.getView()).toMatchObject({ status: 'idle', owner: true })
+    // the temporary password is gone; the household password works on another device
+    const b = device(server)
+    await expect(b.engine.signIn('sam@example.com', 'temporary-123')).rejects.toThrow(/Invalid login/)
+    expect((await b.engine.signIn('sam@example.com', PW)).kind).toBe('ok')
+    expect((await loadTables(b.store)).household[0]?.name).toBe('Palace')
+    // the password was reset to a plain one in the dashboard, but the account already has a household: refused
+    server.users.get('sam@example.com')!.authKey = 'temporary-456'
+    const c = device(server)
+    await expect(c.engine.bootstrap('sam@example.com', 'temporary-456', 'another long password')).rejects.toThrow(/already has a household/)
+    a.engine.stop(); b.engine.stop(); c.engine.stop()
+  })
+
+  it('a household with no snapshot yet: sign in on an empty device, start the household, it uploads', async () => {
+    const server = new FakeServer()
+    server.addUser('sam@example.com', (await deriveKeys('sam@example.com', PW, FAST)).authKey)
+    // the first sign-in happened on a device without data: the server has the household and keys, but nothing to show
+    const a = device(server)
+    expect((await a.engine.signIn('sam@example.com', PW)).kind).toBe('created')
+    expect(server.members).toHaveLength(1)
+    expect(server.snapshots.size).toBe(0)
+    await a.engine.signOut({ wipe: true })
+    // signing in again on an empty device is fine: nothing to pull, nothing to push
+    const b = device(server)
+    expect((await b.engine.signIn('sam@example.com', PW)).kind).toBe('ok')
+    expect(b.engine.getView()).toMatchObject({ status: 'idle', owner: true, pending: false })
+    expect(server.snapshots.size).toBe(0)
+    // starting the household now uploads it, and a third device receives it
+    await quickCreateHousehold(b.store, { name: 'Palace', baseCurrency: 'EUR', locale: 'en-IE', startMonth: '2026-01' })
+    await b.engine.flush()
+    expect(server.snapshots.get('h-1')?.version).toBe(1)
+    const c = device(server)
+    expect((await c.engine.signIn('sam@example.com', PW)).kind).toBe('ok')
+    expect((await loadTables(c.store)).household[0]?.name).toBe('Palace')
+    a.engine.stop(); b.engine.stop(); c.engine.stop()
   })
 
   it('admins create and revoke invites', async () => {

@@ -46,10 +46,12 @@ describe('export / import', () => {
     await a.commit([{ op: 'put', table: 'rows', record: r1 }, { op: 'put', table: 'rows', record: r2 }])
     await importReplace(b, await exportSnapshot(a))
 
-    // A renames r1 (later), B renames r2 and also r1 (earlier than A)
-    await a.commit([{ op: 'put', table: 'rows', record: { ...r1, name: 'Rent A', updatedAt: t0 + 50 } }])
-    await b.commit([{ op: 'put', table: 'rows', record: { ...r2, name: 'Groceries B', updatedAt: t0 + 10 } }])
-    await b.commit([{ op: 'put', table: 'rows', record: { ...r1, name: 'Rent B', updatedAt: t0 + 20 } }])
+    // A renames r1 (later), B renames r2 and also r1 (earlier than A). The stamps sit a minute ahead of the clock:
+    // the import raised B's clock floor to A's newest event time, and a write is never stamped below that floor.
+    const later = t0 + 60_000
+    await a.commit([{ op: 'put', table: 'rows', record: { ...r1, name: 'Rent A', updatedAt: later + 50 } }])
+    await b.commit([{ op: 'put', table: 'rows', record: { ...r2, name: 'Groceries B', updatedAt: later + 10 } }])
+    await b.commit([{ op: 'put', table: 'rows', record: { ...r1, name: 'Rent B', updatedAt: later + 20 } }])
 
     const fromA = await exportSnapshot(a)
     const res = await importMerge(b, fromA)
