@@ -24,6 +24,13 @@ test.describe('wave 1b', () => {
     await page.getByLabel('Name').fill('Rex')
     await page.getByRole('button', { name: 'Next' }).click()
     await page.getByLabel('Opening balance').nth(1).fill('5000')
+    // an account in another currency: the opening balance is typed in it
+    await page.getByRole('button', { name: 'Add account' }).click()
+    await page.getByLabel('Account 3 name').fill('Broker')
+    await page.getByLabel('Account type').nth(2).selectOption('investment')
+    await page.getByLabel('Account currency').nth(2).selectOption('USD')
+    await expect(page.getByLabel('Opening balance').nth(2)).toHaveAttribute('placeholder', 'Opening USD')
+    await page.getByLabel('Opening balance').nth(2).fill('1000')
     await page.getByRole('button', { name: 'Next' }).click()
     // rows: one subject at a time, grouped by money in / spending / moving money
     await expect(page.getByRole('heading', { name: 'Rows for the household' })).toBeVisible()
@@ -47,6 +54,8 @@ test.describe('wave 1b', () => {
     await expect(page.getByText(/^Testers ·/)).toBeVisible()
     await expect(page.getByText('Pocket – Ana', { exact: true })).toBeVisible()
     await expect(page.getByText('To savings', { exact: true })).toBeVisible()
+    // the USD account carries its household-currency line
+    await expect(page.getByRole('rowheader', { name: 'Broker · in EUR' })).toBeVisible()
     for (const name of ['Ana – Salary', 'Ben – Salary', 'Child benefit – Cal', 'Food & supplies – Rex', 'Groceries', 'Travel', 'Garden']) {
       await expect(page.getByRole('button', { name: new RegExp(`^${name} Nov 2026`) })).toBeVisible()
     }

@@ -36,7 +36,8 @@ interface Draft {
   pocketTotal: string
   adults: Array<{ name: string }>
   dependents: Array<{ kind: Exclude<EntityKind, 'adult'>; name: string; paidByIndex: number | null }>
-  accounts: Array<{ name: string; type: AccountType; openingBalance: string }>
+  /** `currency` null = the household currency, so it follows a later change of the household's. */
+  accounts: Array<{ name: string; type: AccountType; openingBalance: string; currency: string | null }>
   householdTemplates: Set<string>
   entityTemplates: Record<number, Set<string>>
   /** subject 0 = household, i + 1 = entity i */
@@ -53,7 +54,7 @@ function validate(d: Draft): Errors {
   const hint = `Digits only, "${decimalSeparator(d.locale)}" for decimals, like ${new Intl.NumberFormat(d.locale).format(1234.5)}.`
   if (d.pocketTotal.trim() && parseAmount(d.pocketTotal, d.currency, d.locale) == null) errors.pocketTotal = `Not a number. ${hint}`
   d.accounts.forEach((a, i) => {
-    if (a.openingBalance.trim() && parseAmount(a.openingBalance, d.currency, d.locale) == null) errors.accounts[i] = `Not a number. ${hint}`
+    if (a.openingBalance.trim() && parseAmount(a.openingBalance, a.currency ?? d.currency, d.locale) == null) errors.accounts[i] = `Not a number. ${hint}`
   })
   return errors
 }
@@ -70,7 +71,7 @@ export function SetupWizard({ onCreated, onBack, notice }: { onCreated: () => vo
     name: '', currency: 'EUR', locale: LOCALES.includes(navigator.language) ? navigator.language : 'en-IE', startMonth: monthOfDate(),
     closingRule: 'savings-plug', moneyMode: 'pooled', pocketTotal: '',
     adults: [{ name: '' }, { name: '' }], dependents: [],
-    accounts: [{ name: 'Main account', type: 'checking', openingBalance: '' }, { name: 'Savings', type: 'savings', openingBalance: '' }],
+    accounts: [{ name: 'Main account', type: 'checking', openingBalance: '', currency: null }, { name: 'Savings', type: 'savings', openingBalance: '', currency: null }],
     householdTemplates: recommended('household'), entityTemplates: { 0: recommended('adult'), 1: recommended('adult') },
     customRows: [],
   }))
@@ -135,7 +136,10 @@ export function SetupWizard({ onCreated, onBack, notice }: { onCreated: () => vo
         household: { name: d.name.trim() || 'Our household', baseCurrency: d.currency, locale: d.locale, startMonth: d.startMonth, closingRule: d.closingRule, moneyMode: d.moneyMode, pocketTotal: pocket },
         adults: keptAdults.length ? keptAdults : [{ name: 'Me' }],
         dependents: d.dependents.filter((x) => x.name.trim()),
-        accounts: d.accounts.filter((a) => a.name.trim()).map((a) => ({ name: a.name.trim(), type: a.type, openingBalance: a.openingBalance.trim() ? parseAmount(a.openingBalance, d.currency, d.locale) ?? 0 : 0 })),
+        accounts: d.accounts.filter((a) => a.name.trim()).map((a) => ({
+          name: a.name.trim(), type: a.type, currency: a.currency ?? d.currency,
+          openingBalance: a.openingBalance.trim() ? parseAmount(a.openingBalance, a.currency ?? d.currency, d.locale) ?? 0 : 0,
+        })),
         householdTemplates: [...d.householdTemplates],
         entityTemplates: Object.fromEntries(entities.map((e, i) => [i, [...(d.entityTemplates[i] ?? recommended(e.kind))]])),
       }
@@ -287,21 +291,26 @@ export function SetupWizard({ onCreated, onBack, notice }: { onCreated: () => vo
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
               One current account is enough to start. Add a savings account if you want to see your savings grow month by month. Opening balance is the balance at the start of your first month; leave it empty if you do not know.
+              An account kept in another currency says so next to its type; the grid then shows its household value beneath.
             </p>
             {d.accounts.map((a, i) => (
               <div key={i} className="space-y-1 rounded-md border p-2">
-                <div className="grid grid-cols-[1fr_auto] gap-2 sm:grid-cols-[1fr_11rem_9rem_auto]">
+                <div className="grid grid-cols-[1fr_auto] gap-2 sm:grid-cols-[1fr_10rem_7rem_8rem_auto]">
                   <Input aria-label={`Account ${i + 1} name`} value={a.name} placeholder="Name" onChange={(e) => patch({ accounts: d.accounts.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)) })} />
                   <NativeSelect aria-label="Account type" value={a.type} onChange={(e) => patch({ accounts: d.accounts.map((x, j) => (j === i ? { ...x, type: e.target.value as AccountType } : x)) })}>
                     {WIZARD_ACCOUNT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </NativeSelect>
-                  <Input aria-label="Opening balance" inputMode="decimal" value={a.openingBalance} placeholder={`Opening ${d.currency}`} aria-invalid={!!errors.accounts[i]} onChange={(e) => patch({ accounts: d.accounts.map((x, j) => (j === i ? { ...x, openingBalance: e.target.value } : x)) })} />
+                  <NativeSelect aria-label="Account currency" value={a.currency ?? ''} onChange={(e) => patch({ accounts: d.accounts.map((x, j) => (j === i ? { ...x, currency: e.target.value || null } : x)) })}>
+                    <option value="">{d.currency} (household currency)</option>
+                    {CURRENCIES.filter((c) => c !== d.currency).map((c) => <option key={c} value={c}>{c}</option>)}
+                  </NativeSelect>
+                  <Input aria-label="Opening balance" inputMode="decimal" value={a.openingBalance} placeholder={`Opening ${a.currency ?? d.currency}`} aria-invalid={!!errors.accounts[i]} onChange={(e) => patch({ accounts: d.accounts.map((x, j) => (j === i ? { ...x, openingBalance: e.target.value } : x)) })} />
                   <Button size="icon" variant="ghost" aria-label="Remove account" onClick={() => patch({ accounts: d.accounts.filter((_, j) => j !== i) })}><Trash2 /></Button>
                 </div>
-                <p className={cn('text-xs', errors.accounts[i] ? 'text-destructive' : 'text-muted-foreground')}>{errors.accounts[i] ?? ACCOUNT_TYPE_INFO.find((t) => t.value === a.type)?.help}</p>
+                <p className={cn('text-xs', errors.accounts[i] ? 'text-destructive' : 'text-muted-foreground')}>{errors.accounts[i] ?? `${ACCOUNT_TYPE_INFO.find((t) => t.value === a.type)?.help ?? ''}${a.currency ? ` Kept in ${a.currency}; the grid shows its ${d.currency} value beneath, at each month's rate.` : ''}`}</p>
               </div>
             ))}
-            <Button size="sm" variant="outline" onClick={() => patch({ accounts: [...d.accounts, { name: '', type: 'checking', openingBalance: '' }] })}>Add account</Button>
+            <Button size="sm" variant="outline" onClick={() => patch({ accounts: [...d.accounts, { name: '', type: 'checking', openingBalance: '', currency: null }] })}>Add account</Button>
           </div>
         )}
 
