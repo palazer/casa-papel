@@ -9,12 +9,8 @@ import { useStore } from '@/app/store'
 import { computeContributions, type EngineOutput } from '@/engine'
 import { monthOfDate, type Household, type Tables } from '@/model'
 import { updateHousehold } from '@/store'
-
-const BASIS_HELP: Record<Household['shareBasis'], string> = {
-  'basis-rows': 'Salaries only. Rows marked "counts for the split" set each adult\'s share; child benefit and one-off income do not.',
-  'all-income': 'Everything each adult brings in, including income for the children they pay for.',
-  manual: 'You set the percentages yourself.',
-}
+import { BASIS_HELP } from '@/app/help'
+import { TipLabel } from '@/components/InfoTip'
 
 export function SharesCard({ household, tables, engine, onError }: { household: Household; tables: Tables; engine: EngineOutput | null; onError: (m: string) => void }) {
   const store = useStore()
@@ -43,7 +39,7 @@ export function SharesCard({ household, tables, engine, onError }: { household: 
       <div className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="sh-basis">Shares come from</Label>
+            <TipLabel htmlFor="sh-basis" help="household.shareBasis">Shares come from</TipLabel>
             <NativeSelect id="sh-basis" className="w-full" value={household.shareBasis} onChange={(e) => act(() => updateHousehold(store, { shareBasis: e.target.value as Household['shareBasis'] }))}>
               <option value="basis-rows">Salaries</option>
               <option value="all-income">All income</option>

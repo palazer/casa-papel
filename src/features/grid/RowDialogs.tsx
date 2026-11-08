@@ -9,7 +9,8 @@ import { sortRows } from '@/engine'
 import { monthOfDate, type FundedBy, type Household, type Row, type Section, type Tables } from '@/model'
 import { accountTypeForRow, derivedRowReason, followRow, setRowAccount, setRowFundedBy } from '@/store'
 import { NativeSelect } from './NativeSelect'
-import { SOURCE_HELP, fundingOptions } from './funding'
+import { fundingOptions } from './funding'
+import { HELP } from '@/app/help'
 import { accountHelp, accountVerb } from './rowAccount'
 
 interface Base {
@@ -66,7 +67,7 @@ export function RowSourceDialog({ row, tables, household, onClose }: Base) {
             <NativeSelect id="row-source" className="w-full" value={fundedBy} onChange={(e) => setFundedBy(e.target.value as FundedBy)}>
               {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </NativeSelect>
-            <p className="text-xs text-muted-foreground">{SOURCE_HELP} Items that have their own choice keep it.</p>
+            <p className="text-xs text-muted-foreground">{HELP['cell.comesOutOf'].text} Items that have their own choice keep it.</p>
           </div>
           <fieldset className="space-y-1.5">
             <legend className="text-sm font-medium">Applies to</legend>

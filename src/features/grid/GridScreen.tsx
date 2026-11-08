@@ -2,16 +2,19 @@ import { useMemo, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { ChevronDown, ChevronRight, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { InfoTip } from '@/components/InfoTip'
+import { MarksLegend } from '@/components/MarksLegend'
 import { PageHeader } from '@/components/PageHeader'
 import { cn } from '@/lib/utils'
 import { formatAmount, formatMonth, formatPercent } from '@/app/format'
+import { balanceHelp, type HelpKey } from '@/app/help'
 import { HUES, SECTION_HUE, type Hue } from '@/app/hues'
 import { readPref, writePref } from '@/app/prefs'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { cellKey, type EngineOutput } from '@/engine'
 import { monthOfDate, type Household, type Money, type MonthKey, type Row, type Section, type Tables } from '@/model'
-import { closeMonth, reopenMonth } from '@/store'
+import { closeMonth, derivedRowReason, reopenMonth } from '@/store'
 import { AddRowInline } from './AddRowInline'
 import { BalanceDialog } from './BalanceDialog'
 import { CellEditor } from './CellEditor'
@@ -80,12 +83,13 @@ export function GridScreen() {
   const derivedRow = (
     label: string, flow: Flow, pick: (m: MonthKey) => Money,
     /** `sub`: a detail line under the named parent row; indented and faded, with the parent's name read out but not shown. */
-    opts: { strong?: boolean; muted?: boolean; currency?: string; hue?: Hue; band?: boolean; sub?: string; format?: (v: Money, m: MonthKey) => string; onClick?: (m: MonthKey) => void; mark?: (m: MonthKey) => boolean } = {},
+    opts: { strong?: boolean; muted?: boolean; currency?: string; hue?: Hue; band?: boolean; sub?: string; help?: HelpKey; format?: (v: Money, m: MonthKey) => string; onClick?: (m: MonthKey) => void; mark?: (m: MonthKey) => boolean } = {},
   ): ReactNode => (
     <tr key={opts.sub ? `${opts.sub} · ${label}` : label} className={cn(opts.band && (opts.hue ? opts.hue.tint : 'bg-muted/40'), opts.strong && 'font-medium')}>
       <th scope="row" className={cn('sticky left-0 z-10 px-2 py-0.5 text-left', opts.band ? (opts.hue ? opts.hue.tint : 'bg-muted') : 'bg-card', opts.hue && !opts.sub ? opts.hue.text : 'text-muted-foreground', opts.muted && 'text-[11px]', opts.sub && 'pl-6 font-normal')}>
         {opts.sub && <span className="sr-only">{opts.sub} · </span>}
         {label}
+        {opts.help && <InfoTip help={opts.help} className="ml-1" />}
       </th>
       {months.map((m) => {
         const v = pick(m)
@@ -114,9 +118,7 @@ export function GridScreen() {
       <PageHeader title="Grid" subline={`${household.name} · ${formatMonth(months[0], locale)} – ${formatMonth(months[months.length - 1], locale)}`}>
         <Button size="xs" variant="outline" onClick={() => { const n = extra + 12; setExtra(n); writePref('horizonExtra', n) }}>Show 12 more months</Button>
         <span className="text-muted-foreground">Click a cell to edit · arrows move · Enter opens · click a month name to close or reopen it</span>
-        <span className="inline-flex flex-wrap items-center gap-x-1.5 text-muted-foreground">
-          <span className="italic underline decoration-dashed decoration-partial underline-offset-4">Italic</span> = estimate · <DoneDot done={1} total={1} state="all" /> = done · this month also: <DoneDot done={0} total={1} state="none" /> nothing done yet, <DoneDot done={1} total={2} state="partial" /> partly done
-        </span>
+        <MarksLegend neg={neg} />
         {engine.warnings.length > 0 && <p role="alert" className="basis-full text-amber-700 dark:text-amber-400">{engine.warnings.join(' · ')}</p>}
         {error && (
           <p role="alert" className="flex basis-full items-center gap-2 text-destructive">
@@ -175,6 +177,7 @@ export function GridScreen() {
                       {isCollapsed ? <ChevronRight className="size-3" aria-hidden /> : <ChevronDown className="size-3" aria-hidden />}
                       {title}
                     </button>
+                    <InfoTip help={`section.${key}`} className="ml-1" />
                   </th>
                   <td colSpan={months.length} className="border-t" />
                 </tr>,
@@ -185,10 +188,10 @@ export function GridScreen() {
                     <td colSpan={months.length} />
                   </tr>
                 ),
-                key === 'income' && derivedRow('Income total', 'in', (m) => engine.totals[m].income, { strong: true, hue: HUES.income, band: true }),
-                key === 'expense' && derivedRow('Expenses total', 'out', (m) => engine.totals[m].expensesTotal, { strong: true, hue: HUES.expense, band: true }),
-                key === 'expense' && months.some((m) => engine.totals[m].fromSavingsDerived !== 0) && derivedRow('of which from savings & pool accounts', 'in', (m) => engine.totals[m].fromSavingsDerived, { muted: true, hue: HUES.pool }),
-                key === 'transfer' && derivedRow(household.closingRule === 'savings-plug' ? 'Kept in account' : 'Leftover', 'in', (m) => engine.totals[m].leftover, { strong: true, hue: HUES.transfer, band: true }),
+                key === 'income' && derivedRow('Income total', 'in', (m) => engine.totals[m].income, { strong: true, hue: HUES.income, band: true, help: 'derived.incomeTotal' }),
+                key === 'expense' && derivedRow('Expenses total', 'out', (m) => engine.totals[m].expensesTotal, { strong: true, hue: HUES.expense, band: true, help: 'derived.expensesTotal' }),
+                key === 'expense' && months.some((m) => engine.totals[m].fromSavingsDerived !== 0) && derivedRow('of which from savings & pool accounts', 'in', (m) => engine.totals[m].fromSavingsDerived, { muted: true, hue: HUES.pool, help: 'derived.fromSavings' }),
+                key === 'transfer' && derivedRow(household.closingRule === 'savings-plug' ? 'Kept in account' : 'Leftover', 'in', (m) => engine.totals[m].leftover, { strong: true, hue: HUES.transfer, band: true, help: household.closingRule === 'savings-plug' ? 'derived.keptInAccount' : 'derived.leftover' }),
               ]
             })}
 
@@ -205,19 +208,19 @@ export function GridScreen() {
               const marked = (m: MonthKey) => (s.months[m]?.adjustment ?? 0) !== 0 || s.months[m]?.projected === false
               if (acc.type === 'investment') {
                 return [
-                  derivedRow(`${acc.name} · value`, 'in', (m) => s.months[m]?.balance ?? 0, { strong: true, currency: s.currency, onClick: open, mark: marked, hue: HUES.worth }),
-                  derivedRow('Deposited', 'in', (m) => s.months[m]?.capital ?? 0, { muted: true, sub: acc.name, currency: s.currency }),
-                  derivedRow('Return', 'in', (m) => Math.round((s.months[m]?.totalReturn ?? 0) * 10000), { muted: true, sub: acc.name, format: (v) => (v === 0 ? '' : formatPercent(v / 10000, locale)) }),
+                  derivedRow(`${acc.name} · value`, 'in', (m) => s.months[m]?.balance ?? 0, { strong: true, currency: s.currency, onClick: open, mark: marked, hue: HUES.worth, help: 'balance.investmentValue' }),
+                  derivedRow('Deposited', 'in', (m) => s.months[m]?.capital ?? 0, { muted: true, sub: acc.name, currency: s.currency, help: 'balance.deposited' }),
+                  derivedRow('Return', 'in', (m) => Math.round((s.months[m]?.totalReturn ?? 0) * 10000), { muted: true, sub: acc.name, format: (v) => (v === 0 ? '' : formatPercent(v / 10000, locale)), help: 'balance.return' }),
                 ]
               }
               const label = acc.type === 'credit-card' ? `${acc.name} · owed` : acc.type === 'loan' ? `${acc.name} · outstanding` : acc.name
-              return [derivedRow(label, s.liability ? 'out' : 'in', (m) => s.months[m]?.balance ?? 0, { strong: true, currency: s.currency, onClick: open, mark: marked, hue: HUES.worth })]
+              return [derivedRow(label, s.liability ? 'out' : 'in', (m) => s.months[m]?.balance ?? 0, { strong: true, currency: s.currency, onClick: open, mark: marked, hue: HUES.worth, help: balanceHelp(acc.type) })]
             })}
             {Object.values(engine.pools).map((p) => {
               const pool = tables.pools.find((x) => x.id === p.poolId)
-              return derivedRow(`Pool account · ${pool?.name ?? ''}`, 'in', (m) => p.months[m]?.balance ?? 0, { hue: HUES.pool })
+              return derivedRow(`Pool account · ${pool?.name ?? ''}`, 'in', (m) => p.months[m]?.balance ?? 0, { hue: HUES.pool, help: 'balance.pool' })
             })}
-            {Object.keys(engine.accounts).length > 0 && derivedRow('Net worth', 'in', (m) => engine.netWorth[m] ?? 0, { strong: true, hue: HUES.worth, band: true })}
+            {Object.keys(engine.accounts).length > 0 && derivedRow('Net worth', 'in', (m) => engine.netWorth[m] ?? 0, { strong: true, hue: HUES.worth, band: true, help: 'derived.netWorth' })}
           </tbody>
         </table>
       </div>
@@ -253,6 +256,7 @@ function GridRow({ row, rIndex, months, engine, tables, household, ccy, locale, 
   const flow = flowOf(row)
   const rowCcy = row.currency ?? ccy
   const followed = row.followsRowId ? tables.rows.find((r) => r.id === row.followsRowId) : undefined
+  const automatic = derivedRowReason(row, household.closingRule) !== null
   return (
     <tr className="group">
       <th scope="row" className="sticky left-0 z-10 bg-card px-2 py-0.5 text-left font-normal">
@@ -266,6 +270,8 @@ function GridRow({ row, rIndex, months, engine, tables, household, ccy, locale, 
               Σ {formatAmount(totals?.total ?? 0, ccy, locale, { compact: true })}{row.section !== 'income' && totals?.shareOfIncome ? ` · ${formatPercent(totals.shareOfIncome, locale)} of income` : ''}
             </div>
           </div>
+          {followed && <InfoTip help="row.follows" text={`Same amount as "${followed.name}" every month. Edit that row; this one has no amount of its own.`} />}
+          {automatic && <InfoTip help={row.kind === 'to-savings' ? 'row.toSavingsPlug' : 'row.pocketShare'} />}
           <RowMenu row={row} tables={tables} household={household} onError={onError} />
         </div>
       </th>

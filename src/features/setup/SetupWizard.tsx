@@ -12,6 +12,7 @@ import { decimalSeparator, formatMonth, localeExample, localeLabel, parseAmount 
 import { useStore } from '@/app/store'
 import { cn } from '@/lib/utils'
 import { HUES } from '@/app/hues'
+import { MODE_HELP, RULE_HELP } from '@/app/help'
 import {
   ACCOUNT_TYPE_INFO, ENTITY_KIND_HELP, ENTITY_KIND_LABEL, ENTITY_TEMPLATES, HOUSEHOLD_TEMPLATES, SECTION_INFO, monthOfDate, templateTitle,
   type AccountType, type EntityKind, type Household, type RowTemplate, type Section,
@@ -25,15 +26,6 @@ const WIZARD_ACCOUNT_TYPES = ACCOUNT_TYPE_INFO.filter((t) => t.value !== 'other-
 const STEPS = ['Basics', 'People', 'Things', 'Accounts', 'Rows', 'Finish']
 const SECTIONS: Section[] = ['income', 'expense', 'transfer']
 const SECTION_DOT: Record<Section, string> = { income: HUES.income.fill, expense: HUES.expense.fill, transfer: HUES.transfer.fill }
-const RULE_HELP: Record<Household['closingRule'], string> = {
-  'savings-plug': 'Income minus spending minus pocket money is moved to savings. You never type "To savings".',
-  'leftover-plug': 'You type how much goes to savings. What remains is shown as leftover.',
-}
-const MODE_HELP: Record<Household['moneyMode'], string> = {
-  pooled: 'All income is household money. Each adult gets pocket money to spend freely.',
-  proportional: 'Each adult pays a share of the shared costs in proportion to their income. Moves shows who sends what where.',
-}
-
 interface Draft {
   name: string
   currency: string

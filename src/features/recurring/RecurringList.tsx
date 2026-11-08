@@ -2,6 +2,7 @@ import { Fragment, useMemo, useState } from 'react'
 import { MoreHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
+import { InfoTip } from '@/components/InfoTip'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Check } from '@/components/Check'
 import { MonthPicker } from '@/components/MonthPicker'
@@ -45,7 +46,7 @@ export function RecurringList() {
       <div className="overflow-x-auto rounded-md border">
         <table className="w-full">
           <thead className="text-left">
-            <tr><th className={TH}>Name</th><th className={TH}>Row</th><th className={`${TH} text-right`}>Amount</th><th className={TH}>When</th><th className={TH}>Account</th><th className={TH}>{formatMonth(m, locale)}</th><th className="px-1 py-1" /></tr>
+            <tr><th className={TH}>Name</th><th className={TH}>Row</th><th className={`${TH} text-right`}>Amount</th><th className={TH}>When</th><th className={TH}>Account</th><th className={TH}><span className="inline-flex items-center gap-1">{formatMonth(m, locale)}<InfoTip help="schedule.status" /></span></th><th className="px-1 py-1" /></tr>
           </thead>
           <tbody className="divide-y divide-border/60">
             {items.map((it) => {

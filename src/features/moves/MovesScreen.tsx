@@ -52,11 +52,11 @@ export function MovesScreen() {
       </PageHeader>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-        <StatTile label="Income" value={formatAmount(t.income, ccy, locale)} tone={HUES.income} />
-        <StatTile label="Expenses" value={formatAmount(t.expensesTotal, ccy, locale)} tone={HUES.expense} />
-        <StatTile label="To savings" value={formatAmount(t.toSavings, ccy, locale, { sign: 'exceptZero' })} tone={HUES.transfer} />
-        <StatTile label="Net worth" value={formatAmount(engine.netWorth[m] ?? 0, ccy, locale)} tone={HUES.worth} />
-        <StatTile label={openCount === 0 ? 'All moves done' : 'Moves left'} value={String(openCount)} />
+        <StatTile label="Income" help="derived.incomeTotal" value={formatAmount(t.income, ccy, locale)} tone={HUES.income} />
+        <StatTile label="Expenses" help="derived.expensesTotal" value={formatAmount(t.expensesTotal, ccy, locale)} tone={HUES.expense} />
+        <StatTile label="To savings" help="stat.toSavings" value={formatAmount(t.toSavings, ccy, locale, { sign: 'exceptZero' })} tone={HUES.transfer} />
+        <StatTile label="Net worth" help="derived.netWorth" value={formatAmount(engine.netWorth[m] ?? 0, ccy, locale)} tone={HUES.worth} />
+        <StatTile label={openCount === 0 ? 'All moves done' : 'Moves left'} help="stat.movesLeft" value={String(openCount)} />
       </div>
 
       <GoalsCard household={household} tables={tables} engine={engine} month={m} />

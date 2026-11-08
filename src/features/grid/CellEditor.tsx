@@ -18,7 +18,9 @@ import {
 } from '@/store'
 import { DoneDot } from './DoneDot'
 import { NativeSelect } from './NativeSelect'
-import { SOURCE_HELP, fundingOptions as buildFundingOptions } from './funding'
+import { fundingOptions as buildFundingOptions } from './funding'
+import { HELP } from '@/app/help'
+import { InfoTip, TipLabel } from '@/components/InfoTip'
 
 interface Props {
   tables: Tables
@@ -201,14 +203,14 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
                   <Input id="cell-amount" autoFocus inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') saveValue() }} placeholder="0" />
                 </div>
                 <fieldset className="space-y-1.5">
-                  <legend className="text-sm font-medium">Applies to</legend>
+                  <legend className="text-sm font-medium"><span className="inline-flex items-center gap-1">Applies to <InfoTip help="cell.appliesTo" /></span></legend>
                   <Segmented value={scope} onChange={(v) => setScope(v as EditScope)} options={[{ value: 'from-now-on', label: 'This month and onwards' }, { value: 'this-month', label: 'Only this month' }]} />
                   <p className="text-xs text-muted-foreground">
                     {scope === 'from-now-on' ? 'Later months that follow this row will pick up the new amount.' : 'The next month keeps the old amount.'}
                   </p>
                 </fieldset>
                 <fieldset className="space-y-1.5">
-                  <legend className="text-sm font-medium">How sure</legend>
+                  <legend className="text-sm font-medium"><span className="inline-flex items-center gap-1">How sure <InfoTip help="cell.howSure" /></span></legend>
                   <Segmented
                     value={status}
                     onChange={(v) => setStatus(v as StatusChoice)}
@@ -222,11 +224,10 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
                 </fieldset>
                 {row.section === 'expense' && (
                   <div className="space-y-1.5">
-                    <Label htmlFor="cell-source">Comes out of</Label>
+                    <TipLabel htmlFor="cell-source" help="cell.comesOutOf">Comes out of</TipLabel>
                     <NativeSelect id="cell-source" className="w-full" value={fundedBy} onChange={(e) => setFundedBy(e.target.value as CellItem['fundedBy'])}>
                       {fundingOptions.map((o) => <option key={o.value} value={o.value}>{o.label}{o.value === row.defaultFundedBy ? ' (row default)' : ''}</option>)}
                     </NativeSelect>
-                    <p className="text-xs text-muted-foreground">{SOURCE_HELP}</p>
                   </div>
                 )}
               </div>
@@ -312,7 +313,7 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
                 </div>
                 <p className="text-xs text-muted-foreground">Set an item to Done when it is paid or received. A done cell shows a green dot; in the current month the dot also shows red for nothing done yet and amber for partly done.</p>
                 {row.section === 'expense' && (
-                  <p className="text-xs text-muted-foreground">{SOURCE_HELP}</p>
+                  <p className="text-xs text-muted-foreground">{HELP['cell.comesOutOf'].text}</p>
                 )}
                 {!isRecurringRow && (
                   <Segmented value={scope} onChange={(v) => setScope(v as EditScope)} options={[{ value: 'from-now-on', label: 'This month and onwards' }, { value: 'this-month', label: 'Only this month' }]} />

@@ -78,9 +78,9 @@ export function GoalsCard({ household, tables, engine, month, compact = false }:
   return (
     <>
       {compact ? (
-        <Island title="Goals">{body}</Island>
+        <Island title="Goals" help="goal.status">{body}</Island>
       ) : (
-        <Island air title="Goals" description="A number to reach or a debt to clear. Each bar shows how far the current plan gets, month by month.">{body}</Island>
+        <Island air title="Goals" help="goal.status" description="A number to reach or a debt to clear. Each bar shows how far the current plan gets, month by month.">{body}</Island>
       )}
       {editing && <GoalDialog household={household} tables={tables} goal={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
     </>

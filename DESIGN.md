@@ -164,9 +164,24 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   drawn with the `DoneDot` so done keeps one mark.
 - Dialogs are shadcn `Dialog`; the confirm step lives inside the dialog, never behind it. Errors appear beside the field
   that caused them, `role="alert"`.
-- Help: every option carries a one-line explanation inline; `InfoTip` (i) icons (hover on desktop, tap on touch) explain
-  titles, automatic rows and stat labels; one text map `src/app/help.ts` keeps the wording consistent. The legend popover
-  "What the colours and marks mean" lives in the Grid and Month toolbars.
+- Help is one mechanism: `InfoTip` (`src/components/InfoTip.tsx`), a 16 px (i) in `text-muted-foreground/70` (24 px
+  where the pointer is a finger) that opens a `w-64 text-xs` popover on hover after 150 ms and on tap, and closes when
+  the mouse leaves, on Escape or on a click outside. Its accessible name is `About <title>`. It is a sibling of the thing
+  it explains, never inside a `<label>`, `<button>`, `<legend>` text or menu item (in Playwright, a field with a tip is
+  found with `getByLabel(name, { exact: true })`, since the (i)'s name contains the field's): `TipLabel` pairs a form label with one,
+  `Island`, `StatTile`, the Month view's `Stat` and the grid's `derivedRow` take a `help` key, the grid's row label puts
+  it between the name and the row menu. Where it goes: section titles, every total and balance the app works out,
+  automatic and following rows, stat labels, the cell editor's "Applies to", "How sure" and "Comes out of", the
+  household settings, "Track the balance", the Archived list, Goals and the schedules' status column.
+- Every text lives in `src/app/help.ts`: `HELP[key] = { title, text }`, keys `area.name`, titles up to 40 characters,
+  texts two or three plain sentences up to 360 characters in the app's own words (pool accounts, people & things,
+  schedules, automatic). `balanceHelp(type)` picks the balance text for an account. Texts that belong to a model enum
+  (section blurbs, account types, entity kinds, goal kinds) stay in `src/model/templates.ts`; the wizard's rule and
+  mode lines (`RULE_HELP`, `MODE_HELP`, `BASIS_HELP`) stay inline because their words depend on the choice.
+- `MarksLegend` ("What the colours and marks mean", an `xs outline` button in the Grid and Month toolbars) is the legend:
+  the six hue dots with their kinds of money, then the marks with a sample each: estimate, certain, done, this month's
+  red and amber dots, the negative spending number when that setting is on, the amber draw, the dotted entered balance,
+  the locked closed month.
 
 ## 9. Loading, errors, empty
 

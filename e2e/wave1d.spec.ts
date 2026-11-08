@@ -30,7 +30,7 @@ test.describe('wave 1d', () => {
 
     // switch to proportional contributions
     await page.getByRole('link', { name: 'Household' }).click()
-    await page.getByLabel('How you share money').selectOption('proportional')
+    await page.getByLabel('How you share money', { exact: true }).selectOption('proportional')
     await expect(page.getByText('Shares come from')).toBeVisible()
     await expect(page.getByRole('cell', { name: 'Keeps' })).toBeVisible()
     await page.screenshot({ path: 'e2e/output/shares-card.png', fullPage: true })

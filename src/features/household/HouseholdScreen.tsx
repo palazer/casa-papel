@@ -4,6 +4,7 @@ import { RecurringList } from '@/features/recurring/RecurringList'
 import { FxCard } from './FxCard'
 import { SharesCard } from './SharesCard'
 import { HUES } from '@/app/hues'
+import { InfoTip, TipLabel } from '@/components/InfoTip'
 import { PoolsCard } from './PoolsCard'
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -79,21 +80,21 @@ function SettingsCard({ household: h, tables, onSave, onMonthly }: { household: 
           <NativeSelect id="s-locale" className="w-full" value={h.locale} onChange={(e) => onSave({ locale: e.target.value })}>{LOCALES.map((l) => <option key={l} value={l}>{localeLabel(l)} — {localeExample(l)}</option>)}</NativeSelect>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="s-rule">Month-end rule</Label>
+          <TipLabel htmlFor="s-rule" help="household.closingRule">Month-end rule</TipLabel>
           <NativeSelect id="s-rule" className="w-full" value={h.closingRule} onChange={(e) => onSave({ closingRule: e.target.value as Household['closingRule'] })}>
             <option value="savings-plug">Whatever is left goes to savings</option>
             <option value="leftover-plug">I decide savings, show me what is left</option>
           </NativeSelect>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="s-mode">How you share money</Label>
+          <TipLabel htmlFor="s-mode" help="household.moneyMode">How you share money</TipLabel>
           <NativeSelect id="s-mode" className="w-full" value={h.moneyMode} onChange={(e) => onSave({ moneyMode: e.target.value as Household['moneyMode'] })}>
             <option value="pooled">Pooled with pocket money</option>
             <option value="proportional">Proportional: each adult pays a share of shared costs</option>
           </NativeSelect>
         </div>
         <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="s-scope">Pocket money and cash buffer changes apply to</Label>
+          <TipLabel htmlFor="s-scope" help="household.pocketScope">Pocket money and cash buffer changes apply to</TipLabel>
           <NativeSelect id="s-scope" className="w-full" value={scope} onChange={(e) => setScope(e.target.value as MonthlyDefaultScope)}>
             <option value="from-now-on">This month and onwards (earlier months keep what they show)</option>
             <option value="this-month">Only this month</option>
@@ -102,12 +103,12 @@ function SettingsCard({ household: h, tables, onSave, onMonthly }: { household: 
           <p className="text-muted-foreground">Closed months are never changed. "This month" is {formatMonth(thisMonth, h.locale)}.</p>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="s-pocket">Pocket money per month, all adults ({h.baseCurrency})</Label>
+          <TipLabel htmlFor="s-pocket" help="household.pocket">Pocket money per month, all adults ({h.baseCurrency})</TipLabel>
           <Input id="s-pocket" inputMode="decimal" value={pocket} onChange={(e) => setPocket(e.target.value)} onBlur={() => { const v = money(pocket); if (v !== effective('pocketTotal')) onMonthly('pocketTotal', v, scope) }} />
           {effective('pocketTotal') !== h.pocketTotal && <p className="text-muted-foreground">This month {formatAmount(effective('pocketTotal'), h.baseCurrency, h.locale)} · default {formatAmount(h.pocketTotal, h.baseCurrency, h.locale)}</p>}
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="s-buffer">Cash kept in the account at month end ({h.baseCurrency})</Label>
+          <TipLabel htmlFor="s-buffer" help="household.buffer">Cash kept in the account at month end ({h.baseCurrency})</TipLabel>
           <Input id="s-buffer" inputMode="decimal" value={buffer} onChange={(e) => setBuffer(e.target.value)} onBlur={() => { const v = money(buffer); if (v !== effective('cashBuffer')) onMonthly('cashBuffer', v, scope) }} />
           {effective('cashBuffer') !== h.cashBuffer && <p className="text-muted-foreground">This month {formatAmount(effective('cashBuffer'), h.baseCurrency, h.locale)} · default {formatAmount(h.cashBuffer, h.baseCurrency, h.locale)}</p>}
         </div>
@@ -170,7 +171,7 @@ function EntitiesCard({ household, entities: allEntities, onError }: { household
         </ul>
         {archived.length > 0 && (
           <div className="space-y-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Archived</p>
+            <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Archived <InfoTip help="household.archived" /></p>
             <ul className="divide-y divide-border/60">
               {archived.map((e) => (
                 <li key={e.id} className="flex min-h-8 flex-wrap items-center gap-2 py-1 text-muted-foreground">
@@ -342,8 +343,9 @@ function AccountDialog({ account, entities, baseCurrency, locale, startMonth, on
           <div className="space-y-1.5"><Label htmlFor="acc-month">Opening month</Label><MonthField id="acc-month" label="Opening month" value={openingMonth} onChange={setOpeningMonth} locale={locale} /></div>
           <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="acc-owner">Owner</Label><NativeSelect id="acc-owner" className="w-full" value={owner} onChange={(e) => setOwner(e.target.value)}><option value="">Household / joint</option>{adults.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</NativeSelect></div>
           {trackable && (
-            <div className="sm:col-span-2">
+            <div className="flex items-center gap-1 sm:col-span-2">
               <Check label="Track the balance month by month in the grid" checked={tracked} onChange={(e) => setTracked(e.target.checked)} />
+              <InfoTip help="household.tracked" />
             </div>
           )}
           {type === 'credit-card' && (
