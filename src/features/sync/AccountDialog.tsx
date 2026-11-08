@@ -214,14 +214,14 @@ export function AccountDialog({ initial, inviteCode, hasLocalData, onClose }: Pr
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         </div>
 
-        <DialogFooter className="flex-row flex-wrap gap-2 sm:justify-between">
-          <div className="flex gap-2">
-            {step === 'signin' && <Button variant="ghost" onClick={() => { setError(null); setStep('reset') }} disabled={!!busy}>Forgot the password?</Button>}
-            {step === 'signin' && <Button variant="ghost" onClick={() => { setError(null); setStep('join') }} disabled={!!busy}>I have an invite</Button>}
-            {step === 'signin' && <Button variant="ghost" onClick={() => { setError(null); setStep('bootstrap') }} disabled={!!busy}>First time, temporary password</Button>}
-            {step === 'locked' && hasLocalData && <Button variant="outline" onClick={replaceCloud} disabled={!!busy}>Replace the cloud copy with this device's data</Button>}
+        <DialogFooter className="min-w-0 flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <div className="flex min-w-0 flex-wrap gap-x-1 gap-y-0">
+            {step === 'signin' && <Button variant="ghost" size="sm" onClick={() => { setError(null); setStep('reset') }} disabled={!!busy}>Forgot the password?</Button>}
+            {step === 'signin' && <Button variant="ghost" size="sm" onClick={() => { setError(null); setStep('join') }} disabled={!!busy}>I have an invite</Button>}
+            {step === 'signin' && <Button variant="ghost" size="sm" onClick={() => { setError(null); setStep('bootstrap') }} disabled={!!busy}>First time, temporary password</Button>}
+            {step === 'locked' && hasLocalData && <Button variant="outline" size="sm" className="h-auto whitespace-normal py-1.5 text-left" onClick={replaceCloud} disabled={!!busy}>Replace the cloud copy with this device's data</Button>}
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
             {step !== 'recovery-code' && <Button variant="outline" onClick={() => onClose()} disabled={!!busy}>Cancel</Button>}
             {step === 'signin' && <Button onClick={signIn} disabled={!!busy || !email || !password}>Sign in</Button>}
             {step === 'join' && <Button onClick={join} disabled={!!busy || !code || !email || !passwordsMatch}>Create account</Button>}

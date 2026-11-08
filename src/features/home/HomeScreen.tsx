@@ -3,6 +3,8 @@ import { Button } from '@/components/ui/button'
 import { useStore } from '@/app/store'
 import { loadDemo } from '@/demo/loadDemo'
 import { SetupWizard } from '@/features/setup/SetupWizard'
+import { describeSync } from '@/features/sync/syncText'
+import { useSyncView } from '@/sync/useSync'
 
 interface Props {
   onOpenData: () => void
@@ -15,6 +17,8 @@ interface Props {
 
 export function HomeScreen({ onOpenData, onCreated, syncAvailable = false, onSignIn, onJoin }: Props) {
   const store = useStore()
+  const view = useSyncView()
+  const signedIn = !!view && view.status !== 'off'
   return (
     <div className="space-y-4">
       <Card className="mx-auto max-w-2xl">
@@ -27,11 +31,20 @@ export function HomeScreen({ onOpenData, onCreated, syncAvailable = false, onSig
               : 'Everything stays on this device.'}
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          {syncAvailable && <Button onClick={onSignIn}>Sign in</Button>}
-          {syncAvailable && <Button variant="outline" onClick={onJoin}>I have an invite</Button>}
-          <Button variant="outline" onClick={() => void loadDemo(store)}>Load the demo household</Button>
-          <Button variant="outline" onClick={onOpenData}>Import a file</Button>
+        <CardContent className="space-y-3">
+          {signedIn && view && (
+            <p className="text-sm">
+              Signed in as <strong>{view.email}</strong>, but this device holds no household yet ({describeSync(view).toLowerCase()}).
+              If your household already lives in another browser or on another device, sign in there and it will be uploaded; this device then picks it up by itself.
+              Otherwise start one below, or load the demo to try things out.
+            </p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {syncAvailable && !signedIn && <Button onClick={onSignIn}>Sign in</Button>}
+            {syncAvailable && !signedIn && <Button variant="outline" onClick={onJoin}>I have an invite</Button>}
+            <Button variant="outline" onClick={() => void loadDemo(store)}>Load the demo household</Button>
+            <Button variant="outline" onClick={onOpenData}>{signedIn ? 'Open Data' : 'Import a file'}</Button>
+          </div>
         </CardContent>
       </Card>
       <SetupWizard onCreated={onCreated} />
