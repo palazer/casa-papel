@@ -15,6 +15,8 @@ describe('engine: balances in the household currency', () => {
     expect(jan.balanceBase).toBe(jan.balance)
     expect(jan.missingRate).toBe(true)
     expect(noRate.warnings).toContain('No USD→EUR rate for 2026-01 (Broker)')
+    // one line per account, not one per month
+    expect(noRate.warnings.filter((w) => w.includes('(Broker)'))).toHaveLength(1)
 
     const out = computeEngine({ tables: tables({ household: [h], accounts: [broker], fxRates: [fx('EUR/USD', '2026-01', 1.25)] }), months })
     const r = out.accounts[broker.id].months['2026-01']

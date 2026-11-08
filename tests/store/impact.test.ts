@@ -58,7 +58,8 @@ describe('describeRemoval', () => {
       .map((m) => m as unknown as { table: string; record?: { id?: string; deductedFromRowId?: string | null } })
       .find((m) => m.table === 'rows' && m.record?.id === health)?.record?.deductedFromRowId
     expect(unlinked(planRemoval(t, { kind: 'row', id: other }, T0, OPTS))).toBeNull()
-    expect(unlinked(planArchive(t, { kind: 'row', id: other }, '2026-11', T0, OPTS))).toBeNull()
+    // archiving leaves the link: the engine stops the deduction at the archive month, so earlier months keep their net
+    expect(unlinked(planArchive(t, { kind: 'row', id: other }, '2026-11', T0, OPTS))).toBeUndefined()
   })
 
   it('accounts: typed rows and pool accounts block, plain rows and schedules are consequences, a tracked balance in a closed month is history', () => {

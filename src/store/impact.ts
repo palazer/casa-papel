@@ -425,7 +425,8 @@ function pinFollowers(ctx: Ctx, row: Row, from: MonthKey, ts: number): Mutation[
 }
 
 function rowArchive(ctx: Ctx, row: Row, from: MonthKey, ts: number): Mutation[] {
-  const muts: Mutation[] = [put('rows', RowSchema, row, { archivedMonth: from }, ts), ...pinFollowers(ctx, row, from, ts), ...unlinkDeductions(ctx, row, ts)]
+  // deductions keep their link: the engine stops taking them off the income from the archive month by itself
+  const muts: Mutation[] = [put('rows', RowSchema, row, { archivedMonth: from }, ts), ...pinFollowers(ctx, row, from, ts)]
   const schedules = ctx.schedules.filter((s) => s.rowId === row.id)
   for (const s of schedules) {
     if (compareMonths(s.startMonth, from) >= 0) muts.push(put('recurringItems', RecurringItemSchema, s, { deletedAt: ts }, ts))

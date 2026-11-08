@@ -157,12 +157,13 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
                               placeholder={info ? shown(info.rate) : '—'}
                               onBlur={(e) => {
                                 const t = e.target.value.trim()
-                                if (t === '') { if (rec) act(() => setManualRate(store, p, m, null)); return }
+                                // leaving the field as it was shown is not a change: tabbing through an ECB month must not make it manual
+                                if (t === (rec ? shown(rec.rate) : '')) return
+                                if (t === '') { act(() => setManualRate(store, p, m, null)); return }
                                 const v = Number(t.replace(',', '.'))
                                 if (!(v > 0)) { onError('A rate must be a positive number.'); return }
                                 const value = toStored(o, base, v)
-                                // the same number again (within the display's rounding) is not a change
-                                if (rec?.source === 'manual' && Math.abs(rec.rate - value) <= rec.rate * 1e-6) return
+                                if (rec && Math.abs(rec.rate - value) <= rec.rate * 1e-6) return
                                 act(() => setManualRate(store, p, m, value))
                               }}
                             />

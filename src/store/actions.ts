@@ -458,7 +458,9 @@ export async function followRow(store: Store, rowId: string, targetId: string | 
     if (tables.rows.some((r) => !r.deletedAt && r.followsRowId === rowId)) throw new Error(`Another row already follows "${row.name}". Chains are not supported.`)
     if (share != null && !(share > 0)) throw new Error('A share must be above zero, like 0.25 for a quarter.')
   }
-  await store.commit([{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, followsRowId: targetId, followShare: targetId ? share : null, updatedAt: now() }) }])
+  // the whole amount is stored as null, so "= Salary" and "= 100% of Salary" are one state
+  const followShare = targetId && share != null && share !== 1 ? share : null
+  await store.commit([{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, followsRowId: targetId, followShare, updatedAt: now() }) }])
 }
 
 /** The scope and tags a row gets when it belongs to `scope`: the person or thing it is scoped to is also among its tags, as templates do it. */
@@ -479,7 +481,9 @@ export async function setRowScope(store: Store, rowId: string, scope: string, in
   if (scope !== 'shared' && !tables.entities.some((e) => e.id === scope && !e.deletedAt)) throw new Error('That person or thing no longer exists.')
   if (inShareBasis != null && row.section !== 'income') throw new Error('Only income rows can count for the split.')
   const ts = now()
-  const mutations: Mutation[] = [{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, ...scopePatch(row, scope), inShareBasis: inShareBasis ?? row.inShareBasis, updatedAt: ts }) }]
+  // a shared income has no adult to count for, so the flag goes with the scope
+  const basis = scope === 'shared' ? false : (inShareBasis ?? row.inShareBasis)
+  const mutations: Mutation[] = [{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, ...scopePatch(row, scope), inShareBasis: basis, updatedAt: ts }) }]
   if (row.section === 'income') {
     for (const d of tables.rows) if (!d.deletedAt && d.deductedFromRowId === row.id) mutations.push({ op: 'put', table: 'rows', record: RowSchema.parse({ ...d, ...scopePatch(d, scope), updatedAt: ts }) })
   }

@@ -65,11 +65,11 @@ export interface FetchResult { written: number; months: MonthKey[]; unsupported:
 
 /**
  * Fetch ECB month rates for base→symbols between two months (future months are clipped to today)
- * and store them as 'api' rates. Months that already have a manual rate are left alone.
+ * and store them as 'api' rates. Months that already have a manual rate are left alone unless `replaceManual` is set.
  */
 export async function fetchEcbRates(
   store: Store,
-  opts: { base: string; symbols: string[]; from: MonthKey; to: MonthKey; policy: FxMonthRate },
+  opts: { base: string; symbols: string[]; from: MonthKey; to: MonthKey; policy: FxMonthRate; replaceManual?: boolean },
   fetchFn: typeof fetch = fetch,
 ): Promise<FetchResult> {
   const today = new Date().toISOString().slice(0, 10)
@@ -99,7 +99,7 @@ export async function fetchEcbRates(
   }
 
   const tables = await loadTables(store)
-  const manual = new Set(tables.fxRates.filter((r) => r.source === 'manual').map((r) => `${r.pair}|${r.month}`))
+  const manual = new Set(opts.replaceManual ? [] : tables.fxRates.filter((r) => r.source === 'manual').map((r) => `${r.pair}|${r.month}`))
   const byMonth = monthRatesWithDates(daily, opts.policy)
   const ts = now()
   const mutations: Mutation[] = []
@@ -136,8 +136,11 @@ export async function restoreEcbRate(store: Store, pair: string, month: MonthKey
   if (!household) throw new Error('No household yet')
   const [base, symbol] = pair.split('/')
   if (base !== household.baseCurrency) throw new Error(`Rates are fetched against ${household.baseCurrency}; ${pair} is not one of its pairs.`)
-  if (tables.fxRates.some((r) => r.pair === pair && r.month === month)) await setManualRate(store, pair, month, null)
-  return fetchEcbRates(store, { base, symbols: [symbol], from: month, to: month, policy: household.fxMonthRate }, fetchFn)
+  // fetch first: a failed fetch throws here and the stored rate stays; a fetched rate replaces it in one write
+  const res = await fetchEcbRates(store, { base, symbols: [symbol], from: month, to: month, policy: household.fxMonthRate, replaceManual: true }, fetchFn)
+  // a month the ECB has nothing for (the future) goes back to a projection
+  if (res.written === 0 && tables.fxRates.some((r) => r.pair === pair && r.month === month)) await setManualRate(store, pair, month, null)
+  return res
 }
 
 export const setFxSettings = (store: Store, patch: Partial<Pick<Household, 'fxDriftMode' | 'fxDriftDefault' | 'fxPairDrift' | 'fxMonthRate'>>) => updateHousehold(store, patch)

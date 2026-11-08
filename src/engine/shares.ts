@@ -103,7 +103,8 @@ export function computeContributions(tables: Tables, out: EngineOutput, month: M
   // ---- basis and shares (net of deductions; a net below zero counts as nothing)
   const basis: Record<string, Money> = Object.fromEntries(adults.map((a) => [a.id, 0]))
   const basisMode = household?.shareBasis ?? 'basis-rows'
-  const anyBasisRow = rows.some((r) => r.section === 'income' && r.inShareBasis)
+  // only an income with an adult behind it can switch the basis to flagged rows; a shared income cannot count for anyone
+  const anyBasisRow = rows.some((r) => r.section === 'income' && r.inShareBasis && ownerOf(r, tables, adultIds).adultId)
   for (const r of rows) {
     if (r.section !== 'income') continue
     if (basisMode === 'basis-rows' && anyBasisRow && !r.inShareBasis) continue
@@ -122,7 +123,7 @@ export function computeContributions(tables: Tables, out: EngineOutput, month: M
   }
   if (adults.length === 0) shares = {}
 
-  // ---- income per adult
+  // ---- income per adult: the real net, below zero included (the person paid more than came in); only the basis above clamps
   const income: Record<string, Money> = Object.fromEntries(adults.map((a) => [a.id, 0]))
   for (const r of rows) {
     if (r.section !== 'income') continue

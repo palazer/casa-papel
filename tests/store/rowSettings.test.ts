@@ -119,6 +119,9 @@ describe('followRow with a share', () => {
     await expect(followRow(store, tax.id, salary.id, 0)).rejects.toThrow(/above zero/)
     await followRow(store, tax.id, salary.id, 0.25)
     expect((await engine(store)).cells[cellKey(tax.id, '2026-02')]).toMatchObject({ value: 100000, source: 'derived' })
+    // the whole amount is one state, whether typed as 100 or left alone
+    await followRow(store, tax.id, salary.id, 1)
+    expect((await loadTables(store)).rows.find((r) => r.id === tax.id)).toMatchObject({ followsRowId: salary.id, followShare: null })
     await followRow(store, tax.id, null, 0.25)
     expect((await loadTables(store)).rows.find((r) => r.id === tax.id)).toMatchObject({ followsRowId: null, followShare: null })
   })
@@ -138,6 +141,8 @@ describe('setRowDeductedFrom and setRowScope', () => {
     // the income row's new owner takes its deductions along
     await setRowScope(store, salary.id, 'shared')
     t = await loadTables(store)
+    // a shared income cannot count for anyone's share
+    expect(t.rows.find((r) => r.id === salary.id)).toMatchObject({ scope: 'shared', inShareBasis: false })
     expect(t.rows.find((r) => r.id === rent.id)?.scope).toBe('shared')
     expect(t.rows.find((r) => r.id === rent.id)!.entityTags).not.toContain(pat.id)
 

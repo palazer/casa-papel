@@ -91,6 +91,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
   const requestedSet = new Set(requested)
   const base = household.baseCurrency
   const warnings: string[] = []
+  const warnedRows = new Set<string>()
 
   const states = new Map(tables.monthStates.map((s) => [s.month, s]))
   const isClosed = (m: MonthKey) => states.get(m)?.closed ?? false
@@ -197,7 +198,11 @@ export function computeEngine(input: EngineInput): EngineOutput {
       const status: CellStatus = baseStatus === 'derived' ? (closed || cell?.markedDone ? 'done' : 'derived') : closed || archived ? 'done' : baseStatus
 
       const conv = convertMoney(fx, value, currency, base, m)
-      if (conv.missingRate) warnings.push(`No ${currency}→${base} rate for ${m} (${row.name})`)
+      // once per row, naming the first month without a rate
+      if (conv.missingRate && !warnedRows.has(row.id)) {
+        warnedRows.add(row.id)
+        warnings.push(`No ${currency}→${base} rate for ${m} (${row.name})`)
+      }
       // scale funding split into base currency proportionally
       const fundingBase = zeroFunding()
       if (value !== 0) {
@@ -341,10 +346,14 @@ export function computeEngine(input: EngineInput): EngineOutput {
     poolSeries[pool.id] = series
   }
 
-  /** A balance in the base currency; a missing rate leaves it 1:1 and warns the way rows do. */
+  /** A balance in the base currency; a missing rate leaves it 1:1 and warns once per account, naming the first month. */
+  const warnedAccounts = new Set<string>()
   const inBase = (acc: Account, balance: Money, m: MonthKey): { balanceBase: Money; missingRate: boolean } => {
     const conv = convertMoney(fx, balance, acc.currency, base, m)
-    if (conv.missingRate) warnings.push(`No ${acc.currency}→${base} rate for ${m} (${acc.name})`)
+    if (conv.missingRate && !warnedAccounts.has(acc.id)) {
+      warnedAccounts.add(acc.id)
+      warnings.push(`No ${acc.currency}→${base} rate for ${m} (${acc.name})`)
+    }
     return { balanceBase: conv.value, missingRate: conv.missingRate }
   }
 

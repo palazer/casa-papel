@@ -96,6 +96,18 @@ test('a row in another currency: the typed amount, the household value beneath, 
   await expect(page.getByTestId('rate-line')).toContainText('ECB')
   await expect(page.getByTestId('rate-line')).toContainText('€925.93')
   await page.screenshot({ path: 'e2e/output/rate-line.png' })
+
+  // tabbing through the rates table leaves an ECB month as it is
+  await page.keyboard.press('Escape')
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Household' }).click()
+  const nov = page.getByLabel('1 EUR in USD for Nov 2026')
+  await expect(nov).toHaveValue('1.08')
+  await nov.focus()
+  await nov.press('Tab')
+  await page.waitForTimeout(300)
+  const novRow = page.getByRole('row', { name: /^Nov 2026/ })
+  await expect(novRow.getByText('ECB', { exact: true })).toBeVisible()
+  await expect(novRow.getByText('manual', { exact: true })).toHaveCount(0)
 })
 
 test('a foreign-currency account shows its household-currency value beneath', async ({ page }) => {

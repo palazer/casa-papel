@@ -83,3 +83,17 @@ describe('currency rates: the day of the rate and the ECB again', () => {
     expect(fetchFn).not.toHaveBeenCalled()
   })
 })
+
+describe('currency rates: the ECB again when the service fails', () => {
+  it('keeps the manual rate when the fetch fails, and drops it for a month the ECB has nothing for', async () => {
+    const store = await fresh()
+    await setManualRate(store, 'EUR/USD', '2026-01', 1.5)
+    const failing = (async () => new Response('down', { status: 500 })) as unknown as typeof fetch
+    await expect(restoreEcbRate(store, 'EUR/USD', '2026-01', failing)).rejects.toThrow(/answered 500/)
+    expect((await loadTables(store)).fxRates.find((r) => r.month === '2026-01')).toMatchObject({ rate: 1.5, source: 'manual' })
+
+    await setManualRate(store, 'EUR/USD', '2099-01', 2)
+    expect((await restoreEcbRate(store, 'EUR/USD', '2099-01', vi.fn() as unknown as typeof fetch)).written).toBe(0)
+    expect((await loadTables(store)).fxRates.some((r) => r.month === '2099-01')).toBe(false)
+  })
+})

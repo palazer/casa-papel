@@ -144,7 +144,9 @@ export function RowFollowDialog({ row, tables, household, onClose }: Base) {
   const rule = household.closingRule
   const candidates = sortRows(tables.rows.filter((r) => !r.deletedAt && r.id !== row.id && !r.archivedMonth && !r.followsRowId && !derivedRowReason(r, rule)), tables.categories)
   const [targetId, setTargetId] = useState(row.followsRowId ?? '')
-  const [share, setShare] = useState(String(Math.round((row.followShare ?? 1) * 1000) / 10))
+  // shown to a tenth of a percent; an untouched field keeps the stored fraction exactly
+  const seeded = String(Math.round((row.followShare ?? 1) * 1000) / 10)
+  const [share, setShare] = useState(seeded)
   const { error, busy, save } = useSave(onClose)
 
   return (
@@ -189,7 +191,8 @@ export function RowFollowDialog({ row, tables, household, onClose }: Base) {
             onClick={() => void save(async () => {
               const pct = Number(share.replace(',', '.'))
               if (targetId && !(pct > 0)) throw new Error('The share must be a number above 0.')
-              await followRow(store, row.id, targetId || null, targetId ? pct / 100 : null)
+              const fraction = share === seeded ? row.followShare : pct / 100
+              await followRow(store, row.id, targetId || null, targetId ? fraction : null)
             })}
             disabled={busy}
           >Save</Button>
@@ -237,7 +240,8 @@ export function RowCurrencyDialog({ row, household, onClose }: Base) {
 export function RowDeductionDialog({ row, tables, household, onClose }: Base) {
   const store = useStore()
   const rule = household.closingRule
-  const incomes = sortRows(tables.rows.filter((r) => !r.deletedAt && r.section === 'income' && !r.archivedMonth && !derivedRowReason(r, rule)), tables.categories)
+  // live income rows; an archived one stays listed while this row is still deducted from it (the engine stops at its archive month)
+  const incomes = sortRows(tables.rows.filter((r) => !r.deletedAt && r.section === 'income' && (!r.archivedMonth || r.id === row.deductedFromRowId) && !derivedRowReason(r, rule)), tables.categories)
   const [targetId, setTargetId] = useState(row.deductedFromRowId ?? '')
   const { error, busy, save } = useSave(onClose)
 
@@ -253,7 +257,7 @@ export function RowDeductionDialog({ row, tables, household, onClose }: Base) {
             <TipLabel htmlFor="row-deducted-from" help="row.deductedFrom">This expense is taken off</TipLabel>
             <NativeSelect id="row-deducted-from" className="w-full" value={targetId} onChange={(e) => setTargetId(e.target.value)}>
               <option value="">Nothing: a normal expense</option>
-              {incomes.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+              {incomes.map((r) => <option key={r.id} value={r.id}>{r.name}{r.archivedMonth ? ' (archived)' : ''}</option>)}
             </NativeSelect>
             <p className="text-xs text-muted-foreground">{HELP['row.deductedFrom'].text} The row then belongs to whoever that income belongs to.</p>
           </div>
@@ -261,7 +265,7 @@ export function RowDeductionDialog({ row, tables, household, onClose }: Base) {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button onClick={() => void save(() => setRowDeductedFrom(store, row.id, targetId || null))} disabled={busy}>Save</Button>
+          <Button onClick={() => void save(async () => { if (targetId !== (row.deductedFromRowId ?? '')) await setRowDeductedFrom(store, row.id, targetId || null) })} disabled={busy}>Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

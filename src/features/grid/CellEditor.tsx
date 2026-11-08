@@ -11,7 +11,7 @@ import { readPref, writePref } from '@/app/prefs'
 import { useStore } from '@/app/store'
 import { cellKey, type EngineOutput } from '@/engine'
 import { RecurringDialog } from '@/features/recurring/RecurringDialog'
-import { describeCadence, newId, type CellItem, type Household, type ItemStatus, type MonthKey, type Row, type Tables } from '@/model'
+import { compareMonths, describeCadence, newId, type CellItem, type Household, type ItemStatus, type MonthKey, type Row, type Tables } from '@/model'
 import {
   changeRecurringFrom, clearCell, endRecurringFrom, itemsFromCurrent, reopenMonth, setCellItems, setCellValue, skipRecurringMonth,
   type EditScope,
@@ -48,7 +48,7 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
   const isRecurringRow = engine.recurringRowIds.includes(row.id)
   /** Expense rows taken out of this income, with this month's amount in the base currency. */
   const deductions = row.section === 'income'
-    ? tables.rows.filter((r) => !r.deletedAt && !r.archivedMonth && r.deductedFromRowId === row.id).map((r) => ({ id: r.id, name: r.name, valueBase: engine.cells[cellKey(r.id, month)]?.valueBase ?? 0 }))
+    ? tables.rows.filter((r) => !r.deletedAt && (!r.archivedMonth || compareMonths(r.archivedMonth, month) > 0) && r.deductedFromRowId === row.id).map((r) => ({ id: r.id, name: r.name, valueBase: engine.cells[cellKey(r.id, month)]?.valueBase ?? 0 }))
     : []
 
   // "How sure" on a single amount is stored as one unlabelled item; keep showing it as a single amount

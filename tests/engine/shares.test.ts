@@ -145,3 +145,21 @@ describe('deductions and shares', () => {
     expect(d.lines.find((l) => l.rowId === tax.id)).toMatchObject({ routing: 'own', total: 150000 })
   })
 })
+
+describe('a shared income with the split flag', () => {
+  it('does not switch the basis to flagged rows: salaries without the flag still set the shares', () => {
+    const a = ent('adult', 'A', null, 'a0')
+    const b = ent('adult', 'B', null, 'a1')
+    const salaryA = row({ name: 'A salary', section: 'income', kind: 'salary', scope: a.id })
+    const salaryB = row({ name: 'B salary', section: 'income', kind: 'salary', scope: b.id, order: 'a1' })
+    const interest = row({ name: 'Interest', section: 'income', scope: 'shared', inShareBasis: true, order: 'a2' })
+    const t = tables({
+      household: [household({ moneyMode: 'proportional', closingRule: 'leftover-plug' })],
+      entities: [a, b],
+      rows: [salaryA, salaryB, interest],
+      cells: [cellValue(salaryA.id, M, 300000), cellValue(salaryB.id, M, 100000), cellValue(interest.id, M, 50000)],
+    })
+    const c = computeContributions(t, computeEngine({ tables: t, months: [M] }), M)
+    expect(c.adults.map((x) => x.share)).toEqual([0.75, 0.25])
+  })
+})
