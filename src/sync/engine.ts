@@ -131,9 +131,15 @@ export class SyncEngine {
     this.deviceId = meta.deviceId
     this.sync = meta.sync
     if (!this.sync) return void (await this.refreshView())
-    const user = await this.remote.currentUser().catch(() => null)
-    if (!user) {
-      // the session expired or was cleared: keep the data, forget the link
+    let user: Awaited<ReturnType<SyncRemote['currentUser']>> | undefined
+    try {
+      user = await this.remote.currentUser()
+    } catch {
+      // could not check (offline with an expired token): keep the link, the next trigger tries again
+      user = undefined
+    }
+    if (user === null) {
+      // no session stored any more: keep the data, forget the link
       await this.saveSync(null)
       return void (await this.refreshView())
     }
@@ -266,28 +272,23 @@ export class SyncEngine {
         if (version <= s.lastVersion) return void (await this.recordOk({ lastPullAt: this.now() }))
         const row = await this.remote.getSnapshot(s.householdId)
         if (!row || row.version <= s.lastVersion) return
-        if (row.deviceId === this.deviceId) {
-          // my own push that completed after this tab lost track of it
+        const local = await this.store.db.household.filter((h) => !h.deletedAt).first()
+        if (row.deviceId === this.deviceId && local) {
+          // my own push that completed after this tab lost track of it: this device already holds that state
+          // (an empty device merges even its own old snapshot; a wipe also gives the device a new id)
           await this.saveSync({ ...s, lastVersion: row.version, lastPullAt: this.now() })
           return
         }
         if (row.schemaVersion > SCHEMA_VERSION) throw new StaleSchemaError()
         const raw = await decryptSnapshot<unknown>(this.key!, snapshotAad(s.householdId, row.version), row.cipher)
         const file = parseExportFile(raw)
-        const local = await this.store.db.household.filter((h) => !h.deletedAt).first()
         const cloud = file.tables.household.find((h) => !h.deletedAt)
         if (local && cloud && local.id !== cloud.id) {
           this.pendingCloud = { file, version: row.version }
           await this.refreshView({ choice: { localName: local.name, cloudName: cloud.name } })
           return
         }
-        const before = await this.store.meta()
-        await mergeTables(this.store, file.tables, file.events)
-        if (before.localRevision === before.pushedRevision) {
-          // nothing of ours was waiting: the merged state is the cloud state, no echo push
-          const after = await this.store.meta()
-          await this.store.db.meta.update('meta', { pushedRevision: after.localRevision })
-        }
+        await mergeTables(this.store, file.tables, file.events, { synced: true })
         await this.saveSync({ ...s, lastVersion: row.version, lastPullAt: this.now(), lastError: null, failingSince: null })
         this.offline = false
         this.stale = false
@@ -468,10 +469,28 @@ export class SyncEngine {
     await this.flush()
   }
 
-  /** Locked after a password reset elsewhere: the recovery code unlocks the household key and re-wraps it for the password just typed. */
-  async unlockWithRecovery(code: string): Promise<void> {
+  /** True while locked and the password has to be typed again: the key derived at sign-in does not survive a reload. */
+  needsPasswordToUnlock(): boolean {
+    return !!this.sync && !this.key && !this.pendingWrapKey
+  }
+
+  /** The wrap key for the password typed at sign-in, or derived from `password` now (checked against the account first). */
+  private async wrapKeyForLocked(password: string | undefined): Promise<CryptoKey> {
+    if (this.pendingWrapKey) return this.pendingWrapKey
     const s = this.sync
-    if (!s || !this.pendingWrapKey) throw new Error('Sign in first.')
+    if (!s) throw new Error('Sign in first.')
+    if (!password) throw new Error('Type your password as well: the unlocked key is saved for it.')
+    const { authKey, wrapKey } = await deriveKeys(s.email, password, this.kdfIterations)
+    await this.remote.signIn(s.email, authKey)
+    this.pendingWrapKey = wrapKey
+    return wrapKey
+  }
+
+  /** Locked after a password reset elsewhere: the recovery code unlocks the household key and re-wraps it for the password just typed. */
+  async unlockWithRecovery(code: string, password?: string): Promise<void> {
+    const s = this.sync
+    if (!s) throw new Error('Sign in first.')
+    const wrapKey = await this.wrapKeyForLocked(password)
     const membership = await this.remote.getMembership()
     if (!membership?.recovery) throw new Error('This household has no recovery code on file.')
     const { recoveryKey } = await recoveryKeys(code)
@@ -481,7 +500,7 @@ export class SyncEngine {
     } catch {
       throw new Error('That recovery code does not open this household.')
     }
-    await this.remote.updateMember(s.householdId, { wrappedKey: await wrapHouseholdKey(householdKey, this.pendingWrapKey) })
+    await this.remote.updateMember(s.householdId, { wrappedKey: await wrapHouseholdKey(householdKey, wrapKey) })
     this.key = householdKey
     this.pendingWrapKey = null
     await this.saveSync({ ...s, keyB64: await exportHouseholdKey(householdKey) })
@@ -489,15 +508,19 @@ export class SyncEngine {
     await this.flush()
   }
 
-  /** Locked and no recovery code: start over with a fresh key and this device's data. Returns the new recovery code. */
-  async replaceCloudWithLocal(): Promise<string> {
+  /**
+   * Locked and no recovery code: start over with a fresh key and this device's data. Returns the new recovery code.
+   * Re-keys this member's row only; with several members per household (deferred) the others would need a hand-over.
+   */
+  async replaceCloudWithLocal(password?: string): Promise<string> {
     const s = this.sync
-    if (!s || !this.pendingWrapKey) throw new Error('Sign in first.')
+    if (!s) throw new Error('Sign in first.')
+    const wrapKey = await this.wrapKeyForLocked(password)
     const householdKey = await generateHouseholdKey()
     const recoveryCode = generateRecoveryCode()
     const { recoveryKey, verifier } = await recoveryKeys(recoveryCode)
     await this.remote.updateMember(s.householdId, {
-      wrappedKey: await wrapHouseholdKey(householdKey, this.pendingWrapKey),
+      wrappedKey: await wrapHouseholdKey(householdKey, wrapKey),
       recovery: await wrapHouseholdKey(householdKey, recoveryKey),
       recoveryVerifier: verifier,
     })
@@ -543,8 +566,19 @@ export class SyncEngine {
       throw new Error('The current password is wrong.')
     }
     const fresh = await deriveKeys(s.email, newPassword, this.kdfIterations)
+    const wrappedKey = await wrapHouseholdKey(this.key, fresh.wrapKey)
     await this.remote.updatePassword(fresh.authKey)
-    await this.remote.updateMember(s.householdId, { wrappedKey: await wrapHouseholdKey(this.key, fresh.wrapKey) })
+    // the account already takes the new password; the key must follow it, or the user hears exactly where things stand
+    let lastError: unknown
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await this.remote.updateMember(s.householdId, { wrappedKey })
+        return
+      } catch (e) {
+        lastError = e
+      }
+    }
+    throw new Error(`The password was changed, but saving the key for it failed (${describeRemoteError(lastError)}). This device keeps working; a device that asks to be unlocked takes the recovery code.`)
   }
 
   /** Make a new recovery code; the old one stops working. */

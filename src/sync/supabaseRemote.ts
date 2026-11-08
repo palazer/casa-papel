@@ -36,8 +36,10 @@ export class SupabaseRemote implements SyncRemote {
     this.client = createClient(cfg.url, cfg.anonKey, { auth: { detectSessionInUrl: false, persistSession: true, autoRefreshToken: true } })
   }
 
+  /** The stored session's user, or null when none is stored. Throws when the check itself failed (an expired token that could not be refreshed offline). */
   async currentUser(): Promise<RemoteUser | null> {
-    const { data } = await this.client.auth.getSession()
+    const { data, error } = await this.client.auth.getSession()
+    if (error) throw toRemoteError(error)
     const u = data.session?.user
     return u?.email ? { userId: u.id, email: u.email } : null
   }

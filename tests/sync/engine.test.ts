@@ -188,6 +188,17 @@ describe('sync engine', () => {
     const b = device(server)
     expect((await b.engine.signIn('sam@example.com', 'new password for sam')).kind).toBe('locked')
     expect(b.engine.getView().status).toBe('locked')
+    expect(b.engine.needsPasswordToUnlock()).toBe(false)
+    // after a reload the key derived at sign-in is gone: the password is asked again and checked before anything is re-wrapped
+    const b2 = new SyncEngine(b.store, b.remote, { debounceMs: 0, pollMs: 0, kdfIterations: FAST })
+    await b2.start()
+    expect(b2.getView().status).toBe('locked')
+    expect(b2.needsPasswordToUnlock()).toBe(true)
+    await expect(b2.unlockWithRecovery(recoveryCode)).rejects.toThrow(/password/)
+    await expect(b2.unlockWithRecovery(recoveryCode, 'not the right password')).rejects.toThrow(/Invalid login/)
+    await b2.unlockWithRecovery(recoveryCode, 'new password for sam')
+    expect(b2.getView().status).toBe('idle')
+    b2.stop()
     await expect(b.engine.unlockWithRecovery('AAAAA-AAAAA-AAAAA-AAAAA-AAAAAA')).rejects.toThrow(/does not open/)
     await b.engine.unlockWithRecovery(recoveryCode)
     expect(b.engine.getView().status).toBe('idle')
@@ -218,6 +229,11 @@ describe('sync engine', () => {
     await a.engine.signIn('sam@example.com', PW)
     await a.engine.signOut({ wipe: true })
     expect((await loadTables(a.store)).rows).toHaveLength(0)
+    // the same browser signs in again: a wiped device is a new device, so its own old snapshot comes back down
+    expect((await a.engine.signIn('sam@example.com', PW)).kind).toBe('ok')
+    expect((await loadTables(a.store)).household[0]?.name).toBe('Palace')
+    expect((await loadTables(a.store)).rows.length).toBeGreaterThan(0)
+    a.engine.stop()
 
     const b = device(server)
     await b.engine.signIn('sam@example.com', PW)
@@ -226,6 +242,33 @@ describe('sync engine', () => {
     await b.engine.syncNow()
     expect(b.engine.getView().status).toBe('stale')
     b.engine.stop()
+  })
+
+  it('an offline start keeps the sync link; a vanished session drops it and keeps the data', async () => {
+    const server = new FakeServer()
+    server.addUser('sam@example.com', (await deriveKeys('sam@example.com', PW, FAST)).authKey)
+    const a = await withHousehold(server)
+    await a.engine.signIn('sam@example.com', PW)
+    a.engine.stop()
+    // the app opens with no network and a token it cannot refresh: the session cannot be checked, nothing is forgotten
+    a.remote.offline = true
+    const again = new SyncEngine(a.store, a.remote, { debounceMs: 0, pollMs: 0, kdfIterations: FAST })
+    await again.start()
+    await again.syncNow()
+    expect(again.getView().status).toBe('offline')
+    expect((await a.store.meta()).sync).not.toBeNull()
+    a.remote.offline = false
+    await again.syncNow()
+    expect(again.getView().status).toBe('idle')
+    again.stop()
+    // the session is really gone (signed out elsewhere, storage cleared): the link goes, the data stays
+    await a.remote.signOut()
+    const later = new SyncEngine(a.store, a.remote, { debounceMs: 0, pollMs: 0, kdfIterations: FAST })
+    await later.start()
+    expect(later.getView().status).toBe('off')
+    expect((await a.store.meta()).sync).toBeNull()
+    expect((await loadTables(a.store)).rows.length).toBeGreaterThan(0)
+    later.stop()
   })
 
   it('bootstrap: a dashboard-created user signs in with the temporary password and gets the household password', async () => {

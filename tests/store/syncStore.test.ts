@@ -53,6 +53,35 @@ describe('store: last-write-wins across devices', () => {
     expect(canonical({ b: 1, a: 2 })).toBe('{"a":2,"b":1}')
   })
 
+  it('a replace raises the clock floor like a merge', async () => {
+    const a = fresh()
+    const b = fresh()
+    const future = t0 + 3_600_000
+    await b.commit([{ op: 'put', table: 'rows', record: makeRow('Far ahead', future) }])
+    await importReplace(a, await exportSnapshot(b))
+    expect((await a.meta()).clockFloor).toBeGreaterThanOrEqual(future)
+    const local = makeRow('Local')
+    await a.commit([{ op: 'put', table: 'rows', record: local }])
+    expect((await a.db.rows.get(local.id))!.updatedAt).toBeGreaterThan(future)
+  })
+
+  it('a merge marked synced counts as pushed only when nothing of ours was waiting', async () => {
+    const a = fresh()
+    const b = fresh()
+    await b.commit([{ op: 'put', table: 'rows', record: makeRow('From B') }])
+    const first = await exportSnapshot(b)
+    await mergeTables(a, first.tables, first.events, { synced: true })
+    let meta = await a.meta()
+    expect(meta.pushedRevision).toBe(meta.localRevision)
+    // a local edit is waiting: the next synced merge must not count it as pushed
+    await a.commit([{ op: 'put', table: 'rows', record: makeRow('From A') }])
+    await b.commit([{ op: 'put', table: 'rows', record: makeRow('More from B') }])
+    const second = await exportSnapshot(b)
+    await mergeTables(a, second.tables, second.events, { synced: true })
+    meta = await a.meta()
+    expect(meta.localRevision).toBeGreaterThan(meta.pushedRevision)
+  })
+
   it('localRevision counts commits, merges that change something, replaces and wipes', async () => {
     const a = fresh()
     const r0 = await rev(a)

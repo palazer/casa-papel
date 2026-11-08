@@ -115,11 +115,12 @@ export class Store {
   }
 
   private async write(mutations: Mutation[]): Promise<string> {
-    const meta = await this.meta()
     const txId = newId()
-    /** Never behind what this device has merged from elsewhere, so a local change always counts as later. */
-    const ts = Math.max(Date.now(), meta.clockFloor + 1)
     await this.db.transaction('rw', this.db.tables, async () => {
+      // read inside the transaction: a merge landing in between would otherwise lose its revision bump or ours
+      const meta = await this.meta()
+      /** Never behind what this device has merged from elsewhere, so a local change always counts as later. */
+      const ts = Math.max(Date.now(), meta.clockFloor + 1)
       for (const m of mutations) {
         const table = this.db.table(m.table)
         if (m.op === 'put') {

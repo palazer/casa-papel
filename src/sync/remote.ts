@@ -4,6 +4,7 @@ import type { KdfParams, Wrapped } from './crypto'
 export interface SyncRemote {
   // ----- account -----
   /** Resolves with the user when signed in; the session is remembered by the client library. */
+  /** Null when no session is stored; throws when it could not be checked (offline), so the caller keeps the link. */
   currentUser(): Promise<RemoteUser | null>
   signIn(email: string, authKey: string): Promise<RemoteUser>
   signOut(): Promise<void>

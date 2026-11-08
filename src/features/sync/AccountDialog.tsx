@@ -72,6 +72,8 @@ export function AccountDialog({ initial, inviteCode, hasLocalData, onClose }: Pr
   }
 
   const passwordsMatch = password.length > 0 && password === password2
+  /** Locked after a reload: the key derived at sign-in is gone, so the password is asked once more. */
+  const needsPassword = step === 'locked' && engine.needsPasswordToUnlock()
 
   const signIn = () => run('Working out your keys…', async () => {
     handleResult(await engine.signIn(email, password), 'Signed in. This device now syncs with your household.')
@@ -99,12 +101,12 @@ export function AccountDialog({ initial, inviteCode, hasLocalData, onClose }: Pr
   })
 
   const unlock = () => run('Unlocking…', async () => {
-    await engine.unlockWithRecovery(recovery)
+    await engine.unlockWithRecovery(recovery, password || undefined)
     onClose('Unlocked. The cloud copy now opens with the password you typed.')
   })
 
   const replaceCloud = () => run('Uploading this device\'s data…', async () => {
-    const fresh = await engine.replaceCloudWithLocal()
+    const fresh = await engine.replaceCloudWithLocal(password || undefined)
     showCode(fresh, { step: null, message: 'The cloud copy was replaced with this device\'s data.' }, 'The old recovery code is no longer valid.')
   })
 
@@ -152,7 +154,7 @@ export function AccountDialog({ initial, inviteCode, hasLocalData, onClose }: Pr
           {step === 'join' && <DialogDescription>Pick the email and password your household will sign in with. {PRIVACY}</DialogDescription>}
           {step === 'bootstrap' && <DialogDescription>For the very first account, created in the Supabase dashboard with a temporary password. Sign in with that once; the app replaces it with your household password. {PRIVACY}</DialogDescription>}
           {step === 'reset' && <DialogDescription>Your recovery code proves it is you and unlocks the data under a new password.</DialogDescription>}
-          {step === 'locked' && <DialogDescription>The password you typed is right for the account, but the cloud copy was locked with a different one, probably after a reset on another device.</DialogDescription>}
+          {step === 'locked' && <DialogDescription>The account's password is right, but the cloud copy was locked with a different one, probably after a reset on another device.</DialogDescription>}
           {step === 'change-password' && <DialogDescription>Devices that are already signed in keep working. New devices sign in with the new password.</DialogDescription>}
           {step === 'new-recovery' && <DialogDescription>Makes a fresh code and invalidates the old one. Do this if the old code may have been seen by someone else.</DialogDescription>}
         </DialogHeader>
@@ -174,7 +176,10 @@ export function AccountDialog({ initial, inviteCode, hasLocalData, onClose }: Pr
             <Field id="acc-current" label="Current password" type="password" value={current} onChange={setCurrent} autoFocus />
           )}
           {step === 'locked' && (
-            <Field id="acc-recovery" label="Recovery code" value={recovery} onChange={setRecovery} autoFocus help="Unlocks the cloud copy and re-locks it with the password you just typed." />
+            <Field id="acc-recovery" label="Recovery code" value={recovery} onChange={setRecovery} autoFocus help="Unlocks the cloud copy and re-locks it with the password you sign in with." />
+          )}
+          {needsPassword && (
+            <Field id="acc-password-locked" label="Password" type="password" value={password} onChange={setPassword} help="Your sign-in password, once more: what was derived from it at sign-in does not survive a reload." />
           )}
           {(step === 'signin' || step === 'bootstrap' || step === 'join' || step === 'reset' || step === 'change-password') && (
             <Field
@@ -219,7 +224,7 @@ export function AccountDialog({ initial, inviteCode, hasLocalData, onClose }: Pr
             {step === 'signin' && <Button variant="ghost" size="sm" onClick={() => { setError(null); setStep('reset') }} disabled={!!busy}>Forgot the password?</Button>}
             {step === 'signin' && <Button variant="ghost" size="sm" onClick={() => { setError(null); setStep('join') }} disabled={!!busy}>I have an invite</Button>}
             {step === 'signin' && <Button variant="ghost" size="sm" onClick={() => { setError(null); setStep('bootstrap') }} disabled={!!busy}>First time, temporary password</Button>}
-            {step === 'locked' && hasLocalData && <Button variant="outline" size="sm" className="h-auto whitespace-normal py-1.5 text-left" onClick={replaceCloud} disabled={!!busy}>Replace the cloud copy with this device's data</Button>}
+            {step === 'locked' && hasLocalData && <Button variant="outline" size="sm" className="h-auto whitespace-normal py-1.5 text-left" onClick={replaceCloud} disabled={!!busy || (needsPassword && !password)}>Replace the cloud copy with this device's data</Button>}
           </div>
           <div className="flex flex-wrap justify-end gap-2">
             {step !== 'recovery-code' && <Button variant="outline" onClick={() => onClose()} disabled={!!busy}>Cancel</Button>}
@@ -227,7 +232,7 @@ export function AccountDialog({ initial, inviteCode, hasLocalData, onClose }: Pr
             {step === 'join' && <Button onClick={join} disabled={!!busy || !code || !email || !passwordsMatch}>Create account</Button>}
             {step === 'bootstrap' && <Button onClick={bootstrap} disabled={!!busy || !email || !current || !passwordsMatch}>Set household password</Button>}
             {step === 'reset' && <Button onClick={reset} disabled={!!busy || !email || !recovery || !passwordsMatch}>Set new password</Button>}
-            {step === 'locked' && <Button onClick={unlock} disabled={!!busy || !recovery}>Unlock</Button>}
+            {step === 'locked' && <Button onClick={unlock} disabled={!!busy || !recovery || (needsPassword && !password)}>Unlock</Button>}
             {step === 'change-password' && <Button onClick={changePassword} disabled={!!busy || !current || !passwordsMatch}>Change password</Button>}
             {step === 'new-recovery' && <Button onClick={rotate} disabled={!!busy}>Make a new code</Button>}
             {step === 'recovery-code' && <Button onClick={finishCode} disabled={!codeOk}>I have stored it</Button>}
