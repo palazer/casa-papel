@@ -10,17 +10,18 @@ import { useStore } from '@/app/store'
 import type { Household, Row, Tables } from '@/model'
 import { derivedRowReason, moveRow, renameRow, restoreRow, updateRow } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
-import { RowAccountDialog, RowCurrencyDialog, RowFollowDialog, RowSourceDialog } from './RowDialogs'
+import { RowAccountDialog, RowCurrencyDialog, RowDeductionDialog, RowFollowDialog, RowScopeDialog, RowSourceDialog } from './RowDialogs'
 import { RowCategoryDialog } from './RowCategoryDialog'
 import { accountVerb } from './rowAccount'
 
-type Open = 'rename' | 'category' | 'currency' | 'source' | 'account' | 'follow' | 'remove' | null
+type Open = 'rename' | 'category' | 'scope' | 'currency' | 'source' | 'deduction' | 'account' | 'follow' | 'remove' | null
 
 export function RowMenu({ row, tables, household, onError }: { row: Row; tables: Tables; household: Household; onError: (msg: string) => void }) {
   const store = useStore()
   const [open, setOpen] = useState<Open>(null)
   const [name, setName] = useState(row.name)
   const followed = row.followsRowId ? tables.rows.find((r) => r.id === row.followsRowId) : undefined
+  const deductedFrom = row.deductedFromRowId ? tables.rows.find((r) => r.id === row.deductedFromRowId) : undefined
   /** Rows the app works out itself have no amount of their own to follow with. */
   const canFollow = !derivedRowReason(row, household.closingRule)
 
@@ -38,6 +39,7 @@ export function RowMenu({ row, tables, household, onError }: { row: Row; tables:
           <DropdownMenuItem onClick={act(() => moveRow(store, row.id, 'up'))}>Move up</DropdownMenuItem>
           <DropdownMenuItem onClick={act(() => moveRow(store, row.id, 'down'))}>Move down</DropdownMenuItem>
           <DropdownMenuItem onClick={() => setOpen('category')}>Category…</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setOpen('scope')}>Belongs to…</DropdownMenuItem>
           {canFollow && !followed && <DropdownMenuItem onClick={() => setOpen('currency')}>Currency…</DropdownMenuItem>}
           <DropdownMenuSeparator />
           {!followed && (
@@ -46,6 +48,7 @@ export function RowMenu({ row, tables, household, onError }: { row: Row; tables:
             </DropdownMenuItem>
           )}
           {row.section === 'expense' && <DropdownMenuItem onClick={() => setOpen('source')}>Comes out of…</DropdownMenuItem>}
+          {row.section === 'expense' && <DropdownMenuItem onClick={() => setOpen('deduction')}>{deductedFrom ? `Deducted from ${deductedFrom.name}…` : 'Deducted from an income…'}</DropdownMenuItem>}
           {row.kind !== 'pool-allocation' && <DropdownMenuItem onClick={() => setOpen('account')}>{accountVerb(row)}…</DropdownMenuItem>}
           {canFollow && <DropdownMenuItem onClick={() => setOpen('follow')}>{followed ? `Follows ${followed.name}…` : 'Follow another row…'}</DropdownMenuItem>}
           <DropdownMenuSeparator />
@@ -68,7 +71,9 @@ export function RowMenu({ row, tables, household, onError }: { row: Row; tables:
         </DialogContent>
       </Dialog>
       {open === 'category' && <RowCategoryDialog row={row} tables={tables} onClose={close} />}
+      {open === 'scope' && <RowScopeDialog row={row} tables={tables} household={household} onClose={close} />}
       {open === 'currency' && <RowCurrencyDialog row={row} tables={tables} household={household} onClose={close} />}
+      {open === 'deduction' && <RowDeductionDialog row={row} tables={tables} household={household} onClose={close} />}
       {open === 'source' && <RowSourceDialog row={row} tables={tables} household={household} onClose={close} />}
       {open === 'account' && <RowAccountDialog row={row} tables={tables} household={household} onClose={close} />}
       {open === 'follow' && <RowFollowDialog row={row} tables={tables} household={household} onClose={close} />}

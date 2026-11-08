@@ -27,6 +27,10 @@ export interface CellResult {
   value: Money
   /** Same amount in the household base currency. */
   valueBase: Money
+  /** Income rows: base-currency sum of the expense rows deducted from this one (tax, a pension contribution); 0 elsewhere. */
+  deductionsBase: Money
+  /** valueBase − deductionsBase: what the shares and the per-person views count as income. */
+  netBase: Money
   currency: string
   source: CellSource
   status: CellStatus

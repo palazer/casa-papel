@@ -278,6 +278,8 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
   const followed = row.followsRowId ? tables.rows.find((r) => r.id === row.followsRowId) : undefined
   /** The code after the name: this row's own currency, or the followed row's (a follower takes its target's). */
   const tagCcy = row.currency ?? followed?.currency ?? null
+  const deductedFrom = row.deductedFromRowId ? tables.rows.find((r) => r.id === row.deductedFromRowId) : undefined
+  const shareTag = row.followShare != null && row.followShare !== 1 ? `${formatPercent(row.followShare, locale)} of ` : ''
   const automatic = derivedRowReason(row, household.closingRule) !== null
   return (
     <tr className={cn('group', band)}>
@@ -286,13 +288,15 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
           <div className="min-w-0 flex-1">
             <div className="truncate text-xs font-medium">
               {row.name}{tagCcy && tagCcy !== ccy ? <span className="ml-1 text-[10px] font-normal text-muted-foreground">{tagCcy}</span> : null}
-              {followed ? <span className="ml-1 text-[10px] font-normal text-muted-foreground" title={`Same amount as ${followed.name}`}>= {followed.name}</span> : null}
+              {followed ? <span className="ml-1 text-[10px] font-normal text-muted-foreground" title={`${shareTag ? `${shareTag}the amount of` : 'Same amount as'} ${followed.name}`}>= {shareTag}{followed.name}</span> : null}
+              {deductedFrom ? <span className="ml-1 text-[10px] font-normal text-muted-foreground" title={`Deducted from ${deductedFrom.name}`}>out of {deductedFrom.name}</span> : null}
             </div>
             <div className="truncate text-[10px] leading-3 text-muted-foreground tabular-nums">
               Σ {formatAmount(totals?.total ?? 0, ccy, locale, { compact: true })}{row.section !== 'income' && totals?.shareOfIncome ? ` · ${formatPercent(totals.shareOfIncome, locale)} of income` : ''}
             </div>
           </div>
-          {followed && <InfoTip help="row.follows" text={`Same amount as "${followed.name}" every month. Edit that row; this one has no amount of its own.`} />}
+          {followed && <InfoTip help="row.follows" text={`${shareTag ? `${shareTag}the amount of` : 'Same amount as'} "${followed.name}" every month. Edit that row; this one has no amount of its own.`} />}
+          {deductedFrom && <InfoTip help="row.deductedFrom" />}
           {automatic && <InfoTip help={row.kind === 'to-savings' ? 'row.toSavingsPlug' : 'row.pocketShare'} />}
           <RowMenu row={row} tables={tables} household={household} onError={onError} />
         </div>
@@ -307,7 +311,9 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
         const d = amountDisplay(cell.value, flow, cell.currency, locale, neg)
         // a second, muted line: the household-currency value of an amount typed in another currency
         const about = !isEmpty && cell.currency !== ccy ? formatAmount(cell.valueBase, ccy, locale, { compact: true }) : null
-        const sub = about ? { text: `≈ ${about}`, label: `about ${about}` } : null
+        // an income with deductions shows what is left instead
+        const net = row.section === 'income' && cell.deductionsBase > 0 ? formatAmount(cell.netBase, ccy, locale, { compact: true }) : null
+        const sub = net ? { text: `net ${net}`, label: `net ${net}` } : about ? { text: `≈ ${about}`, label: `about ${about}` } : null
         // One mark only: a green dot for done in any month; the current month also shows red (nothing yet) and amber (partly).
         const dot = !isEmpty && (!isDerived || cell.value !== 0) && ((m === today && !closed) || cell.status === 'done') ? doneness(cell) : null
         return (

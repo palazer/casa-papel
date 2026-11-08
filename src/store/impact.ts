@@ -158,6 +158,7 @@ function describeRow(ctx: Ctx, row: Row): Described {
   const months = amountMonths(ctx, row.id)
   const schedules = ctx.schedules.filter((s) => s.rowId === row.id)
   const followers = ctx.rows.filter((r) => r.followsRowId === row.id)
+  const deductions = ctx.rows.filter((r) => r.deductedFromRowId === row.id)
   const pool = ctx.pools.find((p) => p.allocationRowId === row.id)
   const savingsAcc = row.kind === 'to-savings' && ctx.household.closingRule === 'savings-plug' && row.accountId ? ctx.accounts.find((a) => a.id === row.accountId) : undefined
   const scheduleWords = `Its ${pick(schedules.length, 'schedule', `${schedules.length} schedules`)} ${quoteNames(schedules.map((s) => s.name))}`
@@ -166,6 +167,7 @@ function describeRow(ctx: Ctx, row: Row): Described {
   if (schedules.length) loses.push(scheduleWords)
   const changes: string[] = []
   if (followers.length) changes.push(`${quoteNames(followers.map((f) => f.name))} ${pick(followers.length, 'stops following it and keeps its', 'stop following it and keep their')} own amounts`)
+  if (deductions.length) changes.push(`${quoteNames(deductions.map((d) => d.name))} ${pick(deductions.length, 'is', 'are')} no longer deducted from it and ${pick(deductions.length, 'counts', 'count')} as ordinary spending`)
   if (pool) changes.push(`The pool account "${pool.name}" is no longer filled each month`)
   if (savingsAcc) changes.push(`"${savingsAcc.name}" no longer receives the month's leftover`)
   return {
@@ -176,6 +178,7 @@ function describeRow(ctx: Ctx, row: Row): Described {
       const out = [later.length ? `Hidden from ${at} on; its amounts in ${plural(later.length, 'later month')} no longer count` : `Hidden from ${at} on`]
       if (schedules.length) out.push(`${scheduleWords} ${pick(schedules.length, 'stops', 'stop')} after ${monthLabel(addMonths(from, -1), locale)}`)
       if (followers.length) out.push(`${quoteNames(followers.map((f) => f.name))} ${pick(followers.length, 'stops following it and keeps', 'stop following it and keep')} the last amount as ${pick(followers.length, 'its', 'their')} own from ${at}`)
+      if (deductions.length) out.push(`${quoteNames(deductions.map((d) => d.name))} ${pick(deductions.length, 'is', 'are')} no longer deducted from it and ${pick(deductions.length, 'counts', 'count')} as ordinary spending from ${at}`)
       if (pool) out.push(`The pool account "${pool.name}" is no longer filled from ${at}`)
       if (savingsAcc) out.push(`"${savingsAcc.name}" no longer receives the month's leftover from ${at}`)
       return out
@@ -384,8 +387,14 @@ function rowRemoval(ctx: Ctx, row: Row, ts: number): Mutation[] {
   for (const c of ctx.tables.cells) if (c.rowId === row.id) muts.push({ op: 'delete', table: 'cells', key: [c.rowId, c.month] })
   for (const s of ctx.schedules) if (s.rowId === row.id) muts.push(put('recurringItems', RecurringItemSchema, s, { deletedAt: ts }, ts))
   for (const f of ctx.rows) if (f.followsRowId === row.id) muts.push(put('rows', RowSchema, f, { followsRowId: null }, ts))
+  muts.push(...unlinkDeductions(ctx, row, ts))
   for (const p of ctx.pools) if (p.allocationRowId === row.id) muts.push(put('pools', PoolSchema, p, { allocationRowId: null }, ts))
   return muts
+}
+
+/** Rows deducted from this income row become ordinary spending again. */
+function unlinkDeductions(ctx: Ctx, row: Row, ts: number): Mutation[] {
+  return ctx.rows.filter((d) => d.deductedFromRowId === row.id).map((d) => put('rows', RowSchema, d, { deductedFromRowId: null }, ts))
 }
 
 /** Followers keep what they mirrored before `from` as their own values, then stop following. */
@@ -416,7 +425,7 @@ function pinFollowers(ctx: Ctx, row: Row, from: MonthKey, ts: number): Mutation[
 }
 
 function rowArchive(ctx: Ctx, row: Row, from: MonthKey, ts: number): Mutation[] {
-  const muts: Mutation[] = [put('rows', RowSchema, row, { archivedMonth: from }, ts), ...pinFollowers(ctx, row, from, ts)]
+  const muts: Mutation[] = [put('rows', RowSchema, row, { archivedMonth: from }, ts), ...pinFollowers(ctx, row, from, ts), ...unlinkDeductions(ctx, row, ts)]
   const schedules = ctx.schedules.filter((s) => s.rowId === row.id)
   for (const s of schedules) {
     if (compareMonths(s.startMonth, from) >= 0) muts.push(put('recurringItems', RecurringItemSchema, s, { deletedAt: ts }, ts))

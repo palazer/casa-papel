@@ -438,8 +438,8 @@ export function derivedRowReason(row: Row, closingRule: Household['closingRule']
   return null
 }
 
-/** Make a row mirror another row's amount month by month, or stop with `null`. The row's own cells are kept. */
-export async function followRow(store: Store, rowId: string, targetId: string | null): Promise<void> {
+/** Make a row mirror another row's amount month by month (or a share of it, 0.25 for a quarter), or stop with `null`. The row's own cells are kept. */
+export async function followRow(store: Store, rowId: string, targetId: string | null, share: number | null = null): Promise<void> {
   const tables = await loadTables(store)
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
   if (!row) throw new Error('Row not found')
@@ -456,8 +456,52 @@ export async function followRow(store: Store, rowId: string, targetId: string | 
     if (target.followsRowId) throw new Error(`"${target.name}" follows another row itself. Follow that row instead.`)
     if (target.archivedMonth) throw new Error(`"${target.name}" is archived.`)
     if (tables.rows.some((r) => !r.deletedAt && r.followsRowId === rowId)) throw new Error(`Another row already follows "${row.name}". Chains are not supported.`)
+    if (share != null && !(share > 0)) throw new Error('A share must be above zero, like 0.25 for a quarter.')
   }
-  await store.commit([{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, followsRowId: targetId, updatedAt: now() }) }])
+  await store.commit([{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, followsRowId: targetId, followShare: targetId ? share : null, updatedAt: now() }) }])
+}
+
+/** The scope and tags a row gets when it belongs to `scope`: the person or thing it is scoped to is also among its tags, as templates do it. */
+function scopePatch(row: Row, scope: string): Pick<Row, 'scope' | 'entityTags'> {
+  const entityTags = row.entityTags.filter((t) => t !== row.scope)
+  if (scope !== 'shared' && !entityTags.includes(scope)) entityTags.push(scope)
+  return { scope, entityTags }
+}
+
+/**
+ * Who a row belongs to: 'shared' or a person or thing. Income rows can also join or leave the share basis. An income row
+ * takes the rows deducted from it along, since a tax on one person's salary is that person's.
+ */
+export async function setRowScope(store: Store, rowId: string, scope: string, inShareBasis?: boolean): Promise<void> {
+  const tables = await loadTables(store)
+  const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
+  if (!row) throw new Error('Row not found')
+  if (scope !== 'shared' && !tables.entities.some((e) => e.id === scope && !e.deletedAt)) throw new Error('That person or thing no longer exists.')
+  if (inShareBasis != null && row.section !== 'income') throw new Error('Only income rows can count for the split.')
+  const ts = now()
+  const mutations: Mutation[] = [{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, ...scopePatch(row, scope), inShareBasis: inShareBasis ?? row.inShareBasis, updatedAt: ts }) }]
+  if (row.section === 'income') {
+    for (const d of tables.rows) if (!d.deletedAt && d.deductedFromRowId === row.id) mutations.push({ op: 'put', table: 'rows', record: RowSchema.parse({ ...d, ...scopePatch(d, scope), updatedAt: ts }) })
+  }
+  await store.commit(mutations)
+}
+
+/** Take a spending row out of an income row (tax, a pension contribution): the income's net is what the shares count. `null` undoes it. */
+export async function setRowDeductedFrom(store: Store, rowId: string, incomeRowId: string | null): Promise<void> {
+  const tables = await loadTables(store)
+  const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
+  if (!row) throw new Error('Row not found')
+  if (row.section !== 'expense') throw new Error('Only spending rows can be deducted from an income.')
+  let patch: Partial<Row> = { deductedFromRowId: null }
+  if (incomeRowId) {
+    const target = tables.rows.find((r) => r.id === incomeRowId && !r.deletedAt)
+    if (!target || target.section !== 'income') throw new Error('Pick an income row to deduct from.')
+    const why = derivedRowReason(target, tables.household.find((h) => !h.deletedAt)?.closingRule ?? 'savings-plug')
+    if (why) throw new Error(`${why} Nothing can be deducted from it.`)
+    if (target.archivedMonth) throw new Error(`"${target.name}" is archived.`)
+    patch = { deductedFromRowId: target.id, ...(target.scope !== 'shared' ? scopePatch(row, target.scope) : {}) }
+  }
+  await store.commit([{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, ...patch, updatedAt: now() }) }])
 }
 
 const ACCOUNT_TYPE_FOR_KIND: Partial<Record<RowKind, Account['type']>> = {

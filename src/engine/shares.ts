@@ -86,14 +86,21 @@ function amountToPay(row: Row, c: CellResult): Money {
   return c.valueBase
 }
 
+/** Rows taken out of an income row that is live this month: already inside that row's net, so never a line or own spend. */
+function deductionTest(rows: Row[]): (r: Row) => boolean {
+  const incomeIds = new Set(rows.filter((r) => r.section === 'income').map((r) => r.id))
+  return (r) => r.section === 'expense' && r.deductedFromRowId != null && incomeIds.has(r.deductedFromRowId)
+}
+
 export function computeContributions(tables: Tables, out: EngineOutput, month: MonthKey): MonthContributions {
   const household = tables.household.find((h) => !h.deletedAt)
   const adults = liveAdults(tables, month)
   const adultIds = new Set(adults.map((a) => a.id))
   const cellOf = (row: Row) => out.cells[cellKey(row.id, month)]
   const rows = out.rows.filter((r) => !(r.archivedMonth && r.archivedMonth <= month))
+  const isDeduction = deductionTest(rows)
 
-  // ---- basis and shares
+  // ---- basis and shares (net of deductions; a net below zero counts as nothing)
   const basis: Record<string, Money> = Object.fromEntries(adults.map((a) => [a.id, 0]))
   const basisMode = household?.shareBasis ?? 'basis-rows'
   const anyBasisRow = rows.some((r) => r.section === 'income' && r.inShareBasis)
@@ -102,7 +109,7 @@ export function computeContributions(tables: Tables, out: EngineOutput, month: M
     if (basisMode === 'basis-rows' && anyBasisRow && !r.inShareBasis) continue
     if (basisMode === 'manual') continue
     const { adultId } = ownerOf(r, tables, adultIds)
-    if (adultId) basis[adultId] += cellOf(r)?.valueBase ?? 0
+    if (adultId) basis[adultId] += Math.max(0, cellOf(r)?.netBase ?? 0)
   }
   let shares: Record<string, number> = {}
   if (basisMode === 'manual') {
@@ -119,7 +126,7 @@ export function computeContributions(tables: Tables, out: EngineOutput, month: M
   const income: Record<string, Money> = Object.fromEntries(adults.map((a) => [a.id, 0]))
   for (const r of rows) {
     if (r.section !== 'income') continue
-    const v = cellOf(r)?.valueBase ?? 0
+    const v = cellOf(r)?.netBase ?? 0
     if (v === 0) continue
     const { adultId } = ownerOf(r, tables, adultIds)
     if (adultId) income[adultId] += v
@@ -130,7 +137,7 @@ export function computeContributions(tables: Tables, out: EngineOutput, month: M
   const lines: ShareLine[] = []
   for (const r of rows) {
     const c = cellOf(r)
-    if (!c || c.source === 'archived') continue
+    if (!c || c.source === 'archived' || isDeduction(r)) continue
     const total = amountToPay(r, c)
     if (total === 0) continue
     const { adultId, routing } = ownerOf(r, tables, adultIds)
@@ -157,6 +164,7 @@ export function computePersonBudgets(tables: Tables, out: EngineOutput, month: M
   const adults = liveAdults(tables, month)
   const adultIds = new Set(adults.map((a) => a.id))
   const rows = out.rows.filter((r) => !(r.archivedMonth && r.archivedMonth <= month))
+  const isDeduction = deductionTest(rows)
   return adults.map((a) => {
     let income = 0
     let ownSpend = 0
@@ -166,9 +174,9 @@ export function computePersonBudgets(tables: Tables, out: EngineOutput, month: M
       if (!c || c.source === 'archived') continue
       const { adultId } = ownerOf(r, tables, adultIds)
       if (adultId !== a.id) continue
-      if (r.section === 'income') income += c.valueBase
+      if (r.section === 'income') income += c.netBase
       else if (r.kind === 'pocket-money') pocket += c.valueBase
-      else if (r.section === 'expense') ownSpend += c.valueBase
+      else if (r.section === 'expense' && !isDeduction(r)) ownSpend += c.valueBase
     }
     return { entityId: a.id, name: a.name, income, ownSpend, pocket, contribution: income - ownSpend - pocket }
   })

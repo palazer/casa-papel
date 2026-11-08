@@ -48,13 +48,14 @@ export function MonthLine({ row, cell, locale, ccy, neg, closed, automatic, foll
     : followedName ? `= ${followedName}` : automatic ? 'automatic' : null
   // an amount in another currency carries its household-currency value in the subline
   const about = !empty && currency !== ccy ? formatAmount(cell.valueBase, ccy, locale, { compact: true }) : null
-  const subline = [subtitle, about ? `≈ ${about}` : null].filter(Boolean).join(' · ') || null
+  const net = row.section === 'income' && cell.deductionsBase > 0 ? formatAmount(cell.netBase, ccy, locale, { compact: true }) : null
+  const subline = [subtitle, net ? `net ${net}` : about ? `≈ ${about}` : null].filter(Boolean).join(' · ') || null
   const amount = (
     <span className={cn('shrink-0 tabular-nums', toneClass[d.tone], empty ? 'text-muted-foreground/40' : derived ? statusClass.derived : statusClass[cell.status])}>
       {empty ? '·' : d.text}
     </span>
   )
-  const label = `${row.name}: ${empty ? 'empty' : d.text}${about ? `, about ${about}` : ''}${tickable ? `, ${doneLabel(dn)}` : ''}`
+  const label = `${row.name}: ${empty ? 'empty' : d.text}${net ? `, net ${net}` : about ? `, about ${about}` : ''}${tickable ? `, ${doneLabel(dn)}` : ''}`
 
   return (
     <li>

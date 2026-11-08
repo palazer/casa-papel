@@ -46,6 +46,10 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
   const locale = household.locale
   /** Rows driven by a schedule: no carry-forward, no single amount; the posted items are the content. */
   const isRecurringRow = engine.recurringRowIds.includes(row.id)
+  /** Expense rows taken out of this income, with this month's amount in the base currency. */
+  const deductions = row.section === 'income'
+    ? tables.rows.filter((r) => !r.deletedAt && !r.archivedMonth && r.deductedFromRowId === row.id).map((r) => ({ id: r.id, name: r.name, valueBase: engine.cells[cellKey(r.id, month)]?.valueBase ?? 0 }))
+    : []
 
   // "How sure" on a single amount is stored as one unlabelled item; keep showing it as a single amount
   const soloItem = cell?.source === 'items' && cell.items.length === 1 && cell.items[0].kind === 'normal' && !cell.items[0].label && !cell.items[0].recurringItemId && !cell.items[0].skipped ? cell.items[0] : null
@@ -329,6 +333,15 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
                 {!isRecurringRow && (
                   <Segmented value={scope} onChange={(v) => setScope(v as EditScope)} options={[{ value: 'from-now-on', label: 'This month and onwards' }, { value: 'this-month', label: 'Only this month' }]} />
                 )}
+              </div>
+            )}
+            {deductions.length > 0 && cell && (
+              <div className="space-y-1 rounded-md border px-2 py-1.5 text-xs" data-testid="deductions">
+                <p className="flex items-center gap-1 font-medium">Deducted from this income <InfoTip help="cell.deductions" /></p>
+                <ul className="divide-y divide-border/60">
+                  {deductions.map((d) => <li key={d.id} className="flex justify-between gap-2 py-0.5"><span className="truncate">{d.name}</span><span className="tabular-nums">−{formatAmount(d.valueBase, household.baseCurrency, locale)}</span></li>)}
+                </ul>
+                <p className="flex justify-between border-t pt-1 font-medium"><span>Net</span><span className="tabular-nums">{formatAmount(cell.netBase, household.baseCurrency, locale)}</span></p>
               </div>
             )}
             {error && <p className="text-sm text-destructive" role="alert">{error}</p>}

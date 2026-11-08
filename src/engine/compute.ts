@@ -151,7 +151,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
         baseStatus = 'done'
       } else if (follows) {
         const target = cells[cellKey(follows, m)]
-        value = target?.value ?? 0
+        value = scaleMoney(target?.value ?? 0, row.followShare ?? 1)
         if (target) currency = target.currency
         source = 'derived'
         baseStatus = 'derived'
@@ -208,13 +208,32 @@ export function computeEngine(input: EngineInput): EngineOutput {
       }
 
       cells[cellKey(row.id, m)] = {
-        rowId: row.id, month: m, value, valueBase: conv.value, currency, source, status, items,
+        rowId: row.id, month: m, value, valueBase: conv.value, deductionsBase: 0, netBase: conv.value, currency, source, status, items,
         funding: fundingBase, missingRate: conv.missingRate, rateProjected: conv.projected, cell,
       }
       if (!derivedToSavings && !archived) {
         prev = value
         if (baseStatus !== 'derived') prevBase = baseStatus
       }
+    }
+  }
+
+  // ---------- deductions: expense rows taken out of an income row lower its net ----------
+  // After pass 1 as a whole, so a deduction that follows its income row (a 25 % tax) already has its amount.
+  // Totals stay gross: the deduction row is still an expense in its own section.
+  for (const row of rows) {
+    if (row.section !== 'expense' || !row.deductedFromRowId) continue
+    const target = rowsById.get(row.deductedFromRowId)
+    if (!target || target.section !== 'income') {
+      warnings.push(`"${row.name}" is deducted from a row that no longer exists.`)
+      continue
+    }
+    for (const m of months) {
+      const c = cells[cellKey(row.id, m)]
+      const t = cells[cellKey(target.id, m)]
+      if (!c || !t || c.source === 'archived' || t.source === 'archived') continue
+      t.deductionsBase += c.valueBase
+      t.netBase = t.valueBase - t.deductionsBase
     }
   }
 
@@ -300,6 +319,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
         const v = i === 0 ? t.toSavings : 0
         c.value = v
         c.valueBase = v
+        c.netBase = v
       })
       if (toSavingsRows.length > 1 && m === months[0]) warnings.push('More than one "to savings" row: the plug goes to the first one.')
     }

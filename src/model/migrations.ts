@@ -15,8 +15,8 @@ const STEPS: Record<number, Step> = {
   },
   // 2 → 3: `Cell.markedDone` (an automatic row ticked as moved) and `Pool.archivedMonth`; both fill in from their defaults
   2: (raw) => raw,
-  // 3 → 4: `Household.planUntil` ("Add <year>"), `FxRate.date`, and the 'first' month-rate default for new households
-  // (a stored 'last' is a choice and stays); everything fills in from its default
+  // 3 → 4: `Household.planUntil` ("Add <year>"), `FxRate.date`, `Row.followShare`, `Row.deductedFromRowId`, and the
+  // 'first' month-rate default for new households (a stored 'last' is a choice and stays); everything fills in from its default
   3: (raw) => raw,
 }
 

@@ -49,3 +49,19 @@ describe('rows that follow another row', () => {
     expect(out.warnings).toEqual(['"Orphan" follows a row that no longer exists.'])
   })
 })
+
+describe('rows that follow a share of another row', () => {
+  it('take that share of the followed amount, rounded to the cent, in the followed row\'s currency', () => {
+    const benefit = row({ name: 'Child benefit', section: 'income', currency: 'USD' })
+    const quarter = row({ name: 'Quarter', section: 'transfer', followsRowId: benefit.id, followShare: 0.25, order: 'a1' })
+    const t = tables({
+      household: [household()],
+      rows: [benefit, quarter],
+      cells: [cellValue(benefit.id, '2026-01', 25500), cellValue(benefit.id, '2026-02', 25501)],
+      fxRates: [{ pair: 'USD/EUR', month: '2026-01', rate: 0.5, source: 'manual', updatedAt: 0 }],
+    })
+    const out = computeEngine({ tables: t, months: ['2026-01', '2026-02'] })
+    expect(out.cells[cellKey(quarter.id, '2026-01')]).toMatchObject({ value: 6375, currency: 'USD', source: 'derived' })
+    expect(out.cells[cellKey(quarter.id, '2026-02')].value).toBe(6375)
+  })
+})

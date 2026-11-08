@@ -1,18 +1,20 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Check } from '@/components/Check'
 import { Segmented } from '@/components/Segmented'
 import { formatMonth } from '@/app/format'
 import { useStore } from '@/app/store'
 import { sortRows } from '@/engine'
-import { monthOfDate, type FundedBy, type Household, type Row, type Section, type Tables } from '@/model'
-import { accountTypeForRow, derivedRowReason, followRow, setRowAccount, setRowFundedBy, updateRow } from '@/store'
+import { ENTITY_KIND_LABEL, monthOfDate, type FundedBy, type Household, type Row, type Section, type Tables } from '@/model'
+import { accountTypeForRow, derivedRowReason, followRow, setRowAccount, setRowDeductedFrom, setRowFundedBy, setRowScope, updateRow } from '@/store'
 import { NativeSelect } from './NativeSelect'
 import { fundingOptions } from './funding'
 import { CURRENCIES } from '@/app/currencies'
 import { HELP } from '@/app/help'
-import { TipLabel } from '@/components/InfoTip'
+import { InfoTip, TipLabel } from '@/components/InfoTip'
 import { accountHelp, accountVerb } from './rowAccount'
 
 interface Base {
@@ -142,6 +144,7 @@ export function RowFollowDialog({ row, tables, household, onClose }: Base) {
   const rule = household.closingRule
   const candidates = sortRows(tables.rows.filter((r) => !r.deletedAt && r.id !== row.id && !r.archivedMonth && !r.followsRowId && !derivedRowReason(r, rule)), tables.categories)
   const [targetId, setTargetId] = useState(row.followsRowId ?? '')
+  const [share, setShare] = useState(String(Math.round((row.followShare ?? 1) * 1000) / 10))
   const { error, busy, save } = useSave(onClose)
 
   return (
@@ -166,16 +169,30 @@ export function RowFollowDialog({ row, tables, household, onClose }: Base) {
               })}
             </NativeSelect>
             <p className="text-xs text-muted-foreground">
-              Month by month this row shows the same amount as the row you pick, and its cells cannot be edited while it follows.
-              Handy for a transfer that moves exactly what came in, like a child's long-term savings following the child benefit.
+              Month by month this row shows the same amount as the row you pick, or a share of it, and its cells cannot be edited while it follows.
+              Handy for a transfer that moves exactly what came in, like a child's long-term savings following the child benefit, or a tax that takes a quarter of a salary.
               Choose "Nothing" to go back to its own amounts; they were kept.
             </p>
           </div>
+          {targetId && (
+            <div className="space-y-1.5">
+              <TipLabel htmlFor="row-follow-share" help="row.followShare">Share (%)</TipLabel>
+              <Input id="row-follow-share" className="w-28" inputMode="decimal" value={share} onChange={(e) => setShare(e.target.value)} />
+              <p className="text-xs text-muted-foreground">100 mirrors the row exactly; 25 puts a quarter of it here.</p>
+            </div>
+          )}
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button onClick={() => void save(() => followRow(store, row.id, targetId || null))} disabled={busy}>Save</Button>
+          <Button
+            onClick={() => void save(async () => {
+              const pct = Number(share.replace(',', '.'))
+              if (targetId && !(pct > 0)) throw new Error('The share must be a number above 0.')
+              await followRow(store, row.id, targetId || null, targetId ? pct / 100 : null)
+            })}
+            disabled={busy}
+          >Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -210,6 +227,85 @@ export function RowCurrencyDialog({ row, household, onClose }: Base) {
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
           <Button onClick={() => void save(() => updateRow(store, row.id, { currency: ccy === base ? null : ccy }))} disabled={busy}>Save</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** Take this spending row out of an income row: the income shows what is left, and the shares count the net. */
+export function RowDeductionDialog({ row, tables, household, onClose }: Base) {
+  const store = useStore()
+  const rule = household.closingRule
+  const incomes = sortRows(tables.rows.filter((r) => !r.deletedAt && r.section === 'income' && !r.archivedMonth && !derivedRowReason(r, rule)), tables.categories)
+  const [targetId, setTargetId] = useState(row.deductedFromRowId ?? '')
+  const { error, busy, save } = useSave(onClose)
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Deducted from an income</DialogTitle>
+          <DialogDescription>Row "{row.name}"</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <TipLabel htmlFor="row-deducted-from" help="row.deductedFrom">This expense is taken off</TipLabel>
+            <NativeSelect id="row-deducted-from" className="w-full" value={targetId} onChange={(e) => setTargetId(e.target.value)}>
+              <option value="">Nothing: a normal expense</option>
+              {incomes.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </NativeSelect>
+            <p className="text-xs text-muted-foreground">{HELP['row.deductedFrom'].text} The row then belongs to whoever that income belongs to.</p>
+          </div>
+          {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button onClick={() => void save(() => setRowDeductedFrom(store, row.id, targetId || null))} disabled={busy}>Save</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** Who a row is for: the household, an adult, or a child, pet or thing (routed to whoever pays for them). */
+export function RowScopeDialog({ row, tables, onClose }: Base) {
+  const store = useStore()
+  const live = tables.entities.filter((e) => !e.deletedAt && (!e.archivedMonth || e.id === row.scope)).sort((a, b) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0))
+  const adults = live.filter((e) => e.kind === 'adult')
+  const others = live.filter((e) => e.kind !== 'adult')
+  const [scope, setScope] = useState(row.scope)
+  const [inShareBasis, setInShareBasis] = useState(row.inShareBasis)
+  const { error, busy, save } = useSave(onClose)
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Belongs to</DialogTitle>
+          <DialogDescription>Row "{row.name}"</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <TipLabel htmlFor="row-belongs-to" help="row.belongsTo">This row is for</TipLabel>
+            <NativeSelect id="row-belongs-to" className="w-full" value={scope} onChange={(e) => setScope(e.target.value)}>
+              <option value="shared">The household (shared)</option>
+              {adults.length > 0 && <optgroup label="Adults">{adults.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</optgroup>}
+              {others.length > 0 && <optgroup label="Other people & things">{others.map((e) => <option key={e.id} value={e.id}>{e.name} · {ENTITY_KIND_LABEL[e.kind].toLowerCase()}</option>)}</optgroup>}
+            </NativeSelect>
+            <p className="text-xs text-muted-foreground">{HELP['row.belongsTo'].text}</p>
+          </div>
+          {row.section === 'income' && (
+            <div className="flex items-center gap-1">
+              <Check label="Counts for the split" checked={inShareBasis} disabled={scope === 'shared'} onChange={(e) => setInShareBasis(e.target.checked)} />
+              <InfoTip help="row.inShareBasis" />
+            </div>
+          )}
+          {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button onClick={() => void save(() => setRowScope(store, row.id, scope, row.section === 'income' ? inShareBasis : undefined))} disabled={busy}>Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

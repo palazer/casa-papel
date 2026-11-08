@@ -122,3 +122,71 @@ test('a foreign-currency account shows its household-currency value beneath', as
   await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Month' }).click()
   await expect(page.getByText(/≈ €8,000\.00/)).toBeVisible()
 })
+
+test('an expense deducted from an income: the tag, the net line and the editor block', async ({ page }) => {
+  await loadDemo(page)
+  await page.getByRole('button', { name: 'Row menu for Health' }).click()
+  await page.getByRole('menuitem', { name: 'Deducted from an income…' }).click()
+  const dlg = page.getByRole('dialog')
+  await dlg.getByLabel('This expense is taken off', { exact: true }).selectOption({ label: 'Sam – Salary' })
+  await dlg.getByRole('button', { name: 'Save' }).click()
+  await expect(dlg).toBeHidden()
+  await expect(page.getByRole('row', { name: /^Health/ })).toContainText('out of Sam – Salary')
+
+  // Health is €30 a month in the demo: the salary shows what is left, and the editor lists the deduction
+  const salary = page.getByRole('button', { name: /^Sam – Salary Nov 2026: €4,200\.00, net €4/ })
+  await expect(salary).toBeVisible()
+  await salary.click()
+  const block = page.getByTestId('deductions')
+  await expect(block).toContainText('Health')
+  await expect(block).toContainText('−€30.00')
+  await expect(block).toContainText('€4,170.00')
+  await page.screenshot({ path: 'e2e/output/deduction.png' })
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toBeHidden()
+
+  // the menu now names the income; the Month view carries the net line
+  await page.getByRole('button', { name: 'Row menu for Health' }).click()
+  await expect(page.getByRole('menuitem', { name: 'Deducted from Sam – Salary…' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Month' }).click()
+  await expect(page.getByText(/net €4/).first()).toBeVisible()
+})
+
+test('a row can follow a share of another row', async ({ page }) => {
+  await loadDemo(page)
+  await page.getByRole('button', { name: 'Row menu for To investments' }).click()
+  await page.getByRole('menuitem', { name: 'Follow another row…' }).click()
+  const dlg = page.getByRole('dialog')
+  await dlg.getByLabel('Same amount as').selectOption({ label: 'Child benefit' })
+  await dlg.getByLabel('Share (%)', { exact: true }).fill('50')
+  await dlg.getByRole('button', { name: 'Save' }).click()
+  await expect(dlg).toBeHidden()
+  const row = page.getByRole('row', { name: /^To investments/ })
+  await expect(row).toContainText('= 50% of Child benefit')
+  // the child benefit is €255 in the demo
+  await expect(row).toContainText('€127.50')
+})
+
+test('"Belongs to" gives a row to one adult, and Who pays what routes it to them', async ({ page }) => {
+  await loadDemo(page)
+  // an income row also offers the split check
+  await page.getByRole('button', { name: 'Row menu for Other income' }).click()
+  await page.getByRole('menuitem', { name: 'Belongs to…' }).click()
+  await expect(page.getByRole('dialog').getByRole('checkbox', { name: 'Counts for the split' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toBeHidden()
+
+  await page.getByRole('button', { name: 'Row menu for Groceries' }).click()
+  await page.getByRole('menuitem', { name: 'Belongs to…' }).click()
+  const dlg = page.getByRole('dialog')
+  await expect(dlg.getByRole('checkbox', { name: 'Counts for the split' })).toHaveCount(0)
+  await dlg.getByLabel('This row is for', { exact: true }).selectOption({ label: 'Sam' })
+  await dlg.getByRole('button', { name: 'Save' }).click()
+  await expect(dlg).toBeHidden()
+
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Household' }).click()
+  await page.getByLabel('How you share money', { exact: true }).selectOption('proportional')
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Moves' }).click()
+  await expect(page.getByRole('row', { name: /^Groceries/ })).toContainText('own')
+})

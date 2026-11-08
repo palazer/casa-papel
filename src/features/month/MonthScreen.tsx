@@ -8,7 +8,7 @@ import { MarksLegend } from '@/components/MarksLegend'
 import { MonthPicker } from '@/components/MonthPicker'
 import { PageHeader } from '@/components/PageHeader'
 import { cn } from '@/lib/utils'
-import { formatAmount } from '@/app/format'
+import { formatAmount, formatPercent } from '@/app/format'
 import { balanceHelp, type HelpKey } from '@/app/help'
 import { HUES, SECTION_HUE, type Hue } from '@/app/hues'
 import { readPref, writePref } from '@/app/prefs'
@@ -147,7 +147,7 @@ export function MonthScreen() {
                       <MonthLine
                         key={row.id} row={row} cell={cell} locale={locale} ccy={ccy} neg={neg} closed={closed}
                         automatic={derivedRowReason(row, household.closingRule) !== null}
-                        followedName={row.followsRowId ? engine.rows.find((x) => x.id === row.followsRowId)?.name : undefined}
+                        followedName={row.followsRowId ? `${row.followShare != null && row.followShare !== 1 ? `${formatPercent(row.followShare, locale)} of ` : ''}${engine.rows.find((x) => x.id === row.followsRowId)?.name ?? ''}` : undefined}
                         expanded={expanded.has(row.id)} onExpand={(open) => toggleExpanded(row.id, open)}
                         onOpen={(itemId) => setSheet({ rowId: row.id, itemId })}
                         onTick={(itemId, done) => tick(row, cell, itemId, done)}

@@ -83,3 +83,65 @@ describe('pooled per-person budgets', () => {
     expect(p.find((x) => x.entityId === b.id)).toMatchObject({ income: 1250_00, ownSpend: 300_00, pocket: 0, contribution: 950_00 })
   })
 })
+
+describe('deductions and shares', () => {
+  /** Two salaries, a tax that takes a quarter of the first and is deducted from it, one shared cost. */
+  function taxed(moneyMode: 'proportional' | 'pooled') {
+    const a = ent('adult', 'A', null, 'a0')
+    const b = ent('adult', 'B', null, 'a1')
+    const salaryA = row({ name: 'A salary', section: 'income', kind: 'salary', scope: a.id, inShareBasis: true })
+    const salaryB = row({ name: 'B salary', section: 'income', kind: 'salary', scope: b.id, inShareBasis: true, order: 'a1' })
+    const tax = row({ name: 'Tax', section: 'expense', scope: a.id, followsRowId: salaryA.id, followShare: 0.25, deductedFromRowId: salaryA.id, order: 'b0' })
+    const groceries = row({ name: 'Groceries', section: 'expense', order: 'b1' })
+    const t = tables({
+      household: [household({ moneyMode, closingRule: 'leftover-plug' })],
+      entities: [a, b],
+      rows: [salaryA, salaryB, tax, groceries],
+      cells: [cellValue(salaryA.id, M, 400000), cellValue(salaryB.id, M, 200000), cellValue(groceries.id, M, 90000)],
+    })
+    const out = computeEngine({ tables: t, months: [M] })
+    return { t, out, a, b, salaryA, tax, groceries }
+  }
+
+  it('proportional: the shares and the income column use net income, and the tax is not a line of its own', () => {
+    const { t, out, a, b, tax, groceries } = taxed('proportional')
+    const c = computeContributions(t, out, M)
+    const A = c.adults.find((x) => x.entityId === a.id)!
+    const B = c.adults.find((x) => x.entityId === b.id)!
+    expect(A.share).toBeCloseTo(0.6, 9)
+    expect(B.share).toBeCloseTo(0.4, 9)
+    expect(A.income).toBe(300000)
+    expect(B.income).toBe(200000)
+    expect(c.lines.find((l) => l.rowId === tax.id)).toBeUndefined()
+    expect(c.lines.find((l) => l.rowId === groceries.id)!.byAdult).toEqual({ [a.id]: 54000, [b.id]: 36000 })
+    expect(A.remainder).toBe(246000)
+    expect(B.remainder).toBe(164000)
+  })
+
+  it('pooled: the per-person table shows net income and does not count the tax as own spending', () => {
+    const { t, out, a } = taxed('pooled')
+    expect(computePersonBudgets(t, out, M).find((x) => x.entityId === a.id)).toMatchObject({ income: 300000, ownSpend: 0, contribution: 300000 })
+  })
+
+  it('a net below zero counts as nothing; a deduction from an archived income is ordinary spending again', () => {
+    const a = ent('adult', 'A', null, 'a0')
+    const b = ent('adult', 'B', null, 'a1')
+    const salaryA = row({ name: 'A salary', section: 'income', kind: 'salary', scope: a.id, inShareBasis: true })
+    const salaryB = row({ name: 'B salary', section: 'income', kind: 'salary', scope: b.id, inShareBasis: true, order: 'a1' })
+    const tax = row({ name: 'Tax', section: 'expense', scope: a.id, deductedFromRowId: salaryA.id, order: 'b0' })
+    const base = (over: Partial<typeof salaryA> = {}) => tables({
+      household: [household({ moneyMode: 'proportional', closingRule: 'leftover-plug' })],
+      entities: [a, b],
+      rows: [{ ...salaryA, ...over }, salaryB, tax],
+      cells: [cellValue(salaryA.id, M, 100000), cellValue(salaryB.id, M, 200000), cellValue(tax.id, M, 150000)],
+    })
+    const t = base()
+    const c = computeContributions(t, computeEngine({ tables: t, months: [M] }), M)
+    expect(c.adults.map((x) => x.share)).toEqual([0, 1])
+    expect(c.lines.find((l) => l.rowId === tax.id)).toBeUndefined()
+
+    const archived = base({ archivedMonth: M })
+    const d = computeContributions(archived, computeEngine({ tables: archived, months: [M] }), M)
+    expect(d.lines.find((l) => l.rowId === tax.id)).toMatchObject({ routing: 'own', total: 150000 })
+  })
+})

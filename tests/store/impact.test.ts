@@ -46,6 +46,21 @@ describe('describeRemoval', () => {
     expect(plug.changes).toEqual(['"Savings" no longer receives the month\'s leftover'])
   })
 
+  it('an income row names the rows deducted from it; removing or archiving it makes them ordinary spending', () => {
+    const t = buildDemoTables()
+    const other = idOf(t, 'rows', 'Other income')
+    const health = idOf(t, 'rows', 'Health')
+    t.rows.find((r) => r.id === health)!.deductedFromRowId = other
+    const d = describeRemoval(t, { kind: 'row', id: other }, OPTS)
+    expect(d.changes).toEqual(['"Health" is no longer deducted from it and counts as ordinary spending'])
+    expect(d.archiveChanges).toContain('"Health" is no longer deducted from it and counts as ordinary spending from Nov 2026')
+    const unlinked = (muts: ReturnType<typeof planRemoval>) => muts
+      .map((m) => m as unknown as { table: string; record?: { id?: string; deductedFromRowId?: string | null } })
+      .find((m) => m.table === 'rows' && m.record?.id === health)?.record?.deductedFromRowId
+    expect(unlinked(planRemoval(t, { kind: 'row', id: other }, T0, OPTS))).toBeNull()
+    expect(unlinked(planArchive(t, { kind: 'row', id: other }, '2026-11', T0, OPTS))).toBeNull()
+  })
+
   it('accounts: typed rows and pool accounts block, plain rows and schedules are consequences, a tracked balance in a closed month is history', () => {
     const t = buildDemoTables()
     const savings = describeRemoval(t, { kind: 'account', id: idOf(t, 'accounts', 'Savings') }, OPTS)

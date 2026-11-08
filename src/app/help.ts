@@ -25,7 +25,11 @@ export const HELP = {
   // Rows
   'row.toSavingsPlug': { title: 'To savings', text: 'Worked out for you: income minus spending from income minus pocket money and the cash buffer. Whatever is left moves to savings, so you never type it.' },
   'row.pocketShare': { title: 'Pocket money', text: 'Each adult\'s share of the pocket money set under Household, paid out of the pooled income. Change the amount there, not here.' },
-  'row.follows': { title: 'Follows another row', text: 'This row copies another row\'s amount every month, like a child\'s savings following the child benefit. Edit the row it follows; this one has no amount of its own.' },
+  'row.follows': { title: 'Follows another row', text: 'This row copies another row\'s amount every month, or a share of it, like a child\'s savings following the child benefit or a tax taking a quarter of a salary. Edit the row it follows; this one has no amount of its own.' },
+  'row.followShare': { title: 'Share of the followed row', text: 'The row shows this percentage of the row it follows, month by month. 100 mirrors it exactly; 25 puts a quarter of it here, like a tax that takes a fixed slice of a salary.' },
+  'row.deductedFrom': { title: 'Deducted from an income', text: 'A tax or contribution taken off an income before it reaches you. It stays an expense in its own row, the income shows what is left as a net line, and when costs are split in proportion each adult\'s share uses the net amount.' },
+  'row.belongsTo': { title: 'Belongs to', text: 'Who the row is for. An adult\'s own row is theirs alone; a row for a child, pet or thing goes to whoever pays for them; a shared row is split between the adults. Moves uses this to work out who sends what where.' },
+  'row.inShareBasis': { title: 'Counts for the split', text: 'Ticked, this income sets its adult\'s share of the shared costs when shares come from salaries. Leave it off for child benefit or one-off income that should not move the split.' },
   'row.category': { title: 'Category', text: 'A named group inside the section, like Housing or Transport. Rows sort by category in the grid and share a faint band, so related lines sit together. Categories are managed under Household.' },
   'row.automatic': { title: 'Automatic', text: 'The app works this amount out from the rest of the month, so there is nothing to type. Tick it once the money has actually moved; the amount keeps following the plan.' },
   'row.currency': { title: 'Currency of this row', text: 'Amounts in this row are typed in this currency and shown in the household currency beneath, converted at each month\'s rate. Numbers already typed keep their digits and are read in the new currency; the rates live under Household.' },
@@ -50,6 +54,7 @@ export const HELP = {
   'cell.howSure': { title: 'How sure', text: 'An estimate is a guess (italic, dashed underline). Certain means you know the amount. Done means the money has moved; done cells get a green dot and count towards the month\'s progress.' },
   'cell.appliesTo': { title: 'Applies to', text: '"This month and onwards" changes this month and every later month that still follows this row. "Only this month" changes one month; the next month keeps the old amount. Done in a December, it pins January, so the grid shows the next year.' },
   'cell.comesOutOf': { title: 'Comes out of', text: 'The budget side of an expense: this month\'s income (the normal case), the savings balance, or a pool account. Savings and pool accounts do not reduce this month\'s leftover.' },
+  'cell.deductions': { title: 'Deducted from this income', text: 'Rows marked as deducted from this income, taken off this month\'s amount. The net is what actually arrives; the deductions stay as expenses in their own rows.' },
   'cell.rate': { title: 'This month\'s rate', text: 'How this amount becomes the household currency. An ECB rate is the European Central Bank\'s for the day the Month rate setting under Household picks, the first business day by default. A manual rate is yours and applies to every row in that currency that month. Projected and carried rates are estimates.' },
 
   // Household settings

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { cellKey, computeEngine } from '@/engine'
 import { monthRange, newId, poolRef } from '@/model'
 import {
-  CasaDb, Store, addAccount, addPool, addRow, closeMonth, derivedRowReason, followRow, loadTables, quickCreateHousehold, setCellValue, setRowAccount, setRowFundedBy,
+  CasaDb, Store, addAccount, addEntity, addPool, addRow, closeMonth, derivedRowReason, followRow, loadTables, quickCreateHousehold, setCellValue, setRowAccount, setRowDeductedFrom, setRowFundedBy, setRowScope,
 } from '@/store'
 
 const months = monthRange('2026-01', '2026-04')
@@ -108,5 +108,52 @@ describe('setRowAccount', () => {
     const t = await loadTables(store)
     expect(t.rows.find((r) => r.id === longTerm.id)?.accountId).toBe(fund.id)
     expect(t.rows.find((r) => r.id === rent.id)?.accountId).toBeNull()
+  })
+})
+
+describe('followRow with a share', () => {
+  it('keeps the share with the follow and refuses a share of nothing', async () => {
+    const { store, salary } = await fresh()
+    const tax = await addRow(store, { name: 'Tax', section: 'expense' })
+    await setCellValue(store, salary.id, '2026-01', 400000, 'from-now-on')
+    await expect(followRow(store, tax.id, salary.id, 0)).rejects.toThrow(/above zero/)
+    await followRow(store, tax.id, salary.id, 0.25)
+    expect((await engine(store)).cells[cellKey(tax.id, '2026-02')]).toMatchObject({ value: 100000, source: 'derived' })
+    await followRow(store, tax.id, null, 0.25)
+    expect((await loadTables(store)).rows.find((r) => r.id === tax.id)).toMatchObject({ followsRowId: null, followShare: null })
+  })
+})
+
+describe('setRowDeductedFrom and setRowScope', () => {
+  it('ties a spending row to an income row, gives it the same owner, and lets go again', async () => {
+    const { store, salary, rent } = await fresh()
+    const pat = await addEntity(store, { kind: 'adult', name: 'Pat' })
+    await setRowScope(store, salary.id, pat.id, true)
+    await setRowDeductedFrom(store, rent.id, salary.id)
+    let t = await loadTables(store)
+    expect(t.rows.find((r) => r.id === salary.id)).toMatchObject({ scope: pat.id, inShareBasis: true })
+    expect(t.rows.find((r) => r.id === rent.id)).toMatchObject({ deductedFromRowId: salary.id, scope: pat.id })
+    expect(t.rows.find((r) => r.id === rent.id)!.entityTags).toContain(pat.id)
+
+    // the income row's new owner takes its deductions along
+    await setRowScope(store, salary.id, 'shared')
+    t = await loadTables(store)
+    expect(t.rows.find((r) => r.id === rent.id)?.scope).toBe('shared')
+    expect(t.rows.find((r) => r.id === rent.id)!.entityTags).not.toContain(pat.id)
+
+    await setRowDeductedFrom(store, rent.id, null)
+    expect((await loadTables(store)).rows.find((r) => r.id === rent.id)?.deductedFromRowId).toBeNull()
+    await store.undo()
+    expect((await loadTables(store)).rows.find((r) => r.id === rent.id)?.deductedFromRowId).toBe(salary.id)
+  })
+
+  it('refuses the wrong kinds of row and people who are gone', async () => {
+    const { store, salary, rent, toSavings } = await fresh()
+    await expect(setRowDeductedFrom(store, salary.id, rent.id)).rejects.toThrow(/Only spending rows/)
+    await expect(setRowDeductedFrom(store, rent.id, rent.id)).rejects.toThrow(/Pick an income row/)
+    await expect(setRowDeductedFrom(store, rent.id, newId())).rejects.toThrow(/Pick an income row/)
+    await expect(setRowScope(store, rent.id, newId())).rejects.toThrow(/no longer exists/)
+    await expect(setRowScope(store, rent.id, 'shared', true)).rejects.toThrow(/Only income rows/)
+    await expect(setRowScope(store, toSavings.id, 'shared', false)).rejects.toThrow(/Only income rows/)
   })
 })

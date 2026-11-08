@@ -148,6 +148,10 @@ export const RowSchema = BaseRecord.extend({
   pocketShare: FractionSchema.nullable().default(null),
   /** Mirror another row's amount every month; this row's own cells are ignored while set. */
   followsRowId: IdSchema.nullable().default(null),
+  /** With followsRowId: this row shows the followed amount × share (0.25 = a quarter). null = the whole amount. */
+  followShare: FractionSchema.nullable().default(null),
+  /** Expense rows only: the income row this is taken out of (tax, a pension contribution). The income's net is what the shares count. */
+  deductedFromRowId: IdSchema.nullable().default(null),
   archivedMonth: MonthKeySchema.nullable().default(null),
   order: z.string().default('a0'),
 })
