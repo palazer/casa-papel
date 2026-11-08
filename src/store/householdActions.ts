@@ -1,4 +1,5 @@
 import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing'
+import { buildDefaultCategoryMutations } from './categoryActions'
 import {
   AccountMonthSchema, AccountSchema, CellSchema, EntitySchema, HouseholdSchema, PoolSchema, RowSchema,
   ENTITY_TEMPLATES, HOUSEHOLD_TEMPLATES, monthOfDate, newId, poolRef, templateTitle,
@@ -93,6 +94,7 @@ export function buildTemplateMutations(t: RowTemplate, ctx: TemplateContext, ord
     inShareBasis: t.inShareBasis ?? false,
     accountId: destination?.id ?? null,
     defaultFundedBy,
+    categoryId: t.category ? ctx.tables.categories?.find((c) => !c.deletedAt && c.section === t.section && c.name === t.category)?.id ?? null : null,
     pocketMode: t.pocket ? 'share-of-pocket-total' : null,
     pocketShare: t.pocket ? 1 / Math.max(1, ctx.adultCount) : null,
     order,
@@ -157,7 +159,10 @@ export function buildSetupMutations(input: SetupInput): { mutations: Mutation[];
   )
   for (const a of accounts) mutations.push({ op: 'put', table: 'accounts', record: a })
 
-  const tables = { household: [household], entities, accounts } as unknown as Tables
+  // the usual expense categories come with every new household, so the suggested rows land in their groups
+  const { mutations: categoryMutations, categories } = buildDefaultCategoryMutations([], ts)
+  mutations.push(...categoryMutations)
+  const tables = { household: [household], entities, accounts, categories } as unknown as Tables
   const ctxBase = { tables, household, adultCount: adults.length }
   const plan: Array<{ t: RowTemplate; entity?: Entity }> = []
   entities.forEach((e, i) => {

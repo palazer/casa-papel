@@ -17,6 +17,8 @@ describe('demo household', () => {
     for (const r of t.recurringItems) expect(rowIds.has(r.rowId)).toBe(true)
     const accountIds = new Set(t.accounts.map((a) => a.id))
     for (const p of t.pools) expect(accountIds.has(p.accountId)).toBe(true)
+    // a row's category belongs to the row's own section
+    for (const r of t.rows) if (r.categoryId) expect(t.categories.find((c) => c.id === r.categoryId)?.section).toBe(r.section)
   })
   it('loads into a store', async () => {
     const s = new Store(new CasaDb(`test-${newId()}`))

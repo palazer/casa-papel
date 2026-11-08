@@ -12,7 +12,7 @@ import { HUES, SECTION_HUE, type Hue } from '@/app/hues'
 import { readPref, writePref } from '@/app/prefs'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
-import { cellKey, type EngineOutput } from '@/engine'
+import { cellKey, groupRowsByCategory, type EngineOutput } from '@/engine'
 import { monthOfDate, type Household, type Money, type MonthKey, type Row, type Section, type Tables } from '@/model'
 import { closeMonth, derivedRowReason, reopenMonth } from '@/store'
 import { AddRowInline } from './AddRowInline'
@@ -170,6 +170,9 @@ export function GridScreen() {
             {SECTIONS.map(({ key, title }) => {
               const rows = rowsBySection(key)
               const isCollapsed = collapsed.has(key)
+              const sectionCategories = tables.categories.filter((c) => !c.deletedAt && c.section === key)
+              const groups = groupRowsByCategory(rows, tables.categories)
+              const bandOf = (band: boolean) => (band ? SECTION_HUE[key].band : undefined)
               return [
                 <tr key={`${key}-head`} className="bg-card">
                   <th scope="row" className="sticky left-0 z-10 border-t bg-card px-2 py-1.5 text-left">
@@ -181,10 +184,18 @@ export function GridScreen() {
                   </th>
                   <td colSpan={months.length} className="border-t" />
                 </tr>,
-                ...(isCollapsed ? [] : rows.map((row) => <GridRow key={row.id} row={row} rIndex={editableIndex++} months={months} engine={engine} tables={tables} household={household} ccy={ccy} locale={locale} neg={neg} onSelect={(m) => setSelected({ rowId: row.id, month: m })} onError={setError} />)),
+                ...(isCollapsed ? [] : groups.flatMap((g) => [
+                  sectionCategories.length > 0 && (
+                    <tr key={`${key}-label-${g.category?.id ?? 'none'}`} className={bandOf(g.band)}>
+                      <td className={cn('sticky left-0 z-10 px-2 pb-0 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground', bandOf(g.band) ?? 'bg-card')}>{g.category?.name ?? 'No category'}</td>
+                      <td colSpan={months.length} />
+                    </tr>
+                  ),
+                  ...g.rows.map((row) => <GridRow key={row.id} row={row} band={bandOf(g.band)} rIndex={editableIndex++} months={months} engine={engine} tables={tables} household={household} ccy={ccy} locale={locale} neg={neg} onSelect={(m) => setSelected({ rowId: row.id, month: m })} onError={setError} />),
+                ])),
                 !isCollapsed && (
                   <tr key={`${key}-add`}>
-                    <td className="sticky left-0 z-10 bg-card px-1 py-0.5"><AddRowInline section={key} onError={setError} /></td>
+                    <td className="sticky left-0 z-10 bg-card px-1 py-0.5"><AddRowInline section={key} categories={sectionCategories} onError={setError} /></td>
                     <td colSpan={months.length} />
                   </tr>
                 ),
@@ -239,6 +250,8 @@ export function GridScreen() {
 
 interface GridRowProps {
   row: Row
+  /** The category group's faint fill (a hue's `band` class), on every other named group. */
+  band?: string
   rIndex: number
   months: MonthKey[]
   engine: EngineOutput
@@ -251,15 +264,15 @@ interface GridRowProps {
   onError: (msg: string) => void
 }
 
-function GridRow({ row, rIndex, months, engine, tables, household, ccy, locale, neg, onSelect, onError }: GridRowProps) {
+function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, locale, neg, onSelect, onError }: GridRowProps) {
   const totals = engine.rowTotals[row.id]
   const flow = flowOf(row)
   const rowCcy = row.currency ?? ccy
   const followed = row.followsRowId ? tables.rows.find((r) => r.id === row.followsRowId) : undefined
   const automatic = derivedRowReason(row, household.closingRule) !== null
   return (
-    <tr className="group">
-      <th scope="row" className="sticky left-0 z-10 bg-card px-2 py-0.5 text-left font-normal">
+    <tr className={cn('group', band)}>
+      <th scope="row" className={cn('sticky left-0 z-10 px-2 py-0.5 text-left font-normal', band ?? 'bg-card')}>
         <div className="flex items-center gap-1">
           <div className="min-w-0 flex-1">
             <div className="truncate text-xs font-medium">

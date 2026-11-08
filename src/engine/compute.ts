@@ -1,6 +1,6 @@
 import {
   compareMonths, fromMinor, monthRange, poolIdOf, scaleMoney, toMinor,
-  type Account, type Cell, type Money, type MonthKey, type Row, type Section,
+  type Account, type Category, type Cell, type Money, type MonthKey, type Row, type Section,
 } from '@/model'
 import { buildFxIndex, convertMoney } from './fx'
 import {
@@ -11,12 +11,53 @@ import {
 
 const SECTION_ORDER: Record<Section, number> = { income: 0, expense: 1, transfer: 2 }
 
-export function sortRows(rows: Row[]): Row[] {
+/** Sorts after every category of the section. */
+const NO_CATEGORY = '￿'
+
+/** A row's live category in its own section, or null: a category of another section or a removed one counts as none. */
+function categoryOf(row: Row, cats: Map<string, Category>): Category | null {
+  const c = row.categoryId ? cats.get(row.categoryId) : undefined
+  return c && c.section === row.section ? c : null
+}
+
+const liveCategories = (categories: Category[]) => new Map(categories.filter((c) => !c.deletedAt).map((c) => [c.id, c]))
+
+/** Display order: section, then the category's order (rows without one last), then the row's own order. */
+export function sortRows(rows: Row[], categories: Category[] = []): Row[] {
+  const cats = liveCategories(categories)
+  const key = (r: Row) => categoryOf(r, cats)?.order ?? NO_CATEGORY
   return [...rows].sort((a, b) => {
     const s = SECTION_ORDER[a.section] - SECTION_ORDER[b.section]
     if (s !== 0) return s
+    const ka = key(a)
+    const kb = key(b)
+    if (ka !== kb) return ka < kb ? -1 : 1
     return a.order < b.order ? -1 : a.order > b.order ? 1 : 0
   })
+}
+
+export interface RowGroup {
+  category: Category | null
+  rows: Row[]
+  /** Every other named group carries the section's faint band; rows without a category never do. */
+  band: boolean
+}
+
+/** One section's rows (already sorted) cut into category groups, in order; rows without a category come last. */
+export function groupRowsByCategory(rows: Row[], categories: Category[]): RowGroup[] {
+  const cats = liveCategories(categories)
+  const groups: RowGroup[] = []
+  let named = 0
+  for (const r of rows) {
+    const cat = categoryOf(r, cats)
+    const last = groups[groups.length - 1]
+    if (last && (last.category?.id ?? null) === (cat?.id ?? null)) {
+      last.rows.push(r)
+      continue
+    }
+    groups.push({ category: cat, rows: [r], band: cat ? named++ % 2 === 0 : false })
+  }
+  return groups
 }
 
 const zeroFunding = (): Funding => ({ cash: 0, savings: 0, pools: {} })
@@ -60,7 +101,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
   const accountsById = new Map(accounts.map((a) => [a.id, a]))
   const pools = tables.pools.filter((p) => !p.deletedAt)
   const poolByAllocationRow = new Map(pools.filter((p) => p.allocationRowId).map((p) => [p.allocationRowId as string, p]))
-  const rows = sortRows(tables.rows.filter((r) => !r.deletedAt))
+  const rows = sortRows(tables.rows.filter((r) => !r.deletedAt), tables.categories)
   const rowsById = new Map(rows.map((r) => [r.id, r]))
   /** Rows that follow another row mirror its cells, so they are computed after everything else. */
   const pass1Order = [...rows.filter((r) => !r.followsRowId), ...rows.filter((r) => r.followsRowId)]

@@ -31,7 +31,7 @@ interface Props {
 export function RecurringDialog({ tables, household, item, defaultMonth, prefill, onClose, onSaved }: Props) {
   const store = useStore()
   const { locale, baseCurrency } = household
-  const rows = sortRows(tables.rows.filter((r) => !r.deletedAt && !r.archivedMonth && r.kind !== 'to-savings' && r.pocketMode == null))
+  const rows = sortRows(tables.rows.filter((r) => !r.deletedAt && !r.archivedMonth && r.kind !== 'to-savings' && r.pocketMode == null), tables.categories)
   const adults = tables.entities.filter((e) => e.kind === 'adult' && !e.deletedAt)
   const pools = tables.pools.filter((p) => !p.deletedAt)
   const [name, setName] = useState(item?.name ?? prefill?.name ?? '')

@@ -26,7 +26,8 @@ const SECTIONS: Array<{ key: Section; title: string }> = [
   { key: 'transfer', title: 'Transfers' },
 ]
 
-function useSave(onClose: () => void) {
+/** Busy and error state for a dialog that saves once and closes. */
+export function useSave(onClose: () => void) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const save = async (fn: () => Promise<void>) => {
@@ -136,7 +137,7 @@ export function RowAccountDialog({ row, tables, onClose }: Base) {
 export function RowFollowDialog({ row, tables, household, onClose }: Base) {
   const store = useStore()
   const rule = household.closingRule
-  const candidates = sortRows(tables.rows.filter((r) => !r.deletedAt && r.id !== row.id && !r.archivedMonth && !r.followsRowId && !derivedRowReason(r, rule)))
+  const candidates = sortRows(tables.rows.filter((r) => !r.deletedAt && r.id !== row.id && !r.archivedMonth && !r.followsRowId && !derivedRowReason(r, rule)), tables.categories)
   const [targetId, setTargetId] = useState(row.followsRowId ?? '')
   const { error, busy, save } = useSave(onClose)
 

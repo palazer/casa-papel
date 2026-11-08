@@ -3,19 +3,22 @@ import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useStore } from '@/app/store'
-import type { Section } from '@/model'
+import type { Category, Section } from '@/model'
 import { addRow } from '@/store'
+import { NativeSelect } from './NativeSelect'
 
-export function AddRowInline({ section, onError }: { section: Section; onError: (msg: string) => void }) {
+/** "Add row" at the foot of a section: a name, and a category when the section has any. */
+export function AddRowInline({ section, categories, onError }: { section: Section; categories: Category[]; onError: (msg: string) => void }) {
   const store = useStore()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
+  const [categoryId, setCategoryId] = useState('')
 
   async function save() {
     const n = name.trim()
     if (!n) return
     try {
-      await addRow(store, { name: n, section })
+      await addRow(store, { name: n, section, categoryId: categoryId || null })
       setName('')
       setOpen(false)
     } catch (e) {
@@ -37,6 +40,12 @@ export function AddRowInline({ section, onError }: { section: Section; onError: 
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') void save(); if (e.key === 'Escape') setOpen(false) }}
       />
+      {categories.length > 0 && (
+        <NativeSelect aria-label={`Category for the new ${section} row`} className="h-7" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+          <option value="">No category</option>
+          {[...categories].sort((a, b) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0)).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </NativeSelect>
+      )}
       <Button size="sm" onClick={() => void save()}>Add</Button>
       <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
     </div>

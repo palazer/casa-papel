@@ -6,6 +6,7 @@ import { SharesCard } from './SharesCard'
 import { HUES } from '@/app/hues'
 import { InfoTip, TipLabel } from '@/components/InfoTip'
 import { PoolsCard } from './PoolsCard'
+import { CategoriesCard } from './CategoriesCard'
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
@@ -51,6 +52,7 @@ export function HouseholdScreen() {
       <EntitiesCard household={household} entities={tables.entities.filter((e) => !e.deletedAt)} onError={setError} />
       <AccountsCard household={household} accounts={tables.accounts.filter((a) => !a.deletedAt)} entities={tables.entities} engine={engine} months={months} onError={setError} />
       <PoolsCard household={household} tables={tables} engine={engine} onError={setError} />
+      <CategoriesCard tables={tables} onError={setError} />
       <FxCard household={household} tables={tables} months={months} onError={setError} />
       <Island air tone={HUES.transfer} title="Schedules" description="Recurring payments and incomes: rent, salary, insurance, subscriptions, anything on a schedule. They land in the grid by themselves and show up in Moves when due.">
         <RecurringList />

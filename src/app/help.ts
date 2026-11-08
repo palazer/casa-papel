@@ -26,6 +26,7 @@ export const HELP = {
   'row.toSavingsPlug': { title: 'To savings', text: 'Worked out for you: income minus spending from income minus pocket money and the cash buffer. Whatever is left moves to savings, so you never type it.' },
   'row.pocketShare': { title: 'Pocket money', text: 'Each adult\'s share of the pocket money set under Household, paid out of the pooled income. Change the amount there, not here.' },
   'row.follows': { title: 'Follows another row', text: 'This row copies another row\'s amount every month, like a child\'s savings following the child benefit. Edit the row it follows; this one has no amount of its own.' },
+  'row.category': { title: 'Category', text: 'A named group inside the section, like Housing or Transport. Rows sort by category in the grid and share a faint band, so related lines sit together. Categories are managed under Household.' },
   'row.automatic': { title: 'Automatic', text: 'The app works this amount out from the rest of the month, so there is nothing to type. Tick it once the money has actually moved; the amount keeps following the plan.' },
   'month.progress': { title: 'Progress', text: 'Every line with an amount counts once; an itemized line counts each item. Still to pay adds up the open spending and transfers, to come in the open income, both in your base currency.' },
 
@@ -56,6 +57,8 @@ export const HELP = {
   'household.pocket': { title: 'Pocket money', text: 'The amount all adults together take for themselves every month, out of the pooled income. The grid shows one pocket money row per adult with their share.' },
   'household.buffer': { title: 'Cash kept in the account', text: 'With the savings-plug rule, this much stays in the current account at month end instead of going to savings.' },
   'household.tracked': { title: 'Tracked balance', text: 'A tracked account gets a running balance in the grid, month by month, and counts towards net worth. Untick it for an account you only name, like one that just receives a transfer.' },
+  'household.categories': { title: 'Categories', text: 'Named groups inside a section. Rows sort by category in the grid and share a faint band; a label line names each group. Rename, reorder or remove them here; removing a category keeps its rows.' },
+  'household.usualCategories': { title: 'The usual categories', text: 'Adds six expense categories most households use: Housing, Living, Transport, Family & pets, Fun, Personal. Rows stay where they are until you assign them.' },
   'household.archived': { title: 'Archived', text: 'Out of the way but not gone: archived people and things keep their rows and history and can be restored any time.' },
 
   // Goals and schedules

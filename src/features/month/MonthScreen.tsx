@@ -14,7 +14,7 @@ import { HUES, SECTION_HUE, type Hue } from '@/app/hues'
 import { readPref, writePref } from '@/app/prefs'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
-import { cellKey, type CellResult } from '@/engine'
+import { cellKey, groupRowsByCategory, type CellResult } from '@/engine'
 import { monthOfDate, type MonthKey, type Row, type Section } from '@/model'
 import { closeMonth, derivedRowReason, reopenMonth, setCellDone, setDerivedDone, setItemStatus } from '@/store'
 import { CellEditor } from '@/features/grid/CellEditor'
@@ -126,23 +126,35 @@ export function MonthScreen() {
           return cell && cell.source !== 'archived' ? [{ row, cell }] : []
         })
         const shown = hideDone ? lines.filter(({ cell }) => cell.source === 'empty' || cell.value === 0 || doneness(cell).state !== 'all') : lines
+        const cellOf = new Map(shown.map((l) => [l.row.id, l.cell]))
+        const labelled = tables.categories.some((c) => !c.deletedAt && c.section === key)
         return (
           <Island key={key} title={title} help={`section.${key}`} tone={SECTION_HUE[key]} bodyClassName="px-0 pb-0 pt-1">
             {shown.length === 0 ? (
               <p className="px-3 py-2 text-xs text-muted-foreground">{lines.length ? 'All done' : 'Nothing here'}</p>
             ) : (
               <ul className="divide-y divide-border/60">
-                {shown.map(({ row, cell }) => (
-                  <MonthLine
-                    key={row.id} row={row} cell={cell} locale={locale} ccy={ccy} neg={neg} closed={closed}
-                    automatic={derivedRowReason(row, household.closingRule) !== null}
-                    followedName={row.followsRowId ? engine.rows.find((x) => x.id === row.followsRowId)?.name : undefined}
-                    expanded={expanded.has(row.id)} onExpand={(open) => toggleExpanded(row.id, open)}
-                    onOpen={(itemId) => setSheet({ rowId: row.id, itemId })}
-                    onTick={(itemId, done) => tick(row, cell, itemId, done)}
-                    busy={busy === row.id || (busy?.startsWith(`${row.id}:`) ?? false)}
-                  />
-                ))}
+                {groupRowsByCategory(shown.map((l) => l.row), tables.categories).flatMap((g) => [
+                  labelled && (
+                    <li key={`label-${g.category?.id ?? 'none'}`} className="px-3 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {g.category?.name ?? 'No category'}
+                    </li>
+                  ),
+                  ...g.rows.map((row) => {
+                    const cell = cellOf.get(row.id)!
+                    return (
+                      <MonthLine
+                        key={row.id} row={row} cell={cell} locale={locale} ccy={ccy} neg={neg} closed={closed}
+                        automatic={derivedRowReason(row, household.closingRule) !== null}
+                        followedName={row.followsRowId ? engine.rows.find((x) => x.id === row.followsRowId)?.name : undefined}
+                        expanded={expanded.has(row.id)} onExpand={(open) => toggleExpanded(row.id, open)}
+                        onOpen={(itemId) => setSheet({ rowId: row.id, itemId })}
+                        onTick={(itemId, done) => tick(row, cell, itemId, done)}
+                        busy={busy === row.id || (busy?.startsWith(`${row.id}:`) ?? false)}
+                      />
+                    )
+                  }),
+                ])}
               </ul>
             )}
           </Island>

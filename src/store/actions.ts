@@ -102,24 +102,36 @@ export async function setItemStatus(store: Store, rowId: string, month: MonthKey
 
 // ---------- rows ----------
 
-function neighbours(rows: Row[], section: Row['section']) {
-  return sortRows(rows.filter((r) => !r.deletedAt && r.section === section))
+/** The category a row sorts under: a live category of its own section, or none. */
+function groupKey(tables: Tables, r: Pick<Row, 'section' | 'categoryId'>): string | null {
+  const c = r.categoryId ? tables.categories.find((x) => x.id === r.categoryId && !x.deletedAt) : undefined
+  return c && c.section === r.section ? c.id : null
 }
 
+/** The rows a row is placed among: its section and its category group, in display order. */
+function groupRows(tables: Tables, r: Pick<Row, 'section' | 'categoryId'>): Row[] {
+  const key = groupKey(tables, r)
+  return sortRows(tables.rows.filter((x) => !x.deletedAt && x.section === r.section && groupKey(tables, x) === key), tables.categories)
+}
+
+/** Add a row at the end of its category group, or right after `afterRowId`, whose category it inherits unless given one. */
 export async function addRow(store: Store, input: Partial<Row> & { name: string; section: Row['section'] }, afterRowId?: string): Promise<Row> {
   const tables = await loadTables(store)
-  const list = neighbours(tables.rows, input.section)
+  const after = afterRowId ? tables.rows.find((r) => r.id === afterRowId && !r.deletedAt) : undefined
+  const categoryId = input.categoryId !== undefined ? input.categoryId : after?.categoryId ?? null
+  if (categoryId && groupKey(tables, { section: input.section, categoryId }) === null) throw new Error('That category is not in this section.')
+  const list = groupRows(tables, { section: input.section, categoryId })
   let prev: string | null = list.length ? list[list.length - 1].order : null
   let next: string | null = null
-  if (afterRowId) {
-    const i = list.findIndex((r) => r.id === afterRowId)
+  if (after) {
+    const i = list.findIndex((r) => r.id === after.id)
     if (i >= 0) {
       prev = list[i].order
       next = list[i + 1]?.order ?? null
     }
   }
   const ts = now()
-  const row = RowSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, ...input, order: generateKeyBetween(prev, next) })
+  const row = RowSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, ...input, categoryId, order: generateKeyBetween(prev, next) })
   await store.commit([{ op: 'put', table: 'rows', record: row }])
   return row
 }
@@ -139,7 +151,7 @@ export async function moveRow(store: Store, rowId: string, direction: 'up' | 'do
   const tables = await loadTables(store)
   const row = tables.rows.find((r) => r.id === rowId)
   if (!row) throw new Error('Row not found')
-  const list = neighbours(tables.rows, row.section)
+  const list = groupRows(tables, row)
   const i = list.findIndex((r) => r.id === rowId)
   const j = direction === 'up' ? i - 1 : i + 1
   if (j < 0 || j >= list.length) return

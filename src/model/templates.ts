@@ -22,20 +22,25 @@ export interface RowTemplate {
   pool?: boolean
   /** Pre-ticked in the wizard. */
   recommended?: boolean
+  /** The usual expense category the row belongs to, by name, when the household has it. */
+  category?: string
 }
+
+/** The six expense categories most households use, in grid order. */
+export const DEFAULT_CATEGORIES = ['Housing', 'Living', 'Transport', 'Family & pets', 'Fun', 'Personal'] as const
 
 export const HOUSEHOLD_TEMPLATES: RowTemplate[] = [
   { key: 'h.otherIncome', title: 'Other income', description: 'Refunds, gifts, side income that is nobody\'s salary.', section: 'income', recommended: true },
-  { key: 'h.groceries', title: 'Groceries', description: 'Food and everyday supplies.', section: 'expense', recommended: true },
-  { key: 'h.transport', title: 'Transport', description: 'Public transport, taxis, bike.', section: 'expense', recommended: true },
-  { key: 'h.subscriptions', title: 'Subscriptions', description: 'Streaming, phone, software. Counted as certain.', section: 'expense', defaultStatus: 'committed', recommended: true },
-  { key: 'h.health', title: 'Health', description: 'Doctor, pharmacy, glasses.', section: 'expense' },
-  { key: 'h.gym', title: 'Gym & sports', description: 'Memberships and sports.', section: 'expense' },
-  { key: 'h.insurance', title: 'Insurance & tax', description: 'Liability and household insurance, taxes not tied to a car or home.', section: 'expense', defaultStatus: 'committed', recommended: true },
+  { key: 'h.groceries', title: 'Groceries', description: 'Food and everyday supplies.', section: 'expense', recommended: true, category: 'Living' },
+  { key: 'h.transport', title: 'Transport', description: 'Public transport, taxis, bike.', section: 'expense', recommended: true, category: 'Transport' },
+  { key: 'h.subscriptions', title: 'Subscriptions', description: 'Streaming, phone, software. Counted as certain.', section: 'expense', defaultStatus: 'committed', recommended: true, category: 'Fun' },
+  { key: 'h.health', title: 'Health', description: 'Doctor, pharmacy, glasses.', section: 'expense', category: 'Living' },
+  { key: 'h.gym', title: 'Gym & sports', description: 'Memberships and sports.', section: 'expense', category: 'Personal' },
+  { key: 'h.insurance', title: 'Insurance & tax', description: 'Liability and household insurance, taxes not tied to a car or home.', section: 'expense', defaultStatus: 'committed', recommended: true, category: 'Living' },
   { key: 'h.other', title: 'Other', description: 'Whatever fits nowhere else. Treated as an estimate.', section: 'expense', recommended: true },
-  { key: 'h.poolTravel', title: 'Travel', description: 'Pool account: set aside a monthly amount in savings, spend it when you travel.', section: 'expense', pool: true, recommended: true },
-  { key: 'h.poolClothing', title: 'Clothing', description: 'Pool account: a monthly amount set aside for clothes.', section: 'expense', pool: true },
-  { key: 'h.poolFun', title: 'Entertainment & dining out', description: 'Pool account: a monthly amount set aside for going out.', section: 'expense', pool: true },
+  { key: 'h.poolTravel', title: 'Travel', description: 'Pool account: set aside a monthly amount in savings, spend it when you travel.', section: 'expense', pool: true, recommended: true, category: 'Fun' },
+  { key: 'h.poolClothing', title: 'Clothing', description: 'Pool account: a monthly amount set aside for clothes.', section: 'expense', pool: true, category: 'Fun' },
+  { key: 'h.poolFun', title: 'Entertainment & dining out', description: 'Pool account: a monthly amount set aside for going out.', section: 'expense', pool: true, category: 'Fun' },
   { key: 'h.toSavings', title: 'To savings', description: 'What is left at month end moves to savings. Filled in automatically unless your month-end rule says you decide it.', section: 'transfer', kind: 'to-savings', defaultStatus: 'committed', account: 'savings', recommended: true },
   { key: 'h.toInvestments', title: 'To investments', description: 'A fixed monthly deposit into an investment account.', section: 'transfer', kind: 'to-investment', defaultStatus: 'committed', account: 'investment' },
 ]
@@ -44,34 +49,34 @@ export const ENTITY_TEMPLATES: Record<EntityKind, RowTemplate[]> = {
   adult: [
     { key: 'a.salary', title: '{name} – Salary', description: 'Net salary after tax. Counted as certain.', section: 'income', kind: 'salary', defaultStatus: 'committed', scope: 'entity', inShareBasis: true, recommended: true },
     { key: 'a.extra', title: '{name} – Extra income', description: 'Bonuses, freelance work, side income.', section: 'income', scope: 'entity' },
-    { key: 'a.personal', title: '{name} – Personal', description: 'Own spending the household pays for, like a phone contract or a membership.', section: 'expense', scope: 'entity', recommended: true },
+    { key: 'a.personal', title: '{name} – Personal', description: 'Own spending the household pays for, like a phone contract or a membership.', section: 'expense', scope: 'entity', recommended: true, category: 'Personal' },
     { key: 'a.pocket', title: 'Pocket – {name}', description: 'This adult\'s share of the pocket money total. Computed, not typed.', section: 'transfer', kind: 'pocket-money', defaultStatus: 'committed', scope: 'entity', pocket: true, recommended: true },
   ],
   child: [
     { key: 'c.benefit', title: 'Child benefit – {name}', description: 'State child benefit or allowance.', section: 'income', defaultStatus: 'committed', scope: 'entity', tag: true, recommended: true },
-    { key: 'c.care', title: 'Childcare & school – {name}', description: 'Daycare, school fees, clubs.', section: 'expense', defaultStatus: 'committed', scope: 'entity', tag: true, recommended: true },
-    { key: 'c.gear', title: 'Gear & clothes – {name}', description: 'Clothes, toys, equipment.', section: 'expense', tag: true },
+    { key: 'c.care', title: 'Childcare & school – {name}', description: 'Daycare, school fees, clubs.', section: 'expense', defaultStatus: 'committed', scope: 'entity', tag: true, recommended: true, category: 'Family & pets' },
+    { key: 'c.gear', title: 'Gear & clothes – {name}', description: 'Clothes, toys, equipment.', section: 'expense', tag: true, category: 'Family & pets' },
     { key: 'c.longterm', title: 'Long-term savings – {name}', description: 'A monthly deposit into an investment account kept for the child.', section: 'transfer', kind: 'to-investment', defaultStatus: 'committed', scope: 'entity', tag: true, account: 'investment' },
   ],
   pet: [
-    { key: 'p.insurance', title: 'Insurance – {name}', description: 'Pet liability or health insurance.', section: 'expense', defaultStatus: 'committed', tag: true, recommended: true },
-    { key: 'p.tax', title: 'Tax – {name}', description: 'Pet tax or licence where it applies.', section: 'expense', defaultStatus: 'committed', tag: true },
-    { key: 'p.food', title: 'Food & supplies – {name}', description: 'Food, litter, toys.', section: 'expense', tag: true, recommended: true },
-    { key: 'p.vet', title: 'Vet – {name}', description: 'Check-ups and treatment.', section: 'expense', tag: true },
+    { key: 'p.insurance', title: 'Insurance – {name}', description: 'Pet liability or health insurance.', section: 'expense', defaultStatus: 'committed', tag: true, recommended: true, category: 'Family & pets' },
+    { key: 'p.tax', title: 'Tax – {name}', description: 'Pet tax or licence where it applies.', section: 'expense', defaultStatus: 'committed', tag: true, category: 'Family & pets' },
+    { key: 'p.food', title: 'Food & supplies – {name}', description: 'Food, litter, toys.', section: 'expense', tag: true, recommended: true, category: 'Family & pets' },
+    { key: 'p.vet', title: 'Vet – {name}', description: 'Check-ups and treatment.', section: 'expense', tag: true, category: 'Family & pets' },
   ],
   vehicle: [
-    { key: 'v.loan', title: 'Loan or lease – {name}', description: 'The monthly car loan or lease payment. Linked to a loan account, it brings the outstanding amount down.', section: 'expense', kind: 'debt-payment', defaultStatus: 'committed', tag: true, account: 'loan' },
-    { key: 'v.insurance', title: 'Insurance – {name}', description: 'Car insurance.', section: 'expense', defaultStatus: 'committed', tag: true, recommended: true },
-    { key: 'v.tax', title: 'Tax & inspection – {name}', description: 'Road tax and the periodic inspection.', section: 'expense', defaultStatus: 'committed', tag: true },
-    { key: 'v.fuel', title: 'Fuel & parking – {name}', description: 'Fuel or charging, parking, tolls.', section: 'expense', tag: true, recommended: true },
-    { key: 'v.maintenance', title: 'Maintenance – {name}', description: 'Service, tyres, repairs.', section: 'expense', tag: true },
+    { key: 'v.loan', title: 'Loan or lease – {name}', description: 'The monthly car loan or lease payment. Linked to a loan account, it brings the outstanding amount down.', section: 'expense', kind: 'debt-payment', defaultStatus: 'committed', tag: true, account: 'loan', category: 'Transport' },
+    { key: 'v.insurance', title: 'Insurance – {name}', description: 'Car insurance.', section: 'expense', defaultStatus: 'committed', tag: true, recommended: true, category: 'Transport' },
+    { key: 'v.tax', title: 'Tax & inspection – {name}', description: 'Road tax and the periodic inspection.', section: 'expense', defaultStatus: 'committed', tag: true, category: 'Transport' },
+    { key: 'v.fuel', title: 'Fuel & parking – {name}', description: 'Fuel or charging, parking, tolls.', section: 'expense', tag: true, recommended: true, category: 'Transport' },
+    { key: 'v.maintenance', title: 'Maintenance – {name}', description: 'Service, tyres, repairs.', section: 'expense', tag: true, category: 'Transport' },
   ],
   property: [
-    { key: 'r.rent', title: 'Rent or mortgage – {name}', description: 'The monthly rent or mortgage payment.', section: 'expense', defaultStatus: 'committed', tag: true, recommended: true },
-    { key: 'r.utilities', title: 'Utilities – {name}', description: 'Electricity, gas, water, heating.', section: 'expense', defaultStatus: 'committed', tag: true, recommended: true },
-    { key: 'r.internet', title: 'Internet & phone – {name}', description: 'Home internet, landline, TV licence.', section: 'expense', defaultStatus: 'committed', tag: true },
-    { key: 'r.improvement', title: 'Home improvement – {name}', description: 'Furniture, repairs, decoration.', section: 'expense', tag: true },
-    { key: 'r.insurance', title: 'Home insurance – {name}', description: 'Contents or building insurance.', section: 'expense', defaultStatus: 'committed', tag: true },
+    { key: 'r.rent', title: 'Rent or mortgage – {name}', description: 'The monthly rent or mortgage payment.', section: 'expense', defaultStatus: 'committed', tag: true, recommended: true, category: 'Housing' },
+    { key: 'r.utilities', title: 'Utilities – {name}', description: 'Electricity, gas, water, heating.', section: 'expense', defaultStatus: 'committed', tag: true, recommended: true, category: 'Housing' },
+    { key: 'r.internet', title: 'Internet & phone – {name}', description: 'Home internet, landline, TV licence.', section: 'expense', defaultStatus: 'committed', tag: true, category: 'Housing' },
+    { key: 'r.improvement', title: 'Home improvement – {name}', description: 'Furniture, repairs, decoration.', section: 'expense', tag: true, category: 'Housing' },
+    { key: 'r.insurance', title: 'Home insurance – {name}', description: 'Contents or building insurance.', section: 'expense', defaultStatus: 'committed', tag: true, category: 'Housing' },
   ],
   company: [
     { key: 'k.expenses', title: 'Company expenses – {name}', description: 'What the business costs you each month.', section: 'expense', tag: true, recommended: true },

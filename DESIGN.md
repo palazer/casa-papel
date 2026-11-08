@@ -130,6 +130,12 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 - Month columns `min-w-24`; today's header on `bg-muted` with the month in `font-semibold`; cells `px-1.5 py-0.5` (about
   22 px rows), amounts right-aligned, the done dot in the top-right corner. An empty cell shows a faint `·`.
 - Section header rows: the chevron and the title in `text-xs font-semibold` in the section's hue; no bar, no fill.
+- Categories (`groupRowsByCategory`): inside a section rows sort by category, then by their own order; rows without
+  one come last. When the section has categories, each group opens with a label row (`text-[10px] font-semibold
+  uppercase tracking-wider text-muted-foreground`, `No category` for the rest) and every other named group sits on the
+  section hue's `band` (a 5 % mix, opaque, so sticky label cells can carry it too); the uncategorised group never does.
+  The closed-month grey stays a translucent overlay on the cells, so it reads over a band. The Month view shows the same
+  label lines, without bands.
 - Total rows (`derivedRow` with `band`): the label in the hue on the hue's `tint`, `font-medium`; detail lines under an
   investment account (`Deposited`, `Return`) indented and `text-[11px]` muted.
 - Keyboard: arrows move between cells (`data-cell="row,col"`), Enter or Space opens the editor.

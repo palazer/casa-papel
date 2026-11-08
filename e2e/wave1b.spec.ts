@@ -157,9 +157,11 @@ test.describe('recurring from the grid', () => {
 
     // the list under Household reflects it
     await page.getByRole('link', { name: 'Household' }).click()
-    await expect(page.getByRole('cell', { name: 'Car insurance', exact: true })).toHaveCount(0)
+    // the schedules table (the Categories card lists row names too)
+    const schedules = page.getByRole('table').filter({ has: page.getByRole('columnheader', { name: 'When' }) })
     // the schedule was split: the old one ended in October, the new one runs from November
-    await expect(page.getByText('(ended Oct 2026)')).toBeVisible()
-    await expect(page.getByRole('cell', { name: 'Rent', exact: true })).toHaveCount(3)
+    await expect(schedules.getByText('(ended Oct 2026)')).toBeVisible()
+    await expect(schedules.getByRole('cell', { name: 'Car insurance', exact: true })).toHaveCount(0)
+    await expect(schedules.getByRole('cell', { name: 'Rent', exact: true })).toHaveCount(3)
   })
 })
