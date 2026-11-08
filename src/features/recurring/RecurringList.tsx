@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from 'react'
 import { MoreHorizontal } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Chip } from '@/components/ui/chip'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Check } from '@/components/Check'
 import { MonthPicker } from '@/components/MonthPicker'
@@ -11,6 +11,9 @@ import { activeHousehold, defaultMonths, useTables } from '@/app/useEngine'
 import { describeCadence, monthOfDate, type MonthKey, type RecurringItem } from '@/model'
 import { deleteRecurringItem, endRecurringItem, recurringStatus, setRecurringPaid } from '@/store'
 import { RecurringDialog } from './RecurringDialog'
+
+const TH = 'px-1.5 py-1 font-semibold text-muted-foreground'
+const TD = 'px-1.5 py-0.5'
 
 export function RecurringList() {
   const store = useStore()
@@ -30,45 +33,45 @@ export function RecurringList() {
   const act = (fn: () => Promise<unknown>) => void fn().catch((e) => setError(e instanceof Error ? e.message : 'Action failed'))
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4">
-      <MonthPicker months={months} month={m} onChange={setMonth} locale={locale} />
-      {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-      <div className="flex items-start justify-between gap-4">
-        <p className="text-sm text-muted-foreground">
-          The full list. In the grid, open any posted item to change its amount for one month or from now on, skip a month, or end it; open any cell and choose "Make recurring" to start a new one.
-        </p>
-        <Button onClick={() => setEditing('new')}>Add recurring</Button>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <MonthPicker months={months} month={m} onChange={setMonth} locale={locale} />
+        <span className="text-muted-foreground">
+          In the grid, open any posted item to change its amount for one month or from now on, skip a month, or end it; open any cell and choose "Make recurring" to start a new one.
+        </span>
+        <Button size="xs" className="ml-auto" onClick={() => setEditing('new')}>Add recurring</Button>
       </div>
-      <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
-            <tr><th className="px-3 py-2 font-medium">Name</th><th className="px-3 py-2 font-medium">Row</th><th className="px-3 py-2 text-right font-medium">Amount</th><th className="px-3 py-2 font-medium">When</th><th className="px-3 py-2 font-medium">Account</th><th className="px-3 py-2 font-medium">{formatMonth(m, locale)}</th><th className="px-1 py-2" /></tr>
+      {error && <p role="alert" className="text-destructive">{error}</p>}
+      <div className="overflow-x-auto rounded-md border">
+        <table className="w-full">
+          <thead className="text-left">
+            <tr><th className={TH}>Name</th><th className={TH}>Row</th><th className={`${TH} text-right`}>Amount</th><th className={TH}>When</th><th className={TH}>Account</th><th className={TH}>{formatMonth(m, locale)}</th><th className="px-1 py-1" /></tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className="divide-y divide-border/60">
             {items.map((it) => {
               const status = recurringStatus(tables, it, m)
               const ended = it.endMonth != null && it.endMonth < m
               return (
                 <Fragment key={it.id}>
                 <tr className={ended ? 'text-muted-foreground' : ''}>
-                  <td className="px-3 py-2 font-medium">{it.name}{ended && <span className="ml-1 text-xs font-normal">(ended {formatMonth(it.endMonth!, locale)})</span>}</td>
-                  <td className="px-3 py-2">{rowName(it.rowId)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{formatAmount(it.amount, it.currency ?? baseCurrency, locale)}</td>
-                  <td className="px-3 py-2">{describeCadence(it, locale)}</td>
-                  <td className="px-3 py-2">{accountName(it.accountId)}</td>
-                  <td className="px-3 py-2">
+                  <td className={`${TD} font-medium`}>{it.name}{ended && <span className="ml-1 text-[10px] font-normal">(ended {formatMonth(it.endMonth!, locale)})</span>}</td>
+                  <td className={TD}>{rowName(it.rowId)}</td>
+                  <td className={`${TD} text-right tabular-nums`}>{formatAmount(it.amount, it.currency ?? baseCurrency, locale)}</td>
+                  <td className={TD}>{describeCadence(it, locale)}</td>
+                  <td className={TD}>{accountName(it.accountId)}</td>
+                  <td className={TD}>
                     {status === 'not-due' ? <span className="text-muted-foreground">—</span> : (
                       <Check
-                        label={<Badge variant={status === 'paid' ? 'secondary' : status === 'skipped' ? 'outline' : 'default'}>{status === 'paid' ? 'Paid' : status === 'skipped' ? 'Skipped' : 'Due'}</Badge>}
+                        label={<Chip tone={status === 'paid' ? 'emerald' : status === 'skipped' ? 'zinc' : 'amber'}>{status === 'paid' ? 'paid' : status === 'skipped' ? 'skipped' : 'due'}</Chip>}
                         checked={status === 'paid'}
                         aria-label={`${it.name} paid in ${formatMonth(m, locale)}`}
                         onChange={(e) => act(() => setRecurringPaid(store, it.id, m, e.target.checked))}
                       />
                     )}
                   </td>
-                  <td className="px-1 py-2">
+                  <td className="px-1 py-0.5">
                     <DropdownMenu>
-                      <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="size-7" aria-label={`Menu for ${it.name}`} />}><MoreHorizontal /></DropdownMenuTrigger>
+                      <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" aria-label={`Menu for ${it.name}`} />}><MoreHorizontal /></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => setEditing(it)}>Edit…</DropdownMenuItem>
                         {ended ? (
@@ -83,8 +86,8 @@ export function RecurringList() {
                 </tr>
                 {deleting === it.id && (
                   <tr>
-                    <td colSpan={7} className="px-3 py-2">
-                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <td colSpan={7} className="px-2 py-1.5">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="text-muted-foreground">Delete "{it.name}" for good? Nothing more will be posted; amounts already in the grid stay. To stop it from a month on instead, use "End after".</span>
                         <Button size="xs" variant="destructive" onClick={() => { setDeleting(null); act(() => deleteRecurringItem(store, it.id)) }}>Really delete</Button>
                         <Button size="xs" variant="ghost" onClick={() => setDeleting(null)}>Cancel</Button>
@@ -95,7 +98,7 @@ export function RecurringList() {
                 </Fragment>
               )
             })}
-            {items.length === 0 && <tr><td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">Nothing recurring yet. Rent, salary, insurance, subscriptions all belong here.</td></tr>}
+            {items.length === 0 && <tr><td colSpan={7} className="px-2 py-6 text-center text-muted-foreground">Nothing recurring yet. Rent, salary, insurance, subscriptions all belong here.</td></tr>}
           </tbody>
         </table>
       </div>

@@ -24,8 +24,9 @@ Try it without touching your own data: https://palazer.github.io/casa-papel/?dem
 - **Cloud sync** (optional, by invitation): sign in with an email and password to keep the household on Supabase and use it on your phone and laptop. Everything is encrypted on the device before it leaves; the server and the person running the project see only ciphertext. Changes merge record by record, newest wins. A recovery code shown once at setup is the way back in if the password is forgotten. Setup for your own project: `docs/sync-setup.md`.
 - **Goals**: a balance to reach on an account or pool account, a card or loan to clear, or a net worth target, each with an optional target month. Measured against the plan in the grid, so the bar moves as the plan changes.
 - **Colour**: every kind of money has one hue: income, expenses, transfers, balances, pool accounts. Goals are the one thing in gold.
+- **Look**: a dark rail on the left (bottom tabs on a phone), a page header per screen, bordered islands instead of cards, Roboto. The design system is written down in `DESIGN.md` and shared with a sibling app.
 
-Status: Wave 1 complete (0, 1a, 1b, 1c, 1d); Wave 2a (colour, goals) and 2b (cloud sync and login) complete. Next: charts, CSV and PDF export, translations.
+Status: Wave 1 complete (0, 1a, 1b, 1c, 1d); Wave 2a (colour, goals) and 2b (cloud sync and login) complete; Wave 2c (design system, help, month tracking, categories, delete and archive) in progress. Next: charts, CSV and PDF export, translations.
 
 ## Develop
 

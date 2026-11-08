@@ -44,7 +44,7 @@ test.describe('cloud sync', () => {
     await expect(a.getByRole('button', { name: /^Sync: Synced/ })).toBeVisible({ timeout: 15_000 })
     expect(server.snapshots.size).toBe(1)
 
-    await a.getByRole('navigation', { name: 'Screens' }).getByRole('button', { name: 'Data' }).click()
+    await a.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Data' }).click()
     await expect(a.getByTestId('sync-status')).toHaveText(/Synced/)
     await a.getByRole('button', { name: 'Invite someone' }).first().click()
     const link = await a.getByTestId('invite-link').innerText()
@@ -70,7 +70,7 @@ test.describe('cloud sync', () => {
     await expect(b.getByRole('dialog')).toBeHidden()
     await expect(b.getByRole('button', { name: /^Sync: Synced/ })).toBeVisible({ timeout: 15_000 })
     await a.getByRole('button', { name: 'Sync now' }).click()
-    await a.getByRole('navigation', { name: 'Screens' }).getByRole('button', { name: 'Grid' }).click()
+    await a.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Grid' }).click()
     await expect(a.getByRole('button', { name: /^Utilities Nov 2026/ })).toContainText('333', { timeout: 15_000 })
 
     // ----- device C: forgot the password, recovers with the code -----
@@ -132,13 +132,13 @@ test.describe('cloud sync', () => {
     await expect(dlgF.getByRole('alert')).toHaveText(/not valid any more/, { timeout: 20_000 })
 
     // ----- sign out keeps the data; the demo sandbox has no sync -----
-    await a.getByRole('navigation', { name: 'Screens' }).getByRole('button', { name: 'Data' }).click()
+    await a.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Data' }).click()
     await a.getByRole('button', { name: 'Sign out', exact: true }).click()
     await expect(a.getByText('Signed out. Your data stays on this device.')).toBeVisible()
     await expect(a.getByRole('button', { name: /^Sync:/ })).toHaveCount(0)
     await a.goto('?demo=1')
     await a.getByRole('button', { name: 'Load the demo household' }).click()
-    await a.getByRole('navigation', { name: 'Screens' }).getByRole('button', { name: 'Data' }).click()
+    await a.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Data' }).click()
     await expect(a.getByText('Sync is off in the demo sandbox.')).toBeVisible()
   })
 })

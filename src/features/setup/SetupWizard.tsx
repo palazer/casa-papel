@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { ZodError } from 'zod'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Island } from '@/components/ui/island'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Check } from '@/components/Check'
@@ -31,7 +31,7 @@ const RULE_HELP: Record<Household['closingRule'], string> = {
 }
 const MODE_HELP: Record<Household['moneyMode'], string> = {
   pooled: 'All income is household money. Each adult gets pocket money to spend freely.',
-  proportional: 'Each adult pays a share of the shared costs in proportion to their income. Coming in a later wave; pooled is used for now.',
+  proportional: 'Each adult pays a share of the shared costs in proportion to their income. Moves shows who sends what where.',
 }
 
 interface Draft {
@@ -166,13 +166,11 @@ export function SetupWizard({ onCreated }: { onCreated: () => void }) {
   const s = subjects[Math.min(subject, subjects.length - 1)]
 
   return (
-    <Card className="mx-auto max-w-2xl">
-      <CardHeader>
-        <CardTitle>Set up your household</CardTitle>
-        <CardDescription>
-          Step {step + 1} of {STEPS.length}: {STEPS[step]}{step === 4 ? ` · ${subject + 1} of ${subjects.length}` : ''}. Everything can be changed later. "Finish now" uses sensible defaults for the rest.
-        </CardDescription>
-        <ol className="mt-2 flex flex-wrap gap-1 text-xs" aria-label="Steps">
+    <Island
+      air title="Set up your household" className="mx-auto max-w-2xl" bodyClassName="space-y-5"
+      description={<>Step {step + 1} of {STEPS.length}: {STEPS[step]}{step === 4 ? ` · ${subject + 1} of ${subjects.length}` : ''}. Everything can be changed later. "Finish now" uses sensible defaults for the rest.</>}
+    >
+        <ol className="flex flex-wrap gap-1 text-xs" aria-label="Steps">
           {STEPS.map((name, i) => (
             <li key={name}>
               <button
@@ -186,8 +184,6 @@ export function SetupWizard({ onCreated }: { onCreated: () => void }) {
             </li>
           ))}
         </ol>
-      </CardHeader>
-      <CardContent className="space-y-5">
         {step === 0 && (
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
@@ -390,8 +386,7 @@ export function SetupWizard({ onCreated }: { onCreated: () => void }) {
             )}
           </div>
         </div>
-      </CardContent>
-    </Card>
+    </Island>
   )
 }
 

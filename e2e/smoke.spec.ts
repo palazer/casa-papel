@@ -5,14 +5,14 @@ async function loadDemo(page: Page) {
   await page.goto('?demo=1')
   await expect(page.getByText('Welcome to Casa Papel')).toBeVisible()
   await page.getByRole('button', { name: 'Load the demo household' }).click()
-  await expect(page.getByRole('banner').getByText('Demo household')).toBeVisible()
+  await expect(page.getByText(/^Demo household ·/)).toBeVisible()
   await expect(page.getByRole('button', { name: /^Rent Nov 2026/ })).toBeVisible()
 }
 
 test('demo → export → wipe → import → offline reload', async ({ page, context }) => {
   await loadDemo(page)
 
-  await page.getByRole('button', { name: 'Data' }).click()
+  await page.getByRole('link', { name: 'Data' }).click()
   await expect(page.getByText('Where your data lives')).toBeVisible()
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Export now' }).click()
@@ -27,15 +27,15 @@ test('demo → export → wipe → import → offline reload', async ({ page, co
   await page.getByLabel('Type WIPE to confirm').fill('WIPE')
   await page.getByRole('button', { name: 'Wipe this device' }).click()
   await expect(page.getByText('All data removed from this browser.')).toBeVisible()
-  await page.getByRole('button', { name: 'Grid' }).click()
+  await page.getByRole('link', { name: 'Grid' }).click()
   await expect(page.getByText('Welcome to Casa Papel')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Data' }).click()
+  await page.getByRole('link', { name: 'Data' }).click()
   await page.locator('input[type=file]').setInputFiles(filePath)
   await expect(page.getByText(/history entries$/)).toBeVisible()
   await page.getByRole('button', { name: 'Replace everything here' }).click()
   await expect(page.getByText(/Replaced everything with/)).toBeVisible()
-  await page.getByRole('button', { name: 'Grid' }).click()
+  await page.getByRole('link', { name: 'Grid' }).click()
   await expect(page.getByRole('button', { name: /^Rent Nov 2026/ })).toBeVisible()
 
   await page.evaluate(() => navigator.serviceWorker.ready)

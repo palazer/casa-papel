@@ -1,12 +1,14 @@
 import { GoalsCard } from '@/features/goals/GoalsCard'
 import { HUES, SECTION_HUE, type Hue } from '@/app/hues'
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Lock } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Chip } from '@/components/ui/chip'
+import { Island } from '@/components/ui/island'
+import { MonthPicker } from '@/components/MonthPicker'
+import { PageHeader } from '@/components/PageHeader'
 import { cn } from '@/lib/utils'
-import { formatAmount, formatMonth } from '@/app/format'
+import { formatAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { cellKey } from '@/engine'
@@ -22,6 +24,8 @@ const SECTIONS: Array<{ key: Section; title: string }> = [
   { key: 'transfer', title: 'Transfers' },
 ]
 
+/** One month as a list (the phone's first screen, DESIGN.md §2): the totals, the goals, then every row with its
+ *  amount and done dot. Rows keep 14 px text and 44 px of height here, the one place the desktop density does not apply. */
 export function MonthScreen() {
   const store = useStore()
   const tables = useTables()
@@ -42,32 +46,29 @@ export function MonthScreen() {
 
   return (
     <div className="mx-auto max-w-xl space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <Button variant="outline" size="icon" aria-label="Previous month" disabled={idx === 0} onClick={() => setMonth(months[idx - 1])}><ChevronLeft /></Button>
-        <div className="text-center">
-          <h2 className="text-lg font-semibold">{formatMonth(m, locale, 'long')}</h2>
-          {t?.closed && <Badge variant="secondary"><Lock className="size-3" /> Closed</Badge>}
-        </div>
-        <Button variant="outline" size="icon" aria-label="Next month" disabled={idx >= months.length - 1} onClick={() => setMonth(months[idx + 1])}><ChevronRight /></Button>
-      </div>
+      <PageHeader title="Month" subline={<>{household.name}{t?.closed && <> · <Chip tone="zinc"><Lock aria-hidden /> closed</Chip></>}</>}>
+        <MonthPicker months={months} month={m} onChange={setMonth} locale={locale} />
+        {t.closed ? (
+          <Button size="sm" variant="outline" onClick={() => act(() => reopenMonth(store, m))}>Reopen month</Button>
+        ) : (
+          <Button size="sm" onClick={() => act(() => closeMonth(store, m))}>Close month</Button>
+        )}
+        {error && <p role="alert" className="basis-full text-destructive">{error}</p>}
+      </PageHeader>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
-
-      <Card>
-        <CardContent className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-          <Stat label="Income" value={formatAmount(t.income, ccy, locale)} hue={HUES.income} />
-          <Stat label="Expenses" value={formatAmount(t.expensesTotal, ccy, locale)} tone="out" hue={HUES.expense} />
-          <Stat label="To savings" value={formatAmount(t.toSavings, ccy, locale, { sign: 'exceptZero' })} tone={t.toSavings < 0 ? 'draw' : 'neutral'} hue={HUES.transfer} />
-          <Stat label={household.closingRule === 'savings-plug' ? 'Kept in account' : 'Leftover'} value={formatAmount(t.leftover, ccy, locale)} hue={HUES.transfer} />
-          {Object.values(engine.accounts).map((s) => (
-            <Stat key={s.accountId} label={tables.accounts.find((a) => a.id === s.accountId)?.name ?? 'Account'} value={formatAmount(s.months[m]?.balance ?? 0, s.currency, locale)} hue={HUES.worth} />
-          ))}
-          {Object.keys(engine.accounts).length > 0 && <Stat label="Net worth" value={formatAmount(engine.netWorth[m] ?? 0, ccy, locale)} hue={HUES.worth} />}
-          {Object.values(engine.pools).map((p) => (
-            <Stat key={p.poolId} label={`Pool account · ${tables.pools.find((x) => x.id === p.poolId)?.name ?? ''}`} value={formatAmount(p.months[m]?.balance ?? 0, ccy, locale)} hue={HUES.pool} />
-          ))}
-        </CardContent>
-      </Card>
+      <Island title="This month" bodyClassName="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+        <Stat label="Income" value={formatAmount(t.income, ccy, locale)} hue={HUES.income} />
+        <Stat label="Expenses" value={formatAmount(t.expensesTotal, ccy, locale)} tone="out" hue={HUES.expense} />
+        <Stat label="To savings" value={formatAmount(t.toSavings, ccy, locale, { sign: 'exceptZero' })} tone={t.toSavings < 0 ? 'draw' : 'neutral'} hue={HUES.transfer} />
+        <Stat label={household.closingRule === 'savings-plug' ? 'Kept in account' : 'Leftover'} value={formatAmount(t.leftover, ccy, locale)} hue={HUES.transfer} />
+        {Object.values(engine.accounts).map((s) => (
+          <Stat key={s.accountId} label={tables.accounts.find((a) => a.id === s.accountId)?.name ?? 'Account'} value={formatAmount(s.months[m]?.balance ?? 0, s.currency, locale)} hue={HUES.worth} />
+        ))}
+        {Object.keys(engine.accounts).length > 0 && <Stat label="Net worth" value={formatAmount(engine.netWorth[m] ?? 0, ccy, locale)} hue={HUES.worth} />}
+        {Object.values(engine.pools).map((p) => (
+          <Stat key={p.poolId} label={`Pool account · ${tables.pools.find((x) => x.id === p.poolId)?.name ?? ''}`} value={formatAmount(p.months[m]?.balance ?? 0, ccy, locale)} hue={HUES.pool} />
+        ))}
+      </Island>
 
       <GoalsCard household={household} tables={tables} engine={engine} month={m} compact />
 
@@ -75,9 +76,8 @@ export function MonthScreen() {
         const rows = engine.rows.filter((r) => r.section === key)
         if (rows.length === 0) return null
         return (
-          <section key={key} className="space-y-1">
-            <h3 className={cn('pl-2 text-sm font-semibold', SECTION_HUE[key].bar, SECTION_HUE[key].text)}>{title}</h3>
-            <div className="divide-y rounded-lg border">
+          <Island key={key} title={title} tone={SECTION_HUE[key]} bodyClassName="px-0 pb-0 pt-1">
+            <div className="divide-y divide-border/60">
               {rows.map((r) => {
                 const c = engine.cells[cellKey(r.id, m)]
                 if (!c || c.source === 'archived') return null
@@ -87,7 +87,7 @@ export function MonthScreen() {
                 return (
                   <button
                     key={r.id} type="button" disabled={derived}
-                    className={cn('flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm', !derived && 'hover:bg-accent', derived && 'bg-muted/40')}
+                    className={cn('flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm', !derived && 'hover:bg-muted', derived && 'bg-muted/40')}
                     onClick={() => setSelectedRow(r.id)}
                     aria-label={`${r.name}: ${d.text}${dot ? `, ${doneLabel(dot)}` : ''}`}
                   >
@@ -100,17 +100,9 @@ export function MonthScreen() {
                 )
               })}
             </div>
-          </section>
+          </Island>
         )
       })}
-
-      <div className="flex justify-end">
-        {t.closed ? (
-          <Button variant="outline" onClick={() => act(() => reopenMonth(store, m))}>Reopen {formatMonth(m, locale)}</Button>
-        ) : (
-          <Button onClick={() => act(() => closeMonth(store, m))}>Close {formatMonth(m, locale)}</Button>
-        )}
-      </div>
 
       {row && <CellEditor key={`${row.id}:${m}`} tables={tables} engine={engine} household={household} row={row} month={m} onClose={() => setSelectedRow(null)} />}
     </div>

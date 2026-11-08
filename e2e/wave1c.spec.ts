@@ -11,7 +11,7 @@ test.describe('wave 1c', () => {
 
   test('a USD investment account, a manual rate, a pool, and a real value pinned from the grid', async ({ page }) => {
     await loadDemo(page)
-    await page.getByRole('button', { name: 'Household' }).click()
+    await page.getByRole('link', { name: 'Household' }).click()
 
     // investment account in another currency
     await page.getByRole('button', { name: 'Add account' }).click()
@@ -42,7 +42,7 @@ test.describe('wave 1c', () => {
     await expect(page.getByText(/filled by the row "Gifts pool"/)).toBeVisible()
 
     // grid: balances show the broker and the pool; pin a real value and watch December project from it
-    await page.getByRole('button', { name: 'Grid' }).click()
+    await page.getByRole('link', { name: 'Grid' }).click()
     await expect(page.getByText('Pool account · Gifts')).toBeVisible()
     await expect(page.getByRole('button', { name: /^Gifts pool Nov 2026/ })).toContainText('50')
     const brokerNov = page.getByRole('button', { name: /^Broker · value Nov 2026/ })

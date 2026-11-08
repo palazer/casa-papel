@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Island } from '@/components/ui/island'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/features/grid/NativeSelect'
 import { formatAmount, formatMonth, formatPercent } from '@/app/format'
@@ -36,14 +36,11 @@ export function SharesCard({ household, tables, engine, onError }: { household: 
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Who pays what</CardTitle>
-        <CardDescription>
-          Shared costs are split between the adults by their share. A row that belongs to one person is theirs alone; a child's or pet's rows go to whoever pays for them. The Moves screen shows the resulting transfers every month.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <Island
+      air title="Who pays what"
+      description="Shared costs are split between the adults by their share. A row that belongs to one person is theirs alone; a child's or pet's rows go to whoever pays for them. The Moves screen shows the resulting transfers every month."
+    >
+      <div className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="sh-basis">Shares come from</Label>
@@ -52,40 +49,40 @@ export function SharesCard({ household, tables, engine, onError }: { household: 
               <option value="all-income">All income</option>
               <option value="manual">Percentages I set</option>
             </NativeSelect>
-            <p className="text-xs text-muted-foreground">{BASIS_HELP[household.shareBasis]}</p>
+            <p className="text-muted-foreground">{BASIS_HELP[household.shareBasis]}</p>
           </div>
           {household.shareBasis === 'manual' && c && (
             <div className="space-y-1.5">
               <Label>Shares (%)</Label>
               <div className="flex flex-wrap items-center gap-2">
                 {c.adults.map((a) => (
-                  <label key={a.entityId} className="flex items-center gap-1 text-sm">
+                  <label key={a.entityId} className="flex items-center gap-1">
                     <span>{a.name}</span>
-                    <Input aria-label={`${a.name} share %`} className="h-8 w-20 text-right" inputMode="decimal" value={manual[a.entityId] ?? ''} onChange={(e) => setManual((s) => ({ ...s, [a.entityId]: e.target.value }))} />
+                    <Input aria-label={`${a.name} share %`} className="h-7 w-20 text-right" inputMode="decimal" value={manual[a.entityId] ?? ''} onChange={(e) => setManual((s) => ({ ...s, [a.entityId]: e.target.value }))} />
                   </label>
                 ))}
-                <Button size="sm" variant="outline" onClick={saveManual}>Apply</Button>
+                <Button size="xs" variant="outline" onClick={saveManual}>Apply</Button>
               </div>
-              <p className="text-xs text-muted-foreground">They are scaled to add up to 100.</p>
+              <p className="text-muted-foreground">They are scaled to add up to 100.</p>
             </div>
           )}
         </div>
         {c && month && (
           <div className="overflow-x-auto rounded-md border">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
-                <tr><th className="px-3 py-2 font-medium">{formatMonth(month, locale)}</th>{c.adults.map((a) => <th key={a.entityId} className="px-3 py-2 text-right font-medium">{a.name}</th>)}</tr>
+            <table className="w-full">
+              <thead className="bg-muted/50 text-left text-muted-foreground">
+                <tr><th className="px-2 py-1 font-semibold">{formatMonth(month, locale)}</th>{c.adults.map((a) => <th key={a.entityId} className="px-2 py-1 text-right font-semibold">{a.name}</th>)}</tr>
               </thead>
-              <tbody className="divide-y">
-                <tr><td className="px-3 py-1.5">Share</td>{c.adults.map((a) => <td key={a.entityId} className="px-3 py-1.5 text-right tabular-nums">{formatPercent(a.share, locale)}</td>)}</tr>
-                <tr><td className="px-3 py-1.5">Income</td>{c.adults.map((a) => <td key={a.entityId} className="px-3 py-1.5 text-right tabular-nums">{formatAmount(a.income, ccy, locale)}</td>)}</tr>
-                <tr><td className="px-3 py-1.5">Pays this month</td>{c.adults.map((a) => <td key={a.entityId} className="px-3 py-1.5 text-right tabular-nums">{formatAmount(a.owed, ccy, locale)}</td>)}</tr>
-                <tr className="font-medium"><td className="px-3 py-1.5">Keeps</td>{c.adults.map((a) => <td key={a.entityId} className={`px-3 py-1.5 text-right tabular-nums ${a.remainder < 0 ? 'text-destructive' : ''}`}>{formatAmount(a.remainder, ccy, locale, { sign: 'exceptZero' })}</td>)}</tr>
+              <tbody className="divide-y divide-border/60">
+                <tr><td className="px-2 py-1">Share</td>{c.adults.map((a) => <td key={a.entityId} className="px-2 py-1 text-right tabular-nums">{formatPercent(a.share, locale)}</td>)}</tr>
+                <tr><td className="px-2 py-1">Income</td>{c.adults.map((a) => <td key={a.entityId} className="px-2 py-1 text-right tabular-nums">{formatAmount(a.income, ccy, locale)}</td>)}</tr>
+                <tr><td className="px-2 py-1">Pays this month</td>{c.adults.map((a) => <td key={a.entityId} className="px-2 py-1 text-right tabular-nums">{formatAmount(a.owed, ccy, locale)}</td>)}</tr>
+                <tr className="font-medium"><td className="px-2 py-1">Keeps</td>{c.adults.map((a) => <td key={a.entityId} className={`px-2 py-1 text-right tabular-nums ${a.remainder < 0 ? 'text-destructive' : ''}`}>{formatAmount(a.remainder, ccy, locale, { sign: 'exceptZero' })}</td>)}</tr>
               </tbody>
             </table>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Island>
   )
 }

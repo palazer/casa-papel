@@ -13,7 +13,7 @@ test.describe('wave 2a', () => {
     await loadDemo(page)
     await page.screenshot({ path: 'e2e/output/wave2a-grid.png' })
 
-    await page.getByRole('button', { name: 'Moves' }).click()
+    await page.getByRole('link', { name: 'Moves' }).click()
     await expect(page.getByText('No goals yet.', { exact: false })).toBeVisible()
     const dlg = page.getByRole('dialog')
 
@@ -47,7 +47,7 @@ test.describe('wave 2a', () => {
     await expect(dlg).toBeHidden()
 
     // a loan, then a goal to clear it
-    await page.getByRole('button', { name: 'Household' }).click()
+    await page.getByRole('link', { name: 'Household' }).click()
     await page.getByRole('button', { name: 'Add account' }).click()
     await dlg.getByLabel('Name', { exact: true }).fill('Car loan')
     await dlg.getByLabel('Type').selectOption('loan')
@@ -56,7 +56,7 @@ test.describe('wave 2a', () => {
     await expect(dlg).toBeHidden()
     await page.screenshot({ path: 'e2e/output/wave2a-household.png', fullPage: true })
 
-    await page.getByRole('button', { name: 'Moves' }).click()
+    await page.getByRole('link', { name: 'Moves' }).click()
     await page.getByRole('button', { name: 'Add goal' }).click()
     await dlg.getByLabel('Name').fill('Clear the car loan')
     await dlg.getByLabel('Kind').selectOption('pay-off')
@@ -98,7 +98,7 @@ test.describe('wave 2a phone', () => {
     await expect(page.getByRole('heading', { name: 'November 2026' })).toBeVisible()
     await expect(page.getByText('Goals', { exact: true })).toHaveCount(0)
 
-    await page.getByLabel('Screen', { exact: true }).selectOption('moves')
+    await page.getByRole('link', { name: 'Moves' }).click()
     await page.getByRole('button', { name: 'Add goal' }).click()
     const dlg = page.getByRole('dialog')
     await dlg.getByLabel('Name').fill('Net worth 30k')
@@ -107,7 +107,7 @@ test.describe('wave 2a phone', () => {
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
 
-    await page.getByLabel('Screen', { exact: true }).selectOption('month')
+    await page.getByRole('link', { name: 'Month' }).click()
     await expect(page.getByRole('heading', { name: 'November 2026' })).toBeVisible()
     await expect(page.getByRole('progressbar', { name: 'Net worth 30k' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Add goal' })).toHaveCount(0)

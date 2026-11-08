@@ -1,8 +1,8 @@
 import { useMemo, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { ChevronDown, ChevronRight, Lock } from 'lucide-react'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { PageHeader } from '@/components/PageHeader'
 import { cn } from '@/lib/utils'
 import { formatAmount, formatMonth, formatPercent } from '@/app/format'
 import { HUES, SECTION_HUE, type Hue } from '@/app/hues'
@@ -83,7 +83,7 @@ export function GridScreen() {
     opts: { strong?: boolean; muted?: boolean; currency?: string; hue?: Hue; band?: boolean; sub?: string; format?: (v: Money, m: MonthKey) => string; onClick?: (m: MonthKey) => void; mark?: (m: MonthKey) => boolean } = {},
   ): ReactNode => (
     <tr key={opts.sub ? `${opts.sub} · ${label}` : label} className={cn(opts.band && (opts.hue ? opts.hue.tint : 'bg-muted/40'), opts.strong && 'font-medium')}>
-      <th scope="row" className={cn('sticky left-0 z-10 px-3 py-1 text-left text-sm', opts.band ? (opts.hue ? opts.hue.tint : 'bg-muted/90 backdrop-blur') : 'bg-background', opts.hue && !opts.sub ? opts.hue.text : 'text-muted-foreground', opts.muted && 'text-xs', opts.sub && 'pl-7 font-normal')}>
+      <th scope="row" className={cn('sticky left-0 z-10 px-2 py-0.5 text-left', opts.band ? (opts.hue ? opts.hue.tint : 'bg-muted') : 'bg-card', opts.hue && !opts.sub ? opts.hue.text : 'text-muted-foreground', opts.muted && 'text-[11px]', opts.sub && 'pl-6 font-normal')}>
         {opts.sub && <span className="sr-only">{opts.sub} · </span>}
         {label}
       </th>
@@ -93,13 +93,13 @@ export function GridScreen() {
         const text = opts.format ? opts.format(v, m) : d.text
         const marked = opts.mark?.(m) ?? false
         return (
-          <td key={m} className={cn('p-0 text-right text-sm tabular-nums', toneClass[d.tone], opts.muted && 'text-xs', opts.sub && 'text-muted-foreground', engine.totals[m]?.closed && 'bg-muted/60')}>
+          <td key={m} className={cn('p-0 text-right tabular-nums', toneClass[d.tone], opts.muted && 'text-[11px]', opts.sub && 'text-muted-foreground', engine.totals[m]?.closed && 'bg-muted/60')}>
             {opts.onClick ? (
-              <button type="button" aria-label={`${label} ${formatMonth(m, locale)}: ${text}`} onClick={() => opts.onClick!(m)} className={cn('w-full px-2 py-1 text-right hover:bg-accent', marked && 'underline decoration-dotted underline-offset-4')}>
+              <button type="button" aria-label={`${label} ${formatMonth(m, locale)}: ${text}`} onClick={() => opts.onClick!(m)} className={cn('w-full px-1.5 py-0.5 text-right hover:bg-muted', marked && 'underline decoration-dotted underline-offset-4')}>
                 {text}
               </button>
             ) : (
-              <span className="block px-2 py-1">{v === 0 && opts.muted ? '' : text}</span>
+              <span className="block px-1.5 py-0.5">{v === 0 && opts.muted ? '' : text}</span>
             )}
           </td>
         )
@@ -110,39 +110,40 @@ export function GridScreen() {
   const selectedRow = selected ? engine.rows.find((r) => r.id === selected.rowId) : undefined
 
   return (
-    <div className="space-y-3">
-      {error && (
-        <Alert variant="destructive" className="max-w-xl">
-          <AlertDescription className="flex items-center justify-between gap-2">
+    <div className="space-y-4">
+      <PageHeader title="Grid" subline={`${household.name} · ${formatMonth(months[0], locale)} – ${formatMonth(months[months.length - 1], locale)}`}>
+        <Button size="xs" variant="outline" onClick={() => { const n = extra + 12; setExtra(n); writePref('horizonExtra', n) }}>Show 12 more months</Button>
+        <span className="text-muted-foreground">Click a cell to edit · arrows move · Enter opens · click a month name to close or reopen it</span>
+        <span className="inline-flex flex-wrap items-center gap-x-1.5 text-muted-foreground">
+          <span className="italic underline decoration-dashed decoration-partial underline-offset-4">Italic</span> = estimate · <DoneDot done={1} total={1} state="all" /> = done · this month also: <DoneDot done={0} total={1} state="none" /> nothing done yet, <DoneDot done={1} total={2} state="partial" /> partly done
+        </span>
+        {engine.warnings.length > 0 && <p role="alert" className="basis-full text-amber-700 dark:text-amber-400">{engine.warnings.join(' · ')}</p>}
+        {error && (
+          <p role="alert" className="flex basis-full items-center gap-2 text-destructive">
             <span>{error}</span>
             <Button size="xs" variant="outline" onClick={() => setError(null)}>Dismiss</Button>
-          </AlertDescription>
-        </Alert>
-      )}
-      {engine.warnings.length > 0 && (
-        <Alert className="max-w-xl">
-          <AlertDescription>{engine.warnings.join(' · ')}</AlertDescription>
-        </Alert>
-      )}
+          </p>
+        )}
+      </PageHeader>
 
-      <div className="relative max-h-[calc(100dvh-9rem)] overflow-auto rounded-lg border">
-        <table className="border-separate border-spacing-0 text-sm" onKeyDown={onKeyDown}>
+      <div className="relative isolate max-h-[calc(100dvh-var(--page-chrome))] overflow-auto rounded-lg border bg-card">
+        <table className="border-separate border-spacing-0 text-xs" onKeyDown={onKeyDown}>
           <thead>
             <tr>
-              <th className="sticky top-0 left-0 z-30 min-w-60 border-b bg-background px-3 py-2 text-left text-xs font-medium text-muted-foreground">
+              <th className="sticky top-0 left-0 z-30 min-w-[200px] border-b bg-card px-2 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 {household.name}
               </th>
               {months.map((m) => {
                 const t = engine.totals[m]
                 const isToday = m === today
                 return (
-                  <th key={m} className={cn('sticky top-0 z-20 min-w-28 border-b px-1 py-1 text-right text-xs font-medium', isToday ? 'bg-accent' : 'bg-background')}>
+                  <th key={m} className={cn('sticky top-0 z-20 min-w-24 border-b px-1 py-1 text-right font-medium', isToday ? 'bg-muted' : 'bg-card')}>
                     <DropdownMenu>
                       <DropdownMenuTrigger
-                        render={<button className="inline-flex w-full items-center justify-end gap-1 rounded px-1 py-1 hover:bg-muted" aria-label={`${formatMonth(m, locale)}${t?.closed ? ', closed' : ''}`} />}
+                        render={<button className="inline-flex w-full items-center justify-end gap-1 rounded px-1 py-0.5 hover:bg-muted" aria-label={`${formatMonth(m, locale)}${t?.closed ? ', closed' : ''}`} />}
                       >
                         {t?.closed && <Lock className="size-3 text-muted-foreground" aria-hidden />}
-                        <span className={cn(isToday && 'font-semibold')}>{formatMonth(m, locale)}</span>
+                        <span className={cn(isToday ? 'font-semibold text-foreground' : 'text-muted-foreground')}>{formatMonth(m, locale)}</span>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuGroup>
@@ -168,10 +169,10 @@ export function GridScreen() {
               const rows = rowsBySection(key)
               const isCollapsed = collapsed.has(key)
               return [
-                <tr key={`${key}-head`} className="bg-background">
-                  <th scope="row" className={cn('sticky left-0 z-10 border-t bg-background px-2 py-1.5 text-left', SECTION_HUE[key].bar)}>
-                    <button className={cn('inline-flex items-center gap-1 text-sm font-semibold', SECTION_HUE[key].text)} onClick={() => toggle(key)} aria-expanded={!isCollapsed}>
-                      {isCollapsed ? <ChevronRight className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                <tr key={`${key}-head`} className="bg-card">
+                  <th scope="row" className="sticky left-0 z-10 border-t bg-card px-2 py-1.5 text-left">
+                    <button className={cn('inline-flex items-center gap-1 text-xs font-semibold', SECTION_HUE[key].text)} onClick={() => toggle(key)} aria-expanded={!isCollapsed}>
+                      {isCollapsed ? <ChevronRight className="size-3" aria-hidden /> : <ChevronDown className="size-3" aria-hidden />}
                       {title}
                     </button>
                   </th>
@@ -180,7 +181,7 @@ export function GridScreen() {
                 ...(isCollapsed ? [] : rows.map((row) => <GridRow key={row.id} row={row} rIndex={editableIndex++} months={months} engine={engine} tables={tables} household={household} ccy={ccy} locale={locale} neg={neg} onSelect={(m) => setSelected({ rowId: row.id, month: m })} onError={setError} />)),
                 !isCollapsed && (
                   <tr key={`${key}-add`}>
-                    <td className="sticky left-0 z-10 bg-background px-1 py-0.5"><AddRowInline section={key} onError={setError} /></td>
+                    <td className="sticky left-0 z-10 bg-card px-1 py-0.5"><AddRowInline section={key} onError={setError} /></td>
                     <td colSpan={months.length} />
                   </tr>
                 ),
@@ -193,7 +194,7 @@ export function GridScreen() {
 
             {(Object.keys(engine.accounts).length > 0 || Object.keys(engine.pools).length > 0) && (
               <tr>
-                <th scope="row" className={cn('sticky left-0 z-10 border-t bg-background px-2 py-1.5 text-left text-sm font-semibold', HUES.worth.bar, HUES.worth.text)}>Balances</th>
+                <th scope="row" className={cn('sticky left-0 z-10 border-t bg-card px-2 py-1.5 text-left text-xs font-semibold', HUES.worth.text)}>Balances</th>
                 <td colSpan={months.length} className="border-t" />
               </tr>
             )}
@@ -219,14 +220,6 @@ export function GridScreen() {
             {Object.keys(engine.accounts).length > 0 && derivedRow('Net worth', 'in', (m) => engine.netWorth[m] ?? 0, { strong: true, hue: HUES.worth, band: true })}
           </tbody>
         </table>
-      </div>
-
-      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-        <Button size="xs" variant="outline" onClick={() => { const n = extra + 12; setExtra(n); writePref('horizonExtra', n) }}>Show 12 more months</Button>
-        <span>Click a cell to edit. Arrow keys move, Enter opens. Click a month name to close or reopen it.</span>
-        <span className="inline-flex flex-wrap items-center gap-x-1.5">
-          <span className="italic underline decoration-dashed decoration-partial underline-offset-4">Italic</span> = estimate · <DoneDot done={1} total={1} state="all" /> = done · this month also: <DoneDot done={0} total={1} state="none" /> nothing done yet, <DoneDot done={1} total={2} state="partial" /> partly done.
-        </span>
       </div>
 
       {balanceSel && (() => {
@@ -262,14 +255,14 @@ function GridRow({ row, rIndex, months, engine, tables, household, ccy, locale, 
   const followed = row.followsRowId ? tables.rows.find((r) => r.id === row.followsRowId) : undefined
   return (
     <tr className="group">
-      <th scope="row" className={cn('sticky left-0 z-10 bg-background px-2 py-0.5 text-left font-normal', SECTION_HUE[row.section].edge)}>
+      <th scope="row" className="sticky left-0 z-10 bg-card px-2 py-0.5 text-left font-normal">
         <div className="flex items-center gap-1">
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm">
-              {row.name}{row.currency && row.currency !== ccy ? <span className="ml-1 text-xs text-muted-foreground">{row.currency}</span> : null}
-              {followed ? <span className="ml-1 text-xs text-muted-foreground" title={`Same amount as ${followed.name}`}>= {followed.name}</span> : null}
+            <div className="truncate text-xs font-medium">
+              {row.name}{row.currency && row.currency !== ccy ? <span className="ml-1 text-[10px] font-normal text-muted-foreground">{row.currency}</span> : null}
+              {followed ? <span className="ml-1 text-[10px] font-normal text-muted-foreground" title={`Same amount as ${followed.name}`}>= {followed.name}</span> : null}
             </div>
-            <div className="truncate text-[11px] text-muted-foreground tabular-nums">
+            <div className="truncate text-[10px] leading-3 text-muted-foreground tabular-nums">
               Σ {formatAmount(totals?.total ?? 0, ccy, locale, { compact: true })}{row.section !== 'income' && totals?.shareOfIncome ? ` · ${formatPercent(totals.shareOfIncome, locale)} of income` : ''}
             </div>
           </div>
@@ -289,7 +282,7 @@ function GridRow({ row, rIndex, months, engine, tables, household, ccy, locale, 
         return (
           <td key={m} className={cn('p-0', closed && 'bg-muted/60')}>
             {cell.source === 'archived' ? null : isDerived ? (
-              <div className={cn('px-2 py-1 text-right tabular-nums', toneClass[d.tone], statusClass.derived)}>{d.text}</div>
+              <div className={cn('px-1.5 py-0.5 text-right tabular-nums', toneClass[d.tone], statusClass.derived)}>{d.text}</div>
             ) : (
               <button
                 type="button"
@@ -298,13 +291,13 @@ function GridRow({ row, rIndex, months, engine, tables, household, ccy, locale, 
                 aria-label={`${row.name} ${formatMonth(m, locale)}: ${isEmpty ? 'empty' : d.text}${dot ? `, ${doneLabel(dot)}` : ''}`}
                 onClick={() => onSelect(m)}
                 className={cn(
-                  'relative flex w-full items-center justify-end gap-1 px-2 py-1 text-right tabular-nums outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring',
-                  dot && 'pr-3.5',
+                  'relative flex w-full items-center justify-end gap-1 px-1.5 py-0.5 text-right tabular-nums outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+                  dot && 'pr-3',
                   isEmpty ? 'text-muted-foreground/40' : toneClass[d.tone],
                   !isEmpty && statusClass[cell.status],
                 )}
               >
-                {dot && <DoneDot {...dot} className="absolute right-1 top-1" />}
+                {dot && <DoneDot {...dot} className="absolute right-0.5 top-0.5" />}
                 {isEmpty ? '·' : d.text}
               </button>
             )}

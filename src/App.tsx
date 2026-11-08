@@ -1,30 +1,21 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Redo2, Undo2 } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ErrorBoundary } from '@/app/ErrorBoundary'
+import { ScreenContext, isPhone, readScreen, rememberScreen, type Screen } from '@/app/screens'
 import { createAppStore, isDemoMode, useStore } from '@/app/store'
 import { StoreProvider } from '@/app/StoreProvider'
 import { takeInviteFromUrl } from '@/app/url'
 import { activeHousehold, defaultMonths, useTables } from '@/app/useEngine'
-import { useStoreVersion } from '@/app/useStoreVersion'
+import { AppRail } from '@/components/AppRail'
+import { BottomTabs } from '@/components/BottomTabs'
 import { DataScreen } from '@/features/data/DataScreen'
 import { GridScreen } from '@/features/grid/GridScreen'
-import { NativeSelect } from '@/features/grid/NativeSelect'
 import { HomeScreen } from '@/features/home/HomeScreen'
 import { HouseholdScreen } from '@/features/household/HouseholdScreen'
 import { MonthScreen } from '@/features/month/MonthScreen'
 import { MovesScreen } from '@/features/moves/MovesScreen'
 import { AccountDialog, type AccountStep } from '@/features/sync/AccountDialog'
-import { SyncIndicator } from '@/features/sync/SyncIndicator'
 import { planRecurringPosts } from '@/store'
 import { SyncContext, createSyncEngine, useSyncEngine } from '@/sync/useSync'
-
-type Screen = 'grid' | 'month' | 'moves' | 'household' | 'data'
-const SCREENS: Array<{ key: Screen; label: string }> = [
-  { key: 'grid', label: 'Grid' }, { key: 'month', label: 'Month' }, { key: 'moves', label: 'Moves' },
-  { key: 'household', label: 'Household' }, { key: 'data', label: 'Data' },
-]
 
 export default function App() {
   const store = useMemo(() => createAppStore(), [])
@@ -41,12 +32,18 @@ export default function App() {
   )
 }
 
+/** The frame every screen sits in (DESIGN.md §2): the dark rail on the left (phones: the bottom tabs), the screen in a
+ *  main that scrolls with the window. Each screen draws its own page header. */
 function Shell() {
   const store = useStore()
   const tables = useTables()
   const household = activeHousehold(tables)
-  const [screen, setScreen] = useState<Screen>(() => (window.innerWidth < 768 ? 'month' : 'grid'))
-  useStoreVersion(store)
+  const [screen, setScreen] = useState<Screen>(readScreen)
+  const go = useCallback((s: Screen) => {
+    setScreen(s)
+    rememberScreen(s)
+  }, [])
+  const nav = useMemo(() => ({ screen, go }), [screen, go])
   const sync = useSyncEngine()
   const [inviteCode] = useState(() => takeInviteFromUrl())
   const [account, setAccount] = useState<AccountStep | null>(() => (inviteCode && sync ? 'join' : null))
@@ -82,38 +79,23 @@ function Shell() {
   const showHome = !household && screen !== 'data'
 
   return (
-    <div className="min-h-dvh bg-background text-foreground">
-      <header className="border-b">
-        <div className="mx-auto flex max-w-[1800px] items-center gap-3 px-4 py-2">
-          <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="size-7 rounded-md" />
-          <span className="max-w-[40vw] truncate font-semibold tracking-tight sm:max-w-none">{household?.name ?? 'Casa Papel'}</span>
-          {isDemoMode() && <Badge variant="secondary">demo</Badge>}
-          <nav className="ml-auto flex items-center gap-1" aria-label="Screens">
-            <Button variant="ghost" size="icon" aria-label="Undo" disabled={!store.canUndo} onClick={() => void store.undo()}><Undo2 /></Button>
-            <Button variant="ghost" size="icon" aria-label="Redo" disabled={!store.canRedo} onClick={() => void store.redo()}><Redo2 /></Button>
-            <SyncIndicator onOpen={() => setScreen('data')} />
-            <span className="mx-1 h-5 w-px bg-border" />
-            <div className="hidden gap-1 md:flex">
-              {SCREENS.map((s) => (
-                <Button key={s.key} variant={screen === s.key && !(showHome && s.key !== 'data') ? 'secondary' : 'ghost'} size="sm" onClick={() => setScreen(s.key)}>{s.label}</Button>
-              ))}
-            </div>
-            <NativeSelect aria-label="Screen" className="md:hidden" value={screen} onChange={(e) => setScreen(e.target.value as Screen)}>
-              {SCREENS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
-            </NativeSelect>
-          </nav>
-        </div>
-      </header>
-      <main className="mx-auto max-w-[1800px] px-4 py-4">
-        {showHome ? (
-          <HomeScreen onOpenData={() => setScreen('data')} onCreated={() => setScreen(window.innerWidth < 768 ? 'month' : 'grid')} syncAvailable={!!sync} onSignIn={() => setAccount('signin')} onJoin={() => setAccount('join')} />
-        ) : screen === 'data' ? <DataScreen />
-          : screen === 'month' ? <MonthScreen />
-          : screen === 'moves' ? <MovesScreen />
-          : screen === 'household' ? <HouseholdScreen />
-          : <GridScreen />}
-      </main>
-      {account && sync && <AccountDialog initial={account} inviteCode={inviteCode ?? undefined} hasLocalData={!!household} onClose={() => setAccount(null)} />}
-    </div>
+    <ScreenContext.Provider value={nav}>
+      <div className="flex min-h-dvh bg-background text-foreground">
+        <AppRail householdName={household?.name} />
+        <main className="min-w-0 flex-1 p-4 pb-24 text-sm md:p-6 md:pb-6">
+          <div className="mx-auto max-w-[1800px]">
+            {showHome ? (
+              <HomeScreen onOpenData={() => go('data')} onCreated={() => go(isPhone() ? 'month' : 'grid')} syncAvailable={!!sync} onSignIn={() => setAccount('signin')} onJoin={() => setAccount('join')} />
+            ) : screen === 'data' ? <DataScreen />
+              : screen === 'month' ? <MonthScreen />
+              : screen === 'moves' ? <MovesScreen />
+              : screen === 'household' ? <HouseholdScreen />
+              : <GridScreen />}
+          </div>
+        </main>
+        <BottomTabs />
+        {account && sync && <AccountDialog initial={account} inviteCode={inviteCode ?? undefined} hasLocalData={!!household} onClose={() => setAccount(null)} />}
+      </div>
+    </ScreenContext.Provider>
   )
 }

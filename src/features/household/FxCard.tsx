@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Chip, type ChipTone } from '@/components/ui/chip'
 import { Input } from '@/components/ui/input'
+import { Island } from '@/components/ui/island'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/features/grid/NativeSelect'
 import { formatMonth } from '@/app/format'
@@ -10,6 +10,9 @@ import { useStore } from '@/app/store'
 import { buildFxIndex, driftFor, rateInfo } from '@/engine'
 import { addMonths, compareMonths, monthOfDate, type FxMonthRate, type Household, type MonthKey, type Tables } from '@/model'
 import { fetchEcbRates, neededPairs, setFxSettings, setManualRate } from '@/store'
+
+/** Where a month's rate came from, as a chip: yours is sky, the ECB's a fact in zinc, a projection amber, a gap rose. */
+const TAG_TONE: Record<string, ChipTone> = { manual: 'sky', ECB: 'zinc', projected: 'amber', carried: 'zinc', missing: 'rose' }
 
 export function FxCard({ household, tables, months, onError }: { household: Household; tables: Tables; months: MonthKey[]; onError: (m: string) => void }) {
   const store = useStore()
@@ -52,17 +55,14 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Currency rates</CardTitle>
-        <CardDescription>
-          {pairs.length === 0
-            ? `Everything is in ${household.baseCurrency}; nothing to convert. Give a row or account another currency and the rates appear here.`
-            : `How many units of the other currency one ${household.baseCurrency} buys, per month. Past months can come from the European Central Bank; future months are projected with the drift below. Type a rate to override any month.`}
-        </CardDescription>
-      </CardHeader>
+    <Island
+      air title="Currency rates"
+      description={pairs.length === 0
+        ? `Everything is in ${household.baseCurrency}; nothing to convert. Give a row or account another currency and the rates appear here.`
+        : `How many units of the other currency one ${household.baseCurrency} buys, per month. Past months can come from the European Central Bank; future months are projected with the drift below. Type a rate to override any month.`}
+    >
       {pairs.length > 0 && (
-        <CardContent className="space-y-4">
+        <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
               <Label htmlFor="fx-policy">Month rate</Label>
@@ -86,11 +86,11 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
                   id="fx-drift" inputMode="decimal" value={drift} onChange={(e) => setDrift(e.target.value)}
                   onBlur={() => { const v = Number(drift.replace(',', '.')); if (Number.isFinite(v)) act(() => setFxSettings(store, { fxDriftDefault: v / 100 })); else onError('Drift is not a number.') }}
                 />
-                <p className="text-xs text-muted-foreground">1.5 means the rate rises 1.5% every month after the last known one. 0 keeps it flat.</p>
+                <p className="text-muted-foreground">1.5 means the rate rises 1.5% every month after the last known one. 0 keeps it flat.</p>
               </div>
             )}
             {driftMode === 'fixed' && (
-              <div className="space-y-1 text-xs sm:col-span-3">
+              <div className="space-y-1 sm:col-span-3">
                 {suggestions.map((s) => (
                   <div key={s.pair} className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{s.pair}</span>
@@ -101,7 +101,7 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
                     )}
                     {s.override != null ? (
                       <>
-                        <Badge variant="secondary">using {pct(s.override)}</Badge>
+                        <Chip tone="sky">using {pct(s.override)}</Chip>
                         <Button size="xs" variant="ghost" onClick={() => setPairDrift(s.pair, null)}>Back to the default</Button>
                       </>
                     ) : (
@@ -113,31 +113,31 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <Button size="sm" variant="outline" onClick={() => void fetchNow()} disabled={busy}>{busy ? 'Fetching…' : 'Fetch ECB rates'}</Button>
-            <span className="text-xs text-muted-foreground">Only currency codes and dates are sent to the rate service (frankfurter.dev, ECB data). Nothing about your household.</span>
+            <Button size="xs" variant="outline" onClick={() => void fetchNow()} disabled={busy}>{busy ? 'Fetching…' : 'Fetch ECB rates'}</Button>
+            <span className="text-muted-foreground">Only currency codes and dates are sent to the rate service (frankfurter.dev, ECB data). Nothing about your household.</span>
           </div>
-          {note && <p className="text-sm" role="status">{note}</p>}
+          {note && <p role="status">{note}</p>}
           <div className="overflow-x-auto rounded-md border">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
-                <tr><th className="px-3 py-2 font-medium">Month</th>{pairs.map((p) => <th key={p} className="px-3 py-2 font-medium">{p}</th>)}</tr>
+            <table className="w-full">
+              <thead className="bg-muted/50 text-left text-muted-foreground">
+                <tr><th className="px-2 py-1 font-semibold">Month</th>{pairs.map((p) => <th key={p} className="px-2 py-1 font-semibold">{p}</th>)}</tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-border/60">
                 {months.map((m) => (
                   <tr key={m}>
-                    <td className="px-3 py-1.5 whitespace-nowrap">{formatMonth(m, household.locale)}</td>
+                    <td className="whitespace-nowrap px-2 py-1">{formatMonth(m, household.locale)}</td>
                     {pairs.map((p) => {
                       const [from, to] = p.split('/')
                       const rec = stored.get(`${p}|${m}`)
                       const info = rateInfo(fx, from, to, m)
                       const tag = rec?.source === 'manual' ? 'manual' : rec?.source === 'api' ? 'ECB' : info ? (info.projected ? 'projected' : 'carried') : 'missing'
                       return (
-                        <td key={p} className="px-3 py-1">
+                        <td key={p} className="px-2 py-0.5">
                           <div className="flex items-center gap-2">
                             <Input
                               key={`${p}|${m}|${rec?.rate ?? ''}|${rec?.source ?? ''}`}
                               aria-label={`${p} rate for ${formatMonth(m, household.locale)}`}
-                              className="h-7 w-28 text-right tabular-nums" inputMode="decimal"
+                              className="h-6 w-28 text-right tabular-nums" inputMode="decimal"
                               defaultValue={rec ? String(rec.rate) : ''}
                               placeholder={info ? info.rate.toFixed(4) : '—'}
                               onBlur={(e) => {
@@ -149,7 +149,7 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
                                 act(() => setManualRate(store, p, m, v))
                               }}
                             />
-                            <Badge variant={tag === 'manual' ? 'default' : tag === 'ECB' ? 'secondary' : 'outline'} className="text-[10px]">{tag}</Badge>
+                            <Chip tone={TAG_TONE[tag]}>{tag}</Chip>
                           </div>
                         </td>
                       )
@@ -159,8 +159,8 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
               </tbody>
             </table>
           </div>
-        </CardContent>
+        </div>
       )}
-    </Card>
+    </Island>
   )
 }

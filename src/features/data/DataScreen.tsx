@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Chip } from '@/components/ui/chip'
 import { Input } from '@/components/ui/input'
-import { Separator } from '@/components/ui/separator'
+import { Island } from '@/components/ui/island'
+import { PageHeader } from '@/components/PageHeader'
 import { isDemoMode, useStore } from '@/app/store'
 import { loadDemo } from '@/demo/loadDemo'
 import type { ExportFile } from '@/model'
@@ -16,6 +16,7 @@ import { SyncCard } from './SyncCard'
 
 type Pending = { file: ExportFile; name: string }
 
+/** Where the data lives and how it moves: storage status, cloud sync, export, import, the demo, the danger zone. */
 export function DataScreen() {
   const store = useStore()
   const household = useLiveQuery(() => store.db.household.toArray(), [store])
@@ -141,7 +142,8 @@ export function DataScreen() {
   const nag = exportNag && !syncHealthy
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="mx-auto max-w-2xl space-y-4 text-xs">
+      <PageHeader title="Data" subline={h ? `${h.name} · export, import, sync` : 'Export, import, sync'} />
       {message && (
         <Alert>
           <AlertTitle>Done</AlertTitle>
@@ -155,107 +157,88 @@ export function DataScreen() {
         </Alert>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Where your data lives</CardTitle>
-          <CardDescription>
-            {sync
-              ? 'In this browser, on this device. Sign in below to keep an encrypted copy in the cloud as well; only your password opens it. Export a file now and then so a cleared browser cannot take your history with it.'
-              : 'In this browser only, on this device. Casa Papel has no server. Export a file now and then so a cleared browser cannot take your history with it.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
+      <Island
+        air title="Where your data lives"
+        description={sync
+          ? 'In this browser, on this device. Sign in below to keep an encrypted copy in the cloud as well; only your password opens it. Export a file now and then so a cleared browser cannot take your history with it.'
+          : 'In this browser only, on this device. Casa Papel has no server. Export a file now and then so a cleared browser cannot take your history with it.'}
+      >
+        <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={persisted ? 'secondary' : 'outline'}>{persisted ? 'Persistent storage granted' : persisted === false ? 'Storage may be evicted' : 'Storage status unknown'}</Badge>
-            {usage && <Badge variant="outline">{usage}</Badge>}
-            {isDemoMode() && <Badge>Demo sandbox</Badge>}
+            <Chip tone={persisted ? 'emerald' : persisted === false ? 'amber' : 'zinc'}>{persisted ? 'persistent storage granted' : persisted === false ? 'storage may be evicted' : 'storage status unknown'}</Chip>
+            {usage && <Chip tone="zinc">{usage}</Chip>}
+            {isDemoMode() && <Chip tone="amber">demo sandbox</Chip>}
             {!persisted && (
-              <Button size="sm" variant="outline" onClick={requestPersist}>Ask the browser to keep my data</Button>
+              <Button size="xs" variant="outline" onClick={requestPersist}>Ask the browser to keep my data</Button>
             )}
           </div>
           <p className="text-muted-foreground">
             History entries: {eventCount ?? 0} · since last export: {since} · last export: {lastExport}
           </p>
-        </CardContent>
-      </Card>
+        </div>
+      </Island>
 
       <SyncCard hasLocalData={!!h} onMessage={setMessage} onError={setError} />
       <InviteCard onError={setError} />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Export</CardTitle>
-          <CardDescription>One JSON file with every table and the full change history. Keep it anywhere you like.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap items-center gap-2">
-          <Button onClick={doExport} disabled={!h}>Export now</Button>
-          {nag && <span className="text-sm text-amber-700 dark:text-amber-400">You have unsaved changes since your last export.</span>}
-        </CardContent>
-      </Card>
+      <Island air title="Export" description="One JSON file with every table and the full change history. Keep it anywhere you like.">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" onClick={doExport} disabled={!h}>Export now</Button>
+          {nag && <span role="status" className="text-amber-700 dark:text-amber-400">You have unsaved changes since your last export.</span>}
+        </div>
+      </Island>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Import</CardTitle>
-          <CardDescription>Restore an export, or merge a copy of the same household from another device.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <Island air title="Import" description="Restore an export, or merge a copy of the same household from another device.">
+        <div className="space-y-3">
           <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={onPickFile} />
-          <Button variant="outline" onClick={() => fileRef.current?.click()}>Choose a file…</Button>
+          <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}>Choose a file…</Button>
           {pending && (
-            <div className="rounded-md border p-3 text-sm space-y-2">
+            <div className="space-y-2 rounded-md border p-3">
               <p>
                 <strong>{pending.name}</strong> · exported {new Date(pending.file.exportedAt).toLocaleString()} · {pending.file.tables.household[0]?.name ?? 'unnamed household'} · {pending.file.events.length} history entries
               </p>
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" onClick={() => applyImport('merge')}>Merge into this device</Button>
-                <Button size="sm" variant="destructive" onClick={() => applyImport('replace')}>Replace everything here</Button>
-                <Button size="sm" variant="ghost" onClick={() => setPending(null)}>Cancel</Button>
+                <Button size="xs" onClick={() => applyImport('merge')}>Merge into this device</Button>
+                <Button size="xs" variant="destructive" onClick={() => applyImport('replace')}>Replace everything here</Button>
+                <Button size="xs" variant="ghost" onClick={() => setPending(null)}>Cancel</Button>
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Island>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Demo household</CardTitle>
-          <CardDescription>
-            {isDemoMode()
-              ? 'You are in the demo sandbox. Loading the demo never touches your real data.'
-              : 'Loads a fictional household into this store, replacing what is here. Prefer the sandbox at ?demo=1.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <Button variant={isDemoMode() ? 'default' : 'outline'} onClick={() => void loadDemo(store)} disabled={signedIn}>Load demo household</Button>
-          {signedIn && <p className="text-xs text-muted-foreground">Sign out first: loading the demo here would upload it to your household's cloud copy.</p>}
-        </CardContent>
-      </Card>
+      <Island
+        air title="Demo household"
+        description={isDemoMode()
+          ? 'You are in the demo sandbox. Loading the demo never touches your real data.'
+          : 'Loads a fictional household into this store, replacing what is here. Prefer the sandbox at ?demo=1.'}
+      >
+        <div className="space-y-2">
+          <Button size="sm" variant={isDemoMode() ? 'default' : 'outline'} onClick={() => void loadDemo(store)} disabled={signedIn}>Load demo household</Button>
+          {signedIn && <p className="text-muted-foreground">Sign out first: loading the demo here would upload it to your household's cloud copy.</p>}
+        </div>
+      </Island>
 
-      <Separator />
-
-      <Card className="border-destructive/40">
-        <CardHeader>
-          <CardTitle>Danger zone</CardTitle>
-          <CardDescription>
-            {signedIn ? 'Remove everything from this browser and stop syncing here. The cloud copy and other devices are untouched. Type WIPE to enable the button.' : 'Remove everything from this browser. Export first. Type WIPE to enable the button.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <Island
+        air title="Danger zone" className="border-destructive/40"
+        description={signedIn ? 'Remove everything from this browser and stop syncing here. The cloud copy and other devices are untouched. Type WIPE to enable the button.' : 'Remove everything from this browser. Export first. Type WIPE to enable the button.'}
+      >
+        <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <Input className="max-w-40" value={wipeWord} onChange={(e) => setWipeWord(e.target.value)} placeholder="WIPE" aria-label="Type WIPE to confirm" />
-            <Button variant="destructive" disabled={wipeWord !== 'WIPE'} onClick={doWipe}>{signedIn ? 'Sign out and wipe this device' : 'Wipe this device'}</Button>
+            <Button size="sm" variant="destructive" disabled={wipeWord !== 'WIPE'} onClick={doWipe}>{signedIn ? 'Sign out and wipe this device' : 'Wipe this device'}</Button>
           </div>
           {signedIn && syncView.owner && (
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
                 <Input className="max-w-40" value={deleteWord} onChange={(e) => setDeleteWord(e.target.value)} placeholder="DELETE" aria-label="Type DELETE to confirm" />
-                <Button variant="destructive" disabled={deleteWord !== 'DELETE'} onClick={doDeleteCloud}>Delete the cloud copy</Button>
+                <Button size="sm" variant="destructive" disabled={deleteWord !== 'DELETE'} onClick={doDeleteCloud}>Delete the cloud copy</Button>
               </div>
-              <p className="text-xs text-muted-foreground">Removes the household from the server for every device. Each device keeps what it has locally. Type DELETE to enable the button.</p>
+              <p className="text-muted-foreground">Removes the household from the server for every device. Each device keeps what it has locally. Type DELETE to enable the button.</p>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Island>
     </div>
   )
 }

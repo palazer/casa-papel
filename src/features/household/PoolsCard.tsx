@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Island } from '@/components/ui/island'
 import { Label } from '@/components/ui/label'
 import { Check } from '@/components/Check'
 import { NativeSelect } from '@/features/grid/NativeSelect'
@@ -12,7 +11,7 @@ import { useStore } from '@/app/store'
 import type { EngineOutput } from '@/engine'
 import { monthOfDate, type Account, type Household, type Pool, type Tables } from '@/model'
 import { addPool, updatePool } from '@/store'
-import { HUES, cardBar } from '@/app/hues'
+import { HUES } from '@/app/hues'
 
 export function PoolsCard({ household, tables, engine, onError }: { household: Household; tables: Tables; engine: EngineOutput | null; onError: (m: string) => void }) {
   const [editing, setEditing] = useState<Pool | 'new' | null>(null)
@@ -21,25 +20,22 @@ export function PoolsCard({ household, tables, engine, onError }: { household: H
   const m = monthOfDate()
   const { locale, baseCurrency } = household
   return (
-    <Card className={cardBar(HUES.pool)}>
-      <CardHeader>
-        <CardTitle>Pool accounts</CardTitle>
-        <CardDescription>
-          A pool account is an envelope inside a savings account: a monthly amount is set aside for travel, clothes, gifts, and spending that "comes out of" it draws it down without touching the month's leftover.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <Island
+      air tone={HUES.pool} title="Pool accounts"
+      description={'A pool account is an envelope inside a savings account: a monthly amount is set aside for travel, clothes, gifts, and spending that "comes out of" it draws it down without touching the month\'s leftover.'}
+    >
+      <div className="space-y-3">
         {pools.length > 0 && (
-          <ul className="divide-y rounded-md border">
+          <ul className="divide-y divide-border/60">
             {pools.map((p) => {
               const acc = tables.accounts.find((a) => a.id === p.accountId)
               const alloc = p.allocationRowId ? tables.rows.find((r) => r.id === p.allocationRowId) : undefined
               const bal = engine?.pools[p.id]?.months[m]
               return (
-                <li key={p.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
+                <li key={p.id} className="flex min-h-8 flex-wrap items-center gap-2 py-1">
                   <span className="font-medium">{p.name}</span>
                   <span className="text-muted-foreground">in {acc?.name ?? '?'}{alloc ? ` · filled by the row "${alloc.name}"` : ''}</span>
-                  {bal && <Badge variant="secondary">{formatAmount(bal.balance, baseCurrency, locale)} now</Badge>}
+                  {bal && <span className="tabular-nums text-muted-foreground">· {formatAmount(bal.balance, baseCurrency, locale)} now</span>}
                   <Button size="xs" variant="ghost" className="ml-auto" onClick={() => setEditing(p)}>Edit</Button>
                 </li>
               )
@@ -47,13 +43,13 @@ export function PoolsCard({ household, tables, engine, onError }: { household: H
           </ul>
         )}
         {savings.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Add a savings account first; pool accounts live inside one.</p>
+          <p className="text-muted-foreground">Add a savings account first; pool accounts live inside one.</p>
         ) : (
-          <Button variant="outline" size="sm" onClick={() => setEditing('new')}>Add pool account</Button>
+          <Button variant="outline" size="xs" onClick={() => setEditing('new')}>Add pool account</Button>
         )}
         {editing && <PoolDialog pool={editing === 'new' ? null : editing} savings={savings} baseCurrency={baseCurrency} locale={locale} onClose={() => setEditing(null)} onError={onError} />}
-      </CardContent>
-    </Card>
+      </div>
+    </Island>
   )
 }
 

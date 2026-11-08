@@ -13,29 +13,29 @@ test.describe('wave 1d', () => {
     await loadDemo(page)
 
     // pooled mode: what each adult leaves for the household
-    await page.getByRole('button', { name: 'Moves' }).click()
+    await page.getByRole('link', { name: 'Moves' }).click()
     await expect(page.getByText('Per person', { exact: true })).toBeVisible()
     await expect(page.getByRole('cell', { name: 'Leaves for the household' })).toBeVisible()
     await expect(page.getByText('Net worth', { exact: true })).toBeVisible()
 
     // pocket money from this month on: October keeps 500 each, November shows 750 each
-    await page.getByRole('button', { name: 'Household' }).click()
+    await page.getByRole('link', { name: 'Household' }).click()
     const pocket = page.getByLabel(/^Pocket money per month, all adults/)
     await pocket.fill('1500')
     await pocket.press('Tab')
-    await page.getByRole('button', { name: 'Grid' }).click()
+    await page.getByRole('link', { name: 'Grid' }).click()
     const samPocket = page.getByRole('row', { name: /^Pocket – Sam/ })
     await expect(samPocket).toContainText('€500.00')
     await expect(samPocket).toContainText('€750.00')
 
     // switch to proportional contributions
-    await page.getByRole('button', { name: 'Household' }).click()
+    await page.getByRole('link', { name: 'Household' }).click()
     await page.getByLabel('How you share money').selectOption('proportional')
     await expect(page.getByText('Shares come from')).toBeVisible()
     await expect(page.getByRole('cell', { name: 'Keeps' })).toBeVisible()
     await page.screenshot({ path: 'e2e/output/shares-card.png', fullPage: true })
 
-    await page.getByRole('button', { name: 'Moves' }).click()
+    await page.getByRole('link', { name: 'Moves' }).click()
     await expect(page.getByText(/Shared lines are split/)).toBeVisible()
     await expect(page.getByRole('columnheader', { name: 'Sam' })).toBeVisible()
     await expect(page.getByRole('columnheader', { name: 'Alex' })).toBeVisible()
@@ -43,7 +43,7 @@ test.describe('wave 1d', () => {
     await page.screenshot({ path: 'e2e/output/who-pays-what.png', fullPage: true })
 
     // a loan and a credit card
-    await page.getByRole('button', { name: 'Household' }).click()
+    await page.getByRole('link', { name: 'Household' }).click()
     const dlg = page.getByRole('dialog')
     await page.getByRole('button', { name: 'Add account' }).click()
     await dlg.getByLabel('Name', { exact: true }).fill('Car loan')
@@ -61,7 +61,7 @@ test.describe('wave 1d', () => {
     await expect(dlg).toBeHidden()
 
     // grid: debts in Balances, net worth at the bottom
-    await page.getByRole('button', { name: 'Grid' }).click()
+    await page.getByRole('link', { name: 'Grid' }).click()
     await expect(page.getByRole('button', { name: /^Car loan · outstanding Nov 2026/ })).toContainText('5,000')
     await expect(page.getByRole('button', { name: /^Visa · owed Nov 2026/ })).toContainText('300')
     await expect(page.getByRole('rowheader', { name: 'Net worth' })).toBeVisible()

@@ -1,15 +1,16 @@
 import { MonthField } from '@/components/MonthField'
+import { PageHeader } from '@/components/PageHeader'
 import { RecurringList } from '@/features/recurring/RecurringList'
 import { FxCard } from './FxCard'
 import { SharesCard } from './SharesCard'
-import { HUES, cardBar } from '@/app/hues'
+import { HUES } from '@/app/hues'
 import { PoolsCard } from './PoolsCard'
 import { useMemo, useState } from 'react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Chip } from '@/components/ui/chip'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Island } from '@/components/ui/island'
 import { Label } from '@/components/ui/label'
 import { Check } from '@/components/Check'
 import { NativeSelect } from '@/features/grid/NativeSelect'
@@ -26,6 +27,7 @@ const LOCALES = ['en-IE', 'en-GB', 'en-US', 'de-DE', 'de-AT', 'tr-TR', 'fr-FR', 
 const ACCOUNT_TYPES = ACCOUNT_TYPE_INFO
 const KINDS: EntityKind[] = ['adult', 'child', 'pet', 'vehicle', 'property', 'company', 'other']
 
+/** The household's settings and its parts: people & things, accounts, pool accounts, currency rates, schedules. A reading page: air islands. */
 export function HouseholdScreen() {
   const store = useStore()
   const tables = useTables()
@@ -35,23 +37,23 @@ export function HouseholdScreen() {
   const [error, setError] = useState<string | null>(null)
   if (!tables || !household || !engine) return null
   const act = (fn: () => Promise<unknown>) => void fn().catch((e) => setError(e instanceof Error ? e.message : 'Action failed'))
+  const people = tables.entities.filter((e) => !e.deletedAt && !e.archivedMonth).length
+  const accounts = tables.accounts.filter((a) => !a.deletedAt).length
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      {error && <p className="text-sm text-destructive">{error}</p>}
+    <div className="mx-auto max-w-3xl space-y-4 text-xs">
+      <PageHeader title="Household" subline={`${household.name} · ${people} ${people === 1 ? 'person or thing' : 'people & things'} · ${accounts} ${accounts === 1 ? 'account' : 'accounts'}`}>
+        {error && <p role="alert" className="basis-full text-destructive">{error}</p>}
+      </PageHeader>
       <SettingsCard household={household} tables={tables} onSave={(p) => act(() => updateHousehold(store, p))} onMonthly={(key, value, scope) => act(() => setMonthlyDefault(store, key, value, scope, monthOfDate()))} />
       {household.moneyMode === 'proportional' && <SharesCard household={household} tables={tables} engine={engine} onError={setError} />}
       <EntitiesCard household={household} entities={tables.entities.filter((e) => !e.deletedAt)} onError={setError} />
       <AccountsCard household={household} accounts={tables.accounts.filter((a) => !a.deletedAt)} entities={tables.entities} engine={engine} months={months} onError={setError} />
       <PoolsCard household={household} tables={tables} engine={engine} onError={setError} />
       <FxCard household={household} tables={tables} months={months} onError={setError} />
-      <Card className={cardBar(HUES.transfer)}>
-        <CardHeader>
-          <CardTitle>Recurring payments and incomes</CardTitle>
-          <CardDescription>Rent, salary, insurance, subscriptions: anything on a schedule. They land in the grid by themselves and show up in Moves when due.</CardDescription>
-        </CardHeader>
-        <CardContent><RecurringList /></CardContent>
-      </Card>
+      <Island air tone={HUES.transfer} title="Schedules" description="Recurring payments and incomes: rent, salary, insurance, subscriptions, anything on a schedule. They land in the grid by themselves and show up in Moves when due.">
+        <RecurringList />
+      </Island>
     </div>
   )
 }
@@ -66,12 +68,8 @@ function SettingsCard({ household: h, tables, onSave, onMonthly }: { household: 
   const [buffer, setBuffer] = useState(amountToInput(effective('cashBuffer'), h.baseCurrency, h.locale))
   const money = (s: string) => (s.trim() ? parseAmount(s, h.baseCurrency, h.locale) ?? 0 : 0)
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Settings</CardTitle>
-        <CardDescription>Closed months keep the values they were closed with.</CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-3 sm:grid-cols-2">
+    <Island air title="Settings" description="Closed months keep the values they were closed with.">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="s-name">Household name</Label>
           <Input id="s-name" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => name.trim() && name !== h.name && onSave({ name: name.trim() })} />
@@ -101,24 +99,24 @@ function SettingsCard({ household: h, tables, onSave, onMonthly }: { household: 
             <option value="this-month">Only this month</option>
             <option value="all-open">Every open month</option>
           </NativeSelect>
-          <p className="text-xs text-muted-foreground">Closed months are never changed. "This month" is {formatMonth(thisMonth, h.locale)}.</p>
+          <p className="text-muted-foreground">Closed months are never changed. "This month" is {formatMonth(thisMonth, h.locale)}.</p>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="s-pocket">Pocket money per month, all adults ({h.baseCurrency})</Label>
           <Input id="s-pocket" inputMode="decimal" value={pocket} onChange={(e) => setPocket(e.target.value)} onBlur={() => { const v = money(pocket); if (v !== effective('pocketTotal')) onMonthly('pocketTotal', v, scope) }} />
-          {effective('pocketTotal') !== h.pocketTotal && <p className="text-xs text-muted-foreground">This month {formatAmount(effective('pocketTotal'), h.baseCurrency, h.locale)} · default {formatAmount(h.pocketTotal, h.baseCurrency, h.locale)}</p>}
+          {effective('pocketTotal') !== h.pocketTotal && <p className="text-muted-foreground">This month {formatAmount(effective('pocketTotal'), h.baseCurrency, h.locale)} · default {formatAmount(h.pocketTotal, h.baseCurrency, h.locale)}</p>}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="s-buffer">Cash kept in the account at month end ({h.baseCurrency})</Label>
           <Input id="s-buffer" inputMode="decimal" value={buffer} onChange={(e) => setBuffer(e.target.value)} onBlur={() => { const v = money(buffer); if (v !== effective('cashBuffer')) onMonthly('cashBuffer', v, scope) }} />
-          {effective('cashBuffer') !== h.cashBuffer && <p className="text-xs text-muted-foreground">This month {formatAmount(effective('cashBuffer'), h.baseCurrency, h.locale)} · default {formatAmount(h.cashBuffer, h.baseCurrency, h.locale)}</p>}
+          {effective('cashBuffer') !== h.cashBuffer && <p className="text-muted-foreground">This month {formatAmount(effective('cashBuffer'), h.baseCurrency, h.locale)} · default {formatAmount(h.cashBuffer, h.baseCurrency, h.locale)}</p>}
         </div>
         <div className="sm:col-span-2">
           <Check label="Show expenses as negative red numbers" checked={h.displayExpensesNegative} onChange={(e) => onSave({ displayExpensesNegative: e.target.checked })} />
         </div>
-        <p className="text-xs text-muted-foreground sm:col-span-2">Base currency {h.baseCurrency} · first month {formatMonth(h.startMonth, h.locale)}. These cannot be changed after setup.</p>
-      </CardContent>
-    </Card>
+        <p className="text-muted-foreground sm:col-span-2">Base currency {h.baseCurrency} · first month {formatMonth(h.startMonth, h.locale)}. These cannot be changed after setup.</p>
+      </div>
+    </Island>
   )
 }
 
@@ -139,19 +137,15 @@ function EntitiesCard({ household, entities: allEntities, onError }: { household
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>People and things</CardTitle>
-        <CardDescription>Who and what the household pays for. Each one can bring suggested rows.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <ul className="divide-y rounded-md border">
+    <Island air title="People & things" description="Who and what the household pays for. Each one can bring suggested rows.">
+      <div className="space-y-4">
+        <ul className="divide-y divide-border/60">
           {entities.map((e) => (
-            <li key={e.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
-              <Badge variant="outline">{ENTITY_KIND_LABEL[e.kind]}</Badge>
+            <li key={e.id} className="flex min-h-8 flex-wrap items-center gap-2 py-1">
+              <Chip tone="zinc">{ENTITY_KIND_LABEL[e.kind].toLowerCase()}</Chip>
               <span className="font-medium">{e.name}</span>
               {e.kind !== 'adult' && (
-                <NativeSelect aria-label={`Who pays for ${e.name}`} className="h-7 text-xs" value={e.paidBy ?? ''} onChange={(ev) => act(() => updateEntity(store, e.id, { paidBy: ev.target.value || null }))}>
+                <NativeSelect aria-label={`Who pays for ${e.name}`} className="h-6 text-xs" value={e.paidBy ?? ''} onChange={(ev) => act(() => updateEntity(store, e.id, { paidBy: ev.target.value || null }))}>
                   <option value="">Costs shared</option>
                   {adults.map((a) => <option key={a.id} value={a.id}>Paid by {a.name}</option>)}
                 </NativeSelect>
@@ -168,21 +162,21 @@ function EntitiesCard({ household, entities: allEntities, onError }: { household
                 )}
               </span>
               {archiving === e.id && (
-                <p className="basis-full text-xs text-muted-foreground">Archiving hides {e.name} from this list from {formatMonth(monthOfDate(), household.locale)} on. Rows and past months stay as they are. Restore any time from the archived list below.</p>
+                <p className="basis-full text-muted-foreground">Archiving hides {e.name} from this list from {formatMonth(monthOfDate(), household.locale)} on. Rows and past months stay as they are. Restore any time from the archived list below.</p>
               )}
             </li>
           ))}
-          {entities.length === 0 && <li className="px-3 py-2 text-sm text-muted-foreground">Nobody yet.</li>}
+          {entities.length === 0 && <li className="py-1 text-muted-foreground">Nobody yet.</li>}
         </ul>
         {archived.length > 0 && (
           <div className="space-y-1">
-            <p className="text-xs font-medium text-muted-foreground">Archived</p>
-            <ul className="divide-y rounded-md border">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Archived</p>
+            <ul className="divide-y divide-border/60">
               {archived.map((e) => (
-                <li key={e.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
-                  <Badge variant="outline">{ENTITY_KIND_LABEL[e.kind]}</Badge>
+                <li key={e.id} className="flex min-h-8 flex-wrap items-center gap-2 py-1 text-muted-foreground">
+                  <Chip tone="zinc">{ENTITY_KIND_LABEL[e.kind].toLowerCase()}</Chip>
                   <span>{e.name}</span>
-                  <span className="text-xs">since {formatMonth(e.archivedMonth!, household.locale)}</span>
+                  <span>since {formatMonth(e.archivedMonth!, household.locale)}</span>
                   <Button size="xs" variant="outline" className="ml-auto" onClick={() => act(() => updateEntity(store, e.id, { archivedMonth: null }))}>Restore</Button>
                 </li>
               ))}
@@ -190,12 +184,12 @@ function EntitiesCard({ household, entities: allEntities, onError }: { household
           </div>
         )}
         <div className="space-y-2">
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {KINDS.map((k) => (
-              <Button key={k} size="sm" variant={kind === k ? 'secondary' : 'outline'} aria-pressed={kind === k} title={ENTITY_KIND_HELP[k]} onClick={() => setKind(k)}>Add {ENTITY_KIND_LABEL[k].toLowerCase()}</Button>
+              <Button key={k} size="xs" variant={kind === k ? 'default' : 'outline'} aria-pressed={kind === k} title={ENTITY_KIND_HELP[k]} onClick={() => setKind(k)}>Add {ENTITY_KIND_LABEL[k].toLowerCase()}</Button>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground">{ENTITY_KIND_HELP[kind]}</p>
+          <p className="text-muted-foreground">{ENTITY_KIND_HELP[kind]}</p>
           <div className="flex flex-wrap items-end gap-2">
             <div className="space-y-1">
               <Label htmlFor="e-name">{ENTITY_KIND_LABEL[kind]} name</Label>
@@ -210,12 +204,12 @@ function EntitiesCard({ household, entities: allEntities, onError }: { household
                 </NativeSelect>
               </div>
             )}
-            <Button disabled={!name.trim()} onClick={add}>Add</Button>
+            <Button size="sm" disabled={!name.trim()} onClick={add}>Add</Button>
           </div>
         </div>
         {templatesFor && <TemplatesDialog household={household} entity={templatesFor} onClose={() => setTemplatesFor(null)} onError={onError} />}
-      </CardContent>
-    </Card>
+      </div>
+    </Island>
   )
 }
 
@@ -248,17 +242,13 @@ function AccountsCard({ household, accounts, entities, engine, months, onError }
   const [actualsFor, setActualsFor] = useState<string | null>(null)
   const { locale, baseCurrency } = household
   return (
-    <Card className={cardBar(HUES.worth)}>
-      <CardHeader>
-        <CardTitle>Accounts</CardTitle>
-        <CardDescription>Savings accounts get a running balance from your grid. Enter the real balance any month to keep it honest.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <ul className="divide-y rounded-md border">
+    <Island air tone={HUES.worth} title="Accounts" description="Savings accounts get a running balance from your grid. Enter the real balance any month to keep it honest.">
+      <div className="space-y-3">
+        <ul className="divide-y divide-border/60">
           {accounts.map((a) => (
-            <li key={a.id} className="px-3 py-2 text-sm">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline">{ACCOUNT_TYPES.find((t) => t.value === a.type)?.label ?? a.type}</Badge>
+            <li key={a.id} className="py-1">
+              <div className="flex min-h-6 flex-wrap items-center gap-2">
+                <Chip tone="zinc">{(ACCOUNT_TYPES.find((t) => t.value === a.type)?.label ?? a.type).toLowerCase()}</Chip>
                 <span className="font-medium">{a.name}</span>
                 <span className="text-muted-foreground">{a.currency}{a.ownerEntityId ? ` · ${entities.find((e) => e.id === a.ownerEntityId)?.name ?? ''}` : ''} · opening {formatAmount(a.openingBalance, a.currency, locale)} in {formatMonth(a.openingMonth, locale)}</span>
                 <span className="ml-auto flex gap-1">
@@ -267,8 +257,8 @@ function AccountsCard({ household, accounts, entities, engine, months, onError }
                 </span>
               </div>
               {actualsFor === a.id && engine && (
-                <table className="mt-2 w-full text-xs">
-                  <thead><tr className="text-muted-foreground"><th className="py-1 text-left font-normal">Month</th><th className="text-right font-normal">Computed</th><th className="text-right font-normal">Real balance</th></tr></thead>
+                <table className="mt-2 w-full">
+                  <thead><tr className="text-muted-foreground"><th className="py-1 text-left font-semibold">Month</th><th className="text-right font-semibold">Computed</th><th className="text-right font-semibold">Real balance</th></tr></thead>
                   <tbody>
                     {months.filter((m) => m <= monthOfDate()).slice(-12).map((m) => {
                       const r = engine.accounts[a.id]?.months[m]
@@ -278,7 +268,7 @@ function AccountsCard({ household, accounts, entities, engine, months, onError }
                           <td className="text-right tabular-nums">{r ? formatAmount(r.computed, a.currency, locale) : ''}</td>
                           <td className="text-right">
                             <Input
-                              aria-label={`Real balance ${formatMonth(m, locale)}`} className="ml-auto h-7 w-36 text-right" inputMode="decimal"
+                              aria-label={`Real balance ${formatMonth(m, locale)}`} className="ml-auto h-6 w-36 text-right" inputMode="decimal"
                               defaultValue={r && r.adjustment !== 0 ? amountToInput(r.balance, a.currency, locale) : ''}
                               placeholder="same as computed"
                               onBlur={(e) => { const v = e.target.value.trim() ? parseAmount(e.target.value, a.currency, locale) : null; setAccountActual(store, a.id, m, v).catch((err) => onError(err instanceof Error ? err.message : 'Failed')) }}
@@ -293,10 +283,10 @@ function AccountsCard({ household, accounts, entities, engine, months, onError }
             </li>
           ))}
         </ul>
-        <Button variant="outline" size="sm" onClick={() => setEditing('new')}>Add account</Button>
+        <Button variant="outline" size="xs" onClick={() => setEditing('new')}>Add account</Button>
         {editing && <AccountDialog account={editing === 'new' ? null : editing} entities={entities} baseCurrency={baseCurrency} locale={locale} startMonth={household.startMonth} onClose={() => setEditing(null)} onError={onError} />}
-      </CardContent>
-    </Card>
+      </div>
+    </Island>
   )
 }
 

@@ -7,7 +7,7 @@ test.describe('archiving people and things', () => {
     await page.goto('?demo=1')
     await page.getByRole('button', { name: 'Load the demo household' }).click()
     await expect(page.getByRole('button', { name: /^Rent Nov 2026/ })).toBeVisible()
-    await page.getByRole('button', { name: 'Household' }).click()
+    await page.getByRole('link', { name: 'Household' }).click()
 
     const robin = page.getByRole('listitem').filter({ hasText: 'Robin' }).first()
     await robin.getByRole('button', { name: 'Archive', exact: true }).click()

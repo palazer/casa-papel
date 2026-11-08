@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Island } from '@/components/ui/island'
 import { inviteLink } from '@/app/url'
 import type { Invite } from '@/sync/remote'
 import { useSyncEngine, useSyncView } from '@/sync/useSync'
@@ -43,18 +43,14 @@ export function InviteCard({ onError }: { onError: (m: string) => void }) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Invite someone</CardTitle>
-        <CardDescription>Only you can make these. A link creates one account, works once, and expires after seven days. Send it by message; nothing is emailed.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3 text-sm">
+    <Island air title="Invite someone" description="Only you can make these. A link creates one account, works once, and expires after seven days. Send it by message; nothing is emailed.">
+      <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={create}>Invite someone</Button>
+          <Button size="sm" onClick={create}>Invite someone</Button>
           {latest && (
             <>
-              <code className="break-all rounded bg-muted px-2 py-1 text-xs" data-testid="invite-link">{inviteLink(latest)}</code>
-              <Button size="sm" variant="outline" onClick={() => copy(latest)}>{copied ? 'Copied' : 'Copy link'}</Button>
+              <code className="break-all rounded bg-muted px-2 py-1" data-testid="invite-link">{inviteLink(latest)}</code>
+              <Button size="xs" variant="outline" onClick={() => copy(latest)}>{copied ? 'Copied' : 'Copy link'}</Button>
             </>
           )}
         </div>
@@ -62,15 +58,15 @@ export function InviteCard({ onError }: { onError: (m: string) => void }) {
           <ul className="space-y-1">
             {invites.map((i) => (
               <li key={i.code} className="flex flex-wrap items-center gap-2">
-                <code className="text-xs">{i.code}</code>
-                <span className="text-xs text-muted-foreground">valid until {new Date(i.expiresAt).toLocaleDateString()}</span>
+                <code>{i.code}</code>
+                <span className="text-muted-foreground">valid until {new Date(i.expiresAt).toLocaleDateString()}</span>
                 <Button size="xs" variant="ghost" onClick={() => copy(i.code)}>Copy link</Button>
                 <Button size="xs" variant="ghost" onClick={() => revoke(i.code)}>Revoke</Button>
               </li>
             ))}
           </ul>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Island>
   )
 }

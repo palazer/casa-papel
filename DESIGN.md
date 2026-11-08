@@ -1,0 +1,187 @@
+# Design system
+
+Casa Papel shares its design system with nfl-fantasy (`/Users/erkinpalaz/Projects/nfl-fantasy/web/DESIGN.md`): the same
+stack, tokens, type scale, rail, islands and chips, so the two apps read as siblings. This file is the source of truth
+for Casa Papel; when a screen needs something not covered here, extend this file in the same commit. Read it before any
+UI work. Reference screens: the Grid (dense, a table that scrolls inside its own box) and Household (a reading page of
+air islands).
+
+## 1. Scope and tokens
+
+- Stack: React 19, Vite, Tailwind v4, shadcn `base-rhea` on Base UI primitives (`components.json`: base colour `mist`,
+  theme lime, icons lucide), Dexie. Icons: lucide everywhere, the rail included.
+- Font: Roboto Variable for everything (`--font-sans`; `--font-heading` is an alias, not a second face).
+- Colour tokens live in `src/index.css`. Two layers:
+  - **Neutrals** are nfl-fantasy's mist set (background, card, border, muted, ring) with a lime `--primary` that is
+    reserved for **the pressed or active control**: `Button variant="default"`, the open screen's rail tile, the
+    selected option of a `ViewToggle`. Nothing else is lime.
+  - **Kinds of money** (the Casa Papel layer nfl does not have): one hue per kind, `--income` emerald, `--expense` rose,
+    `--transfer` sky, `--worth` violet (balances and net worth), `--pool` teal, `--goal` amber (a fill), `--draw` amber-700
+    (money taken back out of savings). The values are Tailwind v4 palette steps written out as oklch (700 in light, 400
+    in dark), so both apps use the same greens and reds. Each hue has an opaque `*-tint` (9 %) for total rows and a
+    fainter `*-band` (5 %) for category groups on the grid. The class strings live in `src/app/hues.ts` (`HUES`,
+    `SECTION_HUE`, the `Hue` shape `text / tint / band / fill / bar`). Use the map, never a raw Tailwind colour for money.
+  - **State of an amount this month**: `--todo` rose-500 (nothing done), `--partial` amber-500 (partly), `--done`
+    emerald-500 (done), drawn only by `DoneDot`. Kept apart from the money hues.
+- Radius `--radius: 0.625rem`. Panels `rounded-lg`, inner tables and cards `rounded-md`, chips `rounded`.
+- Light mode everywhere except the navigation (rail and bottom tabs), which carries the `dark` class and is the same dark
+  on every screen. Dark tokens exist for every light one and are kept in step; there is no theme toggle.
+
+## 2. Shell and page frame
+
+```
+App shell        flex min-h-dvh: AppRail (md+) w-[72px] sticky h-dvh dark | main min-w-0 flex-1 p-4 md:p-6 text-sm > mx-auto max-w-[1800px]
+                 phones (< 768 px): no rail; BottomTabs fixed at the bottom, dark, main pb-24
+Page header      header flex flex-col gap-y-2 > h1 text-2xl font-semibold leading-8 tracking-tight + p text-xs text-muted-foreground
+                 toolbar  flex min-h-[28px] flex-wrap items-center gap-x-2.5 gap-y-1 text-xs:
+                          Undo Redo (icon-xs ghost) · the screen's controls · the sync cloud at ml-auto
+                          a basis-full child (an alert, a notice) wraps onto its own line under the controls
+Grid frame       the table in its own scroll box: relative isolate max-h-[calc(100dvh-var(--page-chrome))] overflow-auto rounded-lg border bg-card
+Reading page     mx-auto max-w-3xl space-y-4 text-xs of air islands (Household, Data, Moves)
+Phone list       mx-auto max-w-xl space-y-4 of dense islands, rows text-sm and min-h-11 (the Month view)
+```
+
+- **Rail** (`src/components/AppRail.tsx`, after FantasyPros' and nfl's): a `<nav aria-label="Screens">`, 72 px, one
+  column: the household's monogram (two letters in a 40 px circle with a lime ring; `demo` chip under it in the sandbox;
+  its accessible name is always `Casa Papel`, the household's name is only its tooltip, so no screen's name can hide in
+  it and `getByRole('link', { name: 'Household' })` stays unambiguous), then one tile per screen: a 40 × 30 `rounded-lg` tile holding a 20 px lucide icon over a `text-[10px] font-semibold`
+  label. The open screen's tile is `bg-primary text-primary-foreground` with `aria-current="page"`; the others are
+  `text-white/70`, hover `bg-white/10`. Items are real links (`?screen=…`, every other parameter kept, so `?demo=1`
+  survives); a plain click opens in place, Cmd-click opens a tab.
+- **Bottom tabs** (`src/components/BottomTabs.tsx`): the same five tiles as a bar along the bottom edge, 56 px tall plus
+  the safe-area inset, `md:hidden`.
+- **Screen state** (`src/app/screens.ts`): `?screen=` wins, then the screen open last (`casa.screen`), then the device's
+  natural first screen (Month on a phone, Grid otherwise). `rememberScreen` writes both; the address bar follows through
+  `history.replaceState`, so Back never walks through screen changes. Data is never remembered as the screen to land on:
+  it is a utility, so a fresh visit opens the household (or the welcome screen when there is none).
+- **Page header** (`src/components/PageHeader.tsx`): every screen opens with it. The H1 is the screen's name (the rail's
+  label); the subline names the frame of reference (`The Demo Household · Sep 2026 – Nov 2027`, `· closed` as a chip).
+  The toolbar holds Undo and Redo first, then the controls (`MonthPicker`, Close month, Show 12 more months), then the
+  sync cloud. Errors and warnings are `basis-full` lines: destructive for an action that failed, `text-amber-700` for a
+  warning the engine raises.
+- Nothing floats over the content except popovers, menus and dialogs (`z-50`); the rail and tabs are `z-40`.
+
+## 3. Island (the panel)
+
+`src/components/ui/island.tsx`. Every panel is an Island: a bordered card on the card ground, **no shadow and no
+coloured bar**. Do not use shadcn `Card` for panels. Two heads:
+
+```
+dense    section min-h-0 flex flex-col rounded-lg border bg-card
+         h3  px-2 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground   (right slot at ml-auto)
+         p   px-2 pt-1 text-[11px] leading-[15px] text-muted-foreground                           (description)
+         body min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-1
+air      h3  flex items-end gap-4 border-b px-4 pt-2 text-sm font-medium leading-5                (a hairline edge to edge)
+         p   px-4 pt-3 text-xs text-muted-foreground                                               (description)
+         body px-4 pb-4 pt-3
+```
+
+- `tone={HUES.x}` colours the title in a kind-of-money hue: Income / Expenses / Transfers lists, Accounts (worth), Pool
+  accounts (pool), Schedules and Transfers to make (transfer), Payments due (expense). Mixed panels stay ink. Goals keep
+  an ink title; their gold lives in the bars.
+- `description` is the one sentence that explains the panel (Casa Papel explains every option inline). `right` holds a
+  count or a small control, `toolbar` a non-scrolling filter row, `tabs` a `TabBar` in place of the title, `onFold` a
+  caret that minimizes the island.
+- Dense islands for the phone's Month view and small stat panels; air islands for reading pages (Household, Data, Moves,
+  the setup wizard). Titles are sentence case with facts after a middle dot.
+
+## 4. Typography
+
+| Class | Use |
+|---|---|
+| `text-2xl font-semibold leading-8 tracking-tight` | the page header's H1 only |
+| `text-sm font-medium leading-5` | air island titles, the month in the toolbar, one emphasised value |
+| `text-sm` | the phone's Month view rows and its stats (14 px, the one place desktop density does not apply) |
+| `text-xs` | body text inside every panel, table and toolbar on desktop; the grid |
+| `text-[11px] leading-[15px]` | the muted meta line under a title or row |
+| `text-[10px]` | chips, small-caps island titles, the Σ line under a row name, rail labels |
+
+Weights: `font-medium` for names, `font-semibold` for headers and section titles, `font-bold` nowhere. Numbers are
+right-aligned and `tabular-nums`; money keeps its cents; missing renders `—` or a muted `·` in an empty grid cell.
+Truncation idiom: a `min-w-0` parent, `truncate` on the name, `shrink-0` on siblings.
+
+## 5. Colour semantics
+
+- **Kinds of money** (tokens, §1): section titles and total-row labels in the hue; total rows on their `tint`; spending
+  amounts in the expense hue when "show expenses as negative" is on; money taken back out of savings in `--draw`. Numbers
+  otherwise stay ink, so the grid never becomes a heat map.
+- **Certainty**: an estimate is italic with a dashed `decoration-partial` underline; certain and done are plain.
+- **Done**: one mark only, the `DoneDot` (8 px): a green disc for done in any month; in the current open month also a
+  red ring for nothing done and an amber half disc for partly done.
+- **Chips** (`src/components/ui/chip.tsx`, `rounded px-1.5 leading-4 text-[10px] font-medium`): zinc a neutral fact or
+  idle (`closed`, `automatic`, an account or entity type, `ECB`, `carried`), emerald done or good (`paid`), amber a warning
+  or an estimate (`due`, `demo`, `projected`, storage may be evicted), rose missing or late (`missing`), sky information
+  or something of yours (`manual` rate, `using +1.50%`), violet a second party. An `outline` variant exists for a
+  blocker. Chip copy is lowercase.
+- **Lime** (`--primary`): the pressed control only (§1). Never a status.
+- **Closed months**: the column's cells on `bg-muted/60`, a lock before the month name, `closed` chip in the sublines.
+- **Adjusted balances** (a real balance entered): a dotted underline on the amount.
+- Never `text-red-600` or `text-green-700`; use the tokens or the chip tones above.
+
+## 6. The grid
+
+`src/features/grid/GridScreen.tsx`. A plain `<table class="border-separate border-spacing-0 text-xs">` in a scroll box of
+its own (§2), so its first row (`sticky top-0`) and its label column (`sticky left-0`) stay put while the rest scrolls;
+sticky cells paint `bg-card` (or their tint) because they slide over content. The corner cell is `z-30`, the month
+headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them can rise above a dialog or the rail.
+
+- Label column `min-w-[200px]`: the row's name in `text-xs font-medium`, under it the Σ line (`text-[10px]`: the all-time
+  total and the share of income), the row menu (`…`) at the right, revealed on hover of the `group` row.
+- Month columns `min-w-24`; today's header on `bg-muted` with the month in `font-semibold`; cells `px-1.5 py-0.5` (about
+  22 px rows), amounts right-aligned, the done dot in the top-right corner. An empty cell shows a faint `·`.
+- Section header rows: the chevron and the title in `text-xs font-semibold` in the section's hue; no bar, no fill.
+- Total rows (`derivedRow` with `band`): the label in the hue on the hue's `tint`, `font-medium`; detail lines under an
+  investment account (`Deposited`, `Return`) indented and `text-[11px]` muted.
+- Keyboard: arrows move between cells (`data-cell="row,col"`), Enter or Space opens the editor.
+
+## 7. Rows, lists, tables and tiles
+
+- **List rows inside an island**: `divide-y divide-border/60`, `py-1` to `py-1.5`, a chip for the type, the name in
+  `font-medium`, muted facts after it, actions as `xs` buttons at `ml-auto`. No outer border around a list that is the
+  island's whole body.
+- **Tables** (Schedules, Who pays what, rates): `w-full`, header cells `px-1.5 py-1 font-semibold text-muted-foreground`,
+  body cells `px-1.5 py-0.5`, rows separated by `divide-border/60`; a table that is not the island's whole body sits in
+  `rounded-md border`. No zebra striping.
+- **Stat tiles** (`src/components/ui/stat-tile.tsx`): a small-caps label (in a kind-of-money hue when the number is one)
+  over `text-sm font-semibold tabular-nums`, in `rounded-md border` boxes laid out `grid grid-cols-2 gap-2 sm:grid-cols-5`.
+- **Phone rows** (Month view): `min-h-11 px-3 py-2 text-sm`, name left, amount and dot right; automatic rows on
+  `bg-muted/40` and not tappable.
+- **Progress bars** (goals): `h-2 rounded-full bg-goal-tint` with a `bg-goal` fill, `bg-income` once reached.
+
+## 8. Controls
+
+- Buttons: `size="sm"` (28 px) for a toolbar's one primary action (`Close month`, `Export now`), `size="xs"` (24 px) for
+  everything else in toolbars, lists and islands, `icon-xs` for icon buttons in toolbars. Dialog footers keep the default
+  size. Variants: `default` (lime) for the primary action or the active toggle, `outline` for the rest and inactive
+  toggles, `ghost` for quiet actions (Edit, Cancel), `destructive` for the irreversible. Toggle idiom:
+  `variant={active ? 'default' : 'outline'}` (the entity-kind picker under People & things).
+- `MonthPicker`: two `icon-xs outline` buttons around the month as an `h2 text-sm font-medium`; lives in the page
+  header's toolbar (Month, Moves) or an island's first line (Schedules).
+- `TabBar` switches an island's view (`src/components/ui/tab-bar.tsx`); `ViewToggle` filters a list
+  (`src/components/ui/view-toggle.tsx`); `Segmented` stays for a form field with a few options (certainty, applies to).
+- Native `<select>` through `NativeSelect` for form fields; `MonthField` for months (Safari has no month input).
+- Checkboxes are the native `Check` (16 px) in lists that tick things off (Moves); the Month view gets its own `Tick`
+  drawn with the `DoneDot` so done keeps one mark.
+- Dialogs are shadcn `Dialog`; the confirm step lives inside the dialog, never behind it. Errors appear beside the field
+  that caused them, `role="alert"`.
+- Help: every option carries a one-line explanation inline; `InfoTip` (i) icons (hover on desktop, tap on touch) explain
+  titles, automatic rows and stat labels; one text map `src/app/help.ts` keeps the wording consistent. The legend popover
+  "What the colours and marks mean" lives in the Grid and Month toolbars.
+
+## 9. Loading, errors, empty
+
+- Loading is nothing (the store is local; `useLiveQuery` resolves within a frame), never a spinner.
+- An action that failed shows a `role="alert"` line in `text-destructive` in the page header's toolbar or beside the
+  control; an engine warning is `text-amber-700`. Data-screen outcomes use the `Alert` block.
+- Empty states are one muted sentence that says what to do (`Nothing to transfer.`, `Add a savings account first; pool
+  accounts live inside one.`).
+
+## 10. New-screen checklist
+
+1. Its key, label and lucide icon in `SCREENS` (`src/app/screens.ts`); its line in `App.tsx`'s switch.
+2. It opens with `PageHeader` (name, subline, toolbar); every panel is an `Island` (`air` on a reading page), every tag a
+   `Chip`, every number `tabular-nums`.
+3. Colours only from §5: money through `HUES`, states through the dots and chips, lime for the pressed control alone.
+4. Explanations inline, errors in place, a `help.ts` key for each (i).
+5. `npm run typecheck && npm run lint && npx vitest run && npm run build && npm run e2e`, then screenshots at 1440 × 900
+   and 390 × 844 compared against the Grid and the Month view; extend this file in the same commit.
