@@ -43,7 +43,7 @@ export function SyncCard({ hasLocalData, onMessage, onError }: Props) {
         <CardTitle>Cloud sync</CardTitle>
         <CardDescription>
           {signedIn
-            ? <>Signed in as <strong>{view.email}</strong>. The household is stored encrypted on Supabase (Frankfurt); only your password opens it.</>
+            ? <>Signed in as <strong>{view.email}</strong>. The household is stored encrypted on Supabase in the EU; only your password opens it.</>
             : 'Keep an encrypted copy in the cloud and use the same household on your phone and laptop. Only your password can open it; nobody else, not even the person who runs this app. Accounts are by invitation.'}
         </CardDescription>
       </CardHeader>

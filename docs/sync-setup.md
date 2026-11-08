@@ -9,7 +9,7 @@ About fifteen minutes, once.
 ## 1. Create the project
 
 1. Sign in at supabase.com and create a **New project** in your free organisation.
-2. Name `casa-papel`, region **Frankfurt (eu-central-1)**, and a strong database password. Keep that
+2. Name `casa-papel`, an **EU region** (Ireland or Frankfurt), and a strong database password. Keep that
    password somewhere safe; only the CLI asks for it.
 
 ## 2. Auth settings
