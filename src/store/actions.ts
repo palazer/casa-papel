@@ -1,8 +1,8 @@
 import { generateKeyBetween } from 'fractional-indexing'
 import { computeEngine, cellKey, sortRows, type EngineOutput } from '@/engine'
 import {
-  ACCOUNT_TYPE_INFO, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, RowSchema, addMonths, compareMonths, monthKey, monthOfDate, monthRange, newId, parseMonth, poolIdOf,
-  type Account, type Cell, type CellInput, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Row, type RowKind, type Tables,
+  ACCOUNT_TYPE_INFO, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RowSchema, addMonths, compareMonths, monthKey, monthOfDate, monthRange, newId, parseMonth, poolIdOf,
+  type Account, type Cell, type CellInput, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Pool, type Row, type RowKind, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
 import { planEnd } from './months'
@@ -116,8 +116,8 @@ function groupRows(tables: Tables, r: Pick<Row, 'section' | 'categoryId'>): Row[
 }
 
 /** Add a row at the end of its category group, or right after `afterRowId`, whose category it inherits unless given one. */
-export async function addRow(store: Store, input: Partial<Row> & { name: string; section: Row['section'] }, afterRowId?: string): Promise<Row> {
-  const tables = await loadTables(store)
+/** The put for a new row at the end of its group, or right after `afterRowId`; the caller commits. */
+function newRowMutation(tables: Tables, input: Partial<Row> & { name: string; section: Row['section'] }, afterRowId?: string): { row: Row; mutation: Mutation } {
   const after = afterRowId ? tables.rows.find((r) => r.id === afterRowId && !r.deletedAt) : undefined
   const categoryId = input.categoryId !== undefined ? input.categoryId : after?.categoryId ?? null
   if (categoryId && groupKey(tables, { section: input.section, categoryId }) === null) throw new Error('That category is not in this section.')
@@ -133,7 +133,53 @@ export async function addRow(store: Store, input: Partial<Row> & { name: string;
   }
   const ts = now()
   const row = RowSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, ...input, categoryId, order: generateKeyBetween(prev, next) })
-  await store.commit([{ op: 'put', table: 'rows', record: row }])
+  return { row, mutation: { op: 'put', table: 'rows', record: row } }
+}
+
+export async function addRow(store: Store, input: Partial<Row> & { name: string; section: Row['section'] }, afterRowId?: string): Promise<Row> {
+  const { row, mutation } = newRowMutation(await loadTables(store), input, afterRowId)
+  await store.commit([mutation])
+  return row
+}
+
+/** What a new row under Transfers does; `plain` just moves money between your accounts. */
+export type TransferRowKind = 'plain' | 'to-savings' | 'to-investment' | 'pool-allocation' | 'pocket-money'
+
+/**
+ * "Add row" under Transfers. A deposit row needs its account, a pool row the pool account it fills (one that lost its
+ * row), pocket money the adult it is for; everything is checked here so the grid can say what is missing.
+ */
+export async function addTransferRow(
+  store: Store,
+  input: { name: string; categoryId: string | null; kind: TransferRowKind; accountId?: string | null; poolId?: string | null; adultId?: string | null },
+): Promise<Row> {
+  const tables = await loadTables(store)
+  const base: Partial<Row> & { name: string; section: Row['section'] } = { name: input.name, section: 'transfer', categoryId: input.categoryId, kind: input.kind }
+  if (input.kind !== 'plain') base.defaultStatus = 'committed'
+  if (input.kind === 'to-savings' || input.kind === 'to-investment') {
+    const household = tables.household.find((h) => !h.deletedAt)
+    if (input.kind === 'to-savings' && household?.closingRule === 'savings-plug' && tables.rows.some((r) => !r.deletedAt && r.kind === 'to-savings')) {
+      throw new Error('The month-end rule already fills a "to savings" row; a second one would stay at zero.')
+    }
+    const acc = checkAccountForRow(tables, { kind: input.kind, name: input.name }, input.accountId ?? null)
+    if (acc) base.accountId = acc.id
+  } else if (input.kind === 'pocket-money') {
+    const adult = tables.entities.find((e) => e.id === input.adultId && e.kind === 'adult' && !e.deletedAt)
+    if (!adult) throw new Error('Pick the adult the pocket money is for.')
+    Object.assign(base, { scope: adult.id, entityTags: [adult.id], pocketMode: 'fixed' })
+  }
+  let pool: Pool | undefined
+  if (input.kind === 'pool-allocation') {
+    const found = tables.pools.find((p) => p.id === input.poolId && !p.deletedAt)
+    if (!found) throw new Error('Pick the pool account this row fills.')
+    if (found.allocationRowId && tables.rows.some((r) => r.id === found.allocationRowId && !r.deletedAt)) throw new Error(`"${found.name}" is already filled by another row.`)
+    base.accountId = found.accountId
+    pool = found
+  }
+  const { row, mutation } = newRowMutation(tables, base)
+  const mutations: Mutation[] = [mutation]
+  if (pool) mutations.push({ op: 'put', table: 'pools', record: PoolSchema.parse({ ...pool, allocationRowId: row.id, updatedAt: now() }) })
+  await store.commit(mutations)
   return row
 }
 
@@ -522,14 +568,20 @@ export async function setRowAccount(store: Store, rowId: string, accountId: stri
   const tables = await loadTables(store)
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
   if (!row) throw new Error('Row not found')
+  checkAccountForRow(tables, row, accountId)
+  await updateRow(store, rowId, { accountId })
+}
+
+/** The account a row may point at: it must exist, and a typed row (deposits, payments) needs the matching type. */
+function checkAccountForRow(tables: Tables, row: Pick<Row, 'kind' | 'name'>, accountId: string | null): Account | null {
   const need = accountTypeForRow(row)
   const label = (t: Account['type']) => ACCOUNT_TYPE_INFO.find((i) => i.value === t)?.label ?? t
-  if (accountId) {
-    const acc = tables.accounts.find((a) => a.id === accountId && !a.deletedAt)
-    if (!acc) throw new Error('That account no longer exists.')
-    if (need && acc.type !== need) throw new Error(`"${row.name}" needs an account of type ${label(need)}, and "${acc.name}" is of type ${label(acc.type)}.`)
-  } else if (need) {
-    throw new Error(`"${row.name}" needs an account of type ${label(need)}.`)
+  if (!accountId) {
+    if (need) throw new Error(`"${row.name}" needs an account of type ${label(need)}.`)
+    return null
   }
-  await updateRow(store, rowId, { accountId })
+  const acc = tables.accounts.find((a) => a.id === accountId && !a.deletedAt)
+  if (!acc) throw new Error('That account no longer exists.')
+  if (need && acc.type !== need) throw new Error(`"${row.name}" needs an account of type ${label(need)}, and "${acc.name}" is of type ${label(acc.type)}.`)
+  return acc
 }

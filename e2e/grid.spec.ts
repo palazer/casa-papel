@@ -102,3 +102,24 @@ test.describe('phone', () => {
     await page.getByRole('button', { name: 'Cancel' }).click()
   })
 })
+
+test.describe('grid: add a transfer row', () => {
+  test.use({ viewport: { width: 1400, height: 900 } })
+
+  test('a new transfer row can be a deposit into an investment account', async ({ page }) => {
+    await loadDemo(page)
+    await page.getByRole('button', { name: 'Add transfer row' }).click()
+    const what = page.getByLabel('What the new transfer row does')
+    await expect(what).toHaveValue('plain')
+    // the demo's month-end rule already fills "To savings", so that choice is not offered
+    await expect(what.locator('option[value="to-savings"]')).toHaveCount(0)
+    await what.selectOption('to-investment')
+    await expect(page.getByLabel('Account for the new transfer row')).toHaveValue(/./)
+    await expect(page.getByText('deposited total and return')).toBeVisible()
+    await page.getByLabel('New transfer row name').fill('Extra deposits')
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('button', { name: /^Extra deposits Nov 2026/ })).toBeVisible()
+    await page.getByRole('button', { name: 'Row menu for Extra deposits' }).click()
+    await expect(page.getByRole('menuitem', { name: 'Goes into…' })).toBeVisible()
+  })
+})

@@ -199,7 +199,7 @@ export function GridScreen() {
                 ])),
                 !isCollapsed && (
                   <tr key={`${key}-add`}>
-                    <td className="sticky left-0 z-10 bg-card px-1 py-0.5"><AddRowInline section={key} categories={sectionCategories} onError={setError} /></td>
+                    <td className="sticky left-0 z-10 bg-card px-1 py-0.5"><AddRowInline section={key} categories={sectionCategories} tables={tables} household={household} onError={setError} /></td>
                     <td colSpan={months.length} />
                   </tr>
                 ),

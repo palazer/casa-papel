@@ -145,6 +145,12 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   €2,775`). A deduction row's label carries the muted tag `out of <income>` with an (i); a follower that takes a share
   reads `= 25% of <row>`. The cell editor of such an income lists the deductions in a `rounded-md border` block
   (`data-testid="deductions"`, each `−€…`, then a Net line) above the error line.
+- "Add row" at a section's foot is inline (`src/features/grid/AddRowInline.tsx`): a name and, when the section has any,
+  a category. Under Transfers it also asks what the row does (moves money between your accounts, goes into a savings
+  account, deposits into an investment account, fills a pool account that lost its row, pocket money for an adult), with
+  a second select for the target and one muted sentence under the controls for the chosen kind. A choice without a
+  possible target is left out (a second "to savings" under the savings plug, a pool row when every pool account has one)
+  or the sentence says what to add first and Add is disabled. The store checks the same rules (`addTransferRow`).
 - Section header rows: the chevron and the title in `text-xs font-semibold` in the section's hue; no bar, no fill.
 - Categories (`groupRowsByCategory`): inside a section rows sort by category, then by their own order; rows without
   one come last. When the section has categories, each group opens with a label row (`text-[10px] font-semibold
