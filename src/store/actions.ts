@@ -144,8 +144,6 @@ export async function updateRow(store: Store, rowId: string, patch: Partial<Omit
 }
 
 export const renameRow = (store: Store, rowId: string, name: string) => updateRow(store, rowId, { name })
-export const archiveRow = (store: Store, rowId: string, month: MonthKey | null) => updateRow(store, rowId, { archivedMonth: month })
-export const deleteRow = (store: Store, rowId: string) => updateRow(store, rowId, { deletedAt: now() })
 
 export async function moveRow(store: Store, rowId: string, direction: 'up' | 'down'): Promise<void> {
   const tables = await loadTables(store)
@@ -390,6 +388,11 @@ export async function setRowFundedBy(store: Store, rowId: string, fundedBy: Fund
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
   if (!row) throw new Error('Row not found')
   if (row.section !== 'expense') throw new Error('Only spending rows have a source.')
+  await store.commit(planRowFundedBy(tables, row, fundedBy, scope, now()))
+}
+
+/** The mutations behind `setRowFundedBy`; archiving a pool account uses them too. */
+export function planRowFundedBy(tables: Tables, row: Row, fundedBy: FundedBy, scope: RowSourceScope, ts: number): Mutation[] {
   const poolId = poolIdOf(fundedBy)
   if (poolId && !tables.pools.some((p) => p.id === poolId && !p.deletedAt)) throw new Error('That pool account no longer exists.')
   const mutations: Mutation[] = []
@@ -402,19 +405,19 @@ export async function setRowFundedBy(store: Store, rowId: string, fundedBy: Fund
       const months = monthRange(household.startMonth, addMonths(scope.from, -1))
       const engine = computeEngine({ tables: open, months })
       for (const m of months) {
-        const c = engine.cells[cellKey(rowId, m)]
+        const c = engine.cells[cellKey(row.id, m)]
         if (!c || (c.source !== 'value' && c.source !== 'inherit') || c.value === 0) continue
-        const existing = cellOf(tables, rowId, m)
+        const existing = cellOf(tables, row.id, m)
         const item: CellItem = {
           id: newId(), label: '', amount: c.value, status: c.status === 'derived' ? row.defaultStatus : c.status, fundedBy: row.defaultFundedBy,
           date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false,
         }
-        mutations.push(putCell({ rowId, month: m, mode: 'items', value: null, items: [item], note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, updatedAt: now() }))
+        mutations.push({ op: 'put', table: 'cells', record: CellSchema.parse({ rowId: row.id, month: m, mode: 'items', value: null, items: [item], note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, markedDone: existing?.markedDone ?? false, updatedAt: ts }) })
       }
     }
   }
-  mutations.push({ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, defaultFundedBy: fundedBy, updatedAt: now() }) })
-  await store.commit(mutations)
+  mutations.push({ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, defaultFundedBy: fundedBy, updatedAt: ts }) })
+  return mutations
 }
 
 /** Why a row has no amount of its own to mirror or replace, or null when it is an ordinary row. */

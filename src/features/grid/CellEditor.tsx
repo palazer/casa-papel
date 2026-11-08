@@ -13,9 +13,10 @@ import { cellKey, type EngineOutput } from '@/engine'
 import { RecurringDialog } from '@/features/recurring/RecurringDialog'
 import { describeCadence, newId, type CellItem, type Household, type ItemStatus, type MonthKey, type Row, type Tables } from '@/model'
 import {
-  changeRecurringFrom, clearCell, deleteRecurringItem, endRecurringFrom, itemsFromCurrent, reopenMonth, setCellItems, setCellValue, skipRecurringMonth,
+  changeRecurringFrom, clearCell, endRecurringFrom, itemsFromCurrent, reopenMonth, setCellItems, setCellValue, skipRecurringMonth,
   type EditScope,
 } from '@/store'
+import { RemoveDialog } from '@/features/remove/RemoveDialog'
 import { DoneDot } from './DoneDot'
 import { NativeSelect } from './NativeSelect'
 import { fundingOptions as buildFundingOptions } from './funding'
@@ -55,13 +56,15 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
   /** For edited scheduled items: does the change apply only here or from this month on? */
   const [applyTo, setApplyTo] = useState<Record<string, EditScope>>({})
   const [removing, setRemoving] = useState<string | null>(null)
+  /** "All occurrences" hands the schedule to the remove dialog, which says what goes with it. */
+  const [removingSchedule, setRemovingSchedule] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [recurring, setRecurring] = useState(false)
 
   const original = useMemo(() => new Map((cell?.items ?? []).map((i) => [i.id, i])), [cell])
   const schedules = useMemo(() => new Map(tables.recurringItems.map((r) => [r.id, r])), [tables.recurringItems])
-  const fundingOptions = useMemo(() => buildFundingOptions(tables.pools), [tables.pools])
+  const fundingOptions = useMemo(() => buildFundingOptions(tables.pools, [row.defaultFundedBy, ...items.map((i) => i.fundedBy)]), [tables.pools, row.defaultFundedBy, items])
 
   useEffect(() => {
     writePref('editScope', scope)
@@ -153,8 +156,10 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
         await skipRecurringMonth(store, scheduleId, month, true)
         updateItem(it.id, { skipped: true })
       }, false)
+    } else if (how === 'all') {
+      setRemovingSchedule(scheduleId)
     } else {
-      void run(() => (how === 'all' ? deleteRecurringItem(store, scheduleId) : endRecurringFrom(store, scheduleId, month)))
+      void run(() => endRecurringFrom(store, scheduleId, month))
     }
   }
 
@@ -337,6 +342,7 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
           </DialogFooter>
         )}
       </DialogContent>
+      {removingSchedule && <RemoveDialog target={{ kind: 'schedule', id: removingSchedule }} tables={tables} household={household} onClose={() => setRemovingSchedule(null)} onDone={onClose} />}
       {recurring && (
         <RecurringDialog
           tables={tables}

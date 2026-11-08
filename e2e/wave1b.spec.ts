@@ -151,6 +151,10 @@ test.describe('recurring from the grid', () => {
     await page.getByRole('button', { name: /^Car insurance Oct 2026/ }).click()
     await page.getByRole('button', { name: 'Remove item' }).click()
     await page.getByRole('button', { name: 'All occurrences' }).click()
+    // "All occurrences" hands the schedule to the remove dialog, on top of the editor
+    const remove = page.getByRole('dialog', { name: 'Schedule "Car insurance"' })
+    await expect(remove.getByText(/Its posted amount in \d+ open months/)).toBeVisible()
+    await remove.getByRole('button', { name: 'Delete', exact: true }).click()
     await expect(page.getByRole('dialog')).toBeHidden()
     await expect(page.getByRole('button', { name: /^Car insurance Oct 2026: empty/ })).toBeVisible()
     await expect(page.getByRole('button', { name: /^Car insurance Jan 2027: empty/ })).toBeVisible()

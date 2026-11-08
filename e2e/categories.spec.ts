@@ -44,7 +44,11 @@ test.describe('categories', () => {
     await expect(page.getByLabel('Name of the category Leisure')).toBeVisible()
     await page.getByRole('button', { name: 'Move Personal up' }).click()
     await page.getByRole('button', { name: 'Remove Transport' }).click()
-    await page.getByRole('button', { name: 'Remove', exact: true }).click()
+    await expect(dlg.getByRole('heading', { name: 'Category "Transport"' })).toBeVisible()
+    // Public transport moved to Living above, so Transport holds one row now
+    await expect(dlg.getByText('"Car insurance" keeps its place without a category')).toBeVisible()
+    await dlg.getByRole('button', { name: 'Delete', exact: true }).click()
+    await expect(dlg).toBeHidden()
     await expect(page.getByLabel('Name of the category Transport')).toHaveCount(0)
     await expect(page.getByLabel('Category for Car insurance')).toHaveValue('')
     await page.getByLabel('Category for Car insurance').selectOption({ label: 'Leisure' })

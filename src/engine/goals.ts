@@ -24,18 +24,20 @@ export interface GoalProgress {
   problem: string | null
 }
 
-function reader(goal: Goal, tables: Tables, out: EngineOutput): { read: (m: MonthKey) => Money | null; currency: string; problem: string | null; opening: Money; openingMonth: MonthKey | null } {
+function reader(goal: Goal, tables: Tables, out: EngineOutput, month: MonthKey): { read: (m: MonthKey) => Money | null; currency: string; problem: string | null; opening: Money; openingMonth: MonthKey | null } {
   const base = tables.household.find((h) => !h.deletedAt)?.baseCurrency ?? 'EUR'
   if (goal.kind === 'net-worth') return { read: (m) => out.netWorth[m] ?? null, currency: base, problem: null, opening: 0, openingMonth: null }
   if (goal.kind === 'pool-balance') {
     const pool = goal.poolId ? tables.pools.find((p) => p.id === goal.poolId && !p.deletedAt) : undefined
     const series = goal.poolId ? out.pools[goal.poolId] : undefined
     if (!pool || !series) return { read: () => null, currency: base, problem: 'The pool account this goal watched is gone. Edit the goal and pick another.', opening: 0, openingMonth: null }
+    if (pool.archivedMonth && compareMonths(pool.archivedMonth, month) <= 0) return { read: () => null, currency: base, problem: `The pool account "${pool.name}" is archived. Restore it under Household or edit the goal.`, opening: pool.openingBalance, openingMonth: null }
     return { read: (m) => series.months[m]?.balance ?? null, currency: base, problem: null, opening: pool.openingBalance, openingMonth: null }
   }
   const acc = goal.accountId ? tables.accounts.find((a) => a.id === goal.accountId && !a.deletedAt) : undefined
   const series = goal.accountId ? out.accounts[goal.accountId] : undefined
   if (!acc) return { read: () => null, currency: base, problem: 'The account this goal watched is gone. Edit the goal and pick another.', opening: 0, openingMonth: null }
+  if (acc.archivedMonth && compareMonths(acc.archivedMonth, month) <= 0) return { read: () => null, currency: acc.currency, problem: `"${acc.name}" is archived. Restore it under Household or edit the goal.`, opening: acc.openingBalance, openingMonth: acc.openingMonth }
   if (!series) return { read: () => null, currency: acc.currency, problem: `"${acc.name}" is not tracked. Turn on "Track the balance" in its account settings.`, opening: acc.openingBalance, openingMonth: acc.openingMonth }
   return { read: (m) => series.months[m]?.balance ?? null, currency: series.currency, problem: null, opening: acc.openingBalance, openingMonth: acc.openingMonth }
 }
@@ -46,7 +48,7 @@ export function computeGoals(tables: Tables, out: EngineOutput, month: MonthKey)
   const goals = [...tables.goals.filter((g) => !g.deletedAt)].sort((a, b) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0))
   const last = out.months[out.months.length - 1]
   return goals.map((goal) => {
-    const { read, currency, problem, opening, openingMonth } = reader(goal, tables, out)
+    const { read, currency, problem, opening, openingMonth } = reader(goal, tables, out, month)
     const payOff = goal.kind === 'pay-off'
     const current = read(month) ?? 0
     // what was owed when the goal was set: the month before its start, or the opening balance, or the first reading

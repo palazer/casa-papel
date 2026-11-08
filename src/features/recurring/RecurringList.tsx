@@ -10,7 +10,8 @@ import { formatAmount, formatMonth } from '@/app/format'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useTables } from '@/app/useEngine'
 import { describeCadence, monthOfDate, type MonthKey, type RecurringItem } from '@/model'
-import { deleteRecurringItem, endRecurringItem, recurringStatus, setRecurringPaid } from '@/store'
+import { endRecurringItem, recurringStatus, setRecurringPaid } from '@/store'
+import { RemoveDialog } from '@/features/remove/RemoveDialog'
 import { RecurringDialog } from './RecurringDialog'
 
 const TH = 'px-1.5 py-1 font-semibold text-muted-foreground'
@@ -24,7 +25,7 @@ export function RecurringList() {
   const [month, setMonth] = useState<MonthKey>(() => monthOfDate())
   const [editing, setEditing] = useState<RecurringItem | 'new' | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [deleting, setDeleting] = useState<string | null>(null)
+  const [removing, setRemoving] = useState<RecurringItem | null>(null)
   if (!tables || !household) return null
   const { locale, baseCurrency } = household
   const m = months.includes(month) ? month : months[months.length - 1]
@@ -80,22 +81,11 @@ export function RecurringList() {
                         ) : (
                           <DropdownMenuItem onClick={() => act(() => endRecurringItem(store, it.id, m))}>End after {formatMonth(m, locale)}</DropdownMenuItem>
                         )}
-                        <DropdownMenuItem onClick={() => setDeleting(it.id)}>Delete…</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setRemoving(it)}>Delete…</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>
                 </tr>
-                {deleting === it.id && (
-                  <tr>
-                    <td colSpan={7} className="px-2 py-1.5">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-muted-foreground">Delete "{it.name}" for good? Nothing more will be posted; amounts already in the grid stay. To stop it from a month on instead, use "End after".</span>
-                        <Button size="xs" variant="destructive" onClick={() => { setDeleting(null); act(() => deleteRecurringItem(store, it.id)) }}>Really delete</Button>
-                        <Button size="xs" variant="ghost" onClick={() => setDeleting(null)}>Cancel</Button>
-                      </div>
-                    </td>
-                  </tr>
-                )}
                 </Fragment>
               )
             })}
@@ -104,6 +94,7 @@ export function RecurringList() {
         </table>
       </div>
       {editing && <RecurringDialog tables={tables} household={household} item={editing === 'new' ? null : editing} defaultMonth={m} onClose={() => setEditing(null)} />}
+      {removing && <RemoveDialog target={{ kind: 'schedule', id: removing.id }} tables={tables} household={household} onClose={() => setRemoving(null)} />}
     </div>
   )
 }

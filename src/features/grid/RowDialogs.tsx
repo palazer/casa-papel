@@ -48,7 +48,7 @@ export function useSave(onClose: () => void) {
 /** Where a spending row's single amounts come out of, from a month on or for all months. */
 export function RowSourceDialog({ row, tables, household, onClose }: Base) {
   const store = useStore()
-  const options = fundingOptions(tables.pools)
+  const options = fundingOptions(tables.pools, [row.defaultFundedBy])
   const [fundedBy, setFundedBy] = useState<FundedBy>(row.defaultFundedBy)
   const [scope, setScope] = useState<'from-month' | 'all-months'>('from-month')
   const { error, busy, save } = useSave(onClose)
@@ -98,7 +98,8 @@ export function RowSourceDialog({ row, tables, household, onClose }: Base) {
 export function RowAccountDialog({ row, tables, onClose }: Base) {
   const store = useStore()
   const need = accountTypeForRow(row)
-  const accounts = tables.accounts.filter((a) => !a.deletedAt && (!need || a.type === need))
+  // archived accounts are offered only while the row still points at one
+  const accounts = tables.accounts.filter((a) => !a.deletedAt && (!need || a.type === need) && (!a.archivedMonth || a.id === row.accountId))
   const [accountId, setAccountId] = useState(row.accountId ?? '')
   const { error, busy, save } = useSave(onClose)
   const verb = accountVerb(row)

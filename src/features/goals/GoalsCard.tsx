@@ -6,6 +6,7 @@ import { HUES } from '@/app/hues'
 import { formatAmount, formatMonth, formatPercent } from '@/app/format'
 import { computeGoals, type EngineOutput, type GoalProgress } from '@/engine'
 import { monthDiff, type Goal, type Household, type MonthKey, type Tables } from '@/model'
+import { RemoveDialog } from '@/features/remove/RemoveDialog'
 import { GoalDialog } from './GoalDialog'
 
 interface Props {
@@ -20,6 +21,7 @@ interface Props {
 /** What the household is heading for: a bar per goal, read against the current plan. The gold of the bars is the one bold colour on screen. */
 export function GoalsCard({ household, tables, engine, month, compact = false }: Props) {
   const [editing, setEditing] = useState<Goal | 'new' | null>(null)
+  const [removing, setRemoving] = useState<Goal | null>(null)
   const goals = useMemo(() => computeGoals(tables, engine, month), [tables, engine, month])
   const { locale } = household
   if (compact && goals.length === 0) return null
@@ -82,7 +84,13 @@ export function GoalsCard({ household, tables, engine, month, compact = false }:
       ) : (
         <Island air title="Goals" help="goal.status" description="A number to reach or a debt to clear. Each bar shows how far the current plan gets, month by month.">{body}</Island>
       )}
-      {editing && <GoalDialog household={household} tables={tables} goal={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
+      {editing && (
+        <GoalDialog
+          household={household} tables={tables} goal={editing === 'new' ? null : editing} onClose={() => setEditing(null)}
+          onRemove={editing !== 'new' ? () => { setRemoving(editing); setEditing(null) } : undefined}
+        />
+      )}
+      {removing && <RemoveDialog target={{ kind: 'goal', id: removing.id }} tables={tables} household={household} onClose={() => setRemoving(null)} />}
     </>
   )
 }

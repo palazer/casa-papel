@@ -182,6 +182,18 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   month only.
 - Dialogs are shadcn `Dialog`; the confirm step lives inside the dialog, never behind it. Errors appear beside the field
   that caused them, `role="alert"`.
+- Removing anything goes through one `RemoveDialog` (`src/features/remove/RemoveDialog.tsx`), reached from a row's
+  menu ("Archive or delete…"), the People & things list, the account, pool account and goal dialogs' footers
+  ("Archive or delete…", "Delete…"), the schedules list, the cell editor's "All occurrences" and the Categories card.
+  Title `<Kind> "<name>"`, then an Archive section (a `MonthField` "Archive from" with an (i), what changes from that
+  month, "Earlier months stay exactly as they are") and a Delete section ("Deleting removes", "Also changes", a note,
+  and blockers in a destructive `Alert` "Resolve these first" that says where to fix each). When the thing has amounts
+  in a closed month the Delete section is one sentence saying so, and only Archive remains; an archive month inside
+  that history is refused beside the field. Footer: Cancel, `Archive from <month>` (`outline`, `default` when it is
+  the only choice), `Delete` (`destructive`, disabled with blockers). The words and the write come from the same scan
+  (`describeRemoval` and `planRemoval`/`planArchive` in `src/store/impact.ts`), so they cannot disagree, and every
+  removal is one undoable commit ("You can undo this right after"). Archived things are listed with Restore under
+  Household: Archived rows, and an Archived line in Accounts, Pool accounts and People & things.
 - Help is one mechanism: `InfoTip` (`src/components/InfoTip.tsx`), a 16 px (i) in `text-muted-foreground/70` (24 px
   where the pointer is a finger) that opens a `w-64 text-xs` popover on hover after 150 ms and on tap, and closes when
   the mouse leaves, on Escape or on a click outside. Its accessible name is `About <title>`. It is a sibling of the thing

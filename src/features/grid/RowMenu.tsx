@@ -7,13 +7,14 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { useStore } from '@/app/store'
-import { monthOfDate, type Household, type Row, type Tables } from '@/model'
-import { archiveRow, derivedRowReason, moveRow, renameRow, updateRow } from '@/store'
+import type { Household, Row, Tables } from '@/model'
+import { derivedRowReason, moveRow, renameRow, restoreRow, updateRow } from '@/store'
+import { RemoveDialog } from '@/features/remove/RemoveDialog'
 import { RowAccountDialog, RowFollowDialog, RowSourceDialog } from './RowDialogs'
 import { RowCategoryDialog } from './RowCategoryDialog'
 import { accountVerb } from './rowAccount'
 
-type Open = 'rename' | 'category' | 'source' | 'account' | 'follow' | null
+type Open = 'rename' | 'category' | 'source' | 'account' | 'follow' | 'remove' | null
 
 export function RowMenu({ row, tables, household, onError }: { row: Row; tables: Tables; household: Household; onError: (msg: string) => void }) {
   const store = useStore()
@@ -48,9 +49,9 @@ export function RowMenu({ row, tables, household, onError }: { row: Row; tables:
           {canFollow && <DropdownMenuItem onClick={() => setOpen('follow')}>{followed ? `Follows ${followed.name}…` : 'Follow another row…'}</DropdownMenuItem>}
           <DropdownMenuSeparator />
           {row.archivedMonth ? (
-            <DropdownMenuItem onClick={act(() => archiveRow(store, row.id, null))}>Unarchive</DropdownMenuItem>
+            <DropdownMenuItem onClick={act(() => restoreRow(store, row.id))}>Restore</DropdownMenuItem>
           ) : (
-            <DropdownMenuItem onClick={act(() => archiveRow(store, row.id, monthOfDate()))}>Archive from this month</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setOpen('remove')}>Archive or delete…</DropdownMenuItem>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
@@ -69,6 +70,7 @@ export function RowMenu({ row, tables, household, onError }: { row: Row; tables:
       {open === 'source' && <RowSourceDialog row={row} tables={tables} household={household} onClose={close} />}
       {open === 'account' && <RowAccountDialog row={row} tables={tables} household={household} onClose={close} />}
       {open === 'follow' && <RowFollowDialog row={row} tables={tables} household={household} onClose={close} />}
+      {open === 'remove' && <RemoveDialog target={{ kind: 'row', id: row.id }} tables={tables} household={household} onClose={close} />}
     </>
   )
 }

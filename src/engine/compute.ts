@@ -311,6 +311,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
     const series: PoolSeries = { poolId: pool.id, months: {} }
     let bal = pool.openingBalance
     for (const m of months) {
+      // an archived pool account's series stops at its archive month; net worth and later months no longer see it
+      if (pool.archivedMonth && compareMonths(m, pool.archivedMonth) >= 0) break
       const allocation = totals[m].allocationsByPool[pool.id] ?? 0
       const spend = totals[m].poolFundedByPool[pool.id] ?? 0
       bal = bal + allocation - spend
@@ -330,6 +332,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
     let prevBalance: Money | null = null
     for (const m of months) {
       if (compareMonths(m, acc.openingMonth) < 0) continue
+      if (acc.archivedMonth && compareMonths(m, acc.archivedMonth) >= 0) break
       const start: Money = prevBalance ?? acc.openingBalance
       const inflow = savingsInflow(acc, m, rows, cells, pools, totals[m])
       const outflow = savingsOutflow(acc, m, pools, totals[m], acc.id === primarySavingsId)
@@ -360,6 +363,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
     }
     for (const m of months) {
       if (compareMonths(m, acc.openingMonth) < 0) continue
+      if (acc.archivedMonth && compareMonths(m, acc.archivedMonth) >= 0) break
       const prev: Money = prevValue ?? acc.openingBalance
       const am = actuals.get(`${acc.id}|${m}`)
       let deposit: Money = 0
@@ -406,6 +410,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
     let prevBalance: Money | null = null
     for (const m of months) {
       if (compareMonths(m, acc.openingMonth) < 0) continue
+      if (acc.archivedMonth && compareMonths(m, acc.archivedMonth) >= 0) break
       const prev: Money = prevBalance ?? acc.openingBalance
       let inflow: Money = 0
       let outflow: Money = 0

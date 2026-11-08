@@ -7,6 +7,8 @@ import { HUES } from '@/app/hues'
 import { InfoTip, TipLabel } from '@/components/InfoTip'
 import { PoolsCard } from './PoolsCard'
 import { CategoriesCard } from './CategoriesCard'
+import { ArchivedRowsCard } from './ArchivedRowsCard'
+import { RemoveDialog } from '@/features/remove/RemoveDialog'
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
@@ -23,7 +25,7 @@ import {
   ENTITY_KIND_LABEL, ENTITY_TEMPLATES, monthOfDate, templateTitle,
   ACCOUNT_TYPE_INFO, ENTITY_KIND_HELP, type Account, type AccountType, type Entity, type EntityKind, type Household, type Tables,
 } from '@/model'
-import { addAccount, addEntity, applyTemplates, setAccountActual, setMonthlyDefault, updateAccount, updateEntity, updateHousehold, type MonthlyDefaultScope } from '@/store'
+import { addAccount, addEntity, applyTemplates, restoreAccount, restoreEntity, setAccountActual, setMonthlyDefault, updateAccount, updateEntity, updateHousehold, type MonthlyDefaultScope } from '@/store'
 
 const LOCALES = ['en-IE', 'en-GB', 'en-US', 'de-DE', 'de-AT', 'tr-TR', 'fr-FR', 'es-ES', 'nl-NL', 'it-IT', 'pt-PT', 'sv-SE']
 const ACCOUNT_TYPES = ACCOUNT_TYPE_INFO
@@ -40,7 +42,7 @@ export function HouseholdScreen() {
   if (!tables || !household || !engine) return null
   const act = (fn: () => Promise<unknown>) => void fn().catch((e) => setError(e instanceof Error ? e.message : 'Action failed'))
   const people = tables.entities.filter((e) => !e.deletedAt && !e.archivedMonth).length
-  const accounts = tables.accounts.filter((a) => !a.deletedAt).length
+  const accounts = tables.accounts.filter((a) => !a.deletedAt && !a.archivedMonth).length
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 text-xs">
@@ -49,10 +51,11 @@ export function HouseholdScreen() {
       </PageHeader>
       <SettingsCard household={household} tables={tables} onSave={(p) => act(() => updateHousehold(store, p))} onMonthly={(key, value, scope) => act(() => setMonthlyDefault(store, key, value, scope, monthOfDate()))} />
       {household.moneyMode === 'proportional' && <SharesCard household={household} tables={tables} engine={engine} onError={setError} />}
-      <EntitiesCard household={household} entities={tables.entities.filter((e) => !e.deletedAt)} onError={setError} />
-      <AccountsCard household={household} accounts={tables.accounts.filter((a) => !a.deletedAt)} entities={tables.entities} engine={engine} months={months} onError={setError} />
+      <EntitiesCard household={household} tables={tables} entities={tables.entities.filter((e) => !e.deletedAt)} onError={setError} />
+      <AccountsCard household={household} tables={tables} accounts={tables.accounts.filter((a) => !a.deletedAt)} entities={tables.entities} engine={engine} months={months} onError={setError} />
       <PoolsCard household={household} tables={tables} engine={engine} onError={setError} />
-      <CategoriesCard tables={tables} onError={setError} />
+      <CategoriesCard household={household} tables={tables} onError={setError} />
+      <ArchivedRowsCard household={household} tables={tables} onError={setError} />
       <FxCard household={household} tables={tables} months={months} onError={setError} />
       <Island air tone={HUES.transfer} title="Schedules" description="Recurring payments and incomes: rent, salary, insurance, subscriptions, anything on a schedule. They land in the grid by themselves and show up in Moves when due.">
         <RecurringList />
@@ -123,13 +126,13 @@ function SettingsCard({ household: h, tables, onSave, onMonthly }: { household: 
   )
 }
 
-function EntitiesCard({ household, entities: allEntities, onError }: { household: Household; entities: Entity[]; onError: (m: string) => void }) {
+function EntitiesCard({ household, tables, entities: allEntities, onError }: { household: Household; tables: Tables; entities: Entity[]; onError: (m: string) => void }) {
   const store = useStore()
   const [kind, setKind] = useState<EntityKind>('adult')
   const [name, setName] = useState('')
   const [paidBy, setPaidBy] = useState('')
   const [templatesFor, setTemplatesFor] = useState<Entity | null>(null)
-  const [archiving, setArchiving] = useState<string | null>(null)
+  const [removing, setRemoving] = useState<Entity | null>(null)
   const entities = allEntities.filter((e) => !e.archivedMonth)
   const archived = allEntities.filter((e) => e.archivedMonth)
   const adults = entities.filter((e) => e.kind === 'adult')
@@ -155,18 +158,8 @@ function EntitiesCard({ household, entities: allEntities, onError }: { household
               )}
               <span className="ml-auto flex gap-1">
                 <Button size="xs" variant="outline" onClick={() => setTemplatesFor(e)}>Suggested rows…</Button>
-                {archiving === e.id ? (
-                  <>
-                    <Button size="xs" variant="destructive" onClick={() => { setArchiving(null); act(() => updateEntity(store, e.id, { archivedMonth: monthOfDate() })) }}>Really archive</Button>
-                    <Button size="xs" variant="ghost" onClick={() => setArchiving(null)}>Cancel</Button>
-                  </>
-                ) : (
-                  <Button size="xs" variant="ghost" onClick={() => setArchiving(e.id)}>Archive</Button>
-                )}
+                <Button size="xs" variant="ghost" onClick={() => setRemoving(e)}>Archive or delete…</Button>
               </span>
-              {archiving === e.id && (
-                <p className="basis-full text-muted-foreground">Archiving hides {e.name} from this list from {formatMonth(monthOfDate(), household.locale)} on. Rows and past months stay as they are. Restore any time from the archived list below.</p>
-              )}
             </li>
           ))}
           {entities.length === 0 && <li className="py-1 text-muted-foreground">Nobody yet.</li>}
@@ -180,7 +173,7 @@ function EntitiesCard({ household, entities: allEntities, onError }: { household
                   <Chip tone="zinc">{ENTITY_KIND_LABEL[e.kind].toLowerCase()}</Chip>
                   <span>{e.name}</span>
                   <span>since {formatMonth(e.archivedMonth!, household.locale)}</span>
-                  <Button size="xs" variant="outline" className="ml-auto" onClick={() => act(() => updateEntity(store, e.id, { archivedMonth: null }))}>Restore</Button>
+                  <Button size="xs" variant="outline" className="ml-auto" onClick={() => act(() => restoreEntity(store, e.id))}>Restore</Button>
                 </li>
               ))}
             </ul>
@@ -211,6 +204,7 @@ function EntitiesCard({ household, entities: allEntities, onError }: { household
           </div>
         </div>
         {templatesFor && <TemplatesDialog household={household} entity={templatesFor} onClose={() => setTemplatesFor(null)} onError={onError} />}
+        {removing && <RemoveDialog target={{ kind: 'entity', id: removing.id }} tables={tables} household={household} onClose={() => setRemoving(null)} />}
       </div>
     </Island>
   )
@@ -239,11 +233,15 @@ function TemplatesDialog({ household, entity, onClose, onError }: { household: H
   )
 }
 
-function AccountsCard({ household, accounts, entities, engine, months, onError }: { household: Household; accounts: Account[]; entities: Entity[]; engine: ReturnType<typeof useEngine>; months: string[]; onError: (m: string) => void }) {
+function AccountsCard({ household, tables, accounts: allAccounts, entities, engine, months, onError }: { household: Household; tables: Tables; accounts: Account[]; entities: Entity[]; engine: ReturnType<typeof useEngine>; months: string[]; onError: (m: string) => void }) {
   const store = useStore()
   const [editing, setEditing] = useState<Account | 'new' | null>(null)
+  const [removing, setRemoving] = useState<Account | null>(null)
   const [actualsFor, setActualsFor] = useState<string | null>(null)
   const { locale, baseCurrency } = household
+  const accounts = allAccounts.filter((a) => !a.archivedMonth)
+  const archived = allAccounts.filter((a) => a.archivedMonth)
+  const act = (fn: () => Promise<unknown>) => void fn().catch((e) => onError(e instanceof Error ? e.message : 'Action failed'))
   return (
     <Island air tone={HUES.worth} title="Accounts" description="Savings accounts get a running balance from your grid. Enter the real balance any month to keep it honest.">
       <div className="space-y-3">
@@ -286,14 +284,35 @@ function AccountsCard({ household, accounts, entities, engine, months, onError }
             </li>
           ))}
         </ul>
+        {archived.length > 0 && (
+          <div className="space-y-1">
+            <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Archived <InfoTip help="household.archived" /></p>
+            <ul className="divide-y divide-border/60">
+              {archived.map((a) => (
+                <li key={a.id} className="flex min-h-8 flex-wrap items-center gap-2 py-1 text-muted-foreground">
+                  <Chip tone="zinc">{(ACCOUNT_TYPES.find((t) => t.value === a.type)?.label ?? a.type).toLowerCase()}</Chip>
+                  <span>{a.name}</span>
+                  <span>since {formatMonth(a.archivedMonth!, locale)}</span>
+                  <Button size="xs" variant="outline" className="ml-auto" onClick={() => act(() => restoreAccount(store, a.id))}>Restore</Button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <Button variant="outline" size="xs" onClick={() => setEditing('new')}>Add account</Button>
-        {editing && <AccountDialog account={editing === 'new' ? null : editing} entities={entities} baseCurrency={baseCurrency} locale={locale} startMonth={household.startMonth} onClose={() => setEditing(null)} onError={onError} />}
+        {editing && (
+          <AccountDialog
+            account={editing === 'new' ? null : editing} entities={entities} baseCurrency={baseCurrency} locale={locale} startMonth={household.startMonth}
+            onClose={() => setEditing(null)} onError={onError} onRemove={editing !== 'new' ? () => { setRemoving(editing); setEditing(null) } : undefined}
+          />
+        )}
+        {removing && <RemoveDialog target={{ kind: 'account', id: removing.id }} tables={tables} household={household} onClose={() => setRemoving(null)} />}
       </div>
     </Island>
   )
 }
 
-function AccountDialog({ account, entities, baseCurrency, locale, startMonth, onClose, onError }: { account: Account | null; entities: Entity[]; baseCurrency: string; locale: string; startMonth: string; onClose: () => void; onError: (m: string) => void }) {
+function AccountDialog({ account, entities, baseCurrency, locale, startMonth, onClose, onError, onRemove }: { account: Account | null; entities: Entity[]; baseCurrency: string; locale: string; startMonth: string; onClose: () => void; onError: (m: string) => void; onRemove?: () => void }) {
   const store = useStore()
   const [name, setName] = useState(account?.name ?? '')
   const [type, setType] = useState<AccountType>(account?.type ?? 'checking')
@@ -405,9 +424,12 @@ function AccountDialog({ account, entities, baseCurrency, locale, startMonth, on
           )}
         </div>
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button disabled={!name.trim() || currency.length !== 3} onClick={save}>Save</Button>
+        <DialogFooter className="flex-row flex-wrap gap-2 sm:justify-between">
+          <div>{account && onRemove && <Button variant="ghost" size="sm" onClick={onRemove}>Archive or delete…</Button>}</div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button disabled={!name.trim() || currency.length !== 3} onClick={save}>Save</Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

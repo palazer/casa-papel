@@ -122,6 +122,7 @@ export async function setRecurringPaid(store: Store, id: string, month: MonthKey
   if (!item) throw new Error('Recurring item not found')
   const row = tables.rows.find((r) => r.id === item.rowId)
   if (!row) throw new Error('Row not found')
+  if (!scheduleLive(tables, item, month)) throw new Error(`"${row.name}" is archived in ${month}.`)
   if (tables.monthStates.find((s) => s.month === month)?.closed) throw new Error(`${month} is closed. Reopen it to edit.`)
   const cell: Cell | undefined = tables.cells.find((c) => c.rowId === item.rowId && c.month === month)
   const items = cell?.mode === 'items' ? [...cell.items] : []
@@ -133,8 +134,15 @@ export async function setRecurringPaid(store: Store, id: string, month: MonthKey
 
 export type RecurringMonthStatus = 'not-due' | 'due' | 'paid' | 'skipped'
 
+/** A schedule counts in `month` only while it and its row are there: neither removed nor archived by then. */
+export function scheduleLive(tables: Tables, item: RecurringItem, month: MonthKey): boolean {
+  if (item.deletedAt) return false
+  const row = tables.rows.find((r) => r.id === item.rowId)
+  return !!row && !row.deletedAt && !(row.archivedMonth && compareMonths(month, row.archivedMonth) >= 0)
+}
+
 export function recurringStatus(tables: Tables, item: RecurringItem, month: MonthKey): RecurringMonthStatus {
-  if (!isDue(item, month)) return 'not-due'
+  if (!scheduleLive(tables, item, month) || !isDue(item, month)) return 'not-due'
   const cell = tables.cells.find((c) => c.rowId === item.rowId && c.month === month)
   const posted = cell?.items.find((i) => i.recurringItemId === item.id)
   if (!posted) return 'due'
@@ -176,9 +184,15 @@ export async function endRecurringFrom(store: Store, id: string, month: MonthKey
  */
 export async function changeRecurringFrom(store: Store, id: string, month: MonthKey, patch: Partial<Pick<RecurringItem, 'amount' | 'fundedBy' | 'name'>>): Promise<string> {
   const { tables, item } = await findLive(store, id)
-  const ts = now()
+  const { mutations, targetId } = planChangeRecurringFrom(tables, item, month, patch, now())
+  await store.commit(mutations)
+  return targetId
+}
+
+/** The mutations behind `changeRecurringFrom`; archiving a pool account uses them to move its schedules to savings. */
+export function planChangeRecurringFrom(tables: Tables, item: RecurringItem, month: MonthKey, patch: Partial<Pick<RecurringItem, 'amount' | 'fundedBy' | 'name'>>, ts: number): { mutations: Mutation[]; targetId: string } {
   const mutations: Mutation[] = []
-  let targetId = id
+  let targetId = item.id
   if (compareMonths(month, item.startMonth) <= 0) {
     mutations.push({ op: 'put', table: 'recurringItems', record: RecurringItemSchema.parse({ ...item, ...patch, updatedAt: ts }) })
   } else {
@@ -190,14 +204,13 @@ export async function changeRecurringFrom(store: Store, id: string, month: Month
   const closed = new Set(tables.monthStates.filter((s) => s.closed).map((s) => s.month))
   for (const cell of tables.cells) {
     if (cell.rowId !== item.rowId || compareMonths(cell.month, month) < 0 || closed.has(cell.month)) continue
-    if (!cell.items.some((i) => i.recurringItemId === id)) continue
+    if (!cell.items.some((i) => i.recurringItemId === item.id)) continue
     const items = cell.items.map((i) =>
-      i.recurringItemId !== id ? i
+      i.recurringItemId !== item.id ? i
         : i.pinned ? { ...i, recurringItemId: targetId }
         : { ...i, recurringItemId: targetId, amount: patch.amount ?? i.amount, fundedBy: patch.fundedBy ?? i.fundedBy, label: patch.name ?? i.label },
     )
     mutations.push({ op: 'put', table: 'cells', record: CellSchema.parse({ ...cell, items, updatedAt: ts }) })
   }
-  await store.commit(mutations)
-  return targetId
+  return { mutations, targetId }
 }

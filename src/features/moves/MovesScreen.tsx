@@ -12,7 +12,7 @@ import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { cellKey, computeContributions, computePersonBudgets, type EngineOutput } from '@/engine'
 import { isDue, monthOfDate, type Household, type MonthKey, type Tables } from '@/model'
-import { closeMonth, recurringStatus, reopenMonth, setCellDone, setRecurringPaid } from '@/store'
+import { closeMonth, recurringStatus, reopenMonth, scheduleLive, setCellDone, setRecurringPaid } from '@/store'
 import { HUES } from '@/app/hues'
 import { GoalsCard } from '@/features/goals/GoalsCard'
 
@@ -36,7 +36,7 @@ export function MovesScreen() {
     .filter((r) => r.section === 'transfer')
     .map((r) => ({ row: r, cell: engine.cells[cellKey(r.id, m)] }))
     .filter((x) => x.cell && x.cell.source !== 'archived' && x.cell.value !== 0)
-  const due = tables.recurringItems.filter((r) => !r.deletedAt && isDue(r, m)).sort((a, b) => a.name.localeCompare(b.name))
+  const due = tables.recurringItems.filter((r) => scheduleLive(tables, r, m) && isDue(r, m)).sort((a, b) => a.name.localeCompare(b.name))
   const openCount = transfers.filter((x) => x.cell.status !== 'done').length + due.filter((d) => recurringStatus(tables, d, m) === 'due').length
   /** What a schedule actually posted this month, when the Paid sheet changed it. */
   const postedAmount = (d: (typeof due)[number]) => engine.cells[cellKey(d.rowId, m)]?.items.find((i) => i.recurringItemId === d.id)?.effectiveAmount ?? d.amount

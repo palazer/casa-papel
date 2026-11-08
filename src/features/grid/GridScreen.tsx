@@ -80,8 +80,13 @@ export function GridScreen() {
 
   const act = (fn: () => Promise<unknown>) => void fn().catch((err) => setError(err instanceof Error ? err.message : 'Action failed'))
 
+  /** Balance series that still reach into the shown months; an account archived before them has nothing to show. */
+  const accountSeries = Object.values(engine.accounts).filter((s) => Object.keys(s.months).length > 0)
+  const poolSeries = Object.values(engine.pools).filter((p) => Object.keys(p.months).length > 0)
+
   const derivedRow = (
-    label: string, flow: Flow, pick: (m: MonthKey) => Money,
+    /** `pick` returns null for a month the series does not reach (an archived account or pool account): the cell stays blank. */
+    label: string, flow: Flow, pick: (m: MonthKey) => Money | null,
     /** `sub`: a detail line under the named parent row; indented and faded, with the parent's name read out but not shown. */
     opts: { strong?: boolean; muted?: boolean; currency?: string; hue?: Hue; band?: boolean; sub?: string; help?: HelpKey; format?: (v: Money, m: MonthKey) => string; onClick?: (m: MonthKey) => void; mark?: (m: MonthKey) => boolean } = {},
   ): ReactNode => (
@@ -93,6 +98,7 @@ export function GridScreen() {
       </th>
       {months.map((m) => {
         const v = pick(m)
+        if (v == null) return <td key={m} className={cn('p-0', engine.totals[m]?.closed && 'bg-muted/60')} />
         const d = amountDisplay(v, flow, opts.currency ?? ccy, locale, neg)
         const text = opts.format ? opts.format(v, m) : d.text
         const marked = opts.mark?.(m) ?? false
@@ -206,32 +212,32 @@ export function GridScreen() {
               ]
             })}
 
-            {(Object.keys(engine.accounts).length > 0 || Object.keys(engine.pools).length > 0) && (
+            {(accountSeries.length > 0 || poolSeries.length > 0) && (
               <tr>
                 <th scope="row" className={cn('sticky left-0 z-10 border-t bg-card px-2 py-1.5 text-left text-xs font-semibold', HUES.worth.text)}>Balances</th>
                 <td colSpan={months.length} className="border-t" />
               </tr>
             )}
-            {Object.values(engine.accounts).flatMap((s) => {
+            {accountSeries.flatMap((s) => {
               const acc = tables.accounts.find((a) => a.id === s.accountId)
               if (!acc) return []
-              const open = (m: MonthKey) => setBalanceSel({ accountId: acc.id, month: m })
+              const open = (m: MonthKey) => { if (s.months[m]) setBalanceSel({ accountId: acc.id, month: m }) }
               const marked = (m: MonthKey) => (s.months[m]?.adjustment ?? 0) !== 0 || s.months[m]?.projected === false
               if (acc.type === 'investment') {
                 return [
-                  derivedRow(`${acc.name} · value`, 'in', (m) => s.months[m]?.balance ?? 0, { strong: true, currency: s.currency, onClick: open, mark: marked, hue: HUES.worth, help: 'balance.investmentValue' }),
-                  derivedRow('Deposited', 'in', (m) => s.months[m]?.capital ?? 0, { muted: true, sub: acc.name, currency: s.currency, help: 'balance.deposited' }),
-                  derivedRow('Return', 'in', (m) => Math.round((s.months[m]?.totalReturn ?? 0) * 10000), { muted: true, sub: acc.name, format: (v) => (v === 0 ? '' : formatPercent(v / 10000, locale)), help: 'balance.return' }),
+                  derivedRow(`${acc.name} · value`, 'in', (m) => s.months[m]?.balance ?? null, { strong: true, currency: s.currency, onClick: open, mark: marked, hue: HUES.worth, help: 'balance.investmentValue' }),
+                  derivedRow('Deposited', 'in', (m) => s.months[m]?.capital ?? null, { muted: true, sub: acc.name, currency: s.currency, help: 'balance.deposited' }),
+                  derivedRow('Return', 'in', (m) => (s.months[m] ? Math.round((s.months[m].totalReturn ?? 0) * 10000) : null), { muted: true, sub: acc.name, format: (v) => (v === 0 ? '' : formatPercent(v / 10000, locale)), help: 'balance.return' }),
                 ]
               }
               const label = acc.type === 'credit-card' ? `${acc.name} · owed` : acc.type === 'loan' ? `${acc.name} · outstanding` : acc.name
-              return [derivedRow(label, s.liability ? 'out' : 'in', (m) => s.months[m]?.balance ?? 0, { strong: true, currency: s.currency, onClick: open, mark: marked, hue: HUES.worth, help: balanceHelp(acc.type) })]
+              return [derivedRow(label, s.liability ? 'out' : 'in', (m) => s.months[m]?.balance ?? null, { strong: true, currency: s.currency, onClick: open, mark: marked, hue: HUES.worth, help: balanceHelp(acc.type) })]
             })}
-            {Object.values(engine.pools).map((p) => {
+            {poolSeries.map((p) => {
               const pool = tables.pools.find((x) => x.id === p.poolId)
-              return derivedRow(`Pool account · ${pool?.name ?? ''}`, 'in', (m) => p.months[m]?.balance ?? 0, { hue: HUES.pool, help: 'balance.pool' })
+              return derivedRow(`Pool account · ${pool?.name ?? ''}`, 'in', (m) => p.months[m]?.balance ?? null, { hue: HUES.pool, help: 'balance.pool' })
             })}
-            {Object.keys(engine.accounts).length > 0 && derivedRow('Net worth', 'in', (m) => engine.netWorth[m] ?? 0, { strong: true, hue: HUES.worth, band: true, help: 'derived.netWorth' })}
+            {accountSeries.length > 0 && derivedRow('Net worth', 'in', (m) => (accountSeries.some((s) => s.months[m]) ? engine.netWorth[m] ?? 0 : null), { strong: true, hue: HUES.worth, band: true, help: 'derived.netWorth' })}
           </tbody>
         </table>
       </div>

@@ -59,7 +59,8 @@ export const HELP = {
   'household.tracked': { title: 'Tracked balance', text: 'A tracked account gets a running balance in the grid, month by month, and counts towards net worth. Untick it for an account you only name, like one that just receives a transfer.' },
   'household.categories': { title: 'Categories', text: 'Named groups inside a section. Rows sort by category in the grid and share a faint band; a label line names each group. Rename, reorder or remove them here; removing a category keeps its rows.' },
   'household.usualCategories': { title: 'The usual categories', text: 'Adds six expense categories most households use: Housing, Living, Transport, Family & pets, Fun, Personal. Rows stay where they are until you assign them.' },
-  'household.archived': { title: 'Archived', text: 'Out of the way but not gone: archived people and things keep their rows and history and can be restored any time.' },
+  'household.archived': { title: 'Archived', text: 'Out of the way but not gone: archived rows, accounts, pool accounts, people and things keep their history up to the month they were archived from, and can be restored any time.' },
+  'remove.archiveFrom': { title: 'Archive from', text: 'From this month on the thing is hidden and stops counting. Every earlier month stays exactly as it was, closed months included; that is why anything with amounts in a closed month can only be archived, never deleted.' },
 
   // Goals and schedules
   'goal.status': { title: 'Goal status', text: 'Measured against the plan in the grid, so the bar moves when the plan changes. On track: reached by the target month. Late: reached after it, or not within the months shown. Reached: already there.' },

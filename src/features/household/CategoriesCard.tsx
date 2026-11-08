@@ -8,9 +8,10 @@ import { cn } from '@/lib/utils'
 import { SECTION_HUE } from '@/app/hues'
 import { useStore } from '@/app/store'
 import { sortRows } from '@/engine'
-import type { Category, Section, Tables } from '@/model'
-import { addCategory, deleteCategory, moveCategory, renameCategory, seedDefaultCategories, setRowCategory } from '@/store'
+import type { Category, Household, Section, Tables } from '@/model'
+import { addCategory, moveCategory, renameCategory, seedDefaultCategories, setRowCategory } from '@/store'
 import { NativeSelect } from '@/features/grid/NativeSelect'
+import { RemoveDialog } from '@/features/remove/RemoveDialog'
 
 const SECTIONS: Array<{ key: Section; title: string }> = [
   { key: 'income', title: 'Income' },
@@ -21,7 +22,7 @@ const SECTIONS: Array<{ key: Section; title: string }> = [
 const byOrder = (a: Category, b: Category) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0)
 
 /** Categories per section: rename, reorder, remove, add; and every row's category in one place (DESIGN.md §6). */
-export function CategoriesCard({ tables, onError }: { tables: Tables; onError: (m: string) => void }) {
+export function CategoriesCard({ household, tables, onError }: { household: Household; tables: Tables; onError: (m: string) => void }) {
   const store = useStore()
   const act = (fn: () => Promise<unknown>) => void fn().catch((e) => onError(e instanceof Error ? e.message : 'Action failed'))
   return (
@@ -39,7 +40,7 @@ export function CategoriesCard({ tables, onError }: { tables: Tables; onError: (
               ) : (
                 <ul className="divide-y divide-border/60">
                   {categories.map((c, i) => (
-                    <CategoryRow key={c.id} category={c} first={i === 0} last={i === categories.length - 1} act={act} />
+                    <CategoryRow key={c.id} category={c} first={i === 0} last={i === categories.length - 1} household={household} tables={tables} act={act} />
                   ))}
                 </ul>
               )}
@@ -69,7 +70,7 @@ export function CategoriesCard({ tables, onError }: { tables: Tables; onError: (
   )
 }
 
-function CategoryRow({ category: c, first, last, act }: { category: Category; first: boolean; last: boolean; act: (fn: () => Promise<unknown>) => void }) {
+function CategoryRow({ category: c, first, last, household, tables, act }: { category: Category; first: boolean; last: boolean; household: Household; tables: Tables; act: (fn: () => Promise<unknown>) => void }) {
   const store = useStore()
   const [name, setName] = useState(c.name)
   const [removing, setRemoving] = useState(false)
@@ -83,15 +84,8 @@ function CategoryRow({ category: c, first, last, act }: { category: Category; fi
       <Input aria-label={`Name of the category ${c.name}`} className="h-7 w-44" value={name} onChange={(e) => setName(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} />
       <Button size="icon-xs" variant="ghost" aria-label={`Move ${c.name} up`} disabled={first} onClick={() => act(() => moveCategory(store, c.id, 'up'))}><ChevronUp /></Button>
       <Button size="icon-xs" variant="ghost" aria-label={`Move ${c.name} down`} disabled={last} onClick={() => act(() => moveCategory(store, c.id, 'down'))}><ChevronDown /></Button>
-      {removing ? (
-        <span className="flex items-center gap-2 text-muted-foreground">
-          Its rows keep their place, just without a category.
-          <Button size="xs" variant="destructive" onClick={() => act(() => deleteCategory(store, c.id))}>Remove</Button>
-          <Button size="xs" variant="ghost" onClick={() => setRemoving(false)}>Cancel</Button>
-        </span>
-      ) : (
-        <Button size="xs" variant="ghost" className="ml-auto" aria-label={`Remove ${c.name}`} onClick={() => setRemoving(true)}>Remove</Button>
-      )}
+      <Button size="xs" variant="ghost" className="ml-auto" aria-label={`Remove ${c.name}`} onClick={() => setRemoving(true)}>Remove…</Button>
+      {removing && <RemoveDialog target={{ kind: 'category', id: c.id }} tables={tables} household={household} onClose={() => setRemoving(false)} />}
     </li>
   )
 }

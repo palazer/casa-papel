@@ -106,13 +106,14 @@ export function MonthScreen() {
         <Stat label="Expenses" help="derived.expensesTotal" value={formatAmount(t.expensesTotal, ccy, locale)} tone="out" hue={HUES.expense} />
         <Stat label="To savings" help="stat.toSavings" value={formatAmount(t.toSavings, ccy, locale, { sign: 'exceptZero' })} tone={t.toSavings < 0 ? 'draw' : 'neutral'} hue={HUES.transfer} />
         <Stat label={household.closingRule === 'savings-plug' ? 'Kept in account' : 'Leftover'} help={household.closingRule === 'savings-plug' ? 'derived.keptInAccount' : 'derived.leftover'} value={formatAmount(t.leftover, ccy, locale)} hue={HUES.transfer} />
-        {Object.values(engine.accounts).map((s) => {
+        {/* an account or pool account archived by this month has no balance to show */}
+        {Object.values(engine.accounts).filter((s) => s.months[m]).map((s) => {
           const acc = tables.accounts.find((a) => a.id === s.accountId)
-          return <Stat key={s.accountId} label={acc?.name ?? 'Account'} help={balanceHelp(acc?.type)} value={formatAmount(s.months[m]?.balance ?? 0, s.currency, locale)} hue={HUES.worth} />
+          return <Stat key={s.accountId} label={acc?.name ?? 'Account'} help={balanceHelp(acc?.type)} value={formatAmount(s.months[m].balance, s.currency, locale)} hue={HUES.worth} />
         })}
-        {Object.keys(engine.accounts).length > 0 && <Stat label="Net worth" help="derived.netWorth" value={formatAmount(engine.netWorth[m] ?? 0, ccy, locale)} hue={HUES.worth} />}
-        {Object.values(engine.pools).map((p) => (
-          <Stat key={p.poolId} label={`Pool account · ${tables.pools.find((x) => x.id === p.poolId)?.name ?? ''}`} help="balance.pool" value={formatAmount(p.months[m]?.balance ?? 0, ccy, locale)} hue={HUES.pool} />
+        {Object.values(engine.accounts).some((s) => s.months[m]) && <Stat label="Net worth" help="derived.netWorth" value={formatAmount(engine.netWorth[m] ?? 0, ccy, locale)} hue={HUES.worth} />}
+        {Object.values(engine.pools).filter((p) => p.months[m]).map((p) => (
+          <Stat key={p.poolId} label={`Pool account · ${tables.pools.find((x) => x.id === p.poolId)?.name ?? ''}`} help="balance.pool" value={formatAmount(p.months[m].balance, ccy, locale)} hue={HUES.pool} />
         ))}
       </Island>
 

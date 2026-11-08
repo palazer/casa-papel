@@ -8,19 +8,21 @@ import { NativeSelect } from '@/features/grid/NativeSelect'
 import { amountToInput, formatMonth, parseAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import { GOAL_KIND_INFO, monthOfDate, type Goal, type GoalKind, type Household, type Tables } from '@/model'
-import { addGoal, deleteGoal, updateGoal } from '@/store'
+import { addGoal, updateGoal } from '@/store'
 
 interface Props {
   household: Household
   tables: Tables
   goal: Goal | null
   onClose: () => void
+  /** "Delete…" hands the goal to the remove dialog; the card opens it after this one closes. */
+  onRemove?: () => void
 }
 
 const ASSET_TYPES = ['savings', 'investment', 'other-asset']
 const DEBT_TYPES = ['credit-card', 'loan']
 
-export function GoalDialog({ household, tables, goal, onClose }: Props) {
+export function GoalDialog({ household, tables, goal, onClose, onRemove }: Props) {
   const store = useStore()
   const { locale, baseCurrency } = household
   const [name, setName] = useState(goal?.name ?? '')
@@ -30,13 +32,13 @@ export function GoalDialog({ household, tables, goal, onClose }: Props) {
   const [target, setTarget] = useState(goal && goal.kind !== 'pay-off' ? amountToInput(goal.target, currencyFor(goal.kind, goal.accountId), locale) : '')
   const [targetMonth, setTargetMonth] = useState(goal?.targetMonth ?? '')
   const [notes, setNotes] = useState(goal?.notes ?? '')
-  const [confirmDelete, setConfirmDelete] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const accounts = tables.accounts.filter((a) => !a.deletedAt)
+  // archived accounts and pool accounts are offered only while this goal still watches one
+  const accounts = tables.accounts.filter((a) => !a.deletedAt && (!a.archivedMonth || a.id === goal?.accountId))
   const choices = kind === 'account-balance' ? accounts.filter((a) => ASSET_TYPES.includes(a.type)) : kind === 'pay-off' ? accounts.filter((a) => DEBT_TYPES.includes(a.type)) : []
-  const pools = tables.pools.filter((p) => !p.deletedAt)
+  const pools = tables.pools.filter((p) => !p.deletedAt && (!p.archivedMonth || p.id === goal?.poolId))
   const chosenAccount = accounts.find((a) => a.id === accountId)
   const needsAccount = kind === 'account-balance' || kind === 'pay-off'
   const effectiveAccountId = needsAccount ? (choices.some((a) => a.id === accountId) ? accountId : choices[0]?.id ?? '') : ''
@@ -65,19 +67,6 @@ export function GoalDialog({ household, tables, goal, onClose }: Props) {
       setBusy(false)
     }
   }
-  async function remove() {
-    if (!goal) return
-    setBusy(true)
-    try {
-      await deleteGoal(store, goal.id)
-      onClose()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not delete.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
   const noChoice = needsAccount ? choices.length === 0 : kind === 'pool-balance' ? pools.length === 0 : false
 
   return (
@@ -131,9 +120,7 @@ export function GoalDialog({ household, tables, goal, onClose }: Props) {
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         <DialogFooter className="flex-row flex-wrap gap-2 sm:justify-between">
           <div>
-            {goal && (confirmDelete
-              ? <Button variant="destructive" size="sm" onClick={() => void remove()} disabled={busy}>Really delete</Button>
-              : <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(true)} disabled={busy}>Delete</Button>)}
+            {goal && onRemove && <Button variant="ghost" size="sm" onClick={onRemove} disabled={busy}>Delete…</Button>}
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>

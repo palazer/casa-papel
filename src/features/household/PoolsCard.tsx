@@ -6,19 +6,25 @@ import { Island } from '@/components/ui/island'
 import { Label } from '@/components/ui/label'
 import { Check } from '@/components/Check'
 import { NativeSelect } from '@/features/grid/NativeSelect'
-import { amountToInput, formatAmount, parseAmount } from '@/app/format'
+import { amountToInput, formatAmount, formatMonth, parseAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import type { EngineOutput } from '@/engine'
 import { monthOfDate, type Account, type Household, type Pool, type Tables } from '@/model'
-import { addPool, updatePool } from '@/store'
+import { addPool, restorePool, updatePool } from '@/store'
 import { HUES } from '@/app/hues'
+import { InfoTip } from '@/components/InfoTip'
+import { RemoveDialog } from '@/features/remove/RemoveDialog'
 
 export function PoolsCard({ household, tables, engine, onError }: { household: Household; tables: Tables; engine: EngineOutput | null; onError: (m: string) => void }) {
+  const store = useStore()
   const [editing, setEditing] = useState<Pool | 'new' | null>(null)
-  const pools = tables.pools.filter((p) => !p.deletedAt)
-  const savings = tables.accounts.filter((a) => a.type === 'savings' && !a.deletedAt)
+  const [removing, setRemoving] = useState<Pool | null>(null)
+  const pools = tables.pools.filter((p) => !p.deletedAt && !p.archivedMonth)
+  const archived = tables.pools.filter((p) => !p.deletedAt && p.archivedMonth)
+  const savings = tables.accounts.filter((a) => a.type === 'savings' && !a.deletedAt && !a.archivedMonth)
   const m = monthOfDate()
   const { locale, baseCurrency } = household
+  const act = (fn: () => Promise<unknown>) => void fn().catch((e) => onError(e instanceof Error ? e.message : 'Action failed'))
   return (
     <Island
       air tone={HUES.pool} title="Pool accounts"
@@ -42,18 +48,38 @@ export function PoolsCard({ household, tables, engine, onError }: { household: H
             })}
           </ul>
         )}
+        {archived.length > 0 && (
+          <div className="space-y-1">
+            <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Archived <InfoTip help="household.archived" /></p>
+            <ul className="divide-y divide-border/60">
+              {archived.map((p) => (
+                <li key={p.id} className="flex min-h-8 flex-wrap items-center gap-2 py-1 text-muted-foreground">
+                  <span>{p.name}</span>
+                  <span>since {formatMonth(p.archivedMonth!, locale)}</span>
+                  <Button size="xs" variant="outline" className="ml-auto" onClick={() => act(() => restorePool(store, p.id))}>Restore</Button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {savings.length === 0 ? (
           <p className="text-muted-foreground">Add a savings account first; pool accounts live inside one.</p>
         ) : (
           <Button variant="outline" size="xs" onClick={() => setEditing('new')}>Add pool account</Button>
         )}
-        {editing && <PoolDialog pool={editing === 'new' ? null : editing} savings={savings} baseCurrency={baseCurrency} locale={locale} onClose={() => setEditing(null)} onError={onError} />}
+        {editing && (
+          <PoolDialog
+            pool={editing === 'new' ? null : editing} savings={savings} baseCurrency={baseCurrency} locale={locale} onClose={() => setEditing(null)} onError={onError}
+            onRemove={editing !== 'new' ? () => { setRemoving(editing); setEditing(null) } : undefined}
+          />
+        )}
+        {removing && <RemoveDialog target={{ kind: 'pool', id: removing.id }} tables={tables} household={household} onClose={() => setRemoving(null)} />}
       </div>
     </Island>
   )
 }
 
-function PoolDialog({ pool, savings, baseCurrency, locale, onClose, onError }: { pool: Pool | null; savings: Account[]; baseCurrency: string; locale: string; onClose: () => void; onError: (m: string) => void }) {
+function PoolDialog({ pool, savings, baseCurrency, locale, onClose, onError, onRemove }: { pool: Pool | null; savings: Account[]; baseCurrency: string; locale: string; onClose: () => void; onError: (m: string) => void; onRemove?: () => void }) {
   const store = useStore()
   const [name, setName] = useState(pool?.name ?? '')
   const [accountId, setAccountId] = useState(pool?.accountId ?? savings[0]?.id ?? '')
@@ -90,9 +116,12 @@ function PoolDialog({ pool, savings, baseCurrency, locale, onClose, onError }: {
           )}
         </div>
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button disabled={!name.trim() || !accountId} onClick={save}>Save</Button>
+        <DialogFooter className="flex-row flex-wrap gap-2 sm:justify-between">
+          <div>{pool && onRemove && <Button variant="ghost" size="sm" onClick={onRemove}>Archive or delete…</Button>}</div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button disabled={!name.trim() || !accountId} onClick={save}>Save</Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

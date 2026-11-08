@@ -80,9 +80,12 @@ test.describe('wave 2a', () => {
     await expect(dlg).toBeHidden()
     await expect(page.getByRole('progressbar', { name: 'Travel fund 2027' })).toBeVisible()
 
+    // "Delete…" hands over to the remove dialog, which names the goal and deletes it
     await page.getByText('Travel fund 2027', { exact: true }).locator('..').getByRole('button', { name: 'Edit' }).click()
-    await dlg.getByRole('button', { name: 'Delete' }).click()
-    await dlg.getByRole('button', { name: 'Really delete' }).click()
+    await dlg.getByRole('button', { name: 'Delete…' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Goal "Travel fund 2027"' })).toBeVisible()
+    await expect(dlg.getByText('What it watched is not touched.')).toBeVisible()
+    await dlg.getByRole('button', { name: 'Delete', exact: true }).click()
     await expect(dlg).toBeHidden()
     await expect(page.getByRole('progressbar', { name: 'Travel fund 2027' })).toHaveCount(0)
     await expect(loan).toBeVisible()
