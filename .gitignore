@@ -26,3 +26,6 @@ test-results/
 !.vscode/extensions.json
 *.local
 /e2e/output/
+
+# Supabase CLI link metadata
+supabase/.temp/
