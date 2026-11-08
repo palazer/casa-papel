@@ -1,5 +1,3 @@
-import { GoalsCard } from '@/features/goals/GoalsCard'
-import { HUES, SECTION_HUE, type Hue } from '@/app/hues'
 import { useMemo, useState } from 'react'
 import { Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -12,14 +10,20 @@ import { PageHeader } from '@/components/PageHeader'
 import { cn } from '@/lib/utils'
 import { formatAmount } from '@/app/format'
 import { balanceHelp, type HelpKey } from '@/app/help'
+import { HUES, SECTION_HUE, type Hue } from '@/app/hues'
+import { readPref, writePref } from '@/app/prefs'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
-import { cellKey } from '@/engine'
-import { monthOfDate, type MonthKey, type Section } from '@/model'
-import { closeMonth, reopenMonth } from '@/store'
+import { cellKey, type CellResult } from '@/engine'
+import { monthOfDate, type MonthKey, type Row, type Section } from '@/model'
+import { closeMonth, derivedRowReason, reopenMonth, setCellDone, setDerivedDone, setItemStatus } from '@/store'
 import { CellEditor } from '@/features/grid/CellEditor'
-import { amountDisplay, doneLabel, doneness, flowOf, statusClass, toneClass } from '@/features/grid/display'
-import { DoneDot } from '@/features/grid/DoneDot'
+import { doneness } from '@/features/grid/display'
+import { GoalsCard } from '@/features/goals/GoalsCard'
+import { MonthLine } from './MonthLine'
+import { PaidSheet } from './PaidSheet'
+import { ProgressLine } from './ProgressLine'
+import { monthProgress, progressText } from './progress'
 
 const SECTIONS: Array<{ key: Section; title: string }> = [
   { key: 'income', title: 'Income' },
@@ -27,8 +31,11 @@ const SECTIONS: Array<{ key: Section; title: string }> = [
   { key: 'transfer', title: 'Transfers' },
 ]
 
-/** One month as a list (the phone's first screen, DESIGN.md §2): the totals, the goals, then every row with its
- *  amount and done dot. Rows keep 14 px text and 44 px of height here, the one place the desktop density does not apply. */
+/**
+ * One month as a list (the phone's first screen, DESIGN.md §2): the progress line, the totals, the goals, then every
+ * row with its amount and a tick. Rows keep 14 px text and 44 px of height here, the one place the desktop density does
+ * not apply. Tapping a line opens the Paid sheet; an itemized line opens as an accordion with a tick per item.
+ */
 export function MonthScreen() {
   const store = useStore()
   const tables = useTables()
@@ -36,7 +43,11 @@ export function MonthScreen() {
   const months = useMemo(() => (household && tables ? defaultMonths(household, tables) : []), [household, tables])
   const engine = useEngine(tables, months)
   const [month, setMonth] = useState<MonthKey>(() => monthOfDate())
-  const [selectedRow, setSelectedRow] = useState<string | null>(null)
+  const [editorRow, setEditorRow] = useState<string | null>(null)
+  const [sheet, setSheet] = useState<{ rowId: string; itemId: string | null } | null>(null)
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
+  const [hideDone, setHideDone] = useState(() => readPref('hideDone', false))
+  const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   if (!tables || !household || !engine) return null
@@ -44,14 +55,42 @@ export function MonthScreen() {
   const idx = Math.max(0, months.indexOf(month) === -1 ? months.length - 1 : months.indexOf(month))
   const m = months[idx]
   const t = engine.totals[m]
+  const closed = t?.closed ?? false
   const act = (fn: () => Promise<unknown>) => void fn().catch((e) => setError(e instanceof Error ? e.message : 'Action failed'))
-  const row = selectedRow ? engine.rows.find((r) => r.id === selectedRow) : undefined
+  const progress = monthProgress(engine.rows, engine.cells, m)
+  const editing = editorRow ? engine.rows.find((r) => r.id === editorRow) : undefined
+  const sheetRow = sheet ? engine.rows.find((r) => r.id === sheet.rowId) : undefined
+  const sheetCell = sheetRow ? engine.cells[cellKey(sheetRow.id, m)] : undefined
+
+  function toggleExpanded(rowId: string, open: boolean) {
+    setExpanded((s) => {
+      const next = new Set(s)
+      if (open) next.add(rowId)
+      else next.delete(rowId)
+      return next
+    })
+  }
+
+  /** One tick: a row, one of its items, or an automatic row's "moved" flag. */
+  function tick(row: Row, cell: CellResult, itemId: string | null, done: boolean) {
+    setBusy(itemId ? `${row.id}:${itemId}` : row.id)
+    setError(null)
+    const run = itemId
+      ? setItemStatus(store, row.id, m, itemId, done ? 'done' : row.defaultStatus)
+      : cell.source === 'derived' ? setDerivedDone(store, row.id, m, done) : setCellDone(store, row.id, m, done)
+    run.catch((e) => setError(e instanceof Error ? e.message : 'Action failed')).finally(() => setBusy(null))
+  }
+
+  const setHide = (v: boolean) => {
+    setHideDone(v)
+    writePref('hideDone', v)
+  }
 
   return (
     <div className="mx-auto max-w-xl space-y-4">
-      <PageHeader title="Month" subline={<>{household.name}{t?.closed && <> · <Chip tone="zinc"><Lock aria-hidden /> closed</Chip></>}</>}>
+      <PageHeader title="Month" subline={<>{household.name}{closed && <> · <Chip tone="zinc"><Lock aria-hidden /> closed</Chip></>}</>}>
         <MonthPicker months={months} month={m} onChange={setMonth} locale={locale} />
-        {t.closed ? (
+        {closed ? (
           <Button size="sm" variant="outline" onClick={() => act(() => reopenMonth(store, m))}>Reopen month</Button>
         ) : (
           <Button size="sm" onClick={() => act(() => closeMonth(store, m))}>Close month</Button>
@@ -59,6 +98,8 @@ export function MonthScreen() {
         <MarksLegend neg={neg} />
         {error && <p role="alert" className="basis-full text-destructive">{error}</p>}
       </PageHeader>
+
+      <ProgressLine text={progressText(progress, closed, ccy, locale)} hideDone={hideDone} onHideDone={setHide} />
 
       <Island title="This month" bodyClassName="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 text-sm">
         <Stat label="Income" help="derived.incomeTotal" value={formatAmount(t.income, ccy, locale)} hue={HUES.income} />
@@ -80,36 +121,41 @@ export function MonthScreen() {
       {SECTIONS.map(({ key, title }) => {
         const rows = engine.rows.filter((r) => r.section === key)
         if (rows.length === 0) return null
+        const lines = rows.flatMap((row) => {
+          const cell = engine.cells[cellKey(row.id, m)]
+          return cell && cell.source !== 'archived' ? [{ row, cell }] : []
+        })
+        const shown = hideDone ? lines.filter(({ cell }) => cell.source === 'empty' || cell.value === 0 || doneness(cell).state !== 'all') : lines
         return (
           <Island key={key} title={title} help={`section.${key}`} tone={SECTION_HUE[key]} bodyClassName="px-0 pb-0 pt-1">
-            <div className="divide-y divide-border/60">
-              {rows.map((r) => {
-                const c = engine.cells[cellKey(r.id, m)]
-                if (!c || c.source === 'archived') return null
-                const d = amountDisplay(c.value, flowOf(r), r.currency ?? ccy, locale, neg)
-                const derived = c.source === 'derived'
-                const dot = !derived && c.source !== 'empty' && ((m === monthOfDate() && !engine.totals[m]?.closed) || c.status === 'done') ? doneness(c) : null
-                return (
-                  <button
-                    key={r.id} type="button" disabled={derived}
-                    className={cn('flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm', !derived && 'hover:bg-muted', derived && 'bg-muted/40')}
-                    onClick={() => setSelectedRow(r.id)}
-                    aria-label={`${r.name}: ${d.text}${dot ? `, ${doneLabel(dot)}` : ''}`}
-                  >
-                    <span className="truncate">{r.name}{r.followsRowId ? <span className="ml-1 text-xs text-muted-foreground">= {engine.rows.find((x) => x.id === r.followsRowId)?.name ?? ''}</span> : null}</span>
-                    <span className={cn('flex items-center gap-1 tabular-nums', toneClass[d.tone], c.source === 'empty' ? 'text-muted-foreground/40' : statusClass[c.status])}>
-                      {dot && <DoneDot {...dot} className="mr-0.5" />}
-                      {c.source === 'empty' ? '·' : d.text}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
+            {shown.length === 0 ? (
+              <p className="px-3 py-2 text-xs text-muted-foreground">{lines.length ? 'All done' : 'Nothing here'}</p>
+            ) : (
+              <ul className="divide-y divide-border/60">
+                {shown.map(({ row, cell }) => (
+                  <MonthLine
+                    key={row.id} row={row} cell={cell} locale={locale} ccy={ccy} neg={neg} closed={closed}
+                    automatic={derivedRowReason(row, household.closingRule) !== null}
+                    followedName={row.followsRowId ? engine.rows.find((x) => x.id === row.followsRowId)?.name : undefined}
+                    expanded={expanded.has(row.id)} onExpand={(open) => toggleExpanded(row.id, open)}
+                    onOpen={(itemId) => setSheet({ rowId: row.id, itemId })}
+                    onTick={(itemId, done) => tick(row, cell, itemId, done)}
+                    busy={busy === row.id || (busy?.startsWith(`${row.id}:`) ?? false)}
+                  />
+                ))}
+              </ul>
+            )}
           </Island>
         )
       })}
 
-      {row && <CellEditor key={`${row.id}:${m}`} tables={tables} engine={engine} household={household} row={row} month={m} onClose={() => setSelectedRow(null)} />}
+      {sheet && sheetRow && sheetCell && (
+        <PaidSheet
+          key={`${sheet.rowId}:${sheet.itemId ?? ''}:${m}`} household={household} row={sheetRow} cell={sheetCell} month={m} itemId={sheet.itemId}
+          onClose={() => setSheet(null)} onOpenEditor={() => setEditorRow(sheet.rowId)}
+        />
+      )}
+      {editing && <CellEditor key={`${editing.id}:${m}`} tables={tables} engine={engine} household={household} row={editing} month={m} onClose={() => setEditorRow(null)} />}
     </div>
   )
 }

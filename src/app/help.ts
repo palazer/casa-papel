@@ -26,6 +26,8 @@ export const HELP = {
   'row.toSavingsPlug': { title: 'To savings', text: 'Worked out for you: income minus spending from income minus pocket money and the cash buffer. Whatever is left moves to savings, so you never type it.' },
   'row.pocketShare': { title: 'Pocket money', text: 'Each adult\'s share of the pocket money set under Household, paid out of the pooled income. Change the amount there, not here.' },
   'row.follows': { title: 'Follows another row', text: 'This row copies another row\'s amount every month, like a child\'s savings following the child benefit. Edit the row it follows; this one has no amount of its own.' },
+  'row.automatic': { title: 'Automatic', text: 'The app works this amount out from the rest of the month, so there is nothing to type. Tick it once the money has actually moved; the amount keeps following the plan.' },
+  'month.progress': { title: 'Progress', text: 'Every line with an amount counts once; an itemized line counts each item. Still to pay adds up the open spending and transfers, to come in the open income, both in your base currency.' },
 
   // Balances
   'balance.savings': { title: 'Savings balance', text: 'Last month\'s balance plus what went in minus what came out, month by month from the opening balance. Click a month to enter what the account really held; later months start from your number.' },

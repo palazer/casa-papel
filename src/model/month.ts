@@ -44,6 +44,11 @@ export function monthOfDate(d: Date = new Date()): MonthKey {
   return monthKey(d.getFullYear(), d.getMonth() + 1)
 }
 
+/** Today as an ISO date (YYYY-MM-DD) from the local calendar, the way the Paid sheet prefills its date. */
+export function isoDateOfToday(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 /** Last calendar day of the month as an ISO date (YYYY-MM-DD). */
 export function lastDayOfMonth(m: MonthKey): string {
   const { year, month } = parseMonth(m)

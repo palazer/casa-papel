@@ -13,6 +13,8 @@ const STEPS: Record<number, Step> = {
     const obj = raw as { tables?: Record<string, unknown> }
     return { ...obj, tables: { ...(obj.tables ?? {}), goals: obj.tables?.goals ?? [] } }
   },
+  // 2 → 3: `Cell.markedDone` (an automatic row ticked as moved) and `Pool.archivedMonth`; both fill in from their defaults
+  2: (raw) => raw,
 }
 
 export function migrateExport(raw: unknown): unknown {

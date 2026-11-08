@@ -22,7 +22,7 @@ describe('defaultMonths', () => {
   })
   it('still extends past a cell the user edited', () => {
     const far = addMonths(monthOfDate(), 15)
-    const userCell: Cell = { rowId: row.id, month: far, mode: 'value', value: 5000, items: [], note: null, currencyOverride: null, updatedAt: ts }
+    const userCell: Cell = { rowId: row.id, month: far, mode: 'value', value: 5000, items: [], note: null, currencyOverride: null, markedDone: false, updatedAt: ts }
     const months = defaultMonths(household, { ...tables, cells: [userCell] })
     expect(months[months.length - 1]).toBe(addMonths(far, 12))
   })

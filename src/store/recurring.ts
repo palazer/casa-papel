@@ -78,7 +78,7 @@ export function planRecurringPosts(tables: Tables, months: MonthKey[]): Mutation
       }
       if (!cell || cell.mode !== 'items') {
         if (next.length === 0) continue
-        mutations.push({ op: 'put', table: 'cells', record: CellSchema.parse({ rowId, month: m, mode: 'items', value: null, items: next, note: cell?.note ?? null, currencyOverride: cell?.currencyOverride ?? null, updatedAt: now() }) })
+        mutations.push({ op: 'put', table: 'cells', record: CellSchema.parse({ rowId, month: m, mode: 'items', value: null, items: next, note: cell?.note ?? null, currencyOverride: cell?.currencyOverride ?? null, markedDone: cell?.markedDone ?? false, updatedAt: now() }) })
       } else if (sig(next) !== sig(cell.items)) {
         mutations.push({ op: 'put', table: 'cells', record: CellSchema.parse({ ...cell, items: next, updatedAt: now() }) })
       }
@@ -128,7 +128,7 @@ export async function setRecurringPaid(store: Store, id: string, month: MonthKey
   const idx = items.findIndex((i) => i.recurringItemId === id)
   if (idx === -1) items.push({ ...managedItem(item, row), status: paid ? 'done' : row.defaultStatus })
   else items[idx] = { ...items[idx], status: paid ? 'done' : row.defaultStatus, skipped: false }
-  await store.commit([{ op: 'put', table: 'cells', record: CellSchema.parse({ rowId: item.rowId, month, mode: 'items', value: null, items, note: cell?.note ?? null, currencyOverride: cell?.currencyOverride ?? null, updatedAt: now() }) }])
+  await store.commit([{ op: 'put', table: 'cells', record: CellSchema.parse({ rowId: item.rowId, month, mode: 'items', value: null, items, note: cell?.note ?? null, currencyOverride: cell?.currencyOverride ?? null, markedDone: cell?.markedDone ?? false, updatedAt: now() }) }])
 }
 
 export type RecurringMonthStatus = 'not-due' | 'due' | 'paid' | 'skipped'

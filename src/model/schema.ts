@@ -4,7 +4,7 @@ import { MONTH_PATTERN } from './month'
 import { FUNDED_BY_PATTERN } from './fundedBy'
 
 /** Bump when the shape of stored data changes; add a migration in migrations.ts. */
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 
 // ---------- primitives ----------
 export const IdSchema = z.string().regex(ID_PATTERN, 'expected ULID')
@@ -176,6 +176,8 @@ export const CellSchema = z.object({
   items: z.array(CellItemSchema).default([]),
   note: z.string().nullable().default(null),
   currencyOverride: CurrencyCodeSchema.nullable().default(null),
+  /** Automatic rows only (the savings plug, a pocket share, a follower): this month's amount was ticked as moved. */
+  markedDone: z.boolean().default(false),
   updatedAt: TimestampSchema,
 })
 
@@ -208,6 +210,7 @@ export const PoolSchema = BaseRecord.extend({
   accountId: IdSchema,
   allocationRowId: IdSchema.nullable().default(null),
   openingBalance: MoneySchema.default(0),
+  archivedMonth: MonthKeySchema.nullable().default(null),
   order: z.string().default('a0'),
 })
 
@@ -339,6 +342,8 @@ export type Row = z.infer<typeof RowSchema>
 export type RowKind = z.infer<typeof RowKindSchema>
 export type Section = z.infer<typeof SectionSchema>
 export type Cell = z.infer<typeof CellSchema>
+/** A cell as written, before defaults fill in: what `putCell` and the demo build. */
+export type CellInput = z.input<typeof CellSchema>
 export type CellItem = z.infer<typeof CellItemSchema>
 export type ItemStatus = z.infer<typeof ItemStatusSchema>
 export type RecurringItem = z.infer<typeof RecurringItemSchema>

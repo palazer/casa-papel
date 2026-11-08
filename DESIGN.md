@@ -144,8 +144,13 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   `rounded-md border`. No zebra striping.
 - **Stat tiles** (`src/components/ui/stat-tile.tsx`): a small-caps label (in a kind-of-money hue when the number is one)
   over `text-sm font-semibold tabular-nums`, in `rounded-md border` boxes laid out `grid grid-cols-2 gap-2 sm:grid-cols-5`.
-- **Phone rows** (Month view): `min-h-11 px-3 py-2 text-sm`, name left, amount and dot right; automatic rows on
-  `bg-muted/40` and not tappable.
+- **Month lines** (`src/features/month/MonthLine.tsx`): `grid grid-cols-[minmax(0,1fr)_2.75rem]`, a `min-h-11 px-3
+  py-2 text-sm` body (the name, a muted subline for `= Followed`, `automatic` or `2 of 3 done`, the amount at the end)
+  and the `Tick` in the right column. The body of an itemized line opens its items as an accordion (`aria-expanded`,
+  items on `bg-muted/20` indented `pl-9`, a `Repeat` icon for scheduled ones, each with its own tick); any other body
+  opens the Paid sheet; an automatic line's body is plain text with an (i). Above the islands, `ProgressLine`: an
+  `aria-live` text (`7 of 21 done · €… still to pay · €… to come in`, `All 21 done`, `Closed · all done`) and a small
+  `Hide done` switch; a section whose lines are all hidden says `All done`.
 - **Progress bars** (goals): `h-2 rounded-full bg-goal-tint` with a `bg-goal` fill, `bg-income` once reached.
 
 ## 8. Controls
@@ -160,8 +165,15 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 - `TabBar` switches an island's view (`src/components/ui/tab-bar.tsx`); `ViewToggle` filters a list
   (`src/components/ui/view-toggle.tsx`); `Segmented` stays for a form field with a few options (certainty, applies to).
 - Native `<select>` through `NativeSelect` for form fields; `MonthField` for months (Safari has no month input).
-- Checkboxes are the native `Check` (16 px) in lists that tick things off (Moves); the Month view gets its own `Tick`
-  drawn with the `DoneDot` so done keeps one mark.
+- Checkboxes are the native `Check` (16 px) in lists that tick things off (Moves). The Month view's `Tick`
+  (`src/components/Tick.tsx`) is a `role="checkbox"` button of 44 × 44 px whose face is the `DoneDot` at 20 px
+  (`aria-checked` true, `mixed` or false), named `<line> done`; one tap marks done, a second tap goes back to the row's
+  default. Automatic rows (the savings plug, pocket shares, followers) tick through `Cell.markedDone`; Moves shows the
+  same tick before their `automatic` chip.
+- The Paid sheet (`src/features/month/PaidSheet.tsx`) is the shadcn `Dialog` docked to the bottom edge under 640 px
+  (`SHEET_CLASS`: `max-sm:bottom-0 … rounded-t-2xl` with safe-area padding): amount, date (today in the current month),
+  certainty as a `Segmented` with Done preselected, note, then `Open full editor`, Cancel and Save. Saving changes this
+  month only.
 - Dialogs are shadcn `Dialog`; the confirm step lives inside the dialog, never behind it. Errors appear beside the field
   that caused them, `role="alert"`.
 - Help is one mechanism: `InfoTip` (`src/components/InfoTip.tsx`), a 16 px (i) in `text-muted-foreground/70` (24 px

@@ -284,11 +284,14 @@ function GridRow({ row, rIndex, months, engine, tables, household, ccy, locale, 
         const isEmpty = cell.source === 'empty' || (cell.source === 'items' && cell.items.every((i) => i.skipped))
         const d = amountDisplay(cell.value, flow, rowCcy, locale, neg)
         // One mark only: a green dot for done in any month; the current month also shows red (nothing yet) and amber (partly).
-        const dot = !isDerived && !isEmpty && ((m === today && !closed) || cell.status === 'done') ? doneness(cell) : null
+        const dot = !isEmpty && (!isDerived || cell.value !== 0) && ((m === today && !closed) || cell.status === 'done') ? doneness(cell) : null
         return (
           <td key={m} className={cn('p-0', closed && 'bg-muted/60')}>
             {cell.source === 'archived' ? null : isDerived ? (
-              <div className={cn('px-1.5 py-0.5 text-right tabular-nums', toneClass[d.tone], statusClass.derived)}>{d.text}</div>
+              <div className={cn('relative px-1.5 py-0.5 text-right tabular-nums', dot && 'pr-3', toneClass[d.tone], statusClass.derived)}>
+                {dot && <DoneDot {...dot} className="absolute right-0.5 top-0.5" />}
+                {d.text}
+              </div>
             ) : (
               <button
                 type="button"

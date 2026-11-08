@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { RowSchema, newId, type Row } from '@/model'
+import { EMPTY_TABLES, RowSchema, SCHEMA_VERSION, newId, type Row } from '@/model'
 import {
   CasaDb, Store, exportFileName, exportSnapshot, importMerge, importReplace, parseExportFile, wipeAll,
 } from '@/store'
@@ -93,6 +93,16 @@ describe('export / import', () => {
   it('rejects foreign files and newer schemas', () => {
     expect(() => parseExportFile({ hello: 1 })).toThrow(/not a Casa Papel/)
     expect(() => parseExportFile({ format: 'casa-papel', schemaVersion: 99 })).toThrow(/newer/)
+  })
+
+  it('brings a schema 2 file up to date: cells and pool accounts get their new fields', () => {
+    const row = makeRow('Rent')
+    const pool = { id: newId(), createdAt: t0, updatedAt: t0, deletedAt: null, name: 'Travel', accountId: newId(), allocationRowId: null, openingBalance: 0, order: 'a0' }
+    const cell = { rowId: row.id, month: '2026-11', mode: 'value', value: 193500, items: [], note: null, currencyOverride: null, updatedAt: t0 }
+    const file = parseExportFile({ format: 'casa-papel', schemaVersion: 2, exportedAt: t0, deviceId: 'dev', events: [], tables: { ...EMPTY_TABLES, rows: [row], pools: [pool], cells: [cell] } })
+    expect(file.schemaVersion).toBe(SCHEMA_VERSION)
+    expect(file.tables.cells[0].markedDone).toBe(false)
+    expect(file.tables.pools[0].archivedMonth).toBeNull()
   })
 
   it('names files from the household', () => {

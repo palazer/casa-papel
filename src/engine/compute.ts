@@ -152,7 +152,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
         baseStatus = live.length === 0 ? row.defaultStatus : anyProjected ? 'projected' : allDone ? 'done' : 'committed'
       }
 
-      const status: CellStatus = baseStatus === 'derived' ? (closed && (derivedPocket || follows) ? 'done' : 'derived') : closed || archived ? 'done' : baseStatus
+      // an automatic amount is done once the month is closed or the user ticked it as moved (`markedDone`)
+      const status: CellStatus = baseStatus === 'derived' ? (closed || cell?.markedDone ? 'done' : 'derived') : closed || archived ? 'done' : baseStatus
 
       const conv = convertMoney(fx, value, currency, base, m)
       if (conv.missingRate) warnings.push(`No ${currency}→${base} rate for ${m} (${row.name})`)

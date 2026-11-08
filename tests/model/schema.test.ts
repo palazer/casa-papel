@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CellSchema, EventSchema, HouseholdSchema, RowSchema, newId, poolIdOf, poolRef } from '@/model'
+import { CellSchema, EventSchema, HouseholdSchema, PoolSchema, RowSchema, newId, poolIdOf, poolRef } from '@/model'
 
 const now = Date.now()
 
@@ -24,6 +24,10 @@ describe('schemas', () => {
     const row = RowSchema.parse({ id: newId(), createdAt: now, updatedAt: now, name: 'Travel', section: 'expense', defaultFundedBy: poolRef(pool) })
     expect(poolIdOf(row.defaultFundedBy)).toBe(pool)
     expect(() => RowSchema.parse({ id: newId(), createdAt: now, updatedAt: now, name: 'x', section: 'expense', defaultFundedBy: 'pool:nope' })).toThrow()
+  })
+  it('fills in the v3 fields: a cell is not marked done, a pool account is not archived', () => {
+    expect(CellSchema.parse({ rowId: newId(), month: '2026-11', updatedAt: now }).markedDone).toBe(false)
+    expect(PoolSchema.parse({ id: newId(), createdAt: now, updatedAt: now, name: 'Travel', accountId: newId() }).archivedMonth).toBeNull()
   })
   it('accepts a put event', () => {
     const e = EventSchema.parse({ id: newId(), ts: now, deviceId: 'dev', schemaVersion: 1, txId: newId(), type: 'put', table: 'rows', key: 'abc', record: {}, inverse: null })

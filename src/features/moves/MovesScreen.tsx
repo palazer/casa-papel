@@ -37,7 +37,9 @@ export function MovesScreen() {
     .map((r) => ({ row: r, cell: engine.cells[cellKey(r.id, m)] }))
     .filter((x) => x.cell && x.cell.source !== 'archived' && x.cell.value !== 0)
   const due = tables.recurringItems.filter((r) => !r.deletedAt && isDue(r, m)).sort((a, b) => a.name.localeCompare(b.name))
-  const openCount = transfers.filter((x) => x.cell.source !== 'derived' && x.cell.status !== 'done').length + due.filter((d) => recurringStatus(tables, d, m) === 'due').length
+  const openCount = transfers.filter((x) => x.cell.status !== 'done').length + due.filter((d) => recurringStatus(tables, d, m) === 'due').length
+  /** What a schedule actually posted this month, when the Paid sheet changed it. */
+  const postedAmount = (d: (typeof due)[number]) => engine.cells[cellKey(d.rowId, m)]?.items.find((i) => i.recurringItemId === d.id)?.effectiveAmount ?? d.amount
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 text-sm md:text-xs">
@@ -68,11 +70,10 @@ export function MovesScreen() {
           {transfers.length === 0 && <p className="py-2 text-muted-foreground">Nothing to transfer.</p>}
           {transfers.map(({ row, cell }) => (
             <div key={row.id} className="flex min-h-9 items-center gap-3 py-1.5">
-              {cell.source === 'derived' ? (
-                <Chip tone="zinc" className="w-20 justify-center">automatic</Chip>
-              ) : (
-                <Check label="" aria-label={`${row.name} transferred`} className="w-20" checked={cell.status === 'done'} disabled={t.closed} onChange={(e) => act(() => setCellDone(store, row.id, m, e.target.checked))} />
-              )}
+              <span className="flex w-24 shrink-0 items-center gap-1.5">
+                <Check label="" aria-label={`${row.name} transferred`} checked={cell.status === 'done'} disabled={t.closed} onChange={(e) => act(() => setCellDone(store, row.id, m, e.target.checked))} />
+                {cell.source === 'derived' && <Chip tone="zinc">automatic</Chip>}
+              </span>
               <span className="min-w-0 flex-1 truncate">{row.name}{row.accountId && <span className="text-muted-foreground"> → {accountName(row.accountId)}</span>}</span>
               <span className={`tabular-nums ${cell.value < 0 ? 'text-draw' : ''}`}>{formatAmount(Math.abs(cell.value), ccy, locale)}{cell.value < 0 ? ' back' : ''}</span>
             </div>
@@ -89,7 +90,7 @@ export function MovesScreen() {
               <div key={d.id} className="flex min-h-9 items-center gap-3 py-1.5">
                 <Check label="" aria-label={`${d.name} paid`} className="w-20" checked={status === 'paid'} disabled={t.closed} onChange={(e) => act(() => setRecurringPaid(store, d.id, m, e.target.checked))} />
                 <span className="min-w-0 flex-1 truncate">{d.name}{d.accountId && <span className="text-muted-foreground"> · {accountName(d.accountId)}</span>}</span>
-                <span className="tabular-nums">{formatAmount(d.amount, d.currency ?? ccy, locale)}</span>
+                <span className="tabular-nums">{formatAmount(postedAmount(d), d.currency ?? ccy, locale)}</span>
               </div>
             )
           })}
