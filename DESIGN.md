@@ -59,6 +59,13 @@ Phone list       mx-auto max-w-xl space-y-4 of dense islands, rows text-sm and m
   The toolbar holds Undo and Redo first, then the controls (`MonthPicker`, Close month, Add <year>), then the
   sync cloud. Errors and warnings are `basis-full` lines: destructive for an action that failed, `text-amber-700` for a
   warning the engine raises.
+- **Welcome** (`src/features/home/HomeScreen.tsx`): the one screen without a toolbar (its header carries a `role="status"`
+  line for the account dialog's outcome and a `role="alert"` line for an import that failed). One air island "Welcome to
+  Casa Papel" lists the ways in as rows: a `sm` button (lime on the recommended path only, `outline` otherwise) and one
+  muted sentence each; quiet `xs ghost` links beneath (the demo sandbox, Import a file). Signed out it offers Start on this
+  device, Sign in, I have an invite; without sync only the first; in the sandbox it leads with Load the demo household; signed
+  in with no household it skips straight to the wizard with a "Signed in as …" line and no chooser; a locked or undecided
+  cloud copy offers Open Data instead of the wizard. The wizard's title row carries "Back to start" while the chooser exists.
 - Nothing floats over the content except popovers, menus and dialogs (`z-50`); the rail and tabs are `z-40`.
 
 ## 3. Island (the panel)
@@ -223,6 +230,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   control; an engine warning is `text-amber-700`. Data-screen outcomes use the `Alert` block.
 - Empty states are one muted sentence that says what to do (`Nothing to transfer.`, `Add a savings account first; pool
   accounts live inside one.`).
+- The welcome screen reports an import or the account dialog's outcome in a `role="status"` line under its header, and an
+  import that could not be read in a `role="alert"` line there.
 
 ## 10. New-screen checklist
 

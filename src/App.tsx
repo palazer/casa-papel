@@ -47,6 +47,12 @@ function Shell() {
   const sync = useSyncEngine()
   const [inviteCode] = useState(() => takeInviteFromUrl())
   const [account, setAccount] = useState<AccountStep | null>(() => (inviteCode && sync ? 'join' : null))
+  /** The account dialog's closing words, shown on the welcome screen until a household appears. */
+  const [notice, setNotice] = useState<string | null>(null)
+  const openAccount = useCallback((step: AccountStep) => {
+    setNotice(null)
+    setAccount(step)
+  }, [])
 
   useEffect(() => {
     if (!sync) return
@@ -85,7 +91,7 @@ function Shell() {
         <main className="min-w-0 flex-1 p-4 pb-24 text-sm md:p-6 md:pb-6">
           <div className="mx-auto max-w-[1800px]">
             {showHome ? (
-              <HomeScreen onOpenData={() => go('data')} onCreated={() => go(isPhone() ? 'month' : 'grid')} syncAvailable={!!sync} onSignIn={() => setAccount('signin')} onJoin={() => setAccount('join')} />
+              <HomeScreen onOpenData={() => go('data')} onCreated={() => go(isPhone() ? 'month' : 'grid')} syncAvailable={!!sync} onSignIn={() => openAccount('signin')} onJoin={() => openAccount('join')} notice={notice} />
             ) : screen === 'data' ? <DataScreen />
               : screen === 'month' ? <MonthScreen />
               : screen === 'moves' ? <MovesScreen />
@@ -94,7 +100,7 @@ function Shell() {
           </div>
         </main>
         <BottomTabs />
-        {account && sync && <AccountDialog initial={account} inviteCode={inviteCode ?? undefined} hasLocalData={!!household} onClose={() => setAccount(null)} />}
+        {account && sync && <AccountDialog initial={account} inviteCode={inviteCode ?? undefined} hasLocalData={!!household} onClose={(message) => { setAccount(null); setNotice(message ?? null) }} />}
       </div>
     </ScreenContext.Provider>
   )

@@ -11,6 +11,7 @@ test.describe('wave 1b', () => {
 
   test('setup wizard creates a household with people, things, accounts and suggested rows', async ({ page }) => {
     await page.goto('/')
+    await page.getByRole('button', { name: 'Start on this device' }).click()
     await page.getByLabel('Household name').fill('Testers')
     await page.getByRole('button', { name: 'Next' }).click()
     await page.getByLabel('Adult 1 name').fill('Ana')

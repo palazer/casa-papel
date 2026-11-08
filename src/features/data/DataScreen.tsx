@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -8,13 +8,11 @@ import { Island } from '@/components/ui/island'
 import { PageHeader } from '@/components/PageHeader'
 import { isDemoMode, leaveDemoSandbox, openDemoSandbox, useStore } from '@/app/store'
 import { loadDemo } from '@/demo/loadDemo'
-import type { ExportFile } from '@/model'
-import { exportFileName, exportSnapshot, importMerge, importReplace, parseExportFile, wipeAll } from '@/store'
+import { exportFileName, exportSnapshot, wipeAll } from '@/store'
 import { useSyncEngine, useSyncView } from '@/sync/useSync'
+import { ImportPanel } from './ImportPanel'
 import { InviteCard } from './InviteCard'
 import { SyncCard } from './SyncCard'
-
-type Pending = { file: ExportFile; name: string }
 
 /** Where the data lives and how it moves: storage status, cloud sync, export, import, the demo, the danger zone. */
 export function DataScreen() {
@@ -22,7 +20,6 @@ export function DataScreen() {
   const household = useLiveQuery(() => store.db.household.toArray(), [store])
   const meta = useLiveQuery(() => store.db.meta.get('meta'), [store])
   const eventCount = useLiveQuery(() => store.db.events.count(), [store])
-  const [pending, setPending] = useState<Pending | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [wipeWord, setWipeWord] = useState('')
@@ -32,7 +29,6 @@ export function DataScreen() {
   const signedIn = !!syncView && syncView.status !== 'off'
   const [persisted, setPersisted] = useState<boolean | null>(null)
   const [usage, setUsage] = useState<string | null>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
   const [openedAt] = useState(() => Date.now())
 
   async function refreshStorage() {
@@ -74,38 +70,6 @@ export function DataScreen() {
     a.click()
     URL.revokeObjectURL(url)
     setMessage(`Exported ${name}`)
-  }
-
-  async function onPickFile(ev: React.ChangeEvent<HTMLInputElement>) {
-    setError(null)
-    setMessage(null)
-    const f = ev.target.files?.[0]
-    if (!f) return
-    try {
-      const text = await f.text()
-      const file = parseExportFile(JSON.parse(text))
-      setPending({ file, name: f.name })
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not read that file.')
-    } finally {
-      ev.target.value = ''
-    }
-  }
-
-  async function applyImport(mode: 'replace' | 'merge') {
-    if (!pending) return
-    try {
-      if (mode === 'replace') {
-        await importReplace(store, pending.file)
-        setMessage(`Replaced everything with ${pending.name}.`)
-      } else {
-        const r = await importMerge(store, pending.file)
-        setMessage(`Merged ${pending.name}: ${r.applied} records updated, ${r.kept} kept, ${r.newEvents} new history entries.`)
-      }
-      setPending(null)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Import failed.')
-    }
   }
 
   async function doWipe() {
@@ -190,20 +154,7 @@ export function DataScreen() {
 
       <Island air title="Import" description="Restore an export, or merge a copy of the same household from another device.">
         <div className="space-y-3">
-          <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={onPickFile} />
-          <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}>Choose a file…</Button>
-          {pending && (
-            <div className="space-y-2 rounded-md border p-3">
-              <p>
-                <strong>{pending.name}</strong> · exported {new Date(pending.file.exportedAt).toLocaleString()} · {pending.file.tables.household[0]?.name ?? 'unnamed household'} · {pending.file.events.length} history entries
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Button size="xs" onClick={() => applyImport('merge')}>Merge into this device</Button>
-                <Button size="xs" variant="destructive" onClick={() => applyImport('replace')}>Replace everything here</Button>
-                <Button size="xs" variant="ghost" onClick={() => setPending(null)}>Cancel</Button>
-              </div>
-            </div>
-          )}
+          <ImportPanel onMessage={(m) => { setError(null); setMessage(m) }} onError={(m) => { setMessage(null); setError(m) }} />
         </div>
       </Island>
 

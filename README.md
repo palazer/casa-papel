@@ -6,7 +6,9 @@ Local-first household budgeting. Your money as a month-by-month grid that knows 
 - Installable as an app on phone and desktop, works offline.
 - Live: https://palazer.github.io/casa-papel/
 
-Try it without touching your own data: https://palazer.github.io/casa-papel/?demo=1 loads a fictional household into a separate sandbox.
+Try it without touching your own data: https://palazer.github.io/casa-papel/?demo=1 opens a separate sandbox where one click loads a fictional household.
+
+First visit: the welcome screen offers three ways in. Start on this device (everything stays in the browser), Sign in (an existing cloud account), or I have an invite. The demo and a file import are a link away.
 
 ## What it does today
 
@@ -30,7 +32,7 @@ Try it without touching your own data: https://palazer.github.io/casa-papel/?dem
 - **Look**: a dark rail on the left (bottom tabs on a phone), a page header per screen, bordered islands instead of cards, Roboto. The design system is written down in `DESIGN.md` and shared with a sibling app.
 - **Help**: an (i) beside every section title, total, balance, automatic row and setting explains it in a sentence or two, on hover or on tap. "What the colours and marks mean" on the Grid and Month screens is the legend.
 
-Status: Wave 1 complete (0, 1a, 1b, 1c, 1d); Wave 2a (colour, goals) and 2b (cloud sync and login) complete; Wave 2c (design system, help, month tracking, categories, delete and archive) in progress. Next: charts, CSV and PDF export, translations.
+Status: Wave 1 complete (0, 1a, 1b, 1c, 1d); Wave 2a (colour, goals) and 2b (cloud sync and login) complete; Wave 2c (design system, help, month tracking, categories, delete and archive) complete; Wave 2d (calendar years, currencies, deductions, welcome screen) in progress. Next: charts, CSV and PDF export, translations.
 
 ## Develop
 

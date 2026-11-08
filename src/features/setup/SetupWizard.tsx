@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Trash2 } from 'lucide-react'
 import { ZodError } from 'zod'
 import { Button } from '@/components/ui/button'
@@ -58,7 +58,9 @@ function validate(d: Draft): Errors {
   return errors
 }
 
-export function SetupWizard({ onCreated }: { onCreated: () => void }) {
+/** `onBack` adds a "Back to start" link to the title row (the welcome screen's chooser); `notice` is a line above the steps,
+ *  the signed-in note that the household uploads on finish. */
+export function SetupWizard({ onCreated, onBack, notice }: { onCreated: () => void; onBack?: () => void; notice?: ReactNode }) {
   const store = useStore()
   const [step, setStep] = useState(0)
   const [subject, setSubject] = useState(0)
@@ -161,7 +163,9 @@ export function SetupWizard({ onCreated }: { onCreated: () => void }) {
     <Island
       air title="Set up your household" className="mx-auto max-w-2xl" bodyClassName="space-y-5"
       description={<>Step {step + 1} of {STEPS.length}: {STEPS[step]}{step === 4 ? ` · ${subject + 1} of ${subjects.length}` : ''}. Everything can be changed later. "Finish now" uses sensible defaults for the rest.</>}
+      right={onBack ? <Button size="xs" variant="ghost" onClick={onBack}>Back to start</Button> : undefined}
     >
+        {notice && <p className="text-xs text-muted-foreground">{notice}</p>}
         <ol className="flex flex-wrap gap-1 text-xs" aria-label="Steps">
           {STEPS.map((name, i) => (
             <li key={name}>

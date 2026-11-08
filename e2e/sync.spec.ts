@@ -30,9 +30,9 @@ test.describe('cloud sync', () => {
     // ----- device A: load the demo as its data, sign in from the Data screen, invite someone -----
     const a = await device(browser, server)
     await a.goto('./')
-    await a.getByRole('button', { name: 'Load the demo household' }).click()
-    await expect(a.getByRole('button', { name: /^Rent Nov 2026/ })).toBeVisible()
     await a.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Data' }).click()
+    await a.getByRole('button', { name: 'Load demo household' }).click()
+    await expect(a.getByRole('button', { name: 'Export now' })).toBeEnabled()
     await a.getByRole('button', { name: 'Sign in' }).click()
     const dlgA = a.getByRole('dialog')
     await dlgA.getByLabel('Email').fill('Erkin@Example.test')
