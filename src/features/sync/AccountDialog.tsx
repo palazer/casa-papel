@@ -8,7 +8,7 @@ import type { SignInResult } from '@/sync/engine'
 import { describeRemoteError } from '@/sync/remote'
 import { useSyncEngine } from '@/sync/useSync'
 
-export type AccountStep = 'signin' | 'join' | 'reset' | 'recovery-code' | 'locked' | 'choose' | 'change-password' | 'new-recovery'
+export type AccountStep = 'signin' | 'bootstrap' | 'join' | 'reset' | 'recovery-code' | 'locked' | 'choose' | 'change-password' | 'new-recovery'
 
 interface Props {
   initial: AccountStep
@@ -77,6 +77,12 @@ export function AccountDialog({ initial, inviteCode, hasLocalData, onClose }: Pr
     handleResult(await engine.signIn(email, password), 'Signed in. This device now syncs with your household.')
   })
 
+  const bootstrap = () => run('Setting the household password…', async () => {
+    if (!passwordsMatch) throw new Error('The two passwords are not the same.')
+    const { recoveryCode } = await engine.bootstrap(email, current, password)
+    showCode(recoveryCode, { step: null, message: 'The household password is set and the cloud copy exists. Other devices sign in with it.' })
+  })
+
   const join = () => run('Creating your account…', async () => {
     if (!passwordsMatch) throw new Error('The two passwords are not the same.')
     const { recoveryCode } = await engine.join(code.trim(), email, password)
@@ -125,6 +131,7 @@ export function AccountDialog({ initial, inviteCode, hasLocalData, onClose }: Pr
 
   const title: Record<AccountStep, string> = {
     signin: 'Sign in',
+    bootstrap: 'First sign-in with a temporary password',
     join: 'Join with an invite',
     reset: 'Forgot the password',
     'recovery-code': 'Your recovery code',
@@ -143,6 +150,7 @@ export function AccountDialog({ initial, inviteCode, hasLocalData, onClose }: Pr
           <DialogTitle>{title[step]}</DialogTitle>
           {step === 'signin' && <DialogDescription>Use the household's email and password. Signing in keeps an encrypted copy of this household in the cloud and syncs it to every device that signs in.</DialogDescription>}
           {step === 'join' && <DialogDescription>Pick the email and password your household will sign in with. {PRIVACY}</DialogDescription>}
+          {step === 'bootstrap' && <DialogDescription>For the very first account, created in the Supabase dashboard with a temporary password. Sign in with that once; the app replaces it with your household password. {PRIVACY}</DialogDescription>}
           {step === 'reset' && <DialogDescription>Your recovery code proves it is you and unlocks the data under a new password.</DialogDescription>}
           {step === 'locked' && <DialogDescription>The password you typed is right for the account, but the cloud copy was locked with a different one, probably after a reset on another device.</DialogDescription>}
           {step === 'change-password' && <DialogDescription>Devices that are already signed in keep working. New devices sign in with the new password.</DialogDescription>}
@@ -153,8 +161,11 @@ export function AccountDialog({ initial, inviteCode, hasLocalData, onClose }: Pr
           {step === 'join' && (
             <Field id="acc-code" label="Invite code" value={code} onChange={setCode} help="From the link you were sent. A code works once and for seven days." />
           )}
-          {(step === 'signin' || step === 'join' || step === 'reset') && (
+          {(step === 'signin' || step === 'bootstrap' || step === 'join' || step === 'reset') && (
             <Field id="acc-email" label="Email" type="email" value={email} onChange={setEmail} autoFocus={step !== 'join' || !!inviteCode} help={step === 'join' ? 'The household\'s sign-in name. It cannot be changed later.' : undefined} />
+          )}
+          {step === 'bootstrap' && (
+            <Field id="acc-temporary" label="Temporary password" type="password" value={current} onChange={setCurrent} help="The one typed into the dashboard when the user was created. It stops working after this." />
           )}
           {step === 'reset' && (
             <Field id="acc-recovery" label="Recovery code" value={recovery} onChange={setRecovery} help="The 26-character code shown when the household was set up. Dashes and case do not matter." />
@@ -165,14 +176,14 @@ export function AccountDialog({ initial, inviteCode, hasLocalData, onClose }: Pr
           {step === 'locked' && (
             <Field id="acc-recovery" label="Recovery code" value={recovery} onChange={setRecovery} autoFocus help="Unlocks the cloud copy and re-locks it with the password you just typed." />
           )}
-          {(step === 'signin' || step === 'join' || step === 'reset' || step === 'change-password') && (
+          {(step === 'signin' || step === 'bootstrap' || step === 'join' || step === 'reset' || step === 'change-password') && (
             <Field
               id="acc-password" label={step === 'signin' ? 'Password' : 'New password'} type="password" value={password} onChange={setPassword}
               onEnter={step === 'signin' ? signIn : undefined}
               help={step === 'signin' ? undefined : PASSWORD_HELP}
             />
           )}
-          {(step === 'join' || step === 'reset' || step === 'change-password') && (
+          {(step === 'join' || step === 'bootstrap' || step === 'reset' || step === 'change-password') && (
             <Field id="acc-password2" label="New password again" type="password" value={password2} onChange={setPassword2} />
           )}
 
@@ -207,12 +218,14 @@ export function AccountDialog({ initial, inviteCode, hasLocalData, onClose }: Pr
           <div className="flex gap-2">
             {step === 'signin' && <Button variant="ghost" onClick={() => { setError(null); setStep('reset') }} disabled={!!busy}>Forgot the password?</Button>}
             {step === 'signin' && <Button variant="ghost" onClick={() => { setError(null); setStep('join') }} disabled={!!busy}>I have an invite</Button>}
+            {step === 'signin' && <Button variant="ghost" onClick={() => { setError(null); setStep('bootstrap') }} disabled={!!busy}>First time, temporary password</Button>}
             {step === 'locked' && hasLocalData && <Button variant="outline" onClick={replaceCloud} disabled={!!busy}>Replace the cloud copy with this device's data</Button>}
           </div>
           <div className="flex gap-2">
             {step !== 'recovery-code' && <Button variant="outline" onClick={() => onClose()} disabled={!!busy}>Cancel</Button>}
             {step === 'signin' && <Button onClick={signIn} disabled={!!busy || !email || !password}>Sign in</Button>}
             {step === 'join' && <Button onClick={join} disabled={!!busy || !code || !email || !passwordsMatch}>Create account</Button>}
+            {step === 'bootstrap' && <Button onClick={bootstrap} disabled={!!busy || !email || !current || !passwordsMatch}>Set household password</Button>}
             {step === 'reset' && <Button onClick={reset} disabled={!!busy || !email || !recovery || !passwordsMatch}>Set new password</Button>}
             {step === 'locked' && <Button onClick={unlock} disabled={!!busy || !recovery}>Unlock</Button>}
             {step === 'change-password' && <Button onClick={changePassword} disabled={!!busy || !current || !passwordsMatch}>Change password</Button>}

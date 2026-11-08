@@ -204,7 +204,17 @@ export class SyncEngine {
         break
       }
     }
-    await this.chain
+    // live-query callbacks arrive a few ticks later; let them land and finish whatever they start
+    for (let i = 0; i < 3; i++) {
+      await new Promise((r) => setTimeout(r, 0))
+      if (this.debounceTimer) {
+        clearTimeout(this.debounceTimer)
+        this.debounceTimer = null
+        await this.push().catch(() => undefined)
+      }
+      await this.inFlight
+      await this.chain
+    }
     await this.refreshView()
   }
 
@@ -230,12 +240,19 @@ export class SyncEngine {
   private exclusive<T>(fn: () => Promise<T>): Promise<T> {
     const run = this.chain.then(fn, fn)
     this.chain = run.then(() => undefined, () => undefined)
+    return run
+  }
+
+  /** Marks real network work, so the view says "syncing" only while something is actually being transferred. */
+  private async working<T>(fn: () => Promise<T>): Promise<T> {
     this.active++
     void this.refreshView()
-    return run.finally(() => {
+    try {
+      return await fn()
+    } finally {
       this.active--
       void this.refreshView()
-    })
+    }
   }
 
   // ---------- pull / push ----------
@@ -243,7 +260,7 @@ export class SyncEngine {
   private async pull(): Promise<void> {
     const s = this.sync
     if (!s || !this.key) return
-    return this.exclusive(async () => {
+    return this.exclusive(() => this.working(async () => {
       try {
         const version = await this.remote.getVersion(s.householdId)
         if (version <= s.lastVersion) return void (await this.recordOk({ lastPullAt: this.now() }))
@@ -278,7 +295,7 @@ export class SyncEngine {
         await this.recordFailure(e)
         throw e
       }
-    })
+    }))
   }
 
   private async push(attempt = 0): Promise<void> {
@@ -304,19 +321,21 @@ export class SyncEngine {
     const previousPushed = meta.pushedRevision
     // claim the revision before reading, so a change that lands during the push stays pending
     await this.store.db.meta.update('meta', { pushedRevision: meta.localRevision })
-    try {
-      const payload = await buildSyncPayload(this.store, this.deviceId, this.now())
-      const nextVersion = s.lastVersion + 1
-      const cipher = await encryptSnapshot(this.key, snapshotAad(s.householdId, nextVersion), payload)
-      const version = await this.remote.pushSnapshot(s.householdId, s.lastVersion, cipher, SCHEMA_VERSION, this.deviceId)
-      await this.saveSync({ ...s, lastVersion: version, lastPushAt: this.now(), lastError: null, failingSince: null })
-      this.offline = false
-      this.stale = false
-    } catch (e) {
-      await this.store.db.meta.update('meta', { pushedRevision: previousPushed })
-      if (!(e instanceof SyncConflictError)) await this.recordFailure(e)
-      throw e
-    }
+    await this.working(async () => {
+      try {
+        const payload = await buildSyncPayload(this.store, this.deviceId, this.now())
+        const nextVersion = s.lastVersion + 1
+        const cipher = await encryptSnapshot(this.key!, snapshotAad(s.householdId, nextVersion), payload)
+        const version = await this.remote.pushSnapshot(s.householdId, s.lastVersion, cipher, SCHEMA_VERSION, this.deviceId)
+        await this.saveSync({ ...s, lastVersion: version, lastPushAt: this.now(), lastError: null, failingSince: null })
+        this.offline = false
+        this.stale = false
+      } catch (e) {
+        await this.store.db.meta.update('meta', { pushedRevision: previousPushed })
+        if (!(e instanceof SyncConflictError)) await this.recordFailure(e)
+        throw e
+      }
+    })
   }
 
   private async recordOk(patch: Partial<SyncState>): Promise<void> {
@@ -354,6 +373,26 @@ export class SyncEngine {
       return { kind: 'created', recoveryCode }
     }
     return this.adopt(normalized, membership, wrapKey)
+  }
+
+  /**
+   * The very first account is created in the Supabase dashboard with a temporary password. This signs in with it as is,
+   * replaces it with the key derived from the household password, and creates the household. Returns the recovery code.
+   */
+  async bootstrap(email: string, temporaryPassword: string, newPassword: string): Promise<{ recoveryCode: string }> {
+    checkPassword(newPassword)
+    const normalized = normalizeEmail(email)
+    await this.remote.signIn(normalized, temporaryPassword)
+    if (await this.remote.getMembership()) {
+      await this.remote.signOut().catch(() => undefined)
+      throw new Error('This account already has a household. Sign in with its household password instead.')
+    }
+    const { authKey, wrapKey } = await deriveKeys(normalized, newPassword, this.kdfIterations)
+    await this.remote.updatePassword(authKey)
+    const meta = await this.store.meta()
+    this.deviceId = meta.deviceId
+    const recoveryCode = await this.createHousehold(normalized, wrapKey)
+    return { recoveryCode }
   }
 
   /** Create the account from an invite link and set this device up. Returns the recovery code to show once. */
@@ -426,7 +465,7 @@ export class SyncEngine {
       await this.store.db.meta.update('meta', { pushedRevision: 0, localRevision: meta.localRevision + 1 })
       await this.push()
     }
-    await this.refreshView()
+    await this.flush()
   }
 
   /** Locked after a password reset elsewhere: the recovery code unlocks the household key and re-wraps it for the password just typed. */

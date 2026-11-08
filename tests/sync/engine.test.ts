@@ -228,6 +228,29 @@ describe('sync engine', () => {
     b.engine.stop()
   })
 
+  it('bootstrap: a dashboard-created user signs in with the temporary password and gets the household password', async () => {
+    const server = new FakeServer()
+    server.addUser('sam@example.com', 'temporary-123')
+    const a = await withHousehold(server)
+    await expect(a.engine.bootstrap('sam@example.com', 'wrong temp', PW)).rejects.toThrow(/Invalid login/)
+    await expect(a.engine.bootstrap('sam@example.com', 'temporary-123', 'short')).rejects.toThrow(/12 characters/)
+    const { recoveryCode } = await a.engine.bootstrap('sam@example.com', 'temporary-123', PW)
+    expect(recoveryCode).toMatch(/-/)
+    expect(server.users.get('sam@example.com')!.authKey).toBe((await deriveKeys('sam@example.com', PW, FAST)).authKey)
+    expect(server.snapshots.size).toBe(1)
+    expect(a.engine.getView()).toMatchObject({ status: 'idle', owner: true })
+    // the temporary password is gone; the household password works on another device
+    const b = device(server)
+    await expect(b.engine.signIn('sam@example.com', 'temporary-123')).rejects.toThrow(/Invalid login/)
+    expect((await b.engine.signIn('sam@example.com', PW)).kind).toBe('ok')
+    expect((await loadTables(b.store)).household[0]?.name).toBe('Palace')
+    // the password was reset to a plain one in the dashboard, but the account already has a household: refused
+    server.users.get('sam@example.com')!.authKey = 'temporary-456'
+    const c = device(server)
+    await expect(c.engine.bootstrap('sam@example.com', 'temporary-456', 'another long password')).rejects.toThrow(/already has a household/)
+    a.engine.stop(); b.engine.stop(); c.engine.stop()
+  })
+
   it('admins create and revoke invites', async () => {
     const server = new FakeServer()
     const u = server.addUser('sam@example.com', (await deriveKeys('sam@example.com', PW, FAST)).authKey)
