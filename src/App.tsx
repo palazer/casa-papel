@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Redo2, Undo2 } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ErrorBoundary } from '@/app/ErrorBoundary'
-import { createAppStore, isDemoMode, useStore } from '@/app/store'
+import { createAppStore, isDemoMode, leaveDemoSandbox, useStore } from '@/app/store'
 import { StoreProvider } from '@/app/StoreProvider'
 import { takeInviteFromUrl } from '@/app/url'
 import { activeHousehold, defaultMonths, useTables } from '@/app/useEngine'
@@ -87,7 +86,7 @@ function Shell() {
         <div className="mx-auto flex max-w-[1800px] items-center gap-3 px-4 py-2">
           <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="size-7 rounded-md" />
           <span className="max-w-[40vw] truncate font-semibold tracking-tight sm:max-w-none">{household?.name ?? 'Casa Papel'}</span>
-          {isDemoMode() && <Badge variant="secondary">demo</Badge>}
+          {isDemoMode() && <Button variant="secondary" size="xs" onClick={leaveDemoSandbox} title="Back to your own household">Leave the demo</Button>}
           <nav className="ml-auto flex items-center gap-1" aria-label="Screens">
             <Button variant="ghost" size="icon" aria-label="Undo" disabled={!store.canUndo} onClick={() => void store.undo()}><Undo2 /></Button>
             <Button variant="ghost" size="icon" aria-label="Redo" disabled={!store.canRedo} onClick={() => void store.redo()}><Redo2 /></Button>

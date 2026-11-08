@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
-import { isDemoMode, useStore } from '@/app/store'
+import { isDemoMode, openDemoSandbox, useStore } from '@/app/store'
 import { loadDemo } from '@/demo/loadDemo'
 import type { ExportFile } from '@/model'
 import { exportFileName, exportSnapshot, importMerge, importReplace, parseExportFile, wipeAll } from '@/store'
@@ -226,8 +226,10 @@ export function DataScreen() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
-          <Button variant={isDemoMode() ? 'default' : 'outline'} onClick={() => void loadDemo(store)} disabled={signedIn}>Load demo household</Button>
-          {signedIn && <p className="text-xs text-muted-foreground">Sign out first: loading the demo here would upload it to your household's cloud copy.</p>}
+          {signedIn
+            ? <Button variant="outline" onClick={openDemoSandbox}>Open the demo sandbox</Button>
+            : <Button variant={isDemoMode() ? 'default' : 'outline'} onClick={() => void loadDemo(store)}>Load demo household</Button>}
+          {signedIn && <p className="text-xs text-muted-foreground">While signed in, the demo opens in its own sandbox so it never lands in your household's cloud copy.</p>}
         </CardContent>
       </Card>
 

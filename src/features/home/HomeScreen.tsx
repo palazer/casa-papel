@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { useStore } from '@/app/store'
+import { openDemoSandbox, useStore } from '@/app/store'
 import { loadDemo } from '@/demo/loadDemo'
 import { SetupWizard } from '@/features/setup/SetupWizard'
 import { describeSync } from '@/features/sync/syncText'
@@ -36,13 +36,15 @@ export function HomeScreen({ onOpenData, onCreated, syncAvailable = false, onSig
             <p className="text-sm">
               Signed in as <strong>{view.email}</strong>, but this device holds no household yet ({describeSync(view).toLowerCase()}).
               If your household already lives in another browser or on another device, sign in there and it will be uploaded; this device then picks it up by itself.
-              Otherwise start one below, or load the demo to try things out.
+              Otherwise start one below. To look around first, open the demo in its sandbox; it never syncs.
             </p>
           )}
           <div className="flex flex-wrap gap-2">
             {syncAvailable && !signedIn && <Button onClick={onSignIn}>Sign in</Button>}
             {syncAvailable && !signedIn && <Button variant="outline" onClick={onJoin}>I have an invite</Button>}
-            <Button variant="outline" onClick={() => void loadDemo(store)}>Load the demo household</Button>
+            {signedIn
+              ? <Button variant="outline" onClick={openDemoSandbox}>Try the demo sandbox</Button>
+              : <Button variant="outline" onClick={() => void loadDemo(store)}>Load the demo household</Button>}
             <Button variant="outline" onClick={onOpenData}>{signedIn ? 'Open Data' : 'Import a file'}</Button>
           </div>
         </CardContent>

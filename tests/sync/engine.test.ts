@@ -251,6 +251,30 @@ describe('sync engine', () => {
     a.engine.stop(); b.engine.stop(); c.engine.stop()
   })
 
+  it('a household with no snapshot yet: sign in on an empty device, start the household, it uploads', async () => {
+    const server = new FakeServer()
+    server.addUser('sam@example.com', (await deriveKeys('sam@example.com', PW, FAST)).authKey)
+    // the first sign-in happened on a device without data: the server has the household and keys, but nothing to show
+    const a = device(server)
+    expect((await a.engine.signIn('sam@example.com', PW)).kind).toBe('created')
+    expect(server.members).toHaveLength(1)
+    expect(server.snapshots.size).toBe(0)
+    await a.engine.signOut({ wipe: true })
+    // signing in again on an empty device is fine: nothing to pull, nothing to push
+    const b = device(server)
+    expect((await b.engine.signIn('sam@example.com', PW)).kind).toBe('ok')
+    expect(b.engine.getView()).toMatchObject({ status: 'idle', owner: true, pending: false })
+    expect(server.snapshots.size).toBe(0)
+    // starting the household now uploads it, and a third device receives it
+    await quickCreateHousehold(b.store, { name: 'Palace', baseCurrency: 'EUR', locale: 'en-IE', startMonth: '2026-01' })
+    await b.engine.flush()
+    expect(server.snapshots.get('h-1')?.version).toBe(1)
+    const c = device(server)
+    expect((await c.engine.signIn('sam@example.com', PW)).kind).toBe('ok')
+    expect((await loadTables(c.store)).household[0]?.name).toBe('Palace')
+    a.engine.stop(); b.engine.stop(); c.engine.stop()
+  })
+
   it('admins create and revoke invites', async () => {
     const server = new FakeServer()
     const u = server.addUser('sam@example.com', (await deriveKeys('sam@example.com', PW, FAST)).authKey)
