@@ -43,10 +43,10 @@ export class Store {
     for (const l of this.listeners) l()
   }
 
-  /** Singleton meta row; created on first access with a fresh deviceId. */
+  /** Singleton meta row; created on first access with a fresh deviceId. Parsed so rows from older versions get today's defaults. */
   async meta(): Promise<Meta> {
     const existing = await this.db.meta.get('meta')
-    if (existing) return existing
+    if (existing) return MetaSchema.parse(existing)
     const fresh = MetaSchema.parse({ key: 'meta', schemaVersion: SCHEMA_VERSION, deviceId: newId() })
     await this.db.meta.put(fresh)
     return fresh
@@ -117,14 +117,17 @@ export class Store {
   private async write(mutations: Mutation[]): Promise<string> {
     const meta = await this.meta()
     const txId = newId()
-    const ts = Date.now()
+    /** Never behind what this device has merged from elsewhere, so a local change always counts as later. */
+    const ts = Math.max(Date.now(), meta.clockFloor + 1)
     await this.db.transaction('rw', this.db.tables, async () => {
       for (const m of mutations) {
         const table = this.db.table(m.table)
         if (m.op === 'put') {
-          const record = TABLE_SCHEMAS[m.table].parse(m.record)
-          const key = primaryKeyOf(m.table, record)
-          const inverse = (await table.get(key)) ?? null
+          const parsed = TABLE_SCHEMAS[m.table].parse(m.record)
+          const key = primaryKeyOf(m.table, parsed)
+          const inverse = (await table.get(key) as { updatedAt?: number } | undefined) ?? null
+          // A write is newer than the version it replaces and than anything merged in, so undo and redo count as new edits.
+          const record = { ...parsed, updatedAt: Math.max(parsed.updatedAt, (inverse?.updatedAt ?? -1) + 1, meta.clockFloor + 1) }
           await table.put(record)
           await this.db.events.add({
             id: newId(), ts, deviceId: meta.deviceId, schemaVersion: SCHEMA_VERSION, txId,
@@ -139,7 +142,7 @@ export class Store {
           })
         }
       }
-      await this.db.meta.update('meta', { eventsSinceExport: meta.eventsSinceExport + mutations.length })
+      await this.db.meta.update('meta', { eventsSinceExport: meta.eventsSinceExport + mutations.length, localRevision: meta.localRevision + 1 })
     })
     return txId
   }

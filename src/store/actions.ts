@@ -70,12 +70,13 @@ export async function setCellItems(store: Store, rowId: string, month: MonthKey,
   await store.commit(mutations)
 }
 
-/** Back to inheriting from the previous month. */
+/** Back to inheriting from the previous month. Stored as an inherit record (not a delete) so the change travels between devices. */
 export async function clearCell(store: Store, rowId: string, month: MonthKey): Promise<void> {
   const tables = await loadTables(store)
   assertOpen(tables, month)
-  if (!cellOf(tables, rowId, month)) return
-  await store.commit([{ op: 'delete', table: 'cells', key: [rowId, month] }])
+  const existing = cellOf(tables, rowId, month)
+  if (!existing || existing.mode === 'inherit') return
+  await store.commit([putCell({ rowId, month, mode: 'inherit', value: null, items: [], note: existing.note, currencyOverride: existing.currencyOverride, updatedAt: now() })])
 }
 
 /** Turn whatever the cell shows into an items list so single entries can be added. */

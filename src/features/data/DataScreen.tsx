@@ -10,6 +10,9 @@ import { isDemoMode, useStore } from '@/app/store'
 import { loadDemo } from '@/demo/loadDemo'
 import type { ExportFile } from '@/model'
 import { exportFileName, exportSnapshot, importMerge, importReplace, parseExportFile, wipeAll } from '@/store'
+import { useSyncEngine, useSyncView } from '@/sync/useSync'
+import { InviteCard } from './InviteCard'
+import { SyncCard } from './SyncCard'
 
 type Pending = { file: ExportFile; name: string }
 
@@ -22,6 +25,10 @@ export function DataScreen() {
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [wipeWord, setWipeWord] = useState('')
+  const [deleteWord, setDeleteWord] = useState('')
+  const sync = useSyncEngine()
+  const syncView = useSyncView()
+  const signedIn = !!syncView && syncView.status !== 'off'
   const [persisted, setPersisted] = useState<boolean | null>(null)
   const [usage, setUsage] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -101,15 +108,37 @@ export function DataScreen() {
   }
 
   async function doWipe() {
-    await wipeAll(store)
-    setWipeWord('')
-    setMessage('All data removed from this browser.')
+    setError(null)
+    try {
+      // signed in, a plain wipe would be undone by the next pull: leave the household first
+      if (signedIn && sync) await sync.signOut({ wipe: true })
+      else await wipeAll(store)
+      setWipeWord('')
+      setMessage(signedIn ? 'Signed out and all data removed from this browser. The cloud copy is untouched.' : 'All data removed from this browser.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not wipe.')
+    }
+  }
+
+  async function doDeleteCloud() {
+    if (!sync) return
+    setError(null)
+    try {
+      await sync.deleteCloudCopy()
+      setDeleteWord('')
+      setMessage('The cloud copy was deleted and this device signed out. Your data stays here.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not delete the cloud copy.')
+    }
   }
 
   const h = household?.[0]
   const since = meta?.eventsSinceExport ?? 0
   const lastExport = meta?.lastExportAt ? new Date(meta.lastExportAt).toLocaleString() : 'never'
-  const nag = since > 50 || (meta?.lastExportAt != null && openedAt - meta.lastExportAt > 30 * 86_400_000) || (meta?.lastExportAt == null && since > 0)
+  const exportNag = since > 50 || (meta?.lastExportAt != null && openedAt - meta.lastExportAt > 30 * 86_400_000) || (meta?.lastExportAt == null && since > 0)
+  // a healthy cloud copy counts as a backup; the reminder returns after a week of failed pushes
+  const syncHealthy = signedIn && (syncView.failingSince == null || openedAt - syncView.failingSince < 7 * 86_400_000)
+  const nag = exportNag && !syncHealthy
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -130,7 +159,9 @@ export function DataScreen() {
         <CardHeader>
           <CardTitle>Where your data lives</CardTitle>
           <CardDescription>
-            In this browser only, on this device. Casa Papel has no server. Export a file now and then so a cleared browser cannot take your history with it.
+            {sync
+              ? 'In this browser, on this device. Sign in below to keep an encrypted copy in the cloud as well; only your password opens it. Export a file now and then so a cleared browser cannot take your history with it.'
+              : 'In this browser only, on this device. Casa Papel has no server. Export a file now and then so a cleared browser cannot take your history with it.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
@@ -147,6 +178,9 @@ export function DataScreen() {
           </p>
         </CardContent>
       </Card>
+
+      <SyncCard hasLocalData={!!h} onMessage={setMessage} onError={setError} />
+      <InviteCard onError={setError} />
 
       <Card>
         <CardHeader>
@@ -191,8 +225,9 @@ export function DataScreen() {
               : 'Loads a fictional household into this store, replacing what is here. Prefer the sandbox at ?demo=1.'}
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Button variant={isDemoMode() ? 'default' : 'outline'} onClick={() => void loadDemo(store)}>Load demo household</Button>
+        <CardContent className="space-y-2">
+          <Button variant={isDemoMode() ? 'default' : 'outline'} onClick={() => void loadDemo(store)} disabled={signedIn}>Load demo household</Button>
+          {signedIn && <p className="text-xs text-muted-foreground">Sign out first: loading the demo here would upload it to your household's cloud copy.</p>}
         </CardContent>
       </Card>
 
@@ -201,11 +236,24 @@ export function DataScreen() {
       <Card className="border-destructive/40">
         <CardHeader>
           <CardTitle>Danger zone</CardTitle>
-          <CardDescription>Remove everything from this browser. Export first. Type WIPE to enable the button.</CardDescription>
+          <CardDescription>
+            {signedIn ? 'Remove everything from this browser and stop syncing here. The cloud copy and other devices are untouched. Type WIPE to enable the button.' : 'Remove everything from this browser. Export first. Type WIPE to enable the button.'}
+          </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-wrap items-center gap-2">
-          <Input className="max-w-40" value={wipeWord} onChange={(e) => setWipeWord(e.target.value)} placeholder="WIPE" aria-label="Type WIPE to confirm" />
-          <Button variant="destructive" disabled={wipeWord !== 'WIPE'} onClick={doWipe}>Wipe this device</Button>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Input className="max-w-40" value={wipeWord} onChange={(e) => setWipeWord(e.target.value)} placeholder="WIPE" aria-label="Type WIPE to confirm" />
+            <Button variant="destructive" disabled={wipeWord !== 'WIPE'} onClick={doWipe}>{signedIn ? 'Sign out and wipe this device' : 'Wipe this device'}</Button>
+          </div>
+          {signedIn && syncView.owner && (
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <Input className="max-w-40" value={deleteWord} onChange={(e) => setDeleteWord(e.target.value)} placeholder="DELETE" aria-label="Type DELETE to confirm" />
+                <Button variant="destructive" disabled={deleteWord !== 'DELETE'} onClick={doDeleteCloud}>Delete the cloud copy</Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Removes the household from the server for every device. Each device keeps what it has locally. Type DELETE to enable the button.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

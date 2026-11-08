@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { ErrorBoundary } from '@/app/ErrorBoundary'
 import { createAppStore, isDemoMode, useStore } from '@/app/store'
 import { StoreProvider } from '@/app/StoreProvider'
+import { takeInviteFromUrl } from '@/app/url'
 import { activeHousehold, defaultMonths, useTables } from '@/app/useEngine'
 import { useStoreVersion } from '@/app/useStoreVersion'
 import { DataScreen } from '@/features/data/DataScreen'
@@ -14,7 +15,10 @@ import { HomeScreen } from '@/features/home/HomeScreen'
 import { HouseholdScreen } from '@/features/household/HouseholdScreen'
 import { MonthScreen } from '@/features/month/MonthScreen'
 import { MovesScreen } from '@/features/moves/MovesScreen'
+import { AccountDialog, type AccountStep } from '@/features/sync/AccountDialog'
+import { SyncIndicator } from '@/features/sync/SyncIndicator'
 import { planRecurringPosts } from '@/store'
+import { SyncContext, createSyncEngine, useSyncEngine } from '@/sync/useSync'
 
 type Screen = 'grid' | 'month' | 'moves' | 'household' | 'data'
 const SCREENS: Array<{ key: Screen; label: string }> = [
@@ -24,10 +28,14 @@ const SCREENS: Array<{ key: Screen; label: string }> = [
 
 export default function App() {
   const store = useMemo(() => createAppStore(), [])
+  // the demo sandbox never syncs; builds without Supabase settings get no engine at all
+  const sync = useMemo(() => createSyncEngine(store, !isDemoMode()), [store])
   return (
     <ErrorBoundary>
       <StoreProvider store={store}>
-        <Shell />
+        <SyncContext.Provider value={sync}>
+          <Shell />
+        </SyncContext.Provider>
       </StoreProvider>
     </ErrorBoundary>
   )
@@ -39,6 +47,15 @@ function Shell() {
   const household = activeHousehold(tables)
   const [screen, setScreen] = useState<Screen>(() => (window.innerWidth < 768 ? 'month' : 'grid'))
   useStoreVersion(store)
+  const sync = useSyncEngine()
+  const [inviteCode] = useState(() => takeInviteFromUrl())
+  const [account, setAccount] = useState<AccountStep | null>(() => (inviteCode && sync ? 'join' : null))
+
+  useEffect(() => {
+    if (!sync) return
+    void sync.start()
+    return () => sync.stop()
+  }, [sync])
   const months = useMemo(() => (household && tables ? defaultMonths(household, tables) : []), [household, tables])
 
   // keep open months in step with the recurring register
@@ -74,6 +91,7 @@ function Shell() {
           <nav className="ml-auto flex items-center gap-1" aria-label="Screens">
             <Button variant="ghost" size="icon" aria-label="Undo" disabled={!store.canUndo} onClick={() => void store.undo()}><Undo2 /></Button>
             <Button variant="ghost" size="icon" aria-label="Redo" disabled={!store.canRedo} onClick={() => void store.redo()}><Redo2 /></Button>
+            <SyncIndicator onOpen={() => setScreen('data')} />
             <span className="mx-1 h-5 w-px bg-border" />
             <div className="hidden gap-1 md:flex">
               {SCREENS.map((s) => (
@@ -88,13 +106,14 @@ function Shell() {
       </header>
       <main className="mx-auto max-w-[1800px] px-4 py-4">
         {showHome ? (
-          <HomeScreen onOpenData={() => setScreen('data')} onCreated={() => setScreen(window.innerWidth < 768 ? 'month' : 'grid')} />
+          <HomeScreen onOpenData={() => setScreen('data')} onCreated={() => setScreen(window.innerWidth < 768 ? 'month' : 'grid')} syncAvailable={!!sync} onSignIn={() => setAccount('signin')} onJoin={() => setAccount('join')} />
         ) : screen === 'data' ? <DataScreen />
           : screen === 'month' ? <MonthScreen />
           : screen === 'moves' ? <MovesScreen />
           : screen === 'household' ? <HouseholdScreen />
           : <GridScreen />}
       </main>
+      {account && sync && <AccountDialog initial={account} inviteCode={inviteCode ?? undefined} hasLocalData={!!household} onClose={() => setAccount(null)} />}
     </div>
   )
 }

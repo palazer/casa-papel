@@ -2,7 +2,7 @@
 
 Local-first household budgeting. Your money as a month-by-month grid that knows what a household is: who lives in it, what it owns, what recurs, what is saved for, who pays what.
 
-- Runs entirely in your browser. No server, no account. Your data never leaves your device unless you export it.
+- Runs in your browser. No account needed: your data stays on your device unless you export it. Optional cloud sync keeps an encrypted copy that only your password can open, for the same household on several devices.
 - Installable as an app on phone and desktop, works offline.
 - Live: https://palazer.github.io/casa-papel/
 
@@ -21,10 +21,11 @@ Try it without touching your own data: https://palazer.github.io/casa-papel/?dem
 - **Balances**: savings and investment accounts get a running balance in the grid. Investments grow at a yearly rate you set, or at the average of the real returns you enter; click any balance to pin what the account really held.
 - **Currencies**: rows and accounts can be in another currency. Past month rates come from the European Central Bank (only currency codes and dates leave your device), future months are projected with a drift you control, any month can be overridden by hand.
 - **Data**: export and import as a single JSON file; merge from another device; wipe.
+- **Cloud sync** (optional, by invitation): sign in with an email and password to keep the household on Supabase and use it on your phone and laptop. Everything is encrypted on the device before it leaves; the server and the person running the project see only ciphertext. Changes merge record by record, newest wins. A recovery code shown once at setup is the way back in if the password is forgotten. Setup for your own project: `docs/sync-setup.md`.
 - **Goals**: a balance to reach on an account or pool account, a card or loan to clear, or a net worth target, each with an optional target month. Measured against the plan in the grid, so the bar moves as the plan changes.
 - **Colour**: every kind of money has one hue: income, expenses, transfers, balances, pool accounts. Goals are the one thing in gold.
 
-Status: Wave 1 is complete (0, 1a, 1b, 1c, 1d). Next: Wave 2, charts, CSV and PDF export, file-based sync, translations.
+Status: Wave 1 complete (0, 1a, 1b, 1c, 1d); Wave 2a (colour, goals) and 2b (cloud sync and login) complete. Next: charts, CSV and PDF export, translations.
 
 ## Develop
 

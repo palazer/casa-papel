@@ -60,7 +60,9 @@ describe('setup and household actions', () => {
     const out = computeEngine({ tables: await loadTables(store), months: ['2026-11'] })
     expect(out.accounts[savings.id].months['2026-11'].balance).toBe(777777)
     await setAccountActual(store, savings.id, '2026-11', null)
-    expect((await loadTables(store)).accountMonths).toHaveLength(0)
+    // cleared actuals stay as a record with nulls, so the change can travel between devices
+    expect((await loadTables(store)).accountMonths).toEqual([expect.objectContaining({ accountId: savings.id, month: '2026-11', actualBalance: null })])
+    expect(computeEngine({ tables: await loadTables(store), months: ['2026-11'] }).accounts[savings.id].months['2026-11'].adjustment).toBe(0)
   })
 
   it('setCellDone turns a value into a done item and back', async () => {

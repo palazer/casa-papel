@@ -16,7 +16,8 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: 'npm run preview',
+    // serves the e2e build (vite --mode e2e), which points sync at a fake server the tests intercept
+    command: 'npm run preview:e2e',
     url: BASE,
     reuseExistingServer: true,
     timeout: 60_000,

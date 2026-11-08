@@ -272,12 +272,35 @@ export const EventSchema = z.object({
   inverse: z.unknown().nullable(),
 })
 
+/** This device's link to the cloud copy of its household. Present only while signed in. */
+export const SyncStateSchema = z.object({
+  householdId: z.string().min(1),
+  email: z.string().min(1),
+  /** The household key (AES-GCM-256, base64). Same threat model as the data in this database. */
+  keyB64: z.string().nullable().default(null),
+  /** Owner of the household row; owners may delete the cloud copy. */
+  owner: z.boolean().default(false),
+  /** Version of the last cloud snapshot this device pushed or pulled. */
+  lastVersion: z.number().int().nonnegative().default(0),
+  lastPullAt: TimestampSchema.nullable().default(null),
+  lastPushAt: TimestampSchema.nullable().default(null),
+  lastError: z.string().nullable().default(null),
+  /** When pushes started failing; null while healthy. */
+  failingSince: TimestampSchema.nullable().default(null),
+})
+
 export const MetaSchema = z.object({
   key: z.literal('meta'),
   schemaVersion: z.number().int().positive(),
   deviceId: z.string().min(1),
   lastExportAt: TimestampSchema.nullable().default(null),
   eventsSinceExport: z.number().int().nonnegative().default(0),
+  /** Newest timestamp merged in from elsewhere; local writes stay above it so last-write-wins keeps its order. */
+  clockFloor: TimestampSchema.default(0),
+  /** Counts every local change (commits, imports, wipes). The sync engine pushes when it passes pushedRevision. */
+  localRevision: z.number().int().nonnegative().default(0),
+  pushedRevision: z.number().int().nonnegative().default(0),
+  sync: SyncStateSchema.nullable().default(null),
 })
 
 export const TablesSchema = z.object({
@@ -329,6 +352,7 @@ export type MonthState = z.infer<typeof MonthStateSchema>
 export type TableName = z.infer<typeof TableNameSchema>
 export type StoreEvent = z.infer<typeof EventSchema>
 export type Meta = z.infer<typeof MetaSchema>
+export type SyncState = z.infer<typeof SyncStateSchema>
 export type Tables = z.infer<typeof TablesSchema>
 export type ExportFile = z.infer<typeof ExportFileSchema>
 

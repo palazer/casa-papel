@@ -52,11 +52,7 @@ export async function updateAccount(store: Store, id: string, patch: Partial<Omi
 export async function setAccountActual(store: Store, accountId: string, month: MonthKey, actualBalance: number | null): Promise<void> {
   const tables = await loadTables(store)
   const existing = tables.accountMonths.find((a) => a.accountId === accountId && a.month === month)
-  if (actualBalance == null && !existing) return
-  if (actualBalance == null && existing && existing.actualDeposit == null && existing.actualSpend == null) {
-    await store.commit([{ op: 'delete', table: 'accountMonths', key: [accountId, month] }])
-    return
-  }
+  if (actualBalance == null && (!existing || existing.actualBalance == null)) return
   await store.commit([{ op: 'put', table: 'accountMonths', record: AccountMonthSchema.parse({ ...existing, accountId, month, actualBalance, updatedAt: now() }) }])
 }
 

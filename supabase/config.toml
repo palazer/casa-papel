@@ -1,0 +1,6 @@
+# Supabase CLI project config. `supabase link --project-ref <ref>` fills in the rest from the dashboard.
+project_id = "casa-papel"
+
+[functions.account]
+# Called before a user exists (sign-up from an invite) and for recovery resets, so no user JWT is required.
+verify_jwt = false
