@@ -45,6 +45,26 @@ test('demo → export → wipe → import → offline reload', async ({ page, co
   await context.setOffline(false)
 })
 
+test('the built page carries its content security policy and no screen trips it', async ({ page }) => {
+  const violations: string[] = []
+  page.on('console', (msg) => {
+    if (/Content Security Policy/i.test(msg.text())) violations.push(msg.text())
+  })
+  await loadDemo(page)
+  const policy = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content')
+  expect(policy).toContain("script-src 'self'")
+  expect(policy).toContain('https://api.frankfurter.dev')
+
+  for (const screen of ['Month', 'Moves', 'Household', 'Data', 'Guide', 'Grid']) {
+    await page.getByRole('link', { name: screen, exact: true }).click()
+    await expect(page.getByRole('heading', { level: 1, name: screen })).toBeVisible()
+  }
+  // a cell editor and a dropdown: the UI library's popups are where a runtime <style> or inline handler would show up
+  await page.getByRole('button', { name: /^The flat – Rent Nov 2026/ }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  expect(violations).toEqual([])
+})
+
 test('real store and demo sandbox are separate databases', async ({ page }) => {
   await loadDemo(page)
   await page.goto('/')

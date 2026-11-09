@@ -3,6 +3,10 @@ import { ID_PATTERN } from './ids'
 import { MONTH_PATTERN } from './month'
 import { FUNDED_BY_PATTERN } from './fundedBy'
 
+// The built page's content security policy (vite.config.ts) forbids `new Function`. Zod would only try it once and
+// fall back, but the browser logs the attempt as a violation; this skips the attempt and gives every build one code path.
+z.config({ jitless: true })
+
 /** Bump when the shape of stored data changes; add a migration in migrations.ts. */
 export const SCHEMA_VERSION = 4
 
