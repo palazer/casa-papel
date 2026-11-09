@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Island } from '@/components/ui/island'
 import { PageHeader } from '@/components/PageHeader'
+import { useScreen } from '@/app/screens'
 import { isDemoMode, leaveDemoSandbox, openDemoSandbox, useStore } from '@/app/store'
 import { loadDemo } from '@/demo/loadDemo'
 import { ImportPanel } from '@/features/data/ImportPanel'
@@ -28,6 +29,7 @@ interface Props {
  */
 export function HomeScreen({ onOpenData, onCreated, syncAvailable = false, onSignIn, onJoin, notice = null }: Props) {
   const store = useStore()
+  const { go } = useScreen()
   const view = useSyncView()
   const [mode, setMode] = useState<'choose' | 'wizard'>('choose')
   const [message, setMessage] = useState<string | null>(null)
@@ -44,6 +46,7 @@ export function HomeScreen({ onOpenData, onCreated, syncAvailable = false, onSig
       {demo
         ? <Button size="xs" variant="ghost" onClick={leaveDemoSandbox}>Leave the demo</Button>
         : <Button size="xs" variant="ghost" onClick={openDemoSandbox}>Look at the demo first</Button>}
+      <Button size="xs" variant="ghost" onClick={() => go('guide')}>How it works</Button>
       <ImportPanel emptyDevice trigger={(open) => <Button size="xs" variant="ghost" onClick={open}>Import a file</Button>} onMessage={setMessage} onError={setError} />
     </div>
   )

@@ -74,6 +74,20 @@ Phone list       mx-auto max-w-xl space-y-4 of dense islands, rows text-sm and m
   device, Sign in, I have an invite; without sync only the first; in the sandbox it leads with Load the demo household; signed
   in with no household it skips straight to the wizard with a "Signed in as …" line and no chooser; a locked or undecided
   cloud copy offers Open Data instead of the wizard. The wizard's title row carries "Back to start" while the chooser exists. Its Accounts step is one row per account: name, type, an "Account currency" select that starts at "EUR (household currency)" and lists the other codes, the opening balance in that currency ("Opening USD" as the placeholder), and a help line per type that adds "Kept in USD; the grid shows its EUR value beneath" for a foreign one. The Rows step shows only people and things with a name (or "Me"), so every preview is a row that will exist.
+- **Guide** (`src/features/guide/GuideScreen.tsx`, words in `src/app/guide.ts`, no React there so a translation can
+  follow): a reading page that opens without a household. Its header's toolbar holds one control, a `type="search"`
+  Input "Search the guide" (`h-7 w-64`, full width under 768 px, Escape clears) and, while searching, a `role="status"`
+  line (`4 topics match "pool"`, `1 topic matches "lisbon"`, `Nothing matches "xyz". Try another word.`). The body is the
+  reading frame: the lead island "What Casa Papel is" (three paragraphs, `xs` "Try the demo" hidden in the sandbox,
+  ghost "Open on GitHub"), a "Topics" island whose `<nav aria-label="Topics">` is a two-column grid of links to
+  `#guide-<key>` (title over summary), then one air island per topic (`id="guide-<key>"`, the title as the heading, the
+  summary as the description): one to three paragraphs, an `<ol>` of steps naming the controls in quotes, the model's
+  own option texts as a `<dl>` where the topic explains a choice (account types, goal kinds, people & things kinds, the
+  month-end rules, the sharing choices), "Related tips" as a `<dl>` straight from `HELP`, and a footer with
+  `Open <screen>` (`xs outline`, `useScreen().go`) and `Topics` (`xs ghost`, `#guide-topics`). A search matches every
+  typed word somewhere in those texts, hides the lead and the contents, and wraps the words in `<mark>` on
+  `bg-primary/30`. `screenHref` keeps the hash, so `#guide-marks` from the legend lands on its topic; leaving the Guide
+  drops a `#guide-…` hash. Every `HELP` key is quoted by at least one topic (`tests/app/guide.test.ts`).
 - Nothing floats over the content except popovers, menus and dialogs (`z-50`); the rail and tabs are `z-40`.
 
 ## 3. Island (the panel)
@@ -263,7 +277,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 - `MarksLegend` ("What the colours and marks mean", an `xs outline` button in the Grid and Month toolbars) is the legend:
   the six hue dots with their kinds of money, then the marks with a sample each: estimate, certain, done, this month's
   red and amber dots, the negative spending number when that setting is on, the amber draw, the dotted entered balance,
-  the locked closed month.
+  the locked closed month, the category band. It ends with a ghost `xs` "More in the Guide" that opens the Guide's
+  Marks & keyboard topic (`#guide-marks`). The welcome screen's quiet links carry "How it works" for the same page.
 
 ## 9. Loading, errors, empty
 

@@ -3,6 +3,7 @@ import { Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { HUES } from '@/app/hues'
+import { useScreen } from '@/app/screens'
 import { DoneDot } from '@/features/grid/DoneDot'
 import { statusClass } from '@/features/grid/display'
 import { cn } from '@/lib/utils'
@@ -32,6 +33,12 @@ function Mark({ sample, children }: { sample: ReactNode; children: ReactNode }) 
  * Every kind of money has one hue, every mark one meaning; the samples use the same classes as the real cells.
  */
 export function MarksLegend({ neg }: { neg: boolean }) {
+  const { go } = useScreen()
+  // the hash names the topic; `rememberScreen` keeps it in the address, and the Guide scrolls there on arrival
+  const moreInGuide = () => {
+    window.history.replaceState(null, '', '#guide-marks')
+    go('guide')
+  }
   return (
     <Popover>
       <PopoverTrigger render={<Button size="xs" variant="outline" />}>What the colours and marks mean</PopoverTrigger>
@@ -62,6 +69,7 @@ export function MarksLegend({ neg }: { neg: boolean }) {
             <Mark sample={<span className={cn('block h-4 w-14 rounded-sm ring-1 ring-border', HUES.expense.band)} aria-hidden />}>A faint band: the rows of one category</Mark>
           </ul>
         </section>
+        <Button size="xs" variant="ghost" className="self-start" onClick={moreInGuide}>More in the Guide</Button>
       </PopoverContent>
     </Popover>
   )

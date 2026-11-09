@@ -31,8 +31,9 @@ First visit: the welcome screen offers three ways in. Start on this device (ever
 - **Colour**: every kind of money has one hue: income, expenses, transfers, balances, pool accounts. Goals are the one thing in gold.
 - **Look**: a dark rail on the left (bottom tabs on a phone), a page header per screen, bordered islands instead of cards, Roboto. The design system is written down in `DESIGN.md` and shared with a sibling app.
 - **Help**: an (i) beside every section title, total, balance, automatic row and setting explains it in a sentence or two, on hover or on tap. "What the colours and marks mean" on the Grid and Month screens is the legend.
+- **Guide**: an in-app guide under Settings. What Casa Papel is, then sixteen topics in setup order (the grid, people & things, income, spending, schedules, pool accounts, transfers and the month-end rule, investments, debts and cards, goals, sharing money, currencies, the Month view, archive or delete, data and privacy, marks and keyboard), each with numbered steps that name the exact controls, the related (i) texts and an "Open <screen>" button. A search field filters the topics as you type over all of it. It reads without a household: https://palazer.github.io/casa-papel/?screen=guide
 
-Status: Wave 1 complete (0, 1a, 1b, 1c, 1d); Wave 2a (colour, goals) and 2b (cloud sync and login) complete; Wave 2c (design system, help, month tracking, categories, delete and archive) complete; Wave 2d (calendar years, currencies, deductions, welcome screen) in progress. Next: charts, CSV and PDF export, translations.
+Status: Wave 1 complete (0, 1a, 1b, 1c, 1d); Wave 2a (colour, goals) and 2b (cloud sync and login) complete; Wave 2c (design system, help, month tracking, categories, delete and archive) complete; Wave 2d (calendar years, currencies, deductions, welcome screen) and 2e (Settings group, the Guide) complete. Next: charts, CSV and PDF export, translations.
 
 ## Develop
 
