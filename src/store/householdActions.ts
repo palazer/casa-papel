@@ -66,11 +66,24 @@ interface TemplateContext {
   adultCount: number
 }
 
+/** What the setup wizard adds to a template: the account it points at (instead of the first of its type) and a first amount. */
+export interface TemplateOptions {
+  destination?: Account | null
+  /** Written into the household's start month; the engine carries it forward. */
+  amount?: number | null
+}
+
+/** The first amount of a row from the wizard: one value cell in the start month, carried forward from there. */
+const startAmount = (rowId: string, month: MonthKey, value: number, ts: number): Mutation =>
+  ({ op: 'put', table: 'cells', record: CellSchema.parse({ rowId, month, mode: 'value', value, items: [], updatedAt: ts }) })
+
 /** Build the rows (and pools) a template produces. Pure; used by the wizard and the household screen. */
-export function buildTemplateMutations(t: RowTemplate, ctx: TemplateContext, order: string, accounts: Account[]): { mutations: Mutation[]; row: Row } {
+export function buildTemplateMutations(t: RowTemplate, ctx: TemplateContext, order: string, accounts: Account[], opts: TemplateOptions = {}): { mutations: Mutation[]; row: Row } {
   const ts = now()
   const name = templateTitle(t, ctx.entity?.name)
-  const destination = t.account ? accounts.find((a) => a.type === t.account && !a.deletedAt) : undefined
+  const destination = t.account
+    ? (opts.destination && opts.destination.type === t.account ? opts.destination : accounts.find((a) => a.type === t.account && !a.deletedAt))
+    : undefined
   const mutations: Mutation[] = []
   let defaultFundedBy: Row['defaultFundedBy'] = 'cash'
   if (t.pool) {
@@ -100,6 +113,9 @@ export function buildTemplateMutations(t: RowTemplate, ctx: TemplateContext, ord
     order,
   })
   mutations.push({ op: 'put', table: 'rows', record: row })
+  // automatic rows (the savings plug, pocket money) take no amount
+  const automatic = t.pocket || (t.kind === 'to-savings' && ctx.household.closingRule === 'savings-plug')
+  if (opts.amount != null && opts.amount > 0 && !automatic) mutations.push(startAmount(row.id, ctx.household.startMonth, opts.amount, ts))
   return { mutations, row }
 }
 
@@ -120,15 +136,27 @@ export async function applyTemplates(store: Store, keys: string[], entityId?: st
 
 // ---------- setup wizard ----------
 
+/** A template the wizard chose, with the account it points at (an index into `accounts`) and a first monthly amount. */
+export interface TemplateChoice {
+  key: string
+  accountIndex?: number | null
+  amount?: number | null
+}
+
 export interface SetupInput {
   household: Pick<Household, 'name' | 'baseCurrency' | 'locale' | 'startMonth'> & Partial<Household>
   adults: Array<{ name: string }>
   dependents: Array<{ kind: Exclude<EntityKind, 'adult'>; name: string; paidByIndex?: number | null }>
-  accounts: Array<Pick<Account, 'name' | 'type'> & Partial<Account>>
-  /** household template keys */
-  householdTemplates: string[]
-  /** per entity index (adults first, then dependents) → template keys */
-  entityTemplates: Record<number, string[]>
+  /** `ownerIndex` points into the entities (adults first, then dependents); null or absent = the household's. */
+  accounts: Array<Pick<Account, 'name' | 'type'> & Partial<Account> & { ownerIndex?: number | null }>
+  /** household template keys, or choices with an account and an amount */
+  householdTemplates: Array<string | TemplateChoice>
+  /** per entity index (adults first, then dependents) → template keys or choices */
+  entityTemplates: Record<number, Array<string | TemplateChoice>>
+  /** "To <account>" rows: a monthly deposit into an investment account, or a savings account when the user decides the savings amount */
+  deposits?: Array<{ accountIndex: number; amount?: number | null }>
+  /** the user's own rows; `entityIndex` prefixes the name with the subject and scopes or tags the row like a template would */
+  customRows?: Array<{ name: string; section: Row['section']; entityIndex?: number | null; amount?: number | null }>
 }
 
 /** Everything a new household needs, as one commit. Pure apart from id/time generation. */
@@ -151,10 +179,11 @@ export function buildSetupMutations(input: SetupInput): { mutations: Mutation[];
   for (const e of entities) mutations.push({ op: 'put', table: 'entities', record: e })
 
   const accountOrders = generateNKeysBetween(null, null, input.accounts.length)
-  const accounts: Account[] = input.accounts.map((a, i) =>
+  const accounts: Account[] = input.accounts.map(({ ownerIndex, ...a }, i) =>
     AccountSchema.parse({
       id: newId(), createdAt: ts, updatedAt: ts, currency: household.baseCurrency, openingMonth: household.startMonth, openingBalance: 0,
-      tracked: ['savings', 'investment', 'credit-card', 'loan', 'other-asset'].includes(a.type), order: accountOrders[i], ...a,
+      tracked: ['savings', 'investment', 'credit-card', 'loan', 'other-asset'].includes(a.type), order: accountOrders[i],
+      ownerEntityId: ownerIndex != null ? entities[ownerIndex]?.id ?? null : null, ...a,
     }),
   )
   for (const a of accounts) mutations.push({ op: 'put', table: 'accounts', record: a })
@@ -164,16 +193,54 @@ export function buildSetupMutations(input: SetupInput): { mutations: Mutation[];
   mutations.push(...categoryMutations)
   const tables = { household: [household], entities, accounts, categories } as unknown as Tables
   const ctxBase = { tables, household, adultCount: adults.length }
-  const plan: Array<{ t: RowTemplate; entity?: Entity }> = []
+  const choice = (c: string | TemplateChoice): TemplateChoice => (typeof c === 'string' ? { key: c } : c)
+  type Planned =
+    | { kind: 'template'; t: RowTemplate; entity?: Entity; c: TemplateChoice }
+    | { kind: 'deposit'; account: Account; amount: number | null }
+    | { kind: 'custom'; name: string; section: Row['section']; entity?: Entity; amount: number | null }
+  const plan: Planned[] = []
   entities.forEach((e, i) => {
-    const keys = input.entityTemplates[i] ?? []
-    for (const t of ENTITY_TEMPLATES[e.kind]) if (keys.includes(t.key)) plan.push({ t, entity: e })
+    const chosen = (input.entityTemplates[i] ?? []).map(choice)
+    for (const t of ENTITY_TEMPLATES[e.kind]) {
+      const c = chosen.find((x) => x.key === t.key)
+      if (c) plan.push({ kind: 'template', t, entity: e, c })
+    }
   })
-  for (const t of HOUSEHOLD_TEMPLATES) if (input.householdTemplates.includes(t.key)) plan.push({ t })
+  const householdChoices = input.householdTemplates.map(choice)
+  for (const t of HOUSEHOLD_TEMPLATES) {
+    const c = householdChoices.find((x) => x.key === t.key)
+    if (c) plan.push({ kind: 'template', t, c })
+  }
+  // a deposit row per chosen account; under the savings plug a savings account takes no typed row (the plug fills the first one)
+  for (const dep of input.deposits ?? []) {
+    const account = accounts[dep.accountIndex]
+    if (!account) continue
+    if (account.type === 'investment' || (account.type === 'savings' && household.closingRule !== 'savings-plug')) plan.push({ kind: 'deposit', account, amount: dep.amount ?? null })
+  }
+  for (const r of input.customRows ?? []) {
+    if (r.name.trim()) plan.push({ kind: 'custom', name: r.name.trim(), section: r.section, entity: r.entityIndex != null ? entities[r.entityIndex] : undefined, amount: r.amount ?? null })
+  }
   const orders = generateNKeysBetween(null, null, plan.length)
-  plan.forEach(({ t, entity }, i) => {
-    if (t.pocket && household.moneyMode !== 'pooled') return
-    mutations.push(...buildTemplateMutations(t, { ...ctxBase, entity }, orders[i], accounts).mutations)
+  plan.forEach((p, i) => {
+    if (p.kind === 'template') {
+      if (p.t.pocket && household.moneyMode !== 'pooled') return
+      const destination = p.c.accountIndex != null ? accounts[p.c.accountIndex] ?? null : null
+      mutations.push(...buildTemplateMutations(p.t, { ...ctxBase, entity: p.entity }, orders[i], accounts, { destination, amount: p.c.amount }).mutations)
+      return
+    }
+    const row = p.kind === 'deposit'
+      ? RowSchema.parse({
+          id: newId(), createdAt: ts, updatedAt: ts, name: `To ${p.account.name}`, section: 'transfer',
+          kind: p.account.type === 'investment' ? 'to-investment' : 'to-savings', accountId: p.account.id, defaultStatus: 'committed', order: orders[i],
+        })
+      : RowSchema.parse({
+          id: newId(), createdAt: ts, updatedAt: ts, name: p.entity ? `${p.entity.name} – ${p.name}` : p.name, section: p.section,
+          defaultStatus: p.section === 'expense' ? 'projected' : 'committed',
+          scope: p.entity && (p.entity.kind === 'adult' || p.entity.kind === 'child') ? p.entity.id : 'shared',
+          entityTags: p.entity ? [p.entity.id] : [], order: orders[i],
+        })
+    mutations.push({ op: 'put', table: 'rows', record: row })
+    if (p.amount != null && p.amount > 0) mutations.push(startAmount(row.id, household.startMonth, p.amount, ts))
   })
   return { mutations, household }
 }

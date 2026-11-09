@@ -332,6 +332,8 @@ function AccountDialog({ account, entities, baseCurrency, locale, startMonth, on
   const [cardMode, setCardMode] = useState<'itemized' | 'lump'>(account?.card?.cardMode ?? 'itemized')
   const [error, setError] = useState<string | null>(null)
   const adults = entities.filter((e) => e.kind === 'adult' && !e.deletedAt)
+  // a child can own an account too: their long-term savings row goes into it
+  const children = entities.filter((e) => e.kind === 'child' && !e.deletedAt)
   const trackable = ['savings', 'investment', 'credit-card', 'loan', 'other-asset'].includes(type)
   const ccy = currency.toUpperCase()
 
@@ -364,7 +366,7 @@ function AccountDialog({ account, entities, baseCurrency, locale, startMonth, on
           <p className="-mt-1 text-xs text-muted-foreground sm:col-span-2">{ACCOUNT_TYPES.find((t) => t.value === type)?.help}{ccy !== baseCurrency && ccy.length === 3 ? ` Amounts are shown in ${ccy}; the Currency rates card converts them.` : ''}</p>
           <div className="space-y-1.5"><Label htmlFor="acc-open">Opening balance</Label><Input id="acc-open" inputMode="decimal" value={opening} onChange={(e) => setOpening(e.target.value)} /></div>
           <div className="space-y-1.5"><Label htmlFor="acc-month">Opening month</Label><MonthField id="acc-month" label="Opening month" value={openingMonth} onChange={setOpeningMonth} locale={locale} /></div>
-          <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="acc-owner">Owner</Label><NativeSelect id="acc-owner" className="w-full" value={owner} onChange={(e) => setOwner(e.target.value)}><option value="">Household / joint</option>{adults.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</NativeSelect></div>
+          <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="acc-owner">Owner</Label><NativeSelect id="acc-owner" className="w-full" value={owner} onChange={(e) => setOwner(e.target.value)}><option value="">Household / joint</option>{adults.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}{children.map((c) => <option key={c.id} value={c.id}>{c.name} · child</option>)}</NativeSelect></div>
           {trackable && (
             <div className="flex items-center gap-1 sm:col-span-2">
               <Check label="Track the balance month by month in the grid" checked={tracked} onChange={(e) => setTracked(e.target.checked)} />
