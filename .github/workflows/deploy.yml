@@ -25,7 +25,19 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run lint
       - run: npm test -- --run
+      # every push to main goes live and every device updates itself, so the e2e suite runs first.
+      # It tests its own build: .env.e2e points sync at a fake server the tests intercept.
+      - run: npm run build:e2e
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-results
+          path: e2e/output/results
+          retention-days: 7
       - run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}

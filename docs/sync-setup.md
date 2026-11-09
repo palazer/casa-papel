@@ -32,7 +32,7 @@ From the repository, once the Supabase CLI is logged in (`npx supabase login` op
 
 ```sh
 npx supabase link --project-ref <your project ref>       # the id in the project URL
-npx supabase db push                                       # applies supabase/migrations/0001_sync.sql
+npx supabase db push                                       # applies every migration in supabase/migrations/
 npx supabase functions deploy account --no-verify-jwt      # supabase/functions/account
 ```
 
