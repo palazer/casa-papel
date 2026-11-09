@@ -80,6 +80,7 @@ export const HELP = {
   'statement.setAside': { title: 'Set aside, pay off', text: 'Money that leaves the main account but stays yours: into savings, investments and pool accounts, or off a loan or a card. Loan payments sit here; the Grid counts them under Expenses.' },
   'statement.mainAccount': { title: 'Main account', text: 'Worked out, not a bank balance: what your current accounts started with, plus what each month kept or fell short, plus money waiting for a card bill. In a household that passes everything on it never moves.' },
   'statement.netWorth': { title: 'Net worth', text: 'Assets minus debts. Unlike the Grid\'s figure it counts the main account, so its change is the month\'s result: income minus spending, plus what investments earned.' },
+  'statement.estimate': { title: 'Estimates', text: 'A number on a light yellow shade is an estimate. Click the line to overwrite it or to say how sure you are, and tick it once the money has moved. A category is shaded while one of its lines still is.' },
   'statement.free': { title: 'Free', text: 'The part of your net worth that no pool account has set aside. It closes the right side, which is why both sides agree.' },
 
   // Goals and schedules

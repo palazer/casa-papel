@@ -54,9 +54,12 @@ test.describe('the Statement', () => {
     await moneyOut.getByRole('button', { name: 'Personal', exact: true }).click()
     await expect(moneyOut.getByText('Sam – Personal')).toBeVisible()
     await expect(moneyOut.getByText('Concert tickets')).toHaveCount(0)
-    await moneyOut.getByRole('button', { name: 'Sam – Personal' }).click()
+    await moneyOut.getByRole('button', { name: 'Items of Sam – Personal' }).click()
     await expect(moneyOut.getByText('Concert tickets')).toBeVisible()
     await expect(moneyOut.getByText('Books')).toBeVisible()
+    // a closed month is locked: nothing to tick, no line opens the editor
+    await expect(page.getByRole('checkbox')).toHaveCount(0)
+    await expect(moneyOut.getByRole('button', { name: /^Alex – Personal:/ })).toHaveCount(0)
     await page.screenshot({ path: 'e2e/output/statement-closed.png', fullPage: true })
 
     // "Open all" and "Close all"
@@ -80,6 +83,105 @@ test.describe('the Statement', () => {
   })
 })
 
+test.describe('working the month in the Statement', () => {
+  test.use({ viewport: { width: 1440, height: 900 } })
+
+  const euros = (text: string) => Number(text.replace(/[^0-9.]/g, ''))
+
+  test('an estimate is shaded until it is overwritten as certain; ticks mark rows and items done', async ({ page }) => {
+    await openStatement(page)
+    await goToMonth(page, 'November 2026')
+    const moneyOut = page.getByRole('region', { name: 'Money out' })
+    const dlg = page.getByRole('dialog')
+
+    // an estimate sits on the yellow shade, and so does the category above it
+    const housing = moneyOut.locator('[data-line^="cat:expense"]').filter({ hasText: 'Housing' })
+    await expect(housing.locator('[data-estimate]')).toHaveText('€1,860.00')
+    await moneyOut.getByRole('button', { name: 'Housing', exact: true }).click()
+    const utilities = moneyOut.getByRole('button', { name: /^The flat – Utilities:/ })
+    await expect(utilities).toHaveAccessibleName('The flat – Utilities: €210.00, an estimate')
+    await expect(utilities.locator('[data-estimate]')).toHaveText('€210.00')
+    // a certain amount is plain
+    await expect(moneyOut.getByRole('button', { name: /^The flat – Rent:/ })).toHaveAccessibleName('The flat – Rent: €1,650.00')
+    const rest = moneyOut.locator('[data-line]').filter({ hasText: 'the rest' })
+    const restBefore = euros(await rest.innerText())
+
+    // overwrite it for this month and say it is certain
+    await utilities.click()
+    await expect(dlg.getByRole('heading', { name: /The flat – Utilities/ })).toBeVisible()
+    await dlg.getByLabel('Amount in EUR').fill('199')
+    await dlg.getByRole('radio', { name: 'Only this month' }).click()
+    await dlg.getByRole('radio', { name: 'Certain' }).click()
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(utilities).toHaveAccessibleName('The flat – Utilities: €199.00')
+    await expect(utilities.locator('[data-estimate]')).toHaveCount(0)
+    await expect(housing.locator('[data-estimate]')).toHaveCount(0)
+    await expect(housing).toContainText('€1,849.00')
+    // the 11 saved goes to the rest, and the two sides still agree
+    expect(euros(await rest.innerText())).toBe(restBefore + 11)
+    expect((await total(page, 'in').innerText()).replace(/^Total in\s*/, '')).toBe((await total(page, 'out').innerText()).replace(/^Total out\s*/, ''))
+
+    // one click on a tick marks a row done; the Month screen sees the same
+    await moneyOut.getByRole('button', { name: 'Family & pets', exact: true }).click()
+    const childcare = page.getByRole('checkbox', { name: 'Robin – Childcare done' })
+    await expect(childcare).not.toBeChecked()
+    await childcare.click()
+    await expect(childcare).toBeChecked()
+
+    // an automatic row can be ticked as moved but not typed over
+    await moneyOut.getByRole('button', { name: 'Pocket money', exact: true }).click()
+    await expect(moneyOut.getByRole('button', { name: /^Sam – Pocket:/ })).toHaveCount(0)
+    await expect(page.getByRole('checkbox', { name: 'Sam – Pocket done' })).toBeVisible()
+
+    // an itemized row opens to its items, each with a tick of its own
+    await moneyOut.getByRole('button', { name: 'Living', exact: true }).click()
+    await moneyOut.getByRole('button', { name: /^Health:/ }).click()
+    await dlg.getByRole('tab', { name: 'Itemized' }).click()
+    await dlg.getByRole('button', { name: 'Add item' }).click()
+    await dlg.getByLabel('Item label').last().fill('Physio')
+    await dlg.getByLabel('Item amount').last().fill('45')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(moneyOut.getByRole('button', { name: /^Health:/ })).toHaveAccessibleName(/^Health: €75\.00/)
+    await moneyOut.getByRole('button', { name: 'Items of Health' }).click()
+    const physio = page.getByRole('checkbox', { name: 'Health: Physio done' })
+    await physio.click()
+    await expect(physio).toBeChecked()
+    await expect(page.getByRole('checkbox', { name: 'Health done' })).toHaveAttribute('aria-checked', 'mixed')
+    await page.screenshot({ path: 'e2e/output/statement-working.png', fullPage: true })
+
+    await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Month' }).click()
+    await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
+    await expect(page.getByRole('checkbox', { name: 'Robin – Childcare done' })).toBeChecked()
+    await expect(page.getByRole('checkbox', { name: 'Health done' })).toHaveAttribute('aria-checked', 'mixed')
+  })
+
+  test('a line a goal watches carries its mark and opens to the bar and the sentence', async ({ page }) => {
+    await openStatement(page)
+    await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Moves' }).click()
+    const dlg = page.getByRole('dialog')
+    await page.getByRole('button', { name: 'Add goal' }).click()
+    await dlg.getByLabel('Name').fill('Travel fund')
+    await dlg.getByLabel('Kind').selectOption('pool-balance')
+    await dlg.getByLabel('Tracks').selectOption({ label: 'Travel' })
+    await dlg.getByLabel(/^Target \(EUR\)/).fill('10000')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+
+    await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
+    await goToMonth(page, 'September 2026')
+    const assets = page.getByRole('region', { name: 'Assets' })
+    // 800 of 10,000
+    await expect(assets.locator('[data-line^="pool:"]').filter({ hasText: 'Travel' })).toContainText('Goal Travel fund:8%')
+    await expect(page.getByRole('progressbar', { name: 'Travel fund' })).toHaveCount(0)
+    await assets.getByRole('button', { name: 'Travel', exact: true }).click()
+    await expect(page.getByRole('progressbar', { name: 'Travel fund' })).toHaveAttribute('aria-valuenow', '8')
+    await expect(assets.getByText(/€800\.00 of €10,000\.00/)).toBeVisible()
+    await page.screenshot({ path: 'e2e/output/statement-goal.png', fullPage: true })
+  })
+})
+
 test.describe('the Statement on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
 
@@ -92,5 +194,19 @@ test.describe('the Statement on a phone', () => {
     await expect(total(page, 'in')).toContainText('€7,255.00')
     await expect(total(page, 'out')).toContainText('€7,255.00')
     await page.screenshot({ path: 'e2e/output/statement-phone.png', fullPage: true })
+
+    // an open month: a row keeps its 44 px tick and opens the editor on a tap
+    await goToMonth(page, 'November 2026')
+    await page.getByRole('region', { name: 'Money out' }).getByRole('button', { name: 'Housing', exact: true }).tap()
+    const tick = page.getByRole('checkbox', { name: 'The flat – Utilities done' })
+    const box = await tick.boundingBox()
+    expect(box && box.width >= 44 && box.height >= 44).toBeTruthy()
+    await tick.tap()
+    await expect(tick).toBeChecked()
+    await page.getByRole('button', { name: /^The flat – Utilities:/ }).tap()
+    await expect(page.getByRole('dialog').getByLabel('Amount in EUR')).toHaveValue('210')
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog')).toBeHidden()
+    await page.screenshot({ path: 'e2e/output/statement-phone-working.png', fullPage: true })
   })
 })

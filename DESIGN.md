@@ -142,6 +142,11 @@ Truncation idiom: a `min-w-0` parent, `truncate` on the name, `shrink-0` on sibl
   otherwise stay ink, so the grid never becomes a heat map. A balance below zero (an overdrawn pool account, savings in the
   red, negative net worth) is in the expense hue whatever the negatives setting: it is a warning, not spending.
 - **Certainty**: an estimate is italic with a dashed `decoration-partial` underline; certain and done are plain.
+  **On the Statement, as a trial, an estimate sits on a light yellow shade instead** (`--estimate`, yellow-200,
+  `bg-estimate`; `ESTIMATE_SHADE` in `src/features/statement/StatementLine.tsx`): the amount in a rounded pill of the
+  shade, upright and without the underline, and a category's subtotal shaded while a line under it still is. The
+  shade means an estimate and nothing else; done stays the dot. The Grid and the Month view keep the italic until the
+  trial is judged, then one of the two marks goes everywhere.
 - **Done**: one mark only, the `DoneDot` (8 px): a green disc for done in any month; in the current open month also a
   red ring for nothing done and an amber half disc for partly done.
 - **Chips** (`src/components/ui/chip.tsx`, `rounded px-1.5 leading-4 text-[10px] font-medium`): zinc a neutral fact or
@@ -233,7 +238,12 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   one `Set aside` line. A line a goal watches carries the goal mark: a 12 px `Target` icon in the goal hue and the
   percentage in muted `text-[11px]`, the income hue once reached, a rose `late` chip when late; opening the line
   shows the goal's name, its bar and the Goals card's sentence (`goalStatusLine`). The toolbar holds the
-  `MonthPicker` and `Open all` / `Close all`.
+  `MonthPicker` and `Open all` / `Close all`. The month is worked in its upper half: a row and each of its items
+  carry the `Tick` before the name (44 px on phones, 24 px with a 12 px dot from 768 px), and the rest of the line is
+  a button named `<line>: <amount>` (`, an estimate` when shaded) that opens the cell editor for that row and month.
+  An itemized row's chevron is a button of its own, `Items of <row>`. An automatic row has the tick (it marks the
+  money as moved) but no button; a closed month has neither. The island's head carries the legend, a shaded `an
+  estimate` with an (i). The lower half is read-only.
 
 ## 8. Controls
 
@@ -269,7 +279,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 - Checkboxes are the native `Check` (16 px) in lists that tick things off (Moves). The Month view's `Tick`
   (`src/components/Tick.tsx`) is a `role="checkbox"` button of 44 × 44 px whose face is the `DoneDot` at 20 px
   (`aria-checked` true, `mixed` or false), named `<line> done`; one tap marks done, a second tap goes back to the row's
-  default. Automatic rows (the savings plug, pocket shares, followers) tick through `Cell.markedDone`; Moves shows the
+  default. The Statement uses the same `Tick`, smaller on desktop through `className` and `dotClassName`. Automatic rows (the savings plug, pocket shares, followers) tick through `Cell.markedDone`; Moves shows the
   same tick before their `automatic` chip.
 - The Paid sheet (`src/features/month/PaidSheet.tsx`) is the shadcn `Dialog` docked to the bottom edge under 640 px
   (`SHEET_CLASS`: `max-sm:bottom-0 … rounded-t-2xl` with safe-area padding): amount, date (today in the current month),
