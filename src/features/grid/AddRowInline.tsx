@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useStore } from '@/app/store'
 import type { Category, Household, Section, Tables } from '@/model'
-import { addRow, addTransferRow, type TransferRowKind } from '@/store'
+import { addRow, addTransferRow, transferRowTargets, type TransferRowKind } from '@/store'
 import { NativeSelect } from './NativeSelect'
 
 /** Each choice under Transfers, with the sentence shown beneath the selects. */
@@ -25,16 +25,11 @@ export function AddRowInline({ section, categories, tables, household, onError }
   const [kind, setKind] = useState<TransferRowKind>('plain')
   const [targetId, setTargetId] = useState('')
 
-  const live = <T extends { deletedAt?: number | null }>(xs: T[]) => xs.filter((x) => !x.deletedAt)
-  const accountsOf = (type: 'savings' | 'investment') => live(tables.accounts).filter((a) => a.type === type)
-  // a pool account whose row was deleted can be filled again
-  const orphanPools = live(tables.pools).filter((p) => !p.allocationRowId || !tables.rows.some((r) => r.id === p.allocationRowId && !r.deletedAt))
-  const adults = live(tables.entities).filter((e) => e.kind === 'adult' && !e.archivedMonth)
-  // with the savings plug the app fills one "to savings" row itself; a second would stay at zero
-  const plugTaken = household.closingRule === 'savings-plug' && tables.rows.some((r) => !r.deletedAt && r.kind === 'to-savings')
+  // the lists and rules the store applies in addTransferRow, so what is offered is what is accepted
+  const { savings, investments, orphanPools, adults, plugTaken } = transferRowTargets(tables, household)
   const kinds = (Object.keys(KINDS) as TransferRowKind[]).filter((k) => (k !== 'to-savings' || !plugTaken) && (k !== 'pool-allocation' || orphanPools.length > 0))
   const targets: Array<{ id: string; name: string }> | null =
-    kind === 'to-savings' ? accountsOf('savings') : kind === 'to-investment' ? accountsOf('investment') : kind === 'pool-allocation' ? orphanPools : kind === 'pocket-money' ? adults : null
+    kind === 'to-savings' ? savings : kind === 'to-investment' ? investments : kind === 'pool-allocation' ? orphanPools : kind === 'pocket-money' ? adults : null
   const targetLabel = kind === 'pool-allocation' ? 'Pool account' : kind === 'pocket-money' ? 'Adult' : 'Account'
   const missing = targets && targets.length === 0
     ? kind === 'to-savings' ? 'Add a savings account under Household first.' : kind === 'to-investment' ? 'Add an investment account under Household first.' : 'Add an adult under Household first.'

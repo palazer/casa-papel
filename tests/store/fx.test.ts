@@ -97,3 +97,18 @@ describe('currency rates: the ECB again when the service fails', () => {
     expect((await loadTables(store)).fxRates.some((r) => r.month === '2099-01')).toBe(false)
   })
 })
+
+describe('currency rates: the ECB again keeps what it cannot replace', () => {
+  it('a currency the ECB does not publish, or a month it has no rate for, keeps the typed rate and says so', async () => {
+    const store = await fresh()
+    await setManualRate(store, 'EUR/XXX', '2026-01', 3)
+    const notPublished = (async () => new Response('not found', { status: 404 })) as unknown as typeof fetch
+    await expect(restoreEcbRate(store, 'EUR/XXX', '2026-01', notPublished)).rejects.toThrow(/does not publish XXX/)
+    expect((await loadTables(store)).fxRates.find((r) => r.pair === 'EUR/XXX')).toMatchObject({ rate: 3, source: 'manual' })
+
+    await setManualRate(store, 'EUR/USD', '2026-01', 1.5)
+    const empty = (async () => new Response(JSON.stringify({ rates: {} }), { status: 200 })) as unknown as typeof fetch
+    await expect(restoreEcbRate(store, 'EUR/USD', '2026-01', empty)).rejects.toThrow(/no USD rate for that month/)
+    expect((await loadTables(store)).fxRates.find((r) => r.pair === 'EUR/USD')).toMatchObject({ rate: 1.5, source: 'manual' })
+  })
+})

@@ -138,8 +138,15 @@ export async function restoreEcbRate(store: Store, pair: string, month: MonthKey
   if (base !== household.baseCurrency) throw new Error(`Rates are fetched against ${household.baseCurrency}; ${pair} is not one of its pairs.`)
   // fetch first: a failed fetch throws here and the stored rate stays; a fetched rate replaces it in one write
   const res = await fetchEcbRates(store, { base, symbols: [symbol], from: month, to: month, policy: household.fxMonthRate, replaceManual: true }, fetchFn)
-  // a month the ECB has nothing for (the future) goes back to a projection
-  if (res.written === 0 && tables.fxRates.some((r) => r.pair === pair && r.month === month)) await setManualRate(store, pair, month, null)
+  if (res.unsupported.length) throw new Error(`The ECB does not publish ${symbol}. Keep entering its rate by hand.`)
+  if (res.written === 0) {
+    // only a month the ECB cannot have yet (the future) goes back to a projection; otherwise what was typed stays
+    if (`${month}-01` > new Date().toISOString().slice(0, 10)) {
+      if (tables.fxRates.some((r) => r.pair === pair && r.month === month)) await setManualRate(store, pair, month, null)
+    } else {
+      throw new Error(`The ECB has no ${symbol} rate for that month yet; the one you typed stays.`)
+    }
+  }
   return res
 }
 

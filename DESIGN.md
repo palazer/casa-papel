@@ -65,7 +65,7 @@ Phone list       mx-auto max-w-xl space-y-4 of dense islands, rows text-sm and m
   muted sentence each; quiet `xs ghost` links beneath (the demo sandbox, Import a file). Signed out it offers Start on this
   device, Sign in, I have an invite; without sync only the first; in the sandbox it leads with Load the demo household; signed
   in with no household it skips straight to the wizard with a "Signed in as …" line and no chooser; a locked or undecided
-  cloud copy offers Open Data instead of the wizard. The wizard's title row carries "Back to start" while the chooser exists.
+  cloud copy offers Open Data instead of the wizard. The wizard's title row carries "Back to start" while the chooser exists. Its Accounts step is one row per account: name, type, an "Account currency" select that starts at "EUR (household currency)" and lists the other codes, the opening balance in that currency ("Opening USD" as the placeholder), and a help line per type that adds "Kept in USD; the grid shows its EUR value beneath" for a foreign one. The Rows step shows only people and things with a name (or "Me"), so every preview is a row that will exist.
 - Nothing floats over the content except popovers, menus and dialogs (`z-50`); the rail and tabs are `z-40`.
 
 ## 3. Island (the panel)
@@ -203,7 +203,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   then Treat new values as…, Comes out of…, Deducted from an income… (spending rows, followers included; it names the
   income once set), the account verb, Follow another row…, then Archive or delete… or Restore. Belongs to offers the
   household, an Adults group and an Other people & things group (`name · kind`), plus a "Counts for the split" check on
-  income rows (disabled while shared); Deducted from lists the live income rows after "Nothing: a normal expense";
+  income rows (disabled while shared); Deducted from lists the live income rows after "Nothing: a normal expense" (an archived income the row still points at stays listed as "<name> (archived)");
   Follow another row shows "Share (%)" once a row is chosen (100 mirrors it). Each dialog's help sentence is the
   `HELP` text of its field, so the (i) and the explanation never drift apart.
 - `TabBar` switches an island's view (`src/components/ui/tab-bar.tsx`); `ViewToggle` filters a list

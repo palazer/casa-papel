@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Check } from '@/components/Check'
 import { MonthField } from '@/components/MonthField'
 import { NativeSelect } from '@/features/grid/NativeSelect'
-import { decimalSeparator, formatMonth, localeExample, localeLabel, parseAmount } from '@/app/format'
+import { formatMonth, localeExample, localeLabel } from '@/app/format'
 import { useStore } from '@/app/store'
 import { cn } from '@/lib/utils'
 import { HUES } from '@/app/hues'
@@ -17,8 +17,9 @@ import {
   ACCOUNT_TYPE_INFO, ENTITY_KIND_HELP, ENTITY_KIND_LABEL, ENTITY_TEMPLATES, HOUSEHOLD_TEMPLATES, SECTION_INFO, monthOfDate, templateTitle,
   type AccountType, type EntityKind, type Household, type RowTemplate, type Section,
 } from '@/model'
-import { addRow, createHouseholdFromSetup, type SetupInput } from '@/store'
+import { addRow, createHouseholdFromSetup } from '@/store'
 import { CURRENCIES } from '@/app/currencies'
+import { keptEntities, recommended, toSetupInput, validate, type Draft } from './draft'
 
 const LOCALES = ['en-IE', 'en-GB', 'en-US', 'de-DE', 'de-AT', 'tr-TR', 'fr-FR', 'es-ES', 'nl-NL', 'it-IT', 'pt-PT', 'sv-SE']
 const DEPENDENT_KINDS: Array<Exclude<EntityKind, 'adult'>> = ['child', 'pet', 'vehicle', 'property', 'company', 'other']
@@ -26,39 +27,6 @@ const WIZARD_ACCOUNT_TYPES = ACCOUNT_TYPE_INFO.filter((t) => t.value !== 'other-
 const STEPS = ['Basics', 'People', 'Things', 'Accounts', 'Rows', 'Finish']
 const SECTIONS: Section[] = ['income', 'expense', 'transfer']
 const SECTION_DOT: Record<Section, string> = { income: HUES.income.fill, expense: HUES.expense.fill, transfer: HUES.transfer.fill }
-interface Draft {
-  name: string
-  currency: string
-  locale: string
-  startMonth: string
-  closingRule: Household['closingRule']
-  moneyMode: Household['moneyMode']
-  pocketTotal: string
-  adults: Array<{ name: string }>
-  dependents: Array<{ kind: Exclude<EntityKind, 'adult'>; name: string; paidByIndex: number | null }>
-  /** `currency` null = the household currency, so it follows a later change of the household's. */
-  accounts: Array<{ name: string; type: AccountType; openingBalance: string; currency: string | null }>
-  householdTemplates: Set<string>
-  entityTemplates: Record<number, Set<string>>
-  /** subject 0 = household, i + 1 = entity i */
-  customRows: Array<{ subject: number; name: string; section: Section }>
-}
-
-interface Errors { pocketTotal?: string; accounts: Record<number, string> }
-
-const recommended = (kind: EntityKind | 'household') =>
-  new Set((kind === 'household' ? HOUSEHOLD_TEMPLATES : ENTITY_TEMPLATES[kind]).filter((t) => t.recommended).map((t) => t.key))
-
-function validate(d: Draft): Errors {
-  const errors: Errors = { accounts: {} }
-  const hint = `Digits only, "${decimalSeparator(d.locale)}" for decimals, like ${new Intl.NumberFormat(d.locale).format(1234.5)}.`
-  if (d.pocketTotal.trim() && parseAmount(d.pocketTotal, d.currency, d.locale) == null) errors.pocketTotal = `Not a number. ${hint}`
-  d.accounts.forEach((a, i) => {
-    if (a.openingBalance.trim() && parseAmount(a.openingBalance, a.currency ?? d.currency, d.locale) == null) errors.accounts[i] = `Not a number. ${hint}`
-  })
-  return errors
-}
-
 /** `onBack` adds a "Back to start" link to the title row (the welcome screen's chooser); `notice` is a line above the steps,
  *  the signed-in note that the household uploads on finish. */
 export function SetupWizard({ onCreated, onBack, notice }: { onCreated: () => void; onBack?: () => void; notice?: ReactNode }) {
@@ -77,13 +45,14 @@ export function SetupWizard({ onCreated, onBack, notice }: { onCreated: () => vo
   }))
   const patch = (p: Partial<Draft>) => setD((prev) => ({ ...prev, ...p }))
 
-  const entities = useMemo(() => [...d.adults.map((a) => ({ kind: 'adult' as EntityKind, name: a.name })), ...d.dependents.map((x) => ({ kind: x.kind as EntityKind, name: x.name }))], [d.adults, d.dependents])
+  // only people and things that will be created get a Rows step, so every preview is a row that will exist
+  const kept = useMemo(() => keptEntities(d), [d])
   const subjects = useMemo(
     () => [
       { name: 'the household', kind: null as EntityKind | null, index: -1 },
-      ...entities.map((e, i) => ({ name: e.name.trim() || `${ENTITY_KIND_LABEL[e.kind]} ${i + 1}`, kind: e.kind as EntityKind | null, index: i })),
+      ...kept.map((e) => ({ name: e.name, kind: e.kind as EntityKind | null, index: e.at })),
     ],
-    [entities],
+    [kept],
   )
   const errors = useMemo(() => validate(d), [d])
   const stepErrors = [errors.pocketTotal ? 1 : 0, 0, 0, Object.keys(errors.accounts).length, 0, 0]
@@ -130,26 +99,10 @@ export function SetupWizard({ onCreated, onBack, notice }: { onCreated: () => vo
     setBusy(true)
     setError(null)
     try {
-      const pocket = d.pocketTotal.trim() ? parseAmount(d.pocketTotal, d.currency, d.locale) ?? 0 : 0
-      const keptAdults = d.adults.filter((a) => a.name.trim())
-      const input: SetupInput = {
-        household: { name: d.name.trim() || 'Our household', baseCurrency: d.currency, locale: d.locale, startMonth: d.startMonth, closingRule: d.closingRule, moneyMode: d.moneyMode, pocketTotal: pocket },
-        adults: keptAdults.length ? keptAdults : [{ name: 'Me' }],
-        dependents: d.dependents.filter((x) => x.name.trim()),
-        accounts: d.accounts.filter((a) => a.name.trim()).map((a) => ({
-          name: a.name.trim(), type: a.type, currency: a.currency ?? d.currency,
-          openingBalance: a.openingBalance.trim() ? parseAmount(a.openingBalance, a.currency ?? d.currency, d.locale) ?? 0 : 0,
-        })),
-        householdTemplates: [...d.householdTemplates],
-        entityTemplates: Object.fromEntries(entities.map((e, i) => [i, [...(d.entityTemplates[i] ?? recommended(e.kind))]])),
-      }
-      // indexes shift when blank adults are dropped; rebuild dependents' paidBy on the filtered list
-      const keptIdx = d.adults.map((a, i) => (a.name.trim() ? i : -1)).filter((i) => i >= 0)
-      input.dependents = d.dependents.filter((x) => x.name.trim()).map((x) => ({ ...x, paidByIndex: x.paidByIndex == null ? null : Math.max(0, keptIdx.indexOf(x.paidByIndex)) }))
-      await createHouseholdFromSetup(store, input)
+      await createHouseholdFromSetup(store, toSetupInput(d))
       for (const c of d.customRows) {
         const s = subjects[c.subject]
-        const prefix = s && s.kind && entities[s.index]?.name.trim() ? `${entities[s.index].name.trim()} – ` : ''
+        const prefix = s && s.kind ? `${s.name} – ` : ''
         await addRow(store, { name: `${prefix}${c.name}`, section: c.section, defaultStatus: c.section === 'expense' ? 'projected' : 'committed' })
       }
       onCreated()
@@ -357,7 +310,7 @@ export function SetupWizard({ onCreated, onBack, notice }: { onCreated: () => vo
                       <Check
                         key={t.key}
                         className="items-start py-0.5"
-                        label={<span className="block leading-tight"><span>{templateTitle(t, s.kind ? entities[s.index]?.name || s.name : undefined)}</span><span className="block text-xs text-muted-foreground">{t.description}{missing}</span></span>}
+                        label={<span className="block leading-tight"><span>{templateTitle(t, s.kind ? s.name : undefined)}</span><span className="block text-xs text-muted-foreground">{t.description}{missing}</span></span>}
                         checked={chosenFor(s).has(t.key)}
                         onChange={(e) => toggle(s, t.key, e.target.checked)}
                       />

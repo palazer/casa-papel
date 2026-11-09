@@ -115,7 +115,6 @@ function groupRows(tables: Tables, r: Pick<Row, 'section' | 'categoryId'>): Row[
   return sortRows(tables.rows.filter((x) => !x.deletedAt && x.section === r.section && groupKey(tables, x) === key), tables.categories)
 }
 
-/** Add a row at the end of its category group, or right after `afterRowId`, whose category it inherits unless given one. */
 /** The put for a new row at the end of its group, or right after `afterRowId`; the caller commits. */
 function newRowMutation(tables: Tables, input: Partial<Row> & { name: string; section: Row['section'] }, afterRowId?: string): { row: Row; mutation: Mutation } {
   const after = afterRowId ? tables.rows.find((r) => r.id === afterRowId && !r.deletedAt) : undefined
@@ -136,6 +135,7 @@ function newRowMutation(tables: Tables, input: Partial<Row> & { name: string; se
   return { row, mutation: { op: 'put', table: 'rows', record: row } }
 }
 
+/** Add a row at the end of its category group, or right after `afterRowId`, whose category it inherits unless given one. */
 export async function addRow(store: Store, input: Partial<Row> & { name: string; section: Row['section'] }, afterRowId?: string): Promise<Row> {
   const { row, mutation } = newRowMutation(await loadTables(store), input, afterRowId)
   await store.commit([mutation])
@@ -146,6 +146,24 @@ export async function addRow(store: Store, input: Partial<Row> & { name: string;
 export type TransferRowKind = 'plain' | 'to-savings' | 'to-investment' | 'pool-allocation' | 'pocket-money'
 
 /**
+ * What a new transfer row can point at: live, unarchived accounts and pool accounts, live adults, and whether the savings
+ * plug already has its row. The grid's "Add row" and `addTransferRow` both read this, so what is offered is what is accepted.
+ */
+export function transferRowTargets(tables: Tables, household: Household | undefined) {
+  const live = <T extends { deletedAt: number | null; archivedMonth: MonthKey | null }>(xs: T[]) => xs.filter((x) => !x.deletedAt && !x.archivedMonth)
+  const accounts = live(tables.accounts)
+  const rows = tables.rows.filter((r) => !r.deletedAt)
+  return {
+    savings: accounts.filter((a) => a.type === 'savings'),
+    investments: accounts.filter((a) => a.type === 'investment'),
+    /** pool accounts whose row was deleted, so they can be filled again */
+    orphanPools: live(tables.pools).filter((p) => !p.allocationRowId || !rows.some((r) => r.id === p.allocationRowId)),
+    adults: live(tables.entities).filter((e) => e.kind === 'adult'),
+    plugTaken: household?.closingRule === 'savings-plug' && rows.some((r) => r.kind === 'to-savings'),
+  }
+}
+
+/**
  * "Add row" under Transfers. A deposit row needs its account, a pool row the pool account it fills (one that lost its
  * row), pocket money the adult it is for; everything is checked here so the grid can say what is missing.
  */
@@ -154,17 +172,15 @@ export async function addTransferRow(
   input: { name: string; categoryId: string | null; kind: TransferRowKind; accountId?: string | null; poolId?: string | null; adultId?: string | null },
 ): Promise<Row> {
   const tables = await loadTables(store)
+  const targets = transferRowTargets(tables, tables.household.find((h) => !h.deletedAt))
   const base: Partial<Row> & { name: string; section: Row['section'] } = { name: input.name, section: 'transfer', categoryId: input.categoryId, kind: input.kind }
   if (input.kind !== 'plain') base.defaultStatus = 'committed'
   if (input.kind === 'to-savings' || input.kind === 'to-investment') {
-    const household = tables.household.find((h) => !h.deletedAt)
-    if (input.kind === 'to-savings' && household?.closingRule === 'savings-plug' && tables.rows.some((r) => !r.deletedAt && r.kind === 'to-savings')) {
-      throw new Error('The month-end rule already fills a "to savings" row; a second one would stay at zero.')
-    }
+    if (input.kind === 'to-savings' && targets.plugTaken) throw new Error('The month-end rule already fills a "to savings" row; a second one would stay at zero.')
     const acc = checkAccountForRow(tables, { kind: input.kind, name: input.name }, input.accountId ?? null)
     if (acc) base.accountId = acc.id
   } else if (input.kind === 'pocket-money') {
-    const adult = tables.entities.find((e) => e.id === input.adultId && e.kind === 'adult' && !e.deletedAt)
+    const adult = targets.adults.find((e) => e.id === input.adultId)
     if (!adult) throw new Error('Pick the adult the pocket money is for.')
     Object.assign(base, { scope: adult.id, entityTags: [adult.id], pocketMode: 'fixed' })
   }
@@ -172,7 +188,8 @@ export async function addTransferRow(
   if (input.kind === 'pool-allocation') {
     const found = tables.pools.find((p) => p.id === input.poolId && !p.deletedAt)
     if (!found) throw new Error('Pick the pool account this row fills.')
-    if (found.allocationRowId && tables.rows.some((r) => r.id === found.allocationRowId && !r.deletedAt)) throw new Error(`"${found.name}" is already filled by another row.`)
+    if (found.archivedMonth) throw new Error(`"${found.name}" is archived.`)
+    if (!targets.orphanPools.some((p) => p.id === found.id)) throw new Error(`"${found.name}" is already filled by another row.`)
     base.accountId = found.accountId
     pool = found
   }
@@ -582,6 +599,7 @@ function checkAccountForRow(tables: Tables, row: Pick<Row, 'kind' | 'name'>, acc
   }
   const acc = tables.accounts.find((a) => a.id === accountId && !a.deletedAt)
   if (!acc) throw new Error('That account no longer exists.')
+  if (acc.archivedMonth) throw new Error(`"${acc.name}" is archived.`)
   if (need && acc.type !== need) throw new Error(`"${row.name}" needs an account of type ${label(need)}, and "${acc.name}" is of type ${label(acc.type)}.`)
   return acc
 }

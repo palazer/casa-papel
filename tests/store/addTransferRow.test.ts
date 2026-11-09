@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { cellKey, computeEngine, computePersonBudgets } from '@/engine'
 import { monthRange, newId } from '@/model'
-import { CasaDb, Store, addAccount, addEntity, addPool, addTransferRow, loadTables, planRemoval, quickCreateHousehold, setCellValue } from '@/store'
+import { CasaDb, Store, addAccount, addEntity, addPool, addTransferRow, loadTables, planArchive, planRemoval, quickCreateHousehold, setCellValue, transferRowTargets } from '@/store'
 
 const months = monthRange('2026-01', '2026-03')
 
@@ -55,5 +55,19 @@ describe('addTransferRow', () => {
     expect(computePersonBudgets(t, out, '2026-01').find((p) => p.entityId === pat.id)?.pocket).toBe(5000)
     const plain = await addTransferRow(store, { name: 'To the joint account', categoryId: null, kind: 'plain' })
     expect(plain).toMatchObject({ kind: 'plain', accountId: null, defaultStatus: 'projected' })
+  })
+})
+
+describe('transferRowTargets', () => {
+  it('leaves archived accounts out, and the store refuses them too', async () => {
+    const { store } = await fresh()
+    const fund = await addAccount(store, { name: 'Old fund', type: 'investment', currency: 'EUR', openingMonth: '2026-01' })
+    let t = await loadTables(store)
+    expect(transferRowTargets(t, t.household[0]).investments.map((a) => a.id)).toEqual([fund.id])
+    await store.commit(planArchive(t, { kind: 'account', id: fund.id }, '2026-02', Date.now()))
+    t = await loadTables(store)
+    expect(transferRowTargets(t, t.household[0]).investments).toEqual([])
+    expect(transferRowTargets(t, t.household[0]).plugTaken).toBe(true)
+    await expect(addTransferRow(store, { name: 'Late deposits', categoryId: null, kind: 'to-investment', accountId: fund.id })).rejects.toThrow(/is archived/)
   })
 })

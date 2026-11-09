@@ -91,7 +91,9 @@ export function computeEngine(input: EngineInput): EngineOutput {
   const requestedSet = new Set(requested)
   const base = household.baseCurrency
   const warnings: string[] = []
-  const warnedRows = new Set<string>()
+  // one line per thing without a rate (a row, an account's balance, an account's deposits), naming the first month
+  const warned = new Set<string>()
+  const warnOnce = (key: string, message: string) => { if (!warned.has(key)) { warned.add(key); warnings.push(message) } }
 
   const states = new Map(tables.monthStates.map((s) => [s.month, s]))
   const isClosed = (m: MonthKey) => states.get(m)?.closed ?? false
@@ -198,11 +200,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
       const status: CellStatus = baseStatus === 'derived' ? (closed || cell?.markedDone ? 'done' : 'derived') : closed || archived ? 'done' : baseStatus
 
       const conv = convertMoney(fx, value, currency, base, m)
-      // once per row, naming the first month without a rate
-      if (conv.missingRate && !warnedRows.has(row.id)) {
-        warnedRows.add(row.id)
-        warnings.push(`No ${currency}→${base} rate for ${m} (${row.name})`)
-      }
+      if (conv.missingRate) warnOnce(row.id, `No ${currency}→${base} rate for ${m} (${row.name})`)
       // scale funding split into base currency proportionally
       const fundingBase = zeroFunding()
       if (value !== 0) {
@@ -346,14 +344,10 @@ export function computeEngine(input: EngineInput): EngineOutput {
     poolSeries[pool.id] = series
   }
 
-  /** A balance in the base currency; a missing rate leaves it 1:1 and warns once per account, naming the first month. */
-  const warnedAccounts = new Set<string>()
+  /** A balance in the base currency; a missing rate leaves it 1:1 and warns once per account. */
   const inBase = (acc: Account, balance: Money, m: MonthKey): { balanceBase: Money; missingRate: boolean } => {
     const conv = convertMoney(fx, balance, acc.currency, base, m)
-    if (conv.missingRate && !warnedAccounts.has(acc.id)) {
-      warnedAccounts.add(acc.id)
-      warnings.push(`No ${acc.currency}→${base} rate for ${m} (${acc.name})`)
-    }
+    if (conv.missingRate) warnOnce(acc.id, `No ${acc.currency}→${base} rate for ${m} (${acc.name})`)
     return { balanceBase: conv.value, missingRate: conv.missingRate }
   }
 
@@ -394,7 +388,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
     const toAccountCurrency = (c: CellResult, m: MonthKey): Money => {
       if (inv.depositFxMode === 'fixed' && inv.fixedRate) return toMinor(fromMinor(c.valueBase, base) * inv.fixedRate, acc.currency)
       const conv = convertMoney(fx, c.value, c.currency, acc.currency, m)
-      if (conv.missingRate) warnings.push(`No ${c.currency}→${acc.currency} rate for ${m} (${acc.name})`)
+      if (conv.missingRate) warnOnce(`${acc.id}|${c.currency}`, `No ${c.currency}→${acc.currency} rate for ${m} (${acc.name})`)
       return conv.value
     }
     for (const m of months) {
@@ -436,7 +430,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
   /** A row's base-currency amount in the account's currency. */
   const inAccountCurrency = (acc: Account, c: CellResult, m: MonthKey): Money => {
     const conv = convertMoney(fx, c.value, c.currency, acc.currency, m)
-    if (conv.missingRate) warnings.push(`No ${c.currency}→${acc.currency} rate for ${m} (${acc.name})`)
+    if (conv.missingRate) warnOnce(`${acc.id}|${c.currency}`, `No ${c.currency}→${acc.currency} rate for ${m} (${acc.name})`)
     return conv.value
   }
   for (const acc of accounts) {
