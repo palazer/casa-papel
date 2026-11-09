@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test'
 async function loadDemo(page: Page) {
   await page.goto('?demo=1')
   await page.getByRole('button', { name: 'Load the demo household' }).click()
-  await expect(page.getByRole('button', { name: /^Rent Nov 2026/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
 }
 
 test.describe('wave 1d', () => {
@@ -24,7 +24,7 @@ test.describe('wave 1d', () => {
     await pocket.fill('1500')
     await pocket.press('Tab')
     await page.getByRole('link', { name: 'Grid' }).click()
-    const samPocket = page.getByRole('row', { name: /^Pocket – Sam/ })
+    const samPocket = page.getByRole('row', { name: /^Sam – Pocket/ })
     await expect(samPocket).toContainText('€500.00')
     await expect(samPocket).toContainText('€750.00')
 

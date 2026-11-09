@@ -6,7 +6,7 @@ test.describe('archiving people and things', () => {
   test('the dialog explains, archives from a month, and archived entries can be restored', async ({ page }) => {
     await page.goto('?demo=1')
     await page.getByRole('button', { name: 'Load the demo household' }).click()
-    await expect(page.getByRole('button', { name: /^Rent Nov 2026/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
     await page.getByRole('link', { name: 'Household' }).click()
     const dlg = page.getByRole('dialog')
 
@@ -37,7 +37,7 @@ test.describe('archiving people and things', () => {
     const car = page.getByRole('listitem').filter({ hasText: 'The car' }).first()
     await car.getByRole('button', { name: 'Archive or delete…' }).click()
     await expect(dlg.getByRole('heading', { name: 'Vehicle "The car"' })).toBeVisible()
-    await expect(dlg.getByText('"Car insurance" loses its tag')).toBeVisible()
+    await expect(dlg.getByText('"The car – Insurance" loses its tag')).toBeVisible()
     await dlg.getByRole('button', { name: 'Delete', exact: true }).click()
     await expect(dlg).toBeHidden()
     await expect(page.getByRole('listitem').filter({ hasText: 'The car' })).toHaveCount(0)

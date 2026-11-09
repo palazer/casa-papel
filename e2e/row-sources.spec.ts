@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test'
 async function loadDemo(page: Page) {
   await page.goto('?demo=1')
   await page.getByRole('button', { name: 'Load the demo household' }).click()
-  await expect(page.getByRole('button', { name: /^Rent Nov 2026/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
 }
 
 const money = (text: string) => Number(text.replace(/[^\d.-]/g, ''))
@@ -62,19 +62,19 @@ test.describe('row sources, accounts and followers', () => {
     await menu.click()
     await page.getByRole('menuitem', { name: 'Follow another row…' }).click()
     const dlg = page.getByRole('dialog')
-    await dlg.getByLabel('Same amount as').selectOption({ label: 'Child benefit' })
+    await dlg.getByLabel('Same amount as').selectOption({ label: 'Robin – Child benefit' })
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
 
     // the row is now read-only and mirrors the benefit
     await expect(page.getByRole('button', { name: /^To investments Nov 2026/ })).toHaveCount(0)
     const row = page.getByRole('row', { name: /^To investments/ })
-    await expect(row).toContainText('= Child benefit')
+    await expect(row).toContainText('= Robin – Child benefit')
     await expect(row).toContainText('255')
     await page.screenshot({ path: 'e2e/output/row-follows.png' })
 
     await menu.click()
-    await page.getByRole('menuitem', { name: 'Follows Child benefit…' }).click()
+    await page.getByRole('menuitem', { name: 'Follows Robin – Child benefit…' }).click()
     await dlg.getByLabel('Same amount as').selectOption('')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()

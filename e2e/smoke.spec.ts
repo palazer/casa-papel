@@ -6,7 +6,7 @@ async function loadDemo(page: Page) {
   await expect(page.getByText('Welcome to Casa Papel')).toBeVisible()
   await page.getByRole('button', { name: 'Load the demo household' }).click()
   await expect(page.getByText(/^Demo household ·/)).toBeVisible()
-  await expect(page.getByRole('button', { name: /^Rent Nov 2026/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
 }
 
 test('demo → export → wipe → import → offline reload', async ({ page, context }) => {
@@ -36,12 +36,12 @@ test('demo → export → wipe → import → offline reload', async ({ page, co
   await page.getByRole('button', { name: 'Replace everything here' }).click()
   await expect(page.getByText(/Replaced everything with/)).toBeVisible()
   await page.getByRole('link', { name: 'Grid' }).click()
-  await expect(page.getByRole('button', { name: /^Rent Nov 2026/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
 
   await page.evaluate(() => navigator.serviceWorker.ready)
   await context.setOffline(true)
   await page.reload()
-  await expect(page.getByRole('button', { name: /^Rent Nov 2026/ })).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible({ timeout: 15_000 })
   await context.setOffline(false)
 })
 

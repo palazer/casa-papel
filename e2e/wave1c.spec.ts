@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test'
 async function loadDemo(page: Page) {
   await page.goto('?demo=1')
   await page.getByRole('button', { name: 'Load the demo household' }).click()
-  await expect(page.getByRole('button', { name: /^Rent Nov 2026/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
 }
 
 test.describe('wave 1c', () => {

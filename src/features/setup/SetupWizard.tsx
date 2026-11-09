@@ -415,7 +415,7 @@ function CustomRows({ d, subject, subjectName, onChange }: { d: Draft; subject: 
         </div>
       ))}
       <div className="flex flex-wrap gap-2">
-        <Input aria-label="Your own row name" className="w-48" value={name} placeholder="e.g. Garden" onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add() } }} />
+        <Input aria-label="Your own row name" className="w-48" value={name} placeholder="e.g. Subscriptions – Netflix" onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add() } }} />
         <NativeSelect aria-label="Your own row section" value={section} onChange={(e) => setSection(e.target.value as Section)}>
           {SECTIONS.map((sec) => <option key={sec} value={sec}>{SECTION_INFO[sec].label}</option>)}
         </NativeSelect>

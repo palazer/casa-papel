@@ -42,7 +42,7 @@ describe('v1 register mapper', () => {
     expect(t.entities.map((e) => `${e.kind}:${e.name}`)).toEqual(expect.arrayContaining(['adult:Ada', 'adult:Bo', 'pet:Dog', 'vehicle:Tesla', 'property:Elm Street', 'child:Kid']))
     expect(t.accounts.map((a) => a.type)).toEqual(expect.arrayContaining(['checking', 'joint', 'savings', 'investment']))
     const names = t.rows.map((r) => r.name)
-    expect(names).toEqual(expect.arrayContaining(['Rent', 'Transport', 'Insurance', 'Subscriptions (TRY)', 'Ada – Personal', 'Groceries', 'Tesla', 'To savings', 'To investments', 'Long-term savings – Kid', 'Kindergeld', 'Ada – Salary', 'Pocket – Ada', 'Travel', 'Travel pool']))
+    expect(names).toEqual(expect.arrayContaining(['Rent', 'Transport', 'Insurance', 'Subscriptions (TRY)', 'Ada – Personal', 'Groceries', 'Tesla', 'To savings', 'To investments', 'Kid – Long-term savings', 'Kindergeld', 'Ada – Salary', 'Ada – Pocket', 'Travel', 'Travel pool']))
     expect(t.recurringItems.find((i) => i.name === 'Insurer')).toMatchObject({ amount: 42000, cadence: { intervalMonths: 3, anchorMonth: 1 } })
     expect(t.recurringItems.find((i) => i.name === 'Streaming')).toMatchObject({ amount: 69900, currency: 'TRY', cadence: { intervalMonths: 12, anchorMonth: 9 } })
     expect(t.recurringItems.find((i) => i.name === 'Old thing')).toBeUndefined()

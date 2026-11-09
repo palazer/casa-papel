@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test'
 async function loadDemo(page: Page) {
   await page.goto('?demo=1')
   await page.getByRole('button', { name: 'Load the demo household' }).click()
-  await expect(page.getByRole('button', { name: /^Rent Nov 2026/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
 }
 
 test.describe('done dots', () => {
@@ -11,11 +11,11 @@ test.describe('done dots', () => {
 
   test('this month shows a dot per cell; itemized cells go from partly to all done', async ({ page }) => {
     await loadDemo(page)
-    const rent = page.getByRole('button', { name: /^Rent Nov 2026/ })
+    const rent = page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })
     await expect(rent.getByRole('img', { name: 'Not done yet' })).toBeVisible()
     // a closed month is done, so it carries the green dot; future months carry none
-    await expect(page.getByRole('button', { name: /^Rent Sept 2026/ }).getByRole('img', { name: 'Done' })).toBeVisible()
-    await expect(page.getByRole('button', { name: /^Rent Dec 2026/ }).getByRole('img')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /^The flat – Rent Sept 2026/ }).getByRole('img', { name: 'Done' })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^The flat – Rent Dec 2026/ }).getByRole('img')).toHaveCount(0)
 
     const groceries = page.getByRole('button', { name: /^Groceries Nov 2026/ })
     await groceries.click()
@@ -49,8 +49,8 @@ test.describe('done dots phone', () => {
     await page.goto('?demo=1')
     await page.getByRole('button', { name: 'Load the demo household' }).click()
     await expect(page.getByRole('heading', { name: 'November 2026' })).toBeVisible()
-    await expect(page.getByRole('button', { name: /^Rent:.*Not done yet$/ })).toBeVisible()
-    await expect(page.getByRole('checkbox', { name: 'Rent done' })).not.toBeChecked()
+    await expect(page.getByRole('button', { name: /^The flat – Rent:.*Not done yet$/ })).toBeVisible()
+    await expect(page.getByRole('checkbox', { name: 'The flat – Rent done' })).not.toBeChecked()
     await page.screenshot({ path: 'e2e/output/done-dots-phone.png', fullPage: true })
   })
 })

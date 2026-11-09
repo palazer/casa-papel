@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test'
 async function loadDemo(page: Page) {
   await page.goto('?demo=1')
   await page.getByRole('button', { name: 'Load the demo household' }).click()
-  await expect(page.getByRole('button', { name: /^Rent Nov 2026/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
 }
 
 test.describe('wave 1b', () => {
@@ -52,11 +52,11 @@ test.describe('wave 1b', () => {
     await expect(page.getByText('from November 2026')).toBeVisible()
     await page.getByRole('button', { name: 'Create household' }).click()
     await expect(page.getByText(/^Testers ·/)).toBeVisible()
-    await expect(page.getByText('Pocket – Ana', { exact: true })).toBeVisible()
+    await expect(page.getByText('Ana – Pocket', { exact: true })).toBeVisible()
     await expect(page.getByText('To savings', { exact: true })).toBeVisible()
     // the USD account carries its household-currency line
     await expect(page.getByRole('rowheader', { name: 'Broker · in EUR' })).toBeVisible()
-    for (const name of ['Ana – Salary', 'Ben – Salary', 'Child benefit – Cal', 'Food & supplies – Rex', 'Groceries', 'Travel', 'Garden']) {
+    for (const name of ['Ana – Salary', 'Ben – Salary', 'Cal – Child benefit', 'Rex – Food & supplies', 'Groceries', 'Travel', 'Garden']) {
       await expect(page.getByRole('button', { name: new RegExp(`^${name} Nov 2026`) })).toBeVisible()
     }
     await page.getByRole('link', { name: 'Household' }).click()
@@ -69,8 +69,8 @@ test.describe('wave 1b', () => {
   test('recurring items post into due months only and can be ticked paid', async ({ page }) => {
     await loadDemo(page)
     // demo car insurance is quarterly from January: October yes, November no
-    await expect(page.getByRole('button', { name: /^Car insurance Oct 2026/ })).toContainText('210')
-    await expect(page.getByRole('button', { name: /^Car insurance Nov 2026: empty/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^The car – Insurance Oct 2026/ })).toContainText('210')
+    await expect(page.getByRole('button', { name: /^The car – Insurance Nov 2026: empty/ })).toBeVisible()
 
     await page.getByRole('link', { name: 'Household' }).click()
     await page.getByRole('button', { name: 'Add recurring' }).click()
@@ -114,7 +114,7 @@ test.describe('wave 1b', () => {
     await page.getByRole('link', { name: 'Household' }).click()
     await expect(page.getByLabel('Rent paid in Nov 2026')).toBeChecked()
     await page.getByRole('link', { name: 'Grid' }).click()
-    await expect(page.getByRole('button', { name: /^Rent Nov 2026/ }).getByRole('img', { name: 'Done' })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ }).getByRole('img', { name: 'Done' })).toBeVisible()
   })
 })
 
@@ -123,7 +123,7 @@ test.describe('recurring from the grid', () => {
 
   test('change for one month or from now on, skip a month, end a schedule', async ({ page }) => {
     await loadDemo(page)
-    const rent = (m: string) => page.getByRole('button', { name: new RegExp(`^Rent ${m}`) })
+    const rent = (m: string) => page.getByRole('button', { name: new RegExp(`^The flat – Rent ${m}`) })
 
     // amount change from November on: October keeps the old amount
     await rent('Nov 2026').click()
@@ -154,11 +154,11 @@ test.describe('recurring from the grid', () => {
     await page.screenshot({ path: 'e2e/output/recurring-skip.png' })
     await page.keyboard.press('Escape')
     await expect(page.getByRole('dialog')).toBeHidden()
-    await expect(page.getByRole('button', { name: /^Rent Jan 2027: empty/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^The flat – Rent Jan 2027: empty/ })).toBeVisible()
     await expect(rent('Feb 2027')).toContainText('1,700')
 
     // end car insurance for good: due months empty out, nothing comes back
-    await page.getByRole('button', { name: /^Car insurance Oct 2026/ }).click()
+    await page.getByRole('button', { name: /^The car – Insurance Oct 2026/ }).click()
     await page.getByRole('button', { name: 'Remove item' }).click()
     await page.getByRole('button', { name: 'All occurrences' }).click()
     // "All occurrences" hands the schedule to the remove dialog, on top of the editor
@@ -166,8 +166,8 @@ test.describe('recurring from the grid', () => {
     await expect(remove.getByText(/Its posted amount in \d+ open months/)).toBeVisible()
     await remove.getByRole('button', { name: 'Delete', exact: true }).click()
     await expect(page.getByRole('dialog')).toBeHidden()
-    await expect(page.getByRole('button', { name: /^Car insurance Oct 2026: empty/ })).toBeVisible()
-    await expect(page.getByRole('button', { name: /^Car insurance Jan 2027: empty/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^The car – Insurance Oct 2026: empty/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^The car – Insurance Jan 2027: empty/ })).toBeVisible()
 
     // the list under Household reflects it
     await page.getByRole('link', { name: 'Household' }).click()
@@ -176,6 +176,7 @@ test.describe('recurring from the grid', () => {
     // the schedule was split: the old one ended in October, the new one runs from November
     await expect(schedules.getByText('(ended Oct 2026)')).toBeVisible()
     await expect(schedules.getByRole('cell', { name: 'Car insurance', exact: true })).toHaveCount(0)
-    await expect(schedules.getByRole('cell', { name: 'Rent', exact: true })).toHaveCount(3)
+    await expect(schedules.getByRole('cell', { name: 'Rent', exact: true })).toHaveCount(1)
+    await expect(schedules.getByRole('cell', { name: 'The flat – Rent', exact: true })).toHaveCount(2)
   })
 })

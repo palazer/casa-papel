@@ -24,7 +24,7 @@ describe('engine: automatic rows and markedDone', () => {
   it('a pocket share ticked as moved is done without changing its amount', () => {
     const h = household({ pocketTotal: 100000 })
     const salary = row({ name: 'Salary', section: 'income', defaultStatus: 'committed' })
-    const pocket = row({ name: 'Pocket – Sam', section: 'transfer', kind: 'pocket-money', pocketMode: 'share-of-pocket-total', pocketShare: 0.5 })
+    const pocket = row({ name: 'Sam – Pocket', section: 'transfer', kind: 'pocket-money', pocketMode: 'share-of-pocket-total', pocketShare: 0.5 })
     const ticked = CellSchema.parse({ rowId: pocket.id, month: '2026-01', mode: 'inherit', markedDone: true, updatedAt: T0 })
     const out = computeEngine({ tables: tables({ household: [h], rows: [salary, pocket], cells: [cellValue(salary.id, '2026-01', 300000), ticked] }), months })
     expect(out.cells[cellKey(pocket.id, '2026-01')]).toMatchObject({ source: 'derived', status: 'done', value: 50000 })

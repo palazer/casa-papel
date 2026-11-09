@@ -31,7 +31,7 @@ describe('remove', () => {
   it('deleting a row takes its cells and schedules with it and unlinks followers; undo brings everything back', async () => {
     const { store, tables, engine } = await demo()
     let t = await tables()
-    const car = idOf(t, 'rows', 'Car insurance')
+    const car = idOf(t, 'rows', 'The car – Insurance')
     const mirror = await addRow(store, { name: 'Mirror', section: 'transfer' })
     await followRow(store, mirror.id, car)
     const cellsBefore = t.cells.filter((c) => c.rowId === car).length
@@ -65,7 +65,7 @@ describe('remove', () => {
   it('archiving a row pins what its followers mirrored, ends its schedules and leaves closed months alone', async () => {
     const { store, tables, engine } = await demo()
     let t = await tables()
-    const benefit = idOf(t, 'rows', 'Child benefit')
+    const benefit = idOf(t, 'rows', 'Robin – Child benefit')
     const saver = await addRow(store, { name: 'Robin savings', section: 'transfer' })
     await followRow(store, saver.id, benefit)
     const before = await engine()
@@ -84,7 +84,7 @@ describe('remove', () => {
     expect(after.totals[TODAY].income).toBe(715000) // no benefit, but the other income
 
     // a scheduled row: the schedule ends the month before, its open postings go
-    const rent = idOf(t, 'rows', 'Rent')
+    const rent = idOf(t, 'rows', 'The flat – Rent')
     expect(t.cells.find((c) => c.rowId === rent && c.month === '2026-12')?.items.some((i) => i.recurringItemId)).toBe(true)
     await archiveRow(store, rent, TODAY)
     t = await tables()
@@ -107,7 +107,7 @@ describe('remove', () => {
     expect(t.recurringItems.filter((r) => !r.deletedAt && r.accountId === main)).toHaveLength(0)
     await store.undo()
     t = await tables()
-    expect(t.rows.find((r) => r.name === 'Rent')?.accountId).toBe(main)
+    expect(t.rows.find((r) => r.name === 'The flat – Rent')?.accountId).toBe(main)
 
     const savings = idOf(t, 'accounts', 'Savings')
     await expect(removeAccount(store, savings)).rejects.toThrow(/closed months/)
@@ -154,11 +154,11 @@ describe('remove', () => {
     const { store, tables } = await demo()
     let t = await tables()
     const car = idOf(t, 'entities', 'The car')
-    expect(t.rows.find((r) => r.name === 'Car insurance')?.entityTags).toEqual([car])
+    expect(t.rows.find((r) => r.name === 'The car – Insurance')?.entityTags).toEqual([car])
     await removeEntity(store, car)
     t = await tables()
     expect(t.entities.find((e) => e.id === car)?.deletedAt).not.toBeNull()
-    expect(t.rows.find((r) => r.name === 'Car insurance')?.entityTags).toEqual([])
+    expect(t.rows.find((r) => r.name === 'The car – Insurance')?.entityTags).toEqual([])
 
     const alex = idOf(t, 'entities', 'Alex')
     await expect(removeEntity(store, alex)).rejects.toThrow(/closed months/)
@@ -170,7 +170,7 @@ describe('remove', () => {
     const { store, tables } = await demo()
     let t = await tables()
     const rentSchedule = idOf(t, 'recurringItems', 'Rent')
-    const rent = idOf(t, 'rows', 'Rent')
+    const rent = idOf(t, 'rows', 'The flat – Rent')
     await setRecurringPaid(store, rentSchedule, '2026-10', true)
     await removeRecurringItem(store, rentSchedule)
     t = await tables()

@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test'
 async function loadDemo(page: Page) {
   await page.goto('?demo=1')
   await page.getByRole('button', { name: 'Load the demo household' }).click()
-  await expect(page.getByRole('button', { name: /^Rent Nov 2026/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
 }
 
 test.describe('grid', () => {
@@ -14,7 +14,7 @@ test.describe('grid', () => {
     await page.screenshot({ path: 'e2e/output/grid.png' })
 
     // Utilities carry 210 forward from September (Rent is recurring-driven now); change November onwards to 250
-    const utilNov = page.getByRole('button', { name: /^Utilities Nov 2026/ })
+    const utilNov = page.getByRole('button', { name: /^The flat – Utilities Nov 2026/ })
     await expect(utilNov).toContainText('210')
     await utilNov.click()
     await expect(page.getByRole('dialog')).toBeVisible()
@@ -23,26 +23,26 @@ test.describe('grid', () => {
     await page.screenshot({ path: 'e2e/output/editor.png' })
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByRole('dialog')).toBeHidden()
-    await expect(page.getByRole('button', { name: /^Utilities Nov 2026/ })).toContainText('250')
-    await expect(page.getByRole('button', { name: /^Utilities Dec 2026/ })).toContainText('250')
-    await expect(page.getByRole('button', { name: /^Utilities Oct 2026/ })).toContainText('210')
+    await expect(page.getByRole('button', { name: /^The flat – Utilities Nov 2026/ })).toContainText('250')
+    await expect(page.getByRole('button', { name: /^The flat – Utilities Dec 2026/ })).toContainText('250')
+    await expect(page.getByRole('button', { name: /^The flat – Utilities Oct 2026/ })).toContainText('210')
 
     // only-this-month on December keeps January at 250
-    await page.getByRole('button', { name: /^Utilities Dec 2026/ }).click()
+    await page.getByRole('button', { name: /^The flat – Utilities Dec 2026/ }).click()
     await page.getByLabel('Amount in EUR').fill('300')
     await page.getByRole('radio', { name: 'Only this month' }).click()
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByRole('dialog')).toBeHidden()
-    await expect(page.getByRole('button', { name: /^Utilities Dec 2026/ })).toContainText('300')
-    await expect(page.getByRole('button', { name: /^Utilities Jan 2027/ })).toContainText('250')
+    await expect(page.getByRole('button', { name: /^The flat – Utilities Dec 2026/ })).toContainText('300')
+    await expect(page.getByRole('button', { name: /^The flat – Utilities Jan 2027/ })).toContainText('250')
 
     // "How sure" on a single amount survives reopening as a single amount
-    await page.getByRole('button', { name: /^Utilities Jan 2027/ }).click()
+    await page.getByRole('button', { name: /^The flat – Utilities Jan 2027/ }).click()
     await page.getByRole('radio', { name: 'Done' }).click()
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByRole('dialog')).toBeHidden()
-    await expect(page.getByRole('button', { name: /^Utilities Jan 2027/ }).getByRole('img', { name: 'Done' })).toBeVisible()
-    await page.getByRole('button', { name: /^Utilities Jan 2027/ }).click()
+    await expect(page.getByRole('button', { name: /^The flat – Utilities Jan 2027/ }).getByRole('img', { name: 'Done' })).toBeVisible()
+    await page.getByRole('button', { name: /^The flat – Utilities Jan 2027/ }).click()
     await expect(page.getByRole('tab', { name: 'Single amount' })).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByRole('radio', { name: 'Done' })).toBeChecked()
     await page.keyboard.press('Escape')
@@ -67,7 +67,7 @@ test.describe('grid', () => {
     await page.getByRole('button', { name: 'Nov 2026', exact: true }).click()
     await page.getByRole('menuitem', { name: 'Close month' }).click()
     await expect(page.getByRole('button', { name: 'Nov 2026, closed', exact: true })).toBeVisible()
-    await page.getByRole('button', { name: /^Utilities Nov 2026/ }).click()
+    await page.getByRole('button', { name: /^The flat – Utilities Nov 2026/ }).click()
     await expect(page.getByText('This month is closed.')).toBeVisible()
     await page.getByRole('button', { name: /^Reopen Nov 2026/ }).click()
     await expect(page.getByRole('button', { name: 'Nov 2026', exact: true })).toBeVisible()
@@ -97,7 +97,7 @@ test.describe('phone', () => {
     await expect(page.getByRole('heading', { name: 'November 2026' })).toBeVisible()
     await expect(page.getByText('Kept in account')).toBeVisible()
     await page.screenshot({ path: 'e2e/output/month-phone.png', fullPage: true })
-    await page.getByRole('button', { name: /^Rent:/ }).click()
+    await page.getByRole('button', { name: /^The flat – Rent:/ }).click()
     await expect(page.getByRole('dialog')).toBeVisible()
     await page.getByRole('button', { name: 'Cancel' }).click()
   })

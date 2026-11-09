@@ -182,7 +182,7 @@ export function mapV1(input: V1Input): ExportFile {
     }
     const account = accByName.get(l.account.toLowerCase())
     if (child && /lt\b|long|kindergeld/i.test(l.category + l.notes)) {
-      const row = ensureRow('child-lt', { name: `Long-term savings – ${child.name}`, section: 'transfer', kind: 'to-investment', accountId: account?.id ?? null, scope: child.id, entityTags: [child.id] })
+      const row = ensureRow('child-lt', { name: `${child.name} – Long-term savings`, section: 'transfer', kind: 'to-investment', accountId: account?.id ?? null, scope: child.id, entityTags: [child.id] })
       addItem(row, l.purpose, l.amount, 'EUR', { cadence: { intervalMonths: 1, anchorMonth: 1 }, accountId: account?.id ?? null, scope: child.id })
       if (/kindergeld/i.test(l.purpose + l.notes)) {
         const income = ensureRow('kindergeld', { name: 'Kindergeld', section: 'income', scope: child.id, entityTags: [child.id] })
@@ -195,7 +195,7 @@ export function mapV1(input: V1Input): ExportFile {
   }
   for (const a of adults) {
     ensureRow(`salary-${a.id}`, { name: `${a.name} – Salary`, section: 'income', kind: 'salary', scope: a.id, inShareBasis: true, entityTags: [a.id] })
-    ensureRow(`pocket-${a.id}`, { name: `Pocket – ${a.name}`, section: 'transfer', kind: 'pocket-money', scope: a.id, pocketMode: 'share-of-pocket-total', pocketShare: 1 / adults.length })
+    ensureRow(`pocket-${a.id}`, { name: `${a.name} – Pocket`, section: 'transfer', kind: 'pocket-money', scope: a.id, pocketMode: 'share-of-pocket-total', pocketShare: 1 / adults.length })
   }
   ensureRow('other', { name: 'Other', section: 'expense', defaultStatus: 'projected' })
 

@@ -23,13 +23,13 @@ describe('setup and household actions', () => {
     expect(t.entities[2].paidBy).toBe(t.entities[1].id)
     expect(t.accounts.find((a) => a.type === 'savings')).toMatchObject({ tracked: true, openingBalance: 500000 })
     const names = t.rows.map((r) => r.name)
-    expect(names).toEqual(expect.arrayContaining(['A – Salary', 'Pocket – A', 'B – Personal', 'Child benefit – Kid', 'Long-term savings – Kid', 'Food & supplies – Dog', 'Groceries', 'To savings', 'To investments', 'Travel', 'Travel pool']))
+    expect(names).toEqual(expect.arrayContaining(['A – Salary', 'A – Pocket', 'B – Personal', 'Kid – Child benefit', 'Kid – Long-term savings', 'Dog – Food & supplies', 'Groceries', 'To savings', 'To investments', 'Travel', 'Travel pool']))
     expect(t.pools).toHaveLength(1)
     const travel = t.rows.find((r) => r.name === 'Travel')!
     expect(travel.defaultFundedBy).toBe(`pool:${t.pools[0].id}`)
     expect(t.rows.find((r) => r.name === 'To savings')?.accountId).toBe(t.accounts.find((a) => a.type === 'savings')?.id)
-    expect(t.rows.find((r) => r.name === 'Long-term savings – Kid')).toMatchObject({ kind: 'to-investment', scope: t.entities[2].id })
-    const pocket = t.rows.find((r) => r.name === 'Pocket – A')!
+    expect(t.rows.find((r) => r.name === 'Kid – Long-term savings')).toMatchObject({ kind: 'to-investment', scope: t.entities[2].id })
+    const pocket = t.rows.find((r) => r.name === 'A – Pocket')!
     expect(pocket.pocketShare).toBeCloseTo(0.5)
     const out = computeEngine({ tables: t, months: monthRange('2026-11', '2026-12') })
     expect(out.cells[cellKey(pocket.id, '2026-11')].value).toBe(60000)
@@ -51,7 +51,7 @@ describe('setup and household actions', () => {
     const car = await addEntity(store, { kind: 'vehicle', name: 'Volvo' })
     await applyTemplates(store, ['v.insurance', 'v.fuel'], car.id)
     const t = await loadTables(store)
-    expect(t.rows.filter((r) => r.entityTags.includes(car.id)).map((r) => r.name)).toEqual(['Insurance – Volvo', 'Fuel & parking – Volvo'])
+    expect(t.rows.filter((r) => r.entityTags.includes(car.id)).map((r) => r.name)).toEqual(['Volvo – Insurance', 'Volvo – Fuel & parking'])
 
     const card = await addAccount(store, { name: 'Amex', type: 'credit-card', currency: 'EUR', openingMonth: '2026-11' })
     expect(card.tracked).toBe(true)

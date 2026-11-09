@@ -13,16 +13,16 @@ test.describe('month tracking on a phone', () => {
     await page.screenshot({ path: 'e2e/output/month-track.png', fullPage: true })
 
     // one tap: Rent is paid
-    const rent = page.getByRole('checkbox', { name: 'Rent done' })
+    const rent = page.getByRole('checkbox', { name: 'The flat – Rent done' })
     await expect(rent).not.toBeChecked()
     await rent.tap()
     await expect(rent).toBeChecked()
     await expect(progress).toHaveText('1 of 21 done · €6,415.00 still to pay · €7,405.00 to come in')
 
     // the Paid sheet: Utilities actually cost 199 this month; December keeps its 210
-    await page.getByRole('button', { name: /^Utilities:/ }).tap()
+    await page.getByRole('button', { name: /^The flat – Utilities:/ }).tap()
     const sheet = page.getByRole('dialog')
-    await expect(sheet.getByRole('heading', { name: 'Utilities' })).toBeVisible()
+    await expect(sheet.getByRole('heading', { name: 'The flat – Utilities' })).toBeVisible()
     await expect(sheet.getByLabel('Amount in EUR')).toHaveValue('210')
     await expect(sheet.getByLabel('Date')).toHaveValue(/^\d{4}-\d{2}-\d{2}$/)
     await expect(sheet.getByRole('radio', { name: 'Done' })).toHaveAttribute('aria-checked', 'true')
@@ -31,12 +31,12 @@ test.describe('month tracking on a phone', () => {
     await page.screenshot({ path: 'e2e/output/month-paid-sheet.png' })
     await sheet.getByRole('button', { name: 'Save' }).tap()
     await expect(sheet).toBeHidden()
-    await expect(page.getByRole('button', { name: /^Utilities: -€199\.00/ })).toBeVisible()
-    await expect(page.getByRole('checkbox', { name: 'Utilities done' })).toBeChecked()
+    await expect(page.getByRole('button', { name: /^The flat – Utilities: -€199\.00/ })).toBeVisible()
+    await expect(page.getByRole('checkbox', { name: 'The flat – Utilities done' })).toBeChecked()
     await expect(progress).toHaveText('2 of 21 done · €6,216.00 still to pay · €7,405.00 to come in')
     await page.getByRole('button', { name: 'Next month' }).tap()
     await expect(page.getByRole('heading', { name: 'December 2026' })).toBeVisible()
-    await expect(page.getByRole('button', { name: /^Utilities: -€210\.00/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^The flat – Utilities: -€210\.00/ })).toBeVisible()
     await page.getByRole('button', { name: 'Previous month' }).tap()
     await expect(page.getByRole('heading', { name: 'November 2026' })).toBeVisible()
 
@@ -76,11 +76,11 @@ test.describe('month tracking on a phone', () => {
 
     // hide what is done
     await page.getByRole('switch', { name: 'Hide done' }).tap()
-    await expect(page.getByRole('checkbox', { name: 'Rent done' })).toHaveCount(0)
+    await expect(page.getByRole('checkbox', { name: 'The flat – Rent done' })).toHaveCount(0)
     await expect(page.getByRole('checkbox', { name: 'To savings done' })).toHaveCount(0)
-    await expect(page.getByRole('checkbox', { name: 'Childcare done' })).toBeVisible()
+    await expect(page.getByRole('checkbox', { name: 'Robin – Childcare done' })).toBeVisible()
     await page.getByRole('switch', { name: 'Hide done' }).tap()
-    await expect(page.getByRole('checkbox', { name: 'Rent done' })).toBeVisible()
+    await expect(page.getByRole('checkbox', { name: 'The flat – Rent done' })).toBeVisible()
 
     // Moves agrees
     await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Moves' }).tap()
@@ -91,11 +91,11 @@ test.describe('month tracking on a phone', () => {
     // a closed month: everything done, nothing to tick
     await page.getByRole('button', { name: 'Close month' }).tap()
     await expect(progress).toHaveText('Closed · all done')
-    await expect(page.getByRole('checkbox', { name: 'Childcare done' })).toBeDisabled()
-    await expect(page.getByRole('checkbox', { name: 'Childcare done' })).toBeChecked()
+    await expect(page.getByRole('checkbox', { name: 'Robin – Childcare done' })).toBeDisabled()
+    await expect(page.getByRole('checkbox', { name: 'Robin – Childcare done' })).toBeChecked()
     await page.getByRole('button', { name: 'Reopen month' }).tap()
     await expect(progress).toHaveText(/of 22 done/)
-    await expect(page.getByRole('checkbox', { name: 'Childcare done' })).toBeEnabled()
+    await expect(page.getByRole('checkbox', { name: 'Robin – Childcare done' })).toBeEnabled()
   })
 })
 

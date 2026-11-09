@@ -58,16 +58,16 @@ export function buildDemoTables(): Tables {
     // income
     { ...base(ID.rowSamSalary, 'a0'), name: 'Sam – Salary', section: 'income', kind: 'salary', scope: ID.sam, inShareBasis: true, defaultStatus: 'committed' },
     { ...base(ID.rowAlexSalary, 'a1'), name: 'Alex – Salary', section: 'income', kind: 'salary', scope: ID.alex, inShareBasis: true, defaultStatus: 'committed' },
-    { ...base(ID.rowChildBenefit, 'a2'), name: 'Child benefit', section: 'income', scope: ID.robin, entityTags: [ID.robin], defaultStatus: 'committed' },
+    { ...base(ID.rowChildBenefit, 'a2'), name: 'Robin – Child benefit', section: 'income', scope: ID.robin, entityTags: [ID.robin], defaultStatus: 'committed' },
     { ...base(ID.rowOtherIncome, 'a3'), name: 'Other income', section: 'income' },
     // expenses
-    { ...base(ID.rowRent, 'b0'), name: 'Rent', section: 'expense', categoryId: ID.catHousing, entityTags: [ID.flat], accountId: ID.main, defaultStatus: 'committed' },
-    { ...base(ID.rowUtilities, 'b1'), name: 'Utilities', section: 'expense', categoryId: ID.catHousing, entityTags: [ID.flat], accountId: ID.main },
+    { ...base(ID.rowRent, 'b0'), name: 'The flat – Rent', section: 'expense', categoryId: ID.catHousing, entityTags: [ID.flat], accountId: ID.main, defaultStatus: 'committed' },
+    { ...base(ID.rowUtilities, 'b1'), name: 'The flat – Utilities', section: 'expense', categoryId: ID.catHousing, entityTags: [ID.flat], accountId: ID.main },
     { ...base(ID.rowGroceries, 'b2'), name: 'Groceries', section: 'expense', categoryId: ID.catLiving, accountId: ID.joint },
     { ...base(ID.rowTransport, 'b3'), name: 'Public transport', section: 'expense', categoryId: ID.catTransport, accountId: ID.main },
-    { ...base(ID.rowCarInsurance, 'b4'), name: 'Car insurance', section: 'expense', categoryId: ID.catTransport, entityTags: [ID.car], accountId: ID.main, defaultStatus: 'committed' },
-    { ...base(ID.rowDog, 'b5'), name: 'Biscuit (dog)', section: 'expense', categoryId: ID.catFamily, entityTags: [ID.biscuit], accountId: ID.main },
-    { ...base(ID.rowChildcare, 'b6'), name: 'Childcare', section: 'expense', categoryId: ID.catFamily, entityTags: [ID.robin], scope: ID.robin, accountId: ID.main, defaultStatus: 'committed' },
+    { ...base(ID.rowCarInsurance, 'b4'), name: 'The car – Insurance', section: 'expense', categoryId: ID.catTransport, entityTags: [ID.car], accountId: ID.main, defaultStatus: 'committed' },
+    { ...base(ID.rowDog, 'b5'), name: 'Biscuit – Costs', section: 'expense', categoryId: ID.catFamily, entityTags: [ID.biscuit], accountId: ID.main },
+    { ...base(ID.rowChildcare, 'b6'), name: 'Robin – Childcare', section: 'expense', categoryId: ID.catFamily, entityTags: [ID.robin], scope: ID.robin, accountId: ID.main, defaultStatus: 'committed' },
     { ...base(ID.rowSubscriptions, 'b7'), name: 'Subscriptions', section: 'expense', categoryId: ID.catFun, accountId: ID.card },
     { ...base(ID.rowHealth, 'b8'), name: 'Health', section: 'expense', categoryId: ID.catLiving, accountId: ID.main },
     { ...base(ID.rowSamPersonal, 'b9'), name: 'Sam – Personal', section: 'expense', categoryId: ID.catPersonal, scope: ID.sam, accountId: ID.main },
@@ -79,8 +79,8 @@ export function buildDemoTables(): Tables {
     { ...base(ID.rowToInvestment, 'c1'), name: 'To investments', section: 'transfer', kind: 'to-investment', categoryId: ID.catTransfers, accountId: ID.invest, defaultStatus: 'committed' },
     { ...base(ID.rowTravelAlloc, 'c2'), name: 'Travel pool', section: 'transfer', kind: 'pool-allocation', categoryId: ID.catTransfers, accountId: ID.savings, defaultStatus: 'committed' },
     { ...base(ID.rowClothingAlloc, 'c3'), name: 'Clothing pool', section: 'transfer', kind: 'pool-allocation', categoryId: ID.catTransfers, accountId: ID.savings, defaultStatus: 'committed' },
-    { ...base(ID.rowPocketSam, 'c4'), name: 'Pocket – Sam', section: 'transfer', kind: 'pocket-money', categoryId: ID.catTransfers, scope: ID.sam, pocketMode: 'share-of-pocket-total', pocketShare: 0.5, defaultStatus: 'committed' },
-    { ...base(ID.rowPocketAlex, 'c5'), name: 'Pocket – Alex', section: 'transfer', kind: 'pocket-money', categoryId: ID.catTransfers, scope: ID.alex, pocketMode: 'share-of-pocket-total', pocketShare: 0.5, defaultStatus: 'committed' },
+    { ...base(ID.rowPocketSam, 'c4'), name: 'Sam – Pocket', section: 'transfer', kind: 'pocket-money', categoryId: ID.catTransfers, scope: ID.sam, pocketMode: 'share-of-pocket-total', pocketShare: 0.5, defaultStatus: 'committed' },
+    { ...base(ID.rowPocketAlex, 'c5'), name: 'Alex – Pocket', section: 'transfer', kind: 'pocket-money', categoryId: ID.catTransfers, scope: ID.alex, pocketMode: 'share-of-pocket-total', pocketShare: 0.5, defaultStatus: 'committed' },
   ]
 
   const cells = [

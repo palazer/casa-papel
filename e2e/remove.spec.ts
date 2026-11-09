@@ -7,7 +7,7 @@ test.describe('archive or delete', () => {
   test('a row: delete with its impact and undo, archive one with closed history and restore it', async ({ page }) => {
     await page.goto('?demo=1')
     await page.getByRole('button', { name: 'Load the demo household' }).click()
-    await expect(page.getByRole('button', { name: /^Rent Nov 2026/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
     const dlg = page.getByRole('dialog')
 
     // Other income has no closed history: the dialog says what goes, Delete removes it, Undo brings it back
@@ -55,7 +55,7 @@ test.describe('archive or delete', () => {
   test('an account: a pool account inside it blocks the delete; a schedule goes from the list', async ({ page }) => {
     await page.goto('?demo=1')
     await page.getByRole('button', { name: 'Load the demo household' }).click()
-    await expect(page.getByRole('button', { name: /^Rent Nov 2026/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
     await page.getByRole('link', { name: 'Household' }).click()
     const dlg = page.getByRole('dialog')
 

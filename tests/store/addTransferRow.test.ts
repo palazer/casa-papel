@@ -46,7 +46,7 @@ describe('addTransferRow', () => {
     const { store } = await fresh()
     await expect(addTransferRow(store, { name: 'Pocket', categoryId: null, kind: 'pocket-money', adultId: newId() })).rejects.toThrow(/Pick the adult/)
     const pat = await addEntity(store, { kind: 'adult', name: 'Pat' })
-    const pocket = await addTransferRow(store, { name: 'Pocket – Pat', categoryId: null, kind: 'pocket-money', adultId: pat.id })
+    const pocket = await addTransferRow(store, { name: 'Pat – Pocket', categoryId: null, kind: 'pocket-money', adultId: pat.id })
     expect(pocket).toMatchObject({ kind: 'pocket-money', scope: pat.id, pocketMode: 'fixed', entityTags: [pat.id] })
     await setCellValue(store, pocket.id, '2026-01', 5000, 'from-now-on')
     const t = await loadTables(store)

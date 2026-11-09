@@ -32,7 +32,7 @@ describe('describeRemoval', () => {
 
   it('a row names its schedules, its followers and the pool account it fills', () => {
     const t = buildDemoTables()
-    const rent = idOf(t, 'rows', 'Rent')
+    const rent = idOf(t, 'rows', 'The flat – Rent')
     t.rows.push(RowSchema.parse({ id: newId(), createdAt: T0, updatedAt: T0, name: 'Rent mirror', section: 'transfer', followsRowId: rent, order: 'z0' }))
     const d = describeRemoval(t, { kind: 'row', id: rent }, OPTS)
     expect(d.loses).toContain('Its schedule "Rent"')
@@ -77,7 +77,7 @@ describe('describeRemoval', () => {
     const main = describeRemoval(t, { kind: 'account', id: idOf(t, 'accounts', 'Main account') }, OPTS)
     expect(main).toMatchObject({ closedHistory: null, canDelete: true, blockers: [] })
     expect(main.changes).toEqual([
-      '"Rent", "Utilities", "Public transport", "Car insurance" and 5 more no longer name it as the paying account',
+      '"The flat – Rent", "The flat – Utilities", "Public transport", "The car – Insurance" and 5 more no longer name it as the paying account',
       '3 schedules no longer name it',
     ])
     expect(main.archiveChanges[0]).toBe('Hidden from Nov 2026 on; rows that name it keep working')
@@ -101,13 +101,13 @@ describe('describeRemoval', () => {
     const t = buildDemoTables()
     const robin = describeRemoval(t, { kind: 'entity', id: idOf(t, 'entities', 'Robin') }, OPTS)
     expect(robin).toMatchObject({ kindLabel: 'Child', closedHistory: 'Sept 2026', canDelete: false })
-    expect(robin.changes).toEqual(['"Child benefit" and "Childcare" become shared'])
+    expect(robin.changes).toEqual(['"Robin – Child benefit" and "Robin – Childcare" become shared'])
     expect(robin.archiveChanges).toEqual(['Hidden from People & things from Nov 2026; its rows and earlier months stay as they are'])
     const alex = describeRemoval(t, { kind: 'entity', id: idOf(t, 'entities', 'Alex') }, OPTS)
-    expect(alex.changes).toEqual(['"Alex – Salary", "Alex – Personal" and "Pocket – Alex" become shared', 'The costs of "Robin" become shared'])
+    expect(alex.changes).toEqual(['"Alex – Salary", "Alex – Personal" and "Alex – Pocket" become shared', 'The costs of "Robin" become shared'])
     const car = describeRemoval(t, { kind: 'entity', id: idOf(t, 'entities', 'The car') }, OPTS)
     expect(car).toMatchObject({ kindLabel: 'Vehicle', closedHistory: null, canDelete: true, loses: [] })
-    expect(car.changes).toEqual(['"Car insurance" loses its tag'])
+    expect(car.changes).toEqual(['"The car – Insurance" loses its tag'])
   })
 
   it('schedules, goals and categories are always deletable and never archived', () => {
@@ -122,7 +122,7 @@ describe('describeRemoval', () => {
     expect(describeRemoval(t, { kind: 'account', id: idOf(t, 'accounts', 'Savings') }, OPTS).loses).toContain('The goal "Cushion", which watches it')
     const cat = describeRemoval(t, { kind: 'category', id: idOf(t, 'categories', 'Transport') }, OPTS)
     expect(cat).toMatchObject({ kindLabel: 'Category', canArchive: false, canDelete: true })
-    expect(cat.changes).toEqual(['"Public transport" and "Car insurance" keep their place without a category'])
+    expect(cat.changes).toEqual(['"Public transport" and "The car – Insurance" keep their place without a category'])
   })
 
   it('the plans refuse what the impact refuses', () => {

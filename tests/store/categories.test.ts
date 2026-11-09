@@ -94,7 +94,7 @@ describe('categories', () => {
     const catName = (id: string | null) => categories.find((c) => c.id === id)?.name ?? null
     expect(categories.map((c) => c.name)).toEqual([...DEFAULT_CATEGORIES])
     expect(Object.fromEntries(rows.map((r) => [r.name, catName(r.categoryId)]))).toMatchObject({
-      Groceries: 'Living', Transport: 'Transport', Other: null, Travel: 'Fun', 'Travel pool': null, 'A – Personal': 'Personal', 'Food & supplies – Dog': 'Family & pets',
+      Groceries: 'Living', Transport: 'Transport', Other: null, Travel: 'Fun', 'Travel pool': null, 'A – Personal': 'Personal', 'Dog – Food & supplies': 'Family & pets',
     })
   })
 })

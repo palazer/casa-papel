@@ -58,7 +58,7 @@ test.describe('cloud sync', () => {
     await dlgB.getByLabel('Password', { exact: true }).fill(PW)
     await dlgB.getByRole('button', { name: 'Sign in' }).click()
     await expect(dlgB).toBeHidden({ timeout: 20_000 })
-    const utilB = b.getByRole('button', { name: /^Utilities Nov 2026/ })
+    const utilB = b.getByRole('button', { name: /^The flat – Utilities Nov 2026/ })
     await expect(utilB).toContainText('210', { timeout: 15_000 })
 
     // B edits, A syncs and sees it
@@ -69,7 +69,7 @@ test.describe('cloud sync', () => {
     await expect(b.getByRole('button', { name: /^Sync: Synced/ })).toBeVisible({ timeout: 15_000 })
     await a.getByRole('button', { name: 'Sync now' }).click()
     await a.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Grid' }).click()
-    await expect(a.getByRole('button', { name: /^Utilities Nov 2026/ })).toContainText('333', { timeout: 15_000 })
+    await expect(a.getByRole('button', { name: /^The flat – Utilities Nov 2026/ })).toContainText('333', { timeout: 15_000 })
 
     // ----- device C: forgot the password, recovers with the code -----
     const c = await device(browser, server)
@@ -85,7 +85,7 @@ test.describe('cloud sync', () => {
     await expect(dlgC.getByRole('heading', { name: 'Your recovery code' })).toBeVisible({ timeout: 30_000 })
     const newCode = await storeRecoveryCode(c)
     expect(newCode).not.toBe(recoveryCode)
-    await expect(c.getByRole('button', { name: /^Utilities Nov 2026/ })).toContainText('333', { timeout: 15_000 })
+    await expect(c.getByRole('button', { name: /^The flat – Utilities Nov 2026/ })).toContainText('333', { timeout: 15_000 })
 
     // the old password is gone; the new one works on a fresh device, and A keeps working unchanged
     const d = await device(browser, server)
@@ -99,7 +99,7 @@ test.describe('cloud sync', () => {
     await dlgD.getByLabel('Password', { exact: true }).fill('a completely new password')
     await dlgD.getByRole('button', { name: 'Sign in' }).click()
     await expect(dlgD).toBeHidden({ timeout: 20_000 })
-    await expect(d.getByRole('button', { name: /^Rent Nov 2026/ })).toBeVisible({ timeout: 15_000 })
+    await expect(d.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible({ timeout: 15_000 })
 
     // ----- the invite link creates a separate account -----
     const e = await device(browser, server)

@@ -6,7 +6,7 @@ test.use({ viewport: { width: 1400, height: 900 }, serviceWorkers: 'block' })
 async function loadDemo(page: import('@playwright/test').Page) {
   await page.goto('?demo=1')
   await page.getByRole('button', { name: 'Load the demo household' }).click()
-  await expect(page.getByRole('button', { name: /^Rent Nov 2026/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
 }
 
 test('the welcome screen offers three ways to start, and the wizard can go back to it', async ({ page }) => {
@@ -170,12 +170,12 @@ test('a row can follow a share of another row', async ({ page }) => {
   await page.getByRole('button', { name: 'Row menu for To investments' }).click()
   await page.getByRole('menuitem', { name: 'Follow another row…' }).click()
   const dlg = page.getByRole('dialog')
-  await dlg.getByLabel('Same amount as').selectOption({ label: 'Child benefit' })
+  await dlg.getByLabel('Same amount as').selectOption({ label: 'Robin – Child benefit' })
   await dlg.getByLabel('Share (%)', { exact: true }).fill('50')
   await dlg.getByRole('button', { name: 'Save' }).click()
   await expect(dlg).toBeHidden()
   const row = page.getByRole('row', { name: /^To investments/ })
-  await expect(row).toContainText('= 50% of Child benefit')
+  await expect(row).toContainText('= 50% of Robin – Child benefit')
   // the child benefit is €255 in the demo
   await expect(row).toContainText('€127.50')
 })
