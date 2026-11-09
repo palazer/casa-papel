@@ -86,6 +86,7 @@ export function buildTemplateMutations(t: RowTemplate, ctx: TemplateContext, ord
     : undefined
   const mutations: Mutation[] = []
   let defaultFundedBy: Row['defaultFundedBy'] = 'cash'
+  let allocationRowId: string | null = null
   if (t.pool) {
     const savings = accounts.find((a) => a.type === 'savings' && !a.deletedAt)
     if (savings) {
@@ -95,6 +96,7 @@ export function buildTemplateMutations(t: RowTemplate, ctx: TemplateContext, ord
         accountId: savings.id, defaultStatus: 'committed', order: `${order}p`,
       })
       pool.allocationRowId = alloc.id
+      allocationRowId = alloc.id
       mutations.push({ op: 'put', table: 'pools', record: pool }, { op: 'put', table: 'rows', record: alloc })
       defaultFundedBy = poolRef(pool.id)
     }
@@ -115,7 +117,8 @@ export function buildTemplateMutations(t: RowTemplate, ctx: TemplateContext, ord
   mutations.push({ op: 'put', table: 'rows', record: row })
   // automatic rows (the savings plug, pocket money) take no amount
   const automatic = t.pocket || (t.kind === 'to-savings' && ctx.household.closingRule === 'savings-plug')
-  if (opts.amount != null && opts.amount > 0 && !automatic) mutations.push(startAmount(row.id, ctx.household.startMonth, opts.amount, ts))
+  // a pool template's amount is what is set aside each month, so it goes on the "<name> pool" transfer row
+  if (opts.amount != null && opts.amount > 0 && !automatic) mutations.push(startAmount(allocationRowId ?? row.id, ctx.household.startMonth, opts.amount, ts))
   return { mutations, row }
 }
 

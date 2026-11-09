@@ -29,7 +29,7 @@ describe('setup wizard: owners, destinations, first amounts, deposits and own ro
       { name: 'Fund A', type: 'investment' as const, ownerIndex: 0 },
       { name: 'Kid fund', type: 'investment' as const, ownerIndex: 1 },
     ],
-    householdTemplates: [{ key: 'h.groceries', amount: 50000 }, 'h.toSavings'],
+    householdTemplates: [{ key: 'h.groceries', amount: 50000 }, 'h.toSavings', { key: 'h.poolTravel', amount: 20000 }],
     entityTemplates: { 0: [{ key: 'a.salary', amount: 300000 }], 1: [{ key: 'c.longterm', accountIndex: 3, amount: 10000 }] },
     deposits: [{ accountIndex: 2, amount: 20000 }, { accountIndex: 3, amount: 5000 }, { accountIndex: 1, amount: 99 }],
     customRows: [{ name: 'Netflix', section: 'expense' as const, amount: 1500 }, { name: 'Piano', section: 'expense' as const, entityIndex: 1 }],
@@ -66,7 +66,10 @@ describe('setup wizard: owners, destinations, first amounts, deposits and own ro
     expect(amount('Netflix')?.value).toBe(1500)
     expect(amount('To savings')).toBeUndefined()
     expect(amount('Kid – Piano')).toBeUndefined()
-    expect(cells).toHaveLength(6)
+    // a pool template's amount is the monthly set-aside: on the "Travel pool" row, not on the spending row
+    expect(amount('Travel pool')?.value).toBe(20000)
+    expect(amount('Travel')).toBeUndefined()
+    expect(cells).toHaveLength(7)
   })
 
   it('a chosen account of the wrong type falls back to the first of the right type; a savings deposit is typed when the user decides the savings amount', () => {

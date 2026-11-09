@@ -76,7 +76,7 @@ export const GUIDE: GuideTopic[] = [
       'Undo with the arrow in the toolbar or Cmd/Ctrl+Z; Shift redoes.',
       'Try things first: "Look at the demo first" on the welcome screen or "Open the demo sandbox" under Data; "Leave the demo" brings you back.',
     ],
-    tips: ['section.income', 'section.expense', 'section.transfer', 'derived.incomeTotal', 'derived.expensesTotal', 'derived.netWorth', 'cell.appliesTo'],
+    tips: ['section.income', 'section.expense', 'section.transfer', 'derived.incomeTotal', 'derived.expensesTotal', 'derived.netWorth', 'cell.appliesTo', 'setup.amount'],
     open: 'grid',
   },
   {
@@ -201,7 +201,7 @@ export const GUIDE: GuideTopic[] = [
     summary: 'Deposits grow at a yearly rate you set, or at the average of the real values you enter.',
     what: [
       'An account of type "Investments" gets a "<Name> · value" row under Balances with "Deposited" and "Return" beneath it. The demo\'s "Index fund" starts at €12,000 and grows 5% a year, fed by "To investments" at €500 a month.',
-      'Click a value cell to enter what the broker says; later months continue from your number. With "Average of the real returns I enter" the projection follows your own history instead of a fixed rate. An account in another currency gets an "in EUR" line beneath its value.',
+      'Click a value cell to enter what the broker says; later months continue from your number. With "Average of the real returns I enter" the projection follows your own history instead of a fixed rate. An account in another currency gets an "in EUR" line beneath its value. The setup wizard offers a "To <account>" row for every investment account you add, each with its own monthly amount, and an account that "Belongs to" a child feeds their long-term savings row.',
     ],
     steps: [
       'Household → "Accounts" → "Add account" → "Type": "Investments"; fill "Name", "Currency", "Opening balance", "Opening month", "Owner".',
@@ -213,7 +213,7 @@ export const GUIDE: GuideTopic[] = [
     ],
     factsTitle: 'Account types',
     facts: accountTypes,
-    tips: ['balance.investmentValue', 'balance.deposited', 'balance.return', 'balance.inBase', 'household.tracked', 'derived.netWorth'],
+    tips: ['balance.investmentValue', 'balance.deposited', 'balance.return', 'balance.inBase', 'household.tracked', 'setup.owner', 'derived.netWorth'],
     open: 'household',
   },
   {

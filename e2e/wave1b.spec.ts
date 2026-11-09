@@ -31,11 +31,21 @@ test.describe('wave 1b', () => {
     await page.getByLabel('Account currency').nth(2).selectOption('USD')
     await expect(page.getByLabel('Opening balance').nth(2)).toHaveAttribute('placeholder', 'Opening USD')
     await page.getByLabel('Opening balance').nth(2).fill('1000')
+    // a child's own investment account
+    await page.getByRole('button', { name: 'Add account' }).click()
+    await page.getByLabel('Account 4 name').fill('Cal fund')
+    await page.getByLabel('Account type').nth(3).selectOption('investment')
+    await page.getByLabel('Account 4 belongs to').selectOption({ label: 'Cal · child' })
     await page.getByRole('button', { name: 'Next' }).click()
     // rows: one subject at a time, grouped by money in / spending / moving money
     await expect(page.getByRole('heading', { name: 'Rows for the household' })).toBeVisible()
     await expect(page.getByRole('group', { name: /^Money in/ })).toBeVisible()
     await expect(page.getByRole('group', { name: /^Spending/ })).toBeVisible()
+    // one deposit row per investment account, each with its own amount; typed amounts land in the first month
+    await expect(page.getByRole('checkbox', { name: /^To Broker/ })).toBeChecked()
+    await expect(page.getByRole('checkbox', { name: /^To Cal fund/ })).toBeChecked()
+    await page.getByLabel('To Broker per month').fill('200')
+    await page.getByLabel('Groceries per month').fill('600')
     await page.getByLabel('Your own row name').fill('Garden')
     await page.getByRole('button', { name: 'Add row' }).click()
     await page.screenshot({ path: 'e2e/output/wizard-rows.png', fullPage: true })
@@ -44,18 +54,34 @@ test.describe('wave 1b', () => {
     await expect(page.getByRole('heading', { name: 'Rows for Rex' })).toBeVisible()
     await page.getByRole('tab', { name: /^Ana/ }).click()
     await expect(page.getByRole('heading', { name: 'Rows for Ana' })).toBeVisible()
-    for (const who of ['Ben', 'Cal', 'Rex']) {
-      await page.getByRole('button', { name: 'Next' }).click()
-      await expect(page.getByRole('heading', { name: `Rows for ${who}` })).toBeVisible()
-    }
     await page.getByRole('button', { name: 'Next' }).click()
+    await expect(page.getByRole('heading', { name: 'Rows for Ben' })).toBeVisible()
+    await page.getByRole('button', { name: 'Next' }).click()
+    await expect(page.getByRole('heading', { name: 'Rows for Cal' })).toBeVisible()
+    // a child's long-term savings row goes into the child's own account by default
+    await page.getByRole('checkbox', { name: /^Cal – Long-term savings/ }).check()
+    await expect(page.getByLabel('Cal – Long-term savings account').locator('option:checked')).toHaveText('Cal fund')
+    await page.getByLabel('Cal – Long-term savings per month').fill('50')
+    await page.getByRole('button', { name: 'Next' }).click()
+    await expect(page.getByRole('heading', { name: 'Rows for Rex' })).toBeVisible()
+    await page.getByRole('button', { name: 'Next' }).click()
+    // the last step previews what will be created
     await expect(page.getByText('from November 2026')).toBeVisible()
+    await expect(page.getByText('Cal fund · Investments · Cal')).toBeVisible()
+    await expect(page.getByText('€600.00 per month')).toBeVisible()
+    await expect(page.getByText('€200.00 per month')).toBeVisible()
+    await expect(page.getByText('Cal – Long-term savings → Cal fund')).toBeVisible()
+    await page.screenshot({ path: 'e2e/output/wizard-finish.png', fullPage: true })
     await page.getByRole('button', { name: 'Create household' }).click()
     await expect(page.getByText(/^Testers ·/)).toBeVisible()
     await expect(page.getByText('Ana – Pocket', { exact: true })).toBeVisible()
     await expect(page.getByText('To savings', { exact: true })).toBeVisible()
     // the USD account carries its household-currency line
     await expect(page.getByRole('rowheader', { name: 'Broker · in EUR' })).toBeVisible()
+    // the amounts typed in the wizard are the first month's values
+    await expect(page.getByRole('button', { name: /^To Broker Nov 2026: -?€200\.00/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^Groceries Nov 2026: -?€600\.00/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^Cal – Long-term savings Nov 2026: -?€50\.00/ })).toBeVisible()
     for (const name of ['Ana – Salary', 'Ben – Salary', 'Cal – Child benefit', 'Rex – Food & supplies', 'Groceries', 'Travel', 'Garden']) {
       await expect(page.getByRole('button', { name: new RegExp(`^${name} Nov 2026`) })).toBeVisible()
     }

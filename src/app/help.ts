@@ -70,6 +70,8 @@ export const HELP = {
   'household.archived': { title: 'Archived', text: 'Out of the way but not gone: archived rows, accounts, pool accounts, people and things keep their history up to the month they were archived from, and can be restored any time.' },
   'data.export': { title: 'Export file', text: 'One file with every table and the whole change history, so a cleared browser or a new device can take over. Keep it anywhere you like; importing it merges or replaces what is here.' },
   'sync.privacy': { title: 'What leaves this device', text: 'Everything is encrypted on this device before it leaves, and only your password opens it. The server stores the encrypted copy, your email and timestamps. Apart from that, only currency codes and dates ever leave the device, when rates are fetched.' },
+  'setup.amount': { title: 'Per month', text: 'Optional: the usual monthly amount. It becomes the first month\'s value and carries forward until you change it in the grid. Leave it empty to type it later.' },
+  'setup.owner': { title: 'Belongs to', text: 'Whose account it is. A child\'s account feeds their long-term savings row by default; an adult\'s own account stays theirs when costs are split. The household\'s accounts belong to everyone.' },
   'remove.archiveFrom': { title: 'Archive from', text: 'From this month on the thing is hidden and stops counting. Every earlier month stays exactly as it was, closed months included; that is why anything with amounts in a closed month can only be archived, never deleted.' },
 
   // Goals and schedules
