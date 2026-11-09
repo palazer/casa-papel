@@ -5,6 +5,13 @@ import {
 import type { CasaDb } from './db'
 import { primaryKeyOf, type PrimaryKey } from './keys'
 
+/**
+ * How long the change log is kept. Undo only reaches back to the last reload and sync sends 180 days of
+ * deletions (`DELETE_HORIZON_MS`), so nothing reads older entries; without a limit every export file
+ * would carry a before-and-after copy of every change ever made.
+ */
+export const EVENT_RETENTION_MS = 365 * 86_400_000
+
 /** A single change to one record. */
 export type Mutation =
   | { [T in TableName]: { op: 'put'; table: T; record: TableRecord[T] } }[TableName]
@@ -107,6 +114,11 @@ export class Store {
     this.undoStack.push(newTx)
     this.notify()
     return true
+  }
+
+  /** Drop change-log entries older than the retention period (app start). The data tables are not touched. Returns how many went. */
+  async pruneEvents(now: number = Date.now()): Promise<number> {
+    return this.db.events.where('ts').below(now - EVENT_RETENTION_MS).delete()
   }
 
   private async eventsOf(txId: string): Promise<StoreEvent[]> {

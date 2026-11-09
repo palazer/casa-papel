@@ -60,6 +60,10 @@ function Shell() {
     void sync.start()
     return () => sync.stop()
   }, [sync])
+  // housekeeping at start: the change log keeps a year; a failure here costs nothing and the next start tries again
+  useEffect(() => {
+    void store.pruneEvents().catch(() => undefined)
+  }, [store])
   const months = useMemo(() => (household && tables ? defaultMonths(household, tables) : []), [household, tables])
 
   // keep open months in step with the recurring register
