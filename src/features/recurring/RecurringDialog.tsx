@@ -95,7 +95,7 @@ export function RecurringDialog({ tables, household, item, defaultMonth, prefill
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>{item ? 'Edit recurring item' : 'New recurring item'}</DialogTitle>
+          <DialogTitle>{item ? 'Edit schedule' : 'New schedule'}</DialogTitle>
           <DialogDescription>Posted into every due month that is still open. Change the amount here and every open month follows.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 sm:grid-cols-2">

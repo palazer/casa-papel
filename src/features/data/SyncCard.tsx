@@ -24,7 +24,7 @@ export function SyncCard({ hasLocalData, onMessage, onError }: Props) {
   }
 
   if (!engine || !view) {
-    return <Island air title="Cloud sync" description={isDemoMode() ? 'Sync is off in the demo sandbox.' : 'Sync is not set up in this build.'} />
+    return <Island air title="Cloud sync" help="sync.privacy" description={isDemoMode() ? 'Sync is off in the demo sandbox.' : 'Sync is not set up in this build.'} />
   }
 
   const signedIn = view.status !== 'off'
@@ -32,7 +32,7 @@ export function SyncCard({ hasLocalData, onMessage, onError }: Props) {
 
   return (
     <Island
-      air title="Cloud sync"
+      air title="Cloud sync" help="sync.privacy"
       description={signedIn
         ? <>Signed in as <strong>{view.email}</strong>. The household is stored encrypted on Supabase in the EU; only your password opens it.</>
         : 'Keep an encrypted copy in the cloud and use the same household on your phone and laptop. Only your password can open it; nobody else, not even the person who runs this app. Accounts are by invitation.'}

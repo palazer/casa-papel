@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { cellKey, computeEngine, computePersonBudgets } from '@/engine'
 import { monthRange, newId } from '@/model'
-import { CasaDb, Store, addAccount, addEntity, addPool, addTransferRow, loadTables, planArchive, planRemoval, quickCreateHousehold, setCellValue, transferRowTargets } from '@/store'
+import { CasaDb, Store, addAccount, addEntity, addPool, addRowOfKind, addTransferRow, loadTables, planArchive, planRemoval, quickCreateHousehold, rowTargets, setCellValue } from '@/store'
 
 const months = monthRange('2026-01', '2026-03')
 
@@ -58,16 +58,40 @@ describe('addTransferRow', () => {
   })
 })
 
-describe('transferRowTargets', () => {
+describe('rowTargets', () => {
   it('leaves archived accounts out, and the store refuses them too', async () => {
     const { store } = await fresh()
     const fund = await addAccount(store, { name: 'Old fund', type: 'investment', currency: 'EUR', openingMonth: '2026-01' })
     let t = await loadTables(store)
-    expect(transferRowTargets(t, t.household[0]).investments.map((a) => a.id)).toEqual([fund.id])
+    expect(rowTargets(t, t.household[0]).investments.map((a) => a.id)).toEqual([fund.id])
     await store.commit(planArchive(t, { kind: 'account', id: fund.id }, '2026-02', Date.now()))
     t = await loadTables(store)
-    expect(transferRowTargets(t, t.household[0]).investments).toEqual([])
-    expect(transferRowTargets(t, t.household[0]).plugTaken).toBe(true)
+    expect(rowTargets(t, t.household[0]).investments).toEqual([])
+    expect(rowTargets(t, t.household[0]).plugTaken).toBe(true)
     await expect(addTransferRow(store, { name: 'Late deposits', categoryId: null, kind: 'to-investment', accountId: fund.id })).rejects.toThrow(/is archived/)
+  })
+})
+
+describe('addRowOfKind under Expenses', () => {
+  it('a payment row takes its kind from the account: loans and cards only, never archived, never under Transfers', async () => {
+    const { store, savings } = await fresh()
+    const loan = await addAccount(store, { name: 'Car loan', type: 'loan', currency: 'EUR', openingMonth: '2026-01', openingBalance: 500000 })
+    const card = await addAccount(store, { name: 'Visa', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01' })
+    const old = await addAccount(store, { name: 'Old loan', type: 'loan', currency: 'EUR', openingMonth: '2026-01' })
+    let t = await loadTables(store)
+    expect(rowTargets(t, t.household[0]).payoff.map((a) => a.name)).toEqual(['Car loan', 'Visa', 'Old loan'])
+    await expect(addRowOfKind(store, { section: 'expense', name: 'Loan', categoryId: null, kind: 'pay-off', accountId: savings.id })).rejects.toThrow(/not a loan or a credit card/)
+    await expect(addRowOfKind(store, { section: 'expense', name: 'Loan', categoryId: null, kind: 'pay-off', accountId: null })).rejects.toThrow(/Pick the loan or card/)
+    await expect(addRowOfKind(store, { section: 'transfer', name: 'Loan', categoryId: null, kind: 'pay-off', accountId: loan.id })).rejects.toThrow(/does not belong/)
+    await expect(addRowOfKind(store, { section: 'expense', name: 'Dep', categoryId: null, kind: 'to-investment', accountId: loan.id })).rejects.toThrow(/does not belong/)
+    const pay = await addRowOfKind(store, { section: 'expense', name: 'Car loan payment', categoryId: null, kind: 'pay-off', accountId: loan.id })
+    expect(pay).toMatchObject({ section: 'expense', kind: 'debt-payment', accountId: loan.id, defaultStatus: 'committed' })
+    expect(await addRowOfKind(store, { section: 'expense', name: 'Visa payment', categoryId: null, kind: 'pay-off', accountId: card.id })).toMatchObject({ kind: 'card-payment', accountId: card.id })
+    await setCellValue(store, pay.id, '2026-01', 20000, 'from-now-on')
+    const out = computeEngine({ tables: await loadTables(store), months })
+    expect(out.accounts[loan.id].months['2026-03'].balance).toBe(440000)
+    t = await loadTables(store)
+    await store.commit(planArchive(t, { kind: 'account', id: old.id }, '2026-02', Date.now()))
+    await expect(addRowOfKind(store, { section: 'expense', name: 'Late', categoryId: null, kind: 'pay-off', accountId: old.id })).rejects.toThrow(/is archived/)
   })
 })

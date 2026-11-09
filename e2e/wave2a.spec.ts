@@ -22,7 +22,7 @@ test.describe('wave 2a', () => {
     await expect(dlg.getByRole('heading', { name: 'New goal' })).toBeVisible()
     await dlg.getByLabel('Name').fill('Travel fund')
     await dlg.getByLabel('Kind').selectOption('pool-balance')
-    await expect(dlg.getByText('The envelope holds the amount')).toBeVisible()
+    await expect(dlg.getByText('The pool account holds the amount')).toBeVisible()
     await dlg.getByLabel('Tracks').selectOption({ label: 'Travel' })
     await dlg.getByLabel(/^Target \(EUR\)/).fill('1000')
     await dlg.getByLabel('Target month: month').selectOption('6')

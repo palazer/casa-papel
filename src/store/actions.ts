@@ -144,18 +144,22 @@ export async function addRow(store: Store, input: Partial<Row> & { name: string;
 
 /** What a new row under Transfers does; `plain` just moves money between your accounts. */
 export type TransferRowKind = 'plain' | 'to-savings' | 'to-investment' | 'pool-allocation' | 'pocket-money'
+/** What a new row under Expenses does: a normal expense, or a payment that brings a loan or card down. */
+export type ExpenseRowKind = 'plain' | 'pay-off'
 
 /**
- * What a new transfer row can point at: live, unarchived accounts and pool accounts, live adults, and whether the savings
- * plug already has its row. The grid's "Add row" and `addTransferRow` both read this, so what is offered is what is accepted.
+ * What a new row can point at: live, unarchived accounts and pool accounts, live adults, and whether the savings plug
+ * already has its row. The grid's "Add row" and `addRowOfKind` both read this, so what is offered is what is accepted.
  */
-export function transferRowTargets(tables: Tables, household: Household | undefined) {
+export function rowTargets(tables: Tables, household: Household | undefined) {
   const live = <T extends { deletedAt: number | null; archivedMonth: MonthKey | null }>(xs: T[]) => xs.filter((x) => !x.deletedAt && !x.archivedMonth)
   const accounts = live(tables.accounts)
   const rows = tables.rows.filter((r) => !r.deletedAt)
   return {
     savings: accounts.filter((a) => a.type === 'savings'),
     investments: accounts.filter((a) => a.type === 'investment'),
+    /** loans and credit cards a payment row can bring down */
+    payoff: accounts.filter((a) => a.type === 'loan' || a.type === 'credit-card'),
     /** pool accounts whose row was deleted, so they can be filled again */
     orphanPools: live(tables.pools).filter((p) => !p.allocationRowId || !rows.some((r) => r.id === p.allocationRowId)),
     adults: live(tables.entities).filter((e) => e.kind === 'adult'),
@@ -163,19 +167,38 @@ export function transferRowTargets(tables: Tables, household: Household | undefi
   }
 }
 
+export interface RowOfKindInput {
+  section: 'expense' | 'transfer'
+  name: string
+  categoryId: string | null
+  kind: TransferRowKind | ExpenseRowKind
+  accountId?: string | null
+  poolId?: string | null
+  adultId?: string | null
+}
+
 /**
- * "Add row" under Transfers. A deposit row needs its account, a pool row the pool account it fills (one that lost its
- * row), pocket money the adult it is for; everything is checked here so the grid can say what is missing.
+ * "Add row" under Transfers and Expenses. A deposit row needs its account, a pool row the pool account it fills (one
+ * that lost its row), pocket money the adult it is for, a payment row the loan or card it brings down; everything is
+ * checked here so the grid can say what is missing.
  */
-export async function addTransferRow(
-  store: Store,
-  input: { name: string; categoryId: string | null; kind: TransferRowKind; accountId?: string | null; poolId?: string | null; adultId?: string | null },
-): Promise<Row> {
+export async function addRowOfKind(store: Store, input: RowOfKindInput): Promise<Row> {
   const tables = await loadTables(store)
-  const targets = transferRowTargets(tables, tables.household.find((h) => !h.deletedAt))
-  const base: Partial<Row> & { name: string; section: Row['section'] } = { name: input.name, section: 'transfer', categoryId: input.categoryId, kind: input.kind }
+  const targets = rowTargets(tables, tables.household.find((h) => !h.deletedAt))
+  const transferOnly: string[] = ['to-savings', 'to-investment', 'pool-allocation', 'pocket-money']
+  if ((input.section === 'expense' && transferOnly.includes(input.kind)) || (input.section === 'transfer' && input.kind === 'pay-off')) {
+    throw new Error('That kind of row does not belong in this section.')
+  }
+  const base: Partial<Row> & { name: string; section: Row['section'] } = { name: input.name, section: input.section, categoryId: input.categoryId, kind: input.kind === 'pay-off' ? 'plain' : input.kind }
   if (input.kind !== 'plain') base.defaultStatus = 'committed'
-  if (input.kind === 'to-savings' || input.kind === 'to-investment') {
+  if (input.kind === 'pay-off') {
+    const acc = tables.accounts.find((a) => a.id === input.accountId && !a.deletedAt)
+    if (!acc) throw new Error('Pick the loan or card this row pays off.')
+    if (acc.archivedMonth) throw new Error(`"${acc.name}" is archived.`)
+    if (!targets.payoff.some((a) => a.id === acc.id)) throw new Error(`"${acc.name}" is not a loan or a credit card.`)
+    base.kind = acc.type === 'loan' ? 'debt-payment' : 'card-payment'
+    base.accountId = acc.id
+  } else if (input.kind === 'to-savings' || input.kind === 'to-investment') {
     if (input.kind === 'to-savings' && targets.plugTaken) throw new Error('The month-end rule already fills a "to savings" row; a second one would stay at zero.')
     const acc = checkAccountForRow(tables, { kind: input.kind, name: input.name }, input.accountId ?? null)
     if (acc) base.accountId = acc.id
@@ -199,6 +222,9 @@ export async function addTransferRow(
   await store.commit(mutations)
   return row
 }
+
+/** The Transfers section's "Add row" (kept for callers and tests): `addRowOfKind` with `section: 'transfer'`. */
+export const addTransferRow = (store: Store, input: Omit<RowOfKindInput, 'section' | 'kind'> & { kind: TransferRowKind }): Promise<Row> => addRowOfKind(store, { ...input, section: 'transfer' })
 
 export async function updateRow(store: Store, rowId: string, patch: Partial<Omit<Row, 'id' | 'createdAt'>>): Promise<void> {
   const tables = await loadTables(store)

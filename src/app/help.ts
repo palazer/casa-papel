@@ -68,6 +68,8 @@ export const HELP = {
   'household.categories': { title: 'Categories', text: 'Named groups inside a section. Rows sort by category in the grid and share a faint band; a label line names each group. Rename, reorder or remove them here; removing a category keeps its rows.' },
   'household.usualCategories': { title: 'The usual categories', text: 'Adds six expense categories most households use: Housing, Living, Transport, Family & pets, Fun, Personal. Rows stay where they are until you assign them.' },
   'household.archived': { title: 'Archived', text: 'Out of the way but not gone: archived rows, accounts, pool accounts, people and things keep their history up to the month they were archived from, and can be restored any time.' },
+  'data.export': { title: 'Export file', text: 'One file with every table and the whole change history, so a cleared browser or a new device can take over. Keep it anywhere you like; importing it merges or replaces what is here.' },
+  'sync.privacy': { title: 'What leaves this device', text: 'Everything is encrypted on this device before it leaves, and only your password opens it. The server stores the encrypted copy, your email and timestamps. Apart from that, only currency codes and dates ever leave the device, when rates are fetched.' },
   'remove.archiveFrom': { title: 'Archive from', text: 'From this month on the thing is hidden and stops counting. Every earlier month stays exactly as it was, closed months included; that is why anything with amounts in a closed month can only be archived, never deleted.' },
 
   // Goals and schedules

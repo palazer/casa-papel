@@ -113,7 +113,7 @@ export const SECTION_INFO: Record<Section, { label: string; blurb: string }> = {
 
 export const GOAL_KIND_INFO: Array<{ value: GoalKind; label: string; help: string }> = [
   { value: 'account-balance', label: 'Grow an account to an amount', help: 'A savings, investment or other asset reaches a balance. Compared in the account\'s own currency.' },
-  { value: 'pool-balance', label: 'Fill a pool account', help: 'The envelope holds the amount: monthly set-asides minus what comes out of it.' },
+  { value: 'pool-balance', label: 'Fill a pool account', help: 'The pool account holds the amount: monthly set-asides minus what comes out of it.' },
   { value: 'pay-off', label: 'Pay off a card or loan', help: 'Done when nothing is owed. Progress counts down from what was owed when you set the goal.' },
   { value: 'net-worth', label: 'Reach a net worth', help: 'Tracked assets minus tracked debts, in your base currency; the number shown in Moves.' },
 ]

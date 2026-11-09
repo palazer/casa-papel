@@ -188,7 +188,7 @@ export async function createHouseholdFromSetup(store: Store, input: SetupInput):
 
 export interface PoolInput {
   name: string
-  /** Savings account that holds the envelope. */
+  /** Savings account that holds the pool account. */
   accountId: string
   openingBalance?: number
   /** Monthly amount set aside, written into the allocation row from `fromMonth` on. */

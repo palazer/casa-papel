@@ -41,7 +41,7 @@ export function RecurringList() {
         <span className="text-muted-foreground">
           In the grid, open any posted item to change its amount for one month or from now on, skip a month, or end it; open any cell and choose "Make recurring" to start a new one.
         </span>
-        <Button size="xs" className="ml-auto" onClick={() => setEditing('new')}>Add recurring</Button>
+        <Button size="xs" className="ml-auto" onClick={() => setEditing('new')}>Add schedule</Button>
       </div>
       {error && <p role="alert" className="text-destructive">{error}</p>}
       <div className="overflow-x-auto rounded-md border">

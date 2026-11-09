@@ -73,7 +73,7 @@ test.describe('wave 1b', () => {
     await expect(page.getByRole('button', { name: /^The car – Insurance Nov 2026: empty/ })).toBeVisible()
 
     await page.getByRole('link', { name: 'Household' }).click()
-    await page.getByRole('button', { name: 'Add recurring' }).click()
+    await page.getByRole('button', { name: 'Add schedule' }).click()
     // an income row is paid into an account and has no funding source
     await page.getByLabel('Grid row').selectOption({ index: 0 })
     await expect(page.getByText('Paid into')).toBeVisible()

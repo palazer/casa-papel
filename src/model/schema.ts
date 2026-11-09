@@ -213,7 +213,7 @@ export const RecurringItemSchema = BaseRecord.extend({
 // ---------- pools, fx, months ----------
 export const PoolSchema = BaseRecord.extend({
   name: z.string().min(1),
-  /** Savings account that holds this envelope. */
+  /** Savings account that holds this pool account. */
   accountId: IdSchema,
   allocationRowId: IdSchema.nullable().default(null),
   openingBalance: MoneySchema.default(0),

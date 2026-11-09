@@ -4,11 +4,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useStore } from '@/app/store'
 import type { Category, Household, Section, Tables } from '@/model'
-import { addRow, addTransferRow, transferRowTargets, type TransferRowKind } from '@/store'
+import { addRow, addRowOfKind, rowTargets, type ExpenseRowKind, type TransferRowKind } from '@/store'
 import { NativeSelect } from './NativeSelect'
 
+type Choice = TransferRowKind | ExpenseRowKind
+interface Kind { key: Choice; label: string; text: string }
+
 /** Each choice under Transfers, with the sentence shown beneath the selects. */
-const KINDS: Record<TransferRowKind, { label: string; text: string }> = {
+const TRANSFER_KINDS: Record<TransferRowKind, Omit<Kind, 'key'>> = {
   plain: { label: 'Moves money between your accounts', text: 'An amount you type each month. It is not spending, so it never counts as an expense.' },
   'to-savings': { label: 'Goes into a savings account', text: 'An amount you type; that savings balance under Balances rises with it.' },
   'to-investment': { label: 'Deposits into an investment account', text: 'The account\'s value, deposited total and return under Balances follow this row.' },
@@ -16,23 +19,42 @@ const KINDS: Record<TransferRowKind, { label: string; text: string }> = {
   'pocket-money': { label: 'Pocket money for an adult', text: 'A fixed amount you type for that adult. It comes off the month\'s leftover, and in the proportional split it is theirs alone.' },
 }
 
-/** "Add row" at the foot of a section: a name, a category when the section has any, and under Transfers what the row does. */
+/** Each choice under Expenses. */
+const EXPENSE_KINDS: Record<ExpenseRowKind, Omit<Kind, 'key'>> = {
+  plain: { label: 'A normal expense', text: 'Spending you type each month, as one amount or a list of items.' },
+  'pay-off': { label: 'Pays off a loan or card', text: 'Each payment brings down what is owed on the loan or card you pick; what is still owed shows under Balances.' },
+}
+
+/** "Add row" at the foot of a section: a name, a category when the section has any, and under Transfers and Expenses what the row does. */
 export function AddRowInline({ section, categories, tables, household, onError }: { section: Section; categories: Category[]; tables: Tables; household: Household; onError: (msg: string) => void }) {
   const store = useStore()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [categoryId, setCategoryId] = useState('')
-  const [kind, setKind] = useState<TransferRowKind>('plain')
+  const [kind, setKind] = useState<Choice>('plain')
   const [targetId, setTargetId] = useState('')
 
-  // the lists and rules the store applies in addTransferRow, so what is offered is what is accepted
-  const { savings, investments, orphanPools, adults, plugTaken } = transferRowTargets(tables, household)
-  const kinds = (Object.keys(KINDS) as TransferRowKind[]).filter((k) => (k !== 'to-savings' || !plugTaken) && (k !== 'pool-allocation' || orphanPools.length > 0))
+  // the lists and rules the store applies in addRowOfKind, so what is offered is what is accepted
+  const { savings, investments, payoff, orphanPools, adults, plugTaken } = rowTargets(tables, household)
+  const kinds: Kind[] = section === 'transfer'
+    ? (Object.keys(TRANSFER_KINDS) as TransferRowKind[])
+        .filter((k) => (k !== 'to-savings' || !plugTaken) && (k !== 'pool-allocation' || orphanPools.length > 0))
+        .map((k) => ({ key: k, ...TRANSFER_KINDS[k] }))
+    : section === 'expense' ? (Object.keys(EXPENSE_KINDS) as ExpenseRowKind[]).map((k) => ({ key: k, ...EXPENSE_KINDS[k] })) : []
+  const current = kinds.find((k) => k.key === kind) ?? kinds[0]
   const targets: Array<{ id: string; name: string }> | null =
-    kind === 'to-savings' ? savings : kind === 'to-investment' ? investments : kind === 'pool-allocation' ? orphanPools : kind === 'pocket-money' ? adults : null
+    kind === 'to-savings' ? savings
+      : kind === 'to-investment' ? investments
+        : kind === 'pool-allocation' ? orphanPools
+          : kind === 'pocket-money' ? adults
+            : kind === 'pay-off' ? payoff.map((a) => ({ id: a.id, name: `${a.name} · ${a.type === 'loan' ? 'Loan' : 'Credit card'}` }))
+              : null
   const targetLabel = kind === 'pool-allocation' ? 'Pool account' : kind === 'pocket-money' ? 'Adult' : 'Account'
   const missing = targets && targets.length === 0
-    ? kind === 'to-savings' ? 'Add a savings account under Household first.' : kind === 'to-investment' ? 'Add an investment account under Household first.' : 'Add an adult under Household first.'
+    ? kind === 'to-savings' ? 'Add a savings account under Household first.'
+      : kind === 'to-investment' ? 'Add an investment account under Household first.'
+        : kind === 'pay-off' ? 'Add a loan or credit card account under Household first.'
+          : 'Add an adult under Household first.'
     : null
   const chosen = targets ? (targets.find((t) => t.id === targetId) ?? targets[0]) : undefined
 
@@ -40,11 +62,11 @@ export function AddRowInline({ section, categories, tables, household, onError }
     const n = name.trim()
     if (!n || missing) return
     try {
-      if (section === 'transfer') {
+      if (section === 'transfer' || section === 'expense') {
         const id = chosen?.id ?? null
-        await addTransferRow(store, {
-          name: n, categoryId: categoryId || null, kind,
-          accountId: kind === 'to-savings' || kind === 'to-investment' ? id : null,
+        await addRowOfKind(store, {
+          section, name: n, categoryId: categoryId || null, kind,
+          accountId: kind === 'to-savings' || kind === 'to-investment' || kind === 'pay-off' ? id : null,
           poolId: kind === 'pool-allocation' ? id : null,
           adultId: kind === 'pocket-money' ? id : null,
         })
@@ -77,19 +99,19 @@ export function AddRowInline({ section, categories, tables, household, onError }
           {[...categories].sort((a, b) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0)).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </NativeSelect>
       )}
-      {section === 'transfer' && (
-        <NativeSelect aria-label="What the new transfer row does" className="h-7" value={kind} onChange={(e) => { setKind(e.target.value as TransferRowKind); setTargetId('') }}>
-          {kinds.map((k) => <option key={k} value={k}>{KINDS[k].label}</option>)}
+      {kinds.length > 1 && (
+        <NativeSelect aria-label={`What the new ${section} row does`} className="h-7" value={current?.key ?? 'plain'} onChange={(e) => { setKind(e.target.value as Choice); setTargetId('') }}>
+          {kinds.map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
         </NativeSelect>
       )}
-      {section === 'transfer' && targets && targets.length > 0 && (
-        <NativeSelect aria-label={`${targetLabel} for the new transfer row`} className="h-7" value={chosen?.id ?? ''} onChange={(e) => setTargetId(e.target.value)}>
+      {targets && targets.length > 0 && (
+        <NativeSelect aria-label={`${targetLabel} for the new ${section} row`} className="h-7" value={chosen?.id ?? ''} onChange={(e) => setTargetId(e.target.value)}>
           {targets.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
         </NativeSelect>
       )}
       <Button size="sm" onClick={() => void save()} disabled={!!missing}>Add</Button>
       <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
-      {section === 'transfer' && <p className="basis-full text-xs text-muted-foreground">{missing ?? KINDS[kind].text}</p>}
+      {kinds.length > 1 && <p className="basis-full text-xs text-muted-foreground">{missing ?? current?.text}</p>}
     </div>
   )
 }

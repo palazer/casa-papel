@@ -158,7 +158,9 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   account, deposits into an investment account, fills a pool account that lost its row, pocket money for an adult), with
   a second select for the target and one muted sentence under the controls for the chosen kind. A choice without a
   possible target is left out (a second "to savings" under the savings plug, a pool row when every pool account has one)
-  or the sentence says what to add first and Add is disabled. The store checks the same rules (`addTransferRow`).
+  or the sentence says what to add first and Add is disabled. Under Expenses the same select offers "A normal expense" or
+  "Pays off a loan or card" with the loan and card accounts as targets (the account's type picks the row kind). The
+  store checks the same rules (`addRowOfKind`, `rowTargets`).
 - Section header rows: the chevron and the title in `text-xs font-semibold` in the section's hue; no bar, no fill.
 - Categories (`groupRowsByCategory`): inside a section rows sort by category, then by their own order; rows without
   one come last. When the section has categories, each group opens with a label row (`text-[10px] font-semibold
@@ -201,6 +203,10 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   header's toolbar (Month, Moves) or an island's first line (Schedules). At the last planned month the Next button gives
   way to an `xs outline` `Add <year>`, the Grid toolbar's action: the plan always ends in a December and grows a calendar
   year at a time (`planEnd` in `src/store/months.ts`; this year's December, next year's from October on).
+- One name per idea, the same in every control: a repeating amount is a **schedule** (dialog "New schedule" / "Edit
+  schedule", button "Add schedule", never "recurring item"); the month-end rule reads "Leftover goes to savings" /
+  "I decide the savings amount" and the sharing choice "Pooled, with pocket money" / "In proportion to income" in the
+  wizard and in Household settings alike; money set aside is a **pool account**, never an envelope.
 - Rates are always spelled with both codes in the orientation whose number is ≥ 1 (`1 EUR = 1.08 USD`, `1 USD = 48.58 TRY`;
   `readableRate` in `src/features/household/fxDisplay.ts`); the rates table's columns read `1 EUR in USD` and store
   `base/foreign`. The cell editor's rate line (`src/features/grid/RateLine.tsx`) sits under an amount in another currency:

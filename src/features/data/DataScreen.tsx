@@ -147,7 +147,7 @@ export function DataScreen() {
       <SyncCard hasLocalData={!!h} onMessage={setMessage} onError={setError} />
       <InviteCard onError={setError} />
 
-      <Island air title="Export" description="One JSON file with every table and the full change history. Keep it anywhere you like.">
+      <Island air title="Export" help="data.export" description="One JSON file with every table and the full change history. Keep it anywhere you like.">
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" onClick={doExport} disabled={!h}>Export now</Button>
           {nag && <span role="status" className="text-amber-700 dark:text-amber-400">You have unsaved changes since your last export.</span>}

@@ -28,7 +28,7 @@ export function PoolsCard({ household, tables, engine, onError }: { household: H
   return (
     <Island
       air tone={HUES.pool} title="Pool accounts"
-      description={'A pool account is an envelope inside a savings account: a monthly amount is set aside for travel, clothes, gifts, and spending that "comes out of" it draws it down without touching the month\'s leftover.'}
+      description={'A pool account is money set aside inside a savings account for one purpose: a monthly amount goes in for travel, clothes or gifts, and spending that "comes out of" it draws it down without touching the month\'s leftover.'}
     >
       <div className="space-y-3">
         {pools.length > 0 && (
