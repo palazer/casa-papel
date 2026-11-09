@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { amountDisplay } from '@/features/grid/display'
+import { amountDisplay } from '@/app/display'
 
 describe('amountDisplay', () => {
   it('a balance or income below zero takes the expense tone; above zero it reads as money in', () => {

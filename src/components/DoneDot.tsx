@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils'
-import { doneLabel, type DoneState } from './display'
+import { doneLabel, type DoneState } from '@/app/display'
 
 interface Props {
   done: number

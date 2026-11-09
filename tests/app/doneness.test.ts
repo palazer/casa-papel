@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { doneLabel, doneness } from '@/features/grid/display'
+import { doneLabel, doneness } from '@/app/display'
 import type { ResolvedItem } from '@/engine'
 import type { ItemStatus } from '@/model'
 

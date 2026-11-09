@@ -18,8 +18,8 @@ import { AddRowInline } from './AddRowInline'
 import { BalanceDialog } from './BalanceDialog'
 import { CellEditor } from './CellEditor'
 import { RowMenu } from './RowMenu'
-import { amountDisplay, doneLabel, doneness, flowOf, statusClass, toneClass, type Flow } from './display'
-import { DoneDot } from './DoneDot'
+import { amountDisplay, doneLabel, doneness, flowOf, statusClass, toneClass, type Flow } from '@/app/display'
+import { DoneDot } from '@/components/DoneDot'
 
 const SECTIONS: Array<{ key: Section; title: string }> = [
   { key: 'income', title: 'Income' },

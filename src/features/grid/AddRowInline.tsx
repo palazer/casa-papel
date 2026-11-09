@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { useStore } from '@/app/store'
 import type { Account, Category, Household, Section, Tables } from '@/model'
 import { addRow, addRowOfKind, rowTargets, type ExpenseRowKind, type TransferRowKind } from '@/store'
-import { NativeSelect } from './NativeSelect'
+import { NativeSelect } from '@/components/NativeSelect'
 
 type Choice = TransferRowKind | ExpenseRowKind
 type Targets = ReturnType<typeof rowTargets>

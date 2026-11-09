@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { MonthField } from '@/components/MonthField'
-import { NativeSelect } from '@/features/grid/NativeSelect'
+import { NativeSelect } from '@/components/NativeSelect'
 import { amountToInput, formatMonth, parseAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import { GOAL_KIND_INFO, monthOfDate, type Goal, type GoalKind, type Household, type Tables } from '@/model'

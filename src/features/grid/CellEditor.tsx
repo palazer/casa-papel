@@ -17,8 +17,8 @@ import {
   type EditScope,
 } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
-import { DoneDot } from './DoneDot'
-import { NativeSelect } from './NativeSelect'
+import { DoneDot } from '@/components/DoneDot'
+import { NativeSelect } from '@/components/NativeSelect'
 import { RateLine } from './RateLine'
 import { fundingOptions as buildFundingOptions } from './funding'
 import { HELP } from '@/app/help'

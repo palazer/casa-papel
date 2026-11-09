@@ -10,7 +10,7 @@ import { useStore } from '@/app/store'
 import { sortRows } from '@/engine'
 import type { Category, Household, Section, Tables } from '@/model'
 import { addCategory, moveCategory, renameCategory, seedDefaultCategories, setRowCategory } from '@/store'
-import { NativeSelect } from '@/features/grid/NativeSelect'
+import { NativeSelect } from '@/components/NativeSelect'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
 
 const SECTIONS: Array<{ key: Section; title: string }> = [

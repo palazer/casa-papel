@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { HUES } from '@/app/hues'
 import { useScreen } from '@/app/screens'
-import { DoneDot } from '@/features/grid/DoneDot'
-import { statusClass } from '@/features/grid/display'
+import { DoneDot } from './DoneDot'
+import { statusClass } from '@/app/display'
 import { cn } from '@/lib/utils'
 
 const KINDS = [

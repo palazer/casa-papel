@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { NativeSelect } from '@/features/grid/NativeSelect'
+import { NativeSelect } from './NativeSelect'
 
 interface Props {
   id?: string

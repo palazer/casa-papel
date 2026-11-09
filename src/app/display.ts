@@ -1,6 +1,6 @@
 import type { CellResult, CellStatus } from '@/engine'
 import type { Money, Row } from '@/model'
-import { formatAmount } from '@/app/format'
+import { formatAmount } from './format'
 
 export type Flow = 'in' | 'out' | 'net'
 

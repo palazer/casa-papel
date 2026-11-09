@@ -1,7 +1,7 @@
 import { cellKey, type CellResult } from '@/engine'
 import { formatAmount } from '@/app/format'
 import type { Money, MonthKey, Row } from '@/model'
-import { doneness, flowOf } from '@/features/grid/display'
+import { doneness, flowOf } from '@/app/display'
 
 export interface MonthProgress {
   /** Units done and units in all: a line is one unit, an itemized line one per live item. */

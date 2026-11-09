@@ -1,5 +1,5 @@
-import { DoneDot } from '@/features/grid/DoneDot'
-import type { DoneState } from '@/features/grid/display'
+import type { DoneState } from '@/app/display'
+import { DoneDot } from './DoneDot'
 import { cn } from '@/lib/utils'
 
 interface Props {

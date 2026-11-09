@@ -7,7 +7,7 @@ import { InfoTip, TipLabel } from '@/components/InfoTip'
 import { useStore } from '@/app/store'
 import type { Row, Tables } from '@/model'
 import { addCategory, seedDefaultCategories, setRowCategory } from '@/store'
-import { NativeSelect } from './NativeSelect'
+import { NativeSelect } from '@/components/NativeSelect'
 import { useSave } from './RowDialogs'
 
 const NEW = '__new__'

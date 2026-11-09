@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import type { CellResult, ResolvedItem } from '@/engine'
 import type { Row } from '@/model'
 import { formatAmount } from '@/app/format'
-import { amountDisplay, doneLabel, doneness, flowOf, statusClass, toneClass, type DoneState, type Flow } from '@/features/grid/display'
+import { amountDisplay, doneLabel, doneness, flowOf, statusClass, toneClass, type DoneState, type Flow } from '@/app/display'
 
 interface Props {
   row: Row
