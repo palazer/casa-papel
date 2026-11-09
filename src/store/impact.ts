@@ -299,9 +299,10 @@ const describeGoal = (g: Goal): Described => ({
 })
 
 function describeCategory(ctx: Ctx, c: Category): Described {
-  const rows = ctx.rows.filter((r) => r.categoryId === c.id)
+  const rows = ctx.rows.filter((r) => r.categoryId === c.id && r.kind !== 'category-estimate')
+  const estimate = ctx.rows.some((r) => r.categoryId === c.id && r.kind === 'category-estimate')
   return {
-    kindLabel: 'Category', subject: c.name, loses: [], blockers: [], note: null, activity: [], canArchive: false, archive: () => [],
+    kindLabel: 'Category', subject: c.name, loses: estimate ? ['its estimate, in every month'] : [], blockers: [], note: null, activity: [], canArchive: false, archive: () => [],
     changes: rows.length ? [`${quoteNames(rows.map((r) => r.name))} ${pick(rows.length, 'keeps its', 'keep their')} place without a category`] : [],
   }
 }
@@ -537,7 +538,8 @@ export function planRemoval(tables: Tables, target: RemovalTarget, ts: number, o
     case 'goal': return [put('goals', GoalSchema, find(ctx.goals, target.id, 'goal'), { deletedAt: ts }, ts)]
     case 'category': {
       const c = find(ctx.tables.categories.filter((x) => !x.deletedAt), target.id, 'category')
-      return [put('categories', CategorySchema, c, { deletedAt: ts }, ts), ...ctx.rows.filter((r) => r.categoryId === c.id).map((r) => put('rows', RowSchema, r, { categoryId: null }, ts))]
+      // the rows stay, without a category; the estimate belonged to the category and goes with it
+      return [put('categories', CategorySchema, c, { deletedAt: ts }, ts), ...ctx.rows.filter((r) => r.categoryId === c.id).map((r) => put('rows', RowSchema, r, r.kind === 'category-estimate' ? { deletedAt: ts } : { categoryId: null }, ts))]
     }
   }
 }

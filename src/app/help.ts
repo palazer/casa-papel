@@ -57,6 +57,7 @@ export const HELP = {
   'cell.deductions': { title: 'Deducted from this income', text: 'Rows marked as deducted from this income, taken off this month\'s amount. The net is what actually arrives; the deductions stay as expenses in their own rows.' },
   'cell.rate': { title: 'This month\'s rate', text: 'How this amount becomes the household currency. An ECB rate is the European Central Bank\'s for the day the Month rate setting under Household picks, the first business day by default. A manual rate is yours and applies to every row in that currency that month. Projected and carried rates are estimates.' },
 
+  'row.categoryEstimate': { title: 'Category estimate', text: 'What you expect a category to come to in a month, before you know every row. Its rows are taken off it and what is left counts as "Not broken down yet"; once the rows add up to more, the category is their sum. Set it on the Statement, inside the category.' },
   // Household settings
   'household.closingRule': { title: 'Month-end rule', text: 'What happens to the money left at the end of the month. Savings plug: the leftover moves to savings automatically and you never type "To savings". Leftover plug: you type what goes to savings and the rest is shown as leftover.' },
   'household.moneyMode': { title: 'How you share money', text: 'Pooled: all income is household money and each adult gets pocket money. Proportional: each adult pays a share of the shared costs in proportion to their income, and Moves shows who sends what where.' },

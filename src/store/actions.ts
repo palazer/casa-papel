@@ -2,7 +2,7 @@ import { generateKeyBetween } from 'fractional-indexing'
 import { computeEngine, cellKey, sortRows, type EngineOutput } from '@/engine'
 import {
   ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RowSchema, addMonths, cardIsItemized, compareMonths, monthKey, monthOfDate, monthRange, newId, parseMonth, poolIdOf,
-  type Account, type Cell, type CellInput, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Pool, type Row, type RowKind, type Tables,
+  type Account, type Category, type Cell, type CellInput, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Pool, type Row, type RowKind, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
 import { planEnd } from './months'
@@ -52,7 +52,8 @@ function freezeNext(tables: Tables, engine: EngineOutput, rowId: string, month: 
   const current = engine.cells[cellKey(rowId, month)]
   if (!current || current.source === 'empty') return []
   if (nextCell && nextCell.mode !== 'inherit') return []
-  return [putCell({ rowId, month: next, mode: 'value', value: current.value, items: [], note: null, currencyOverride: null, updatedAt: now() })]
+  // a category's estimate carries what was typed, not what its rows have left of it
+  return [putCell({ rowId, month: next, mode: 'value', value: current.estimate ?? current.value, items: [], note: null, currencyOverride: null, updatedAt: now() })]
 }
 
 export async function setCellValue(store: Store, rowId: string, month: MonthKey, value: Money, scope: EditScope): Promise<void> {
@@ -228,6 +229,61 @@ export async function addRowOfKind(store: Store, input: RowOfKindInput): Promise
   const { row, mutation } = newRowMutation(tables, base)
   const mutations: Mutation[] = [mutation]
   if (pool) mutations.push({ op: 'put', table: 'pools', record: PoolSchema.parse({ ...pool, allocationRowId: row.id, updatedAt: now() }) })
+  await store.commit(mutations)
+  return row
+}
+
+// ---------- category estimates ----------
+
+/** The row that carries a category's estimate; the Grid and the Month view show it by this name. */
+export const estimateRowName = (category: Pick<Category, 'name'>): string => `${category.name} – Not broken down yet`
+
+/** A category's estimate row, archived or not; there is one per category at most. */
+export const estimateRowOf = (tables: Tables, categoryId: string): Row | undefined =>
+  tables.rows.find((r) => !r.deletedAt && r.kind === 'category-estimate' && r.categoryId === categoryId)
+
+/**
+ * The puts that give an expense category its estimate from `month`: the estimate row on first use (at the end of the
+ * category, back from the archive if it was there) and its amount for the month. `this-month` holds the following
+ * month at what it was before, 0 for a category that had none. `previous` is the estimate the month showed until now.
+ * Pure; the caller commits, so a new category and its estimate can be one step.
+ */
+export function categoryEstimateMutations(tables: Tables, category: Category, month: MonthKey, amount: Money, scope: EditScope, previous: Money = 0): { row: Row; mutations: Mutation[] } {
+  if (category.section !== 'expense') throw new Error('Only an expense category can have an estimate.')
+  if (!Number.isFinite(amount) || amount < 0) throw new Error('An estimate cannot be below zero.')
+  const mutations: Mutation[] = []
+  let row = estimateRowOf(tables, category.id)
+  if (!row) {
+    const made = newRowMutation(tables, { name: estimateRowName(category), section: 'expense', kind: 'category-estimate', categoryId: category.id })
+    row = made.row
+    mutations.push(made.mutation)
+  } else if (row.archivedMonth) {
+    row = RowSchema.parse({ ...row, archivedMonth: null, updatedAt: now() })
+    mutations.push({ op: 'put', table: 'rows', record: row })
+  }
+  const existing = cellOf(tables, row.id, month)
+  mutations.push(putCell({ rowId: row.id, month, mode: 'value', value: amount, items: [], note: existing?.note ?? null, currencyOverride: null, markedDone: existing?.markedDone, updatedAt: now() }))
+  if (scope === 'this-month') {
+    const next = addMonths(month, 1)
+    const nextCell = cellOf(tables, row.id, next)
+    if (!nextCell || nextCell.mode === 'inherit') mutations.push(putCell({ rowId: row.id, month: next, mode: 'value', value: previous, items: [], note: nextCell?.note ?? null, currencyOverride: null, updatedAt: now() }))
+  }
+  return { row, mutations }
+}
+
+/**
+ * What an expense category is expected to come to in a month, typed before its rows are known. The category's rows
+ * are taken off it and the rest counts as "Not broken down yet"; once they add up to more, they are the category.
+ * 0 takes the estimate away from this month on (or for this month only). One commit.
+ */
+export async function setCategoryEstimate(store: Store, categoryId: string, month: MonthKey, amount: Money, scope: EditScope = 'from-now-on'): Promise<Row> {
+  const { tables, engine } = await engineUpTo(store, month)
+  assertOpen(tables, month)
+  const category = tables.categories.find((c) => c.id === categoryId && !c.deletedAt)
+  if (!category) throw new Error('That category no longer exists.')
+  const known = estimateRowOf(tables, categoryId)
+  const previous = known ? engine.cells[cellKey(known.id, month)]?.estimate ?? 0 : 0
+  const { row, mutations } = categoryEstimateMutations(tables, category, month, amount, scope, previous)
   await store.commit(mutations)
   return row
 }
@@ -572,6 +628,7 @@ export function planRowFundedBy(tables: Tables, row: Row, fundedBy: FundedBy, sc
 
 /** Why a row has no amount of its own to mirror or replace, or null when it is an ordinary row. */
 export function derivedRowReason(row: Row, closingRule: Household['closingRule']): string | null {
+  if (row.kind === 'category-estimate') return `"${row.name}" is what is left of its category's estimate.`
   if (row.kind === 'to-savings' && closingRule === 'savings-plug') return `"${row.name}" is worked out by the app from the rest of the month.`
   if (row.kind === 'pocket-money' && row.pocketMode === 'share-of-pocket-total') return `"${row.name}" is a share of the pocket total.`
   return null

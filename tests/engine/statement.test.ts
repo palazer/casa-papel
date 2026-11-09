@@ -251,6 +251,62 @@ describe('the Statement, the month', () => {
   })
 })
 
+describe('the Statement, a category with an estimate', () => {
+  const cat = (name: string, order: string) => CategorySchema.parse({ id: newId(), createdAt: T0, updatedAt: T0, name, section: 'expense', order })
+
+  it('closes the category with what is not broken down yet, names the estimate, and lets the rows win', () => {
+    const housing = cat('Housing', 'a0')
+    const hobbies = cat('Hobbies', 'a1')
+    const salary = row({ name: 'Salary', section: 'income' })
+    const housingEstimate = row({ name: 'Housing – Not broken down yet', section: 'expense', kind: 'category-estimate', categoryId: housing.id, order: 'b0' })
+    const rent = row({ name: 'Rent', section: 'expense', categoryId: housing.id, defaultStatus: 'committed', order: 'b1' })
+    const power = row({ name: 'Electricity', section: 'expense', categoryId: housing.id, defaultStatus: 'committed', order: 'b2' })
+    const hobbiesEstimate = row({ name: 'Hobbies – Not broken down yet', section: 'expense', kind: 'category-estimate', categoryId: hobbies.id, order: 'b3' })
+    const t = tables({
+      household: [household()], categories: [housing, hobbies], rows: [salary, housingEstimate, rent, power, hobbiesEstimate],
+      cells: [
+        cellValue(salary.id, '2026-01', 4000_00), cellValue(housingEstimate.id, '2026-01', 1450_00), cellValue(rent.id, '2026-01', 1100_00), cellValue(power.id, '2026-01', 90_00),
+        cellValue(hobbiesEstimate.id, '2026-01', 60_00),
+        // February: the rows explain Housing to the cent; March: they pass it
+        cellValue(power.id, '2026-02', 350_00), cellValue(power.id, '2026-03', 440_00),
+      ],
+    })
+    const jan = statementFor(t, '2026-01').s
+    const housingLine = find(jan, `cat:expense:${housing.id}`)!
+    expect(housingLine).toMatchObject({ amount: 1450_00, budget: 1450_00, estimate: true })
+    // the rest comes last, whatever the rows' own order
+    expect(housingLine.children.map((c) => [c.label, c.amount, !!c.estimate, c.estimateFor])).toEqual([['Rent', 1100_00, false, undefined], ['Electricity', 90_00, false, undefined], ['Not broken down yet', 260_00, true, housing.id]])
+    expect(housingLine.children[2]).toMatchObject({ kind: 'row', rowId: housingEstimate.id, automatic: true, chip: 'automatic' })
+    // a category that is only a name and a number counts on its own
+    expect(find(jan, `cat:expense:${hobbies.id}`)).toMatchObject({ amount: 60_00, budget: 60_00, estimate: true })
+    expect(find(jan, `cat:expense:${hobbies.id}`)!.empty).toBeUndefined()
+    expect(topLine(jan, 'out', 'expenses')!.amount).toBe(1510_00)
+
+    const feb = find(statementFor(t, '2026-02').s, `cat:expense:${housing.id}`)!
+    expect(feb).toMatchObject({ amount: 1450_00, budget: 1450_00, estimate: false })
+    expect(feb.children.map((c) => c.label)).toEqual(['Rent', 'Electricity'])
+
+    const mar = find(statementFor(t, '2026-03').s, `cat:expense:${housing.id}`)!
+    expect(mar).toMatchObject({ amount: 1540_00, budget: 1450_00 })
+    expect(mar.children.map((c) => c.label)).toEqual(['Rent', 'Electricity'])
+    expectSound(t, months)
+  })
+
+  it('stops counting the rest as an estimate once it is ticked, and drops an estimate whose category is gone', () => {
+    const housing = cat('Housing', 'a0')
+    const salary = row({ name: 'Salary', section: 'income' })
+    const estimate = row({ name: 'Housing – Not broken down yet', section: 'expense', kind: 'category-estimate', categoryId: housing.id, order: 'b0' })
+    const base = { household: [household()], rows: [salary, estimate], cells: [cellValue(salary.id, '2026-01', 4000_00), { ...cellValue(estimate.id, '2026-01', 500_00), markedDone: true }] }
+    const ticked = statementFor(tables({ ...base, categories: [housing] }), '2026-01').s
+    expect(find(ticked, `cat:expense:${housing.id}`)).toMatchObject({ amount: 500_00, estimate: false })
+    expect(find(ticked, `cat:expense:${housing.id}`)!.children[0]).toMatchObject({ label: 'Not broken down yet', status: 'done', estimate: false })
+    const gone = tables({ ...base, categories: [{ ...housing, deletedAt: T0 }] })
+    const orphan = statementFor(gone, '2026-01').s
+    expect(topLine(orphan, 'out', 'expenses')).toMatchObject({ amount: 0, children: [] })
+    expectSound(gone, months)
+  })
+})
+
 describe('the Statement, the position', () => {
   function world(goals: Goal[] = []) {
     const main = account({ name: 'Main', type: 'checking', openingBalance: 1200_00, tracked: false })

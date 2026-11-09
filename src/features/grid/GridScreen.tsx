@@ -297,7 +297,7 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
           </div>
           {followed && <InfoTip help="row.follows" text={`${shareTag ? `${shareTag}the amount of` : 'Same amount as'} "${followed.name}" every month. Edit that row; this one has no amount of its own.`} />}
           {deductedFrom && <InfoTip help="row.deductedFrom" />}
-          {automatic && <InfoTip help={row.kind === 'to-savings' ? 'row.toSavingsPlug' : 'row.pocketShare'} />}
+          {automatic && <InfoTip help={row.kind === 'to-savings' ? 'row.toSavingsPlug' : row.kind === 'category-estimate' ? 'row.categoryEstimate' : 'row.pocketShare'} />}
           <RowMenu row={row} tables={tables} household={household} onError={onError} />
         </div>
       </th>

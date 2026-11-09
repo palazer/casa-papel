@@ -50,6 +50,10 @@ export interface StatementLine {
   entered?: boolean
   /** How far the entered balance is from what the plan expected, in the base currency; left out when it is not. */
   adjustment?: Money
+  /** A category with an estimate: what it is expected to come to this month. */
+  budget?: Money
+  /** "Not broken down yet": the category whose estimate this line is the rest of. */
+  estimateFor?: string
   /** Shown for the record and left out of every sum. */
   memo?: boolean
   /** A short lowercase tag beside the name: `automatic`, `the rest`, `calculated`. */
@@ -166,7 +170,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
    * of the section is listed in its own order, one without rows too (it is where its first row gets added); rows
    * without a category come last, as in `groupRowsByCategory`.
    */
-  function categorised(section: Section, lines: Array<{ row: Row; line: StatementLine }>): StatementLine[] {
+  function categorised(section: Section, lines: Array<{ row: Row; line: StatementLine }>, estimates: Map<string, { row: Row; cell: CellResult }> = new Map()): StatementLine[] {
     const cats = tables.categories.filter((c) => !c.deletedAt && c.section === section).sort(byOrder)
     if (cats.length === 0) return lines.map((l) => l.line)
     const known = new Set(cats.map((c) => c.id))
@@ -176,8 +180,15 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
       under.set(key, [...(under.get(key) ?? []), line])
     }
     const category = (key: string, label: string): StatementLine => {
-      const children = under.get(key) ?? []
-      return { id: `cat:${section}:${key}`, kind: 'category', label, amount: sum(children), children, estimate: anyEstimate(children), empty: children.length === 0 || undefined }
+      const children = [...(under.get(key) ?? [])]
+      const est = estimates.get(key)
+      // what the rows have not explained yet closes the category; it is an estimate until it is ticked or the month closes
+      if (est && est.cell.valueBase > 0) {
+        children.push(rowLine(est.row, est.cell, est.cell.valueBase, { label: 'Not broken down yet', estimate: est.cell.status !== 'done', estimateFor: key, children: [], native: undefined }))
+      }
+      const line: StatementLine = { id: `cat:${section}:${key}`, kind: 'category', label, amount: sum(children), children, estimate: anyEstimate(children), empty: children.length === 0 || undefined }
+      if (est && (est.cell.estimateBase ?? 0) > 0) line.budget = est.cell.estimateBase
+      return line
     }
     const out = cats.map((c) => category(c.id, c.name))
     if (under.has('none')) out.push(category('none', 'No category'))
@@ -195,6 +206,8 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   const fromSavings: StatementLine[] = []
   const fromPool = new Map<string, StatementLine[]>()
   const toSavingsRows = engine.rows.filter((r) => r.section !== 'income' && r.kind === 'to-savings')
+  const estimates = new Map<string, { row: Row; cell: CellResult }>()
+  const expenseCategories = new Set(tables.categories.filter((c) => !c.deletedAt && c.section === 'expense').map((c) => c.id))
 
   for (const row of engine.rows) {
     const c = cellOf(row)
@@ -208,6 +221,11 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
         fromInvestment.push(rowLine(row, c, v))
         break
       case 'expense': {
+        if (row.kind === 'category-estimate') {
+          // not a line of its own: its rest closes its category (and without a live category it counts nothing)
+          if (row.categoryId && expenseCategories.has(row.categoryId)) estimates.set(row.categoryId, { row, cell: c })
+          break
+        }
         // the engine's totals count an expense by its funding parts, each rounded on its own
         const pools = Object.entries(c.funding.pools)
         const amount = c.funding.cash + c.funding.savings + pools.reduce((s, [, a]) => s + a, 0)
@@ -269,7 +287,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   if (sources.length) inLines.push(group('sources', 'From savings and pool accounts', 'pool', sources))
   if (cover.length) inLines.push(group('cover', 'To cover the month', 'transfer', cover))
 
-  const spending = categorised('expense', expense)
+  const spending = categorised('expense', expense, estimates)
   if (pocket.length) spending.push({ id: 'pocket', kind: 'category', label: 'Pocket money', amount: sum(pocket), children: pocket, estimate: anyEstimate(pocket) })
   const outLines: StatementLine[] = [group('expenses', 'Expenses', 'expense', spending)]
   if (moved.length) outLines.push(group('moved', 'Moved elsewhere', 'transfer', moved))

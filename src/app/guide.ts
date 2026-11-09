@@ -134,7 +134,7 @@ export const GUIDE: GuideTopic[] = [
       'Row menu → "Treat new values as certain" (or "…as estimates") for the row\'s default.',
       'Row menu → "Category…" → pick one, "New category…" or "Add the usual categories"; rename and reorder them under Household → "Categories".',
     ],
-    tips: ['section.expense', 'cell.howSure', 'cell.comesOutOf', 'row.category', 'household.categories', 'household.usualCategories', 'derived.expensesTotal', 'derived.fromSavings'],
+    tips: ['section.expense', 'cell.howSure', 'cell.comesOutOf', 'row.category', 'household.categories', 'household.usualCategories', 'row.categoryEstimate', 'derived.expensesTotal', 'derived.fromSavings'],
     open: 'grid',
   },
   {

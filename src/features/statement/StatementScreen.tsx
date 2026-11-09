@@ -18,6 +18,7 @@ import { BalanceDialog } from '@/features/grid/BalanceDialog'
 import { CellEditor } from '@/features/grid/CellEditor'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
 import { AddCategoryInline } from './AddCategoryInline'
+import { EstimateDialog } from './EstimateDialog'
 import { StatementBand } from './StatementBand'
 import { ESTIMATE_SHADE, type LineContext } from './StatementLine'
 
@@ -44,6 +45,8 @@ export function StatementScreen() {
   const [goalEdit, setGoalEdit] = useState<{ goal: Goal | null; preset?: { kind: GoalKind; accountId?: string | null; poolId?: string | null } } | null>(null)
   const [removingGoal, setRemovingGoal] = useState<Goal | null>(null)
   const [balanceFor, setBalanceFor] = useState<string | null>(null)
+  /** The expense category whose estimate is being typed. */
+  const [estimateFor, setEstimateFor] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -98,11 +101,21 @@ export function StatementScreen() {
   /** Things are added where they will appear: at the foot of a group, and inside a category for a row of that category. */
   function footer(line: StatementLine): ReactNode {
     if (line.id === 'income') return <>{addRow('income')}<AddCategoryInline section="income" onError={setError} /></>
-    if (line.id === 'expenses') return <>{addRow('expense')}<AddCategoryInline section="expense" onError={setError} /></>
+    if (line.id === 'expenses') return <>{addRow('expense')}<AddCategoryInline section="expense" onError={setError} estimate={statement!.closed ? undefined : { month: m, currency: ccy, locale }} /></>
     if (line.id === 'set-aside') return addRow('transfer')
     if (line.kind === 'category' && line.id.startsWith('cat:')) {
       const [, section, categoryId] = line.id.split(':')
-      return addRow(section as Section, categoryId === 'none' ? { label: 'Add row without a category' } : { label: `Add row to ${line.label}`, defaultCategoryId: categoryId })
+      if (categoryId === 'none') return addRow(section as Section, { label: 'Add row without a category' })
+      return (
+        <>
+          {addRow(section as Section, { label: `Add row to ${line.label}`, defaultCategoryId: categoryId })}
+          {section === 'expense' && !statement!.closed && (
+            <Button variant="ghost" size="sm" className="text-muted-foreground" aria-label={`${line.budget != null ? 'Change' : 'Set'} estimate for ${line.label}`} onClick={() => setEstimateFor(categoryId)}>
+              {line.budget != null ? 'Change estimate' : 'Set estimate'}
+            </Button>
+          )}
+        </>
+      )
     }
     return null
   }
@@ -116,7 +129,11 @@ export function StatementScreen() {
   }
 
   const base = { locale, ccy, isOpen, onToggle, goalText }
-  const flowCtx: LineContext = { ...base, withChange: false, closed: statement.closed, doneOf, onTick, onEdit: setEditorRow, busy, footer }
+  const flowCtx: LineContext = { ...base, withChange: false, closed: statement.closed, doneOf, onTick, onEdit: setEditorRow, busy, footer, onEstimate: setEstimateFor }
+  // the estimate dialog reads the category's line: what the month shows now, and what its rows explain
+  const estimateCategory = estimateFor ? tables.categories.find((c) => c.id === estimateFor && !c.deletedAt) : undefined
+  const estimateLine = estimateFor ? walk(statement.flow.right.lines).find((l) => l.id === `cat:expense:${estimateFor}`) : undefined
+  const estimateRest = estimateLine?.children.find((l) => l.estimateFor != null)?.amount ?? 0
   const positionCtx: LineContext = { ...base, withChange: true, onGoal, onBalance: setBalanceFor }
   const day = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${lastDayOfMonth(m)}T00:00:00Z`))
   const foldable = walk([...statement.flow.left.lines, ...statement.flow.right.lines, ...statement.position.left.lines, ...statement.position.right.lines])
@@ -149,6 +166,12 @@ export function StatementScreen() {
       )}
       {balanceAccount && balanceResult && (
         <BalanceDialog key={`${balanceAccount.id}:${m}`} account={balanceAccount} month={m} result={balanceResult} locale={locale} closed={statement.closed} onClose={() => setBalanceFor(null)} />
+      )}
+      {estimateCategory && (
+        <EstimateDialog
+          key={`${estimateCategory.id}:${m}`} category={estimateCategory} month={m} household={household} closed={statement.closed}
+          current={estimateLine?.budget ?? 0} rows={(estimateLine?.amount ?? 0) - estimateRest} onClose={() => setEstimateFor(null)}
+        />
       )}
       {removingGoal && <RemoveDialog target={{ kind: 'goal', id: removingGoal.id }} tables={tables} household={household} onClose={() => setRemovingGoal(null)} />}
     </div>

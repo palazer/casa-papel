@@ -18,6 +18,9 @@ const STEPS: Record<number, Step> = {
   // 3 → 4: `Household.planUntil` ("Add <year>"), `FxRate.date`, `Row.followShare`, `Row.deductedFromRowId`, and the
   // 'first' month-rate default for new households (a stored 'last' is a choice and stays); everything fills in from its default
   3: (raw) => raw,
+  // 4 → 5: the row kind 'category-estimate' (a category's estimate, counted as what its rows have not explained yet).
+  // Nothing to rewrite; the version only keeps an older app from reading a row it would count in full.
+  4: (raw) => raw,
 }
 
 export function migrateExport(raw: unknown): unknown {

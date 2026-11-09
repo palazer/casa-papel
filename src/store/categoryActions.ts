@@ -1,8 +1,8 @@
 import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing'
 import { sortRows } from '@/engine'
-import { CategorySchema, DEFAULT_CATEGORIES, RowSchema, newId, type Category, type Section, type Tables } from '@/model'
+import { CategorySchema, DEFAULT_CATEGORIES, RowSchema, newId, type Category, type Money, type MonthKey, type Section, type Tables } from '@/model'
 import type { Mutation, Store } from './store'
-import { loadTables } from './actions'
+import { categoryEstimateMutations, estimateRowName, estimateRowOf, loadTables } from './actions'
 
 const now = () => Date.now()
 const live = (cs: Category[]) => cs.filter((c) => !c.deletedAt)
@@ -23,8 +23,11 @@ function findCategory(tables: Tables, id: string): Category {
   return c
 }
 
-/** A new category at the end of its section, optionally taking rows of that section with it. */
-export async function addCategory(store: Store, input: { name: string; section: Section; rowIds?: string[] }): Promise<Category> {
+/**
+ * A new category at the end of its section, optionally taking rows of that section with it. An expense category can
+ * start with an estimate ("Hobbies, 60 a month"): it then counts from `estimate.month` on before it has a single row.
+ */
+export async function addCategory(store: Store, input: { name: string; section: Section; rowIds?: string[]; estimate?: { month: MonthKey; amount: Money } }): Promise<Category> {
   const tables = await loadTables(store)
   const name = assertName(tables, input.section, input.name)
   const ts = now()
@@ -37,6 +40,10 @@ export async function addCategory(store: Store, input: { name: string; section: 
     if (row.section !== input.section) throw new Error(`"${row.name}" is not in this section.`)
     mutations.push({ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, categoryId: category.id, updatedAt: ts }) })
   }
+  if (input.estimate && input.estimate.amount > 0) {
+    if (tables.monthStates.find((s) => s.month === input.estimate!.month)?.closed) throw new Error(`${input.estimate.month} is closed. Reopen it to edit.`)
+    mutations.push(...categoryEstimateMutations({ ...tables, categories: [...tables.categories, category] }, category, input.estimate.month, input.estimate.amount, 'from-now-on').mutations)
+  }
   await store.commit(mutations)
   return category
 }
@@ -46,7 +53,12 @@ export async function renameCategory(store: Store, id: string, name: string): Pr
   const cat = findCategory(tables, id)
   const n = assertName(tables, cat.section, name, id)
   if (n === cat.name) return
-  await store.commit([{ op: 'put', table: 'categories', record: CategorySchema.parse({ ...cat, name: n, updatedAt: now() }) }])
+  const ts = now()
+  const mutations: Mutation[] = [{ op: 'put', table: 'categories', record: CategorySchema.parse({ ...cat, name: n, updatedAt: ts }) }]
+  // the estimate's row is named after its category, so it follows the new name (unless someone renamed it by hand)
+  const estimate = estimateRowOf(tables, id)
+  if (estimate && estimate.name === estimateRowName(cat)) mutations.push({ op: 'put', table: 'rows', record: RowSchema.parse({ ...estimate, name: estimateRowName({ name: n }), updatedAt: ts }) })
+  await store.commit(mutations)
 }
 
 export async function moveCategory(store: Store, id: string, direction: 'up' | 'down'): Promise<void> {
@@ -61,14 +73,15 @@ export async function moveCategory(store: Store, id: string, direction: 'up' | '
   await store.commit([{ op: 'put', table: 'categories', record: CategorySchema.parse({ ...cat, order, updatedAt: now() }) }])
 }
 
-/** Remove a category. Its rows keep their place in the section, just without one. One undoable commit. */
+/** Remove a category. Its rows keep their place in the section, just without one; its estimate goes with it. One undoable commit. */
 export async function deleteCategory(store: Store, id: string): Promise<void> {
   const tables = await loadTables(store)
   const cat = findCategory(tables, id)
   const ts = now()
   const mutations: Mutation[] = [{ op: 'put', table: 'categories', record: CategorySchema.parse({ ...cat, deletedAt: ts, updatedAt: ts }) }]
   for (const row of tables.rows) {
-    if (!row.deletedAt && row.categoryId === id) mutations.push({ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, categoryId: null, updatedAt: ts }) })
+    if (row.deletedAt || row.categoryId !== id) continue
+    mutations.push({ op: 'put', table: 'rows', record: RowSchema.parse(row.kind === 'category-estimate' ? { ...row, deletedAt: ts, updatedAt: ts } : { ...row, categoryId: null, updatedAt: ts }) })
   }
   await store.commit(mutations)
 }
@@ -83,6 +96,7 @@ export async function setRowCategory(store: Store, rowId: string, categoryId: st
     if (cat.section !== row.section) throw new Error(`"${cat.name}" belongs to another section.`)
   }
   if ((row.categoryId ?? null) === categoryId) return
+  if (row.kind === 'category-estimate') throw new Error(`"${row.name}" is its category's estimate and stays with it.`)
   const group = sortRows(tables.rows.filter((r) => !r.deletedAt && r.id !== rowId && r.section === row.section && (r.categoryId ?? null) === categoryId), tables.categories)
   const order = generateKeyBetween(group.at(-1)?.order ?? null, null)
   await store.commit([{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, categoryId, order, updatedAt: now() }) }])

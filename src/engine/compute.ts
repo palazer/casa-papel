@@ -221,6 +221,40 @@ export function computeEngine(input: EngineInput): EngineOutput {
     }
   }
 
+  // ---------- category estimates: what a category's rows have not explained yet ----------
+  // After pass 1 as a whole, so every row of the category has its amount. The typed estimate keeps carrying forward
+  // (pass 1 did that); what counts this month is the estimate minus the category's spending rows, never below zero:
+  // once the rows add up to more, they are the category. It always comes out of the month's income.
+  const liveCats = liveCategories(tables.categories)
+  for (const row of rows) {
+    if (row.kind !== 'category-estimate') continue
+    const cat = row.section === 'expense' ? categoryOf(row, liveCats) : null
+    const siblings = cat ? rows.filter((r) => r.id !== row.id && r.section === 'expense' && (r.kind === 'plain' || r.kind === 'salary') && categoryOf(r, liveCats)?.id === cat.id) : []
+    for (const m of months) {
+      const c = cells[cellKey(row.id, m)]
+      if (!c || c.source === 'archived') continue
+      let explained: Money = 0
+      for (const s of siblings) {
+        const sc = cells[cellKey(s.id, m)]
+        if (!sc || sc.source === 'archived') continue
+        // an expense counts by its funding parts, as the month's totals do
+        explained += sc.funding.cash + sc.funding.savings + Object.values(sc.funding.pools).reduce((a, b) => a + b, 0)
+      }
+      // an estimate whose category is gone counts nothing
+      const restBase: Money = cat ? Math.max(0, c.valueBase - explained) : 0
+      c.estimate = c.value
+      c.estimateBase = c.valueBase
+      c.value = c.currency === base ? restBase : c.valueBase > 0 ? Math.round(c.value * (restBase / c.valueBase)) : 0
+      c.valueBase = restBase
+      c.netBase = restBase
+      c.funding = { cash: restBase, savings: 0, pools: {} }
+      if (c.source !== 'empty') {
+        c.source = 'derived'
+        c.status = isClosed(m) || c.cell?.markedDone ? 'done' : 'derived'
+      }
+    }
+  }
+
   // ---------- deductions: expense rows taken out of an income row lower its net ----------
   // After pass 1 as a whole, so a deduction that follows its income row (a 25 % tax) already has its amount.
   // Totals stay gross: the deduction row is still an expense in its own section.

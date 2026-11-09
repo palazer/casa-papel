@@ -36,6 +36,8 @@ export interface LineContext {
   onGoal?: (line: Line, goal?: GoalProgress) => void
   /** Enter what an account really held at the end of the month. */
   onBalance?: (accountId: string) => void
+  /** Set or change a category's estimate; "Not broken down yet" opens it too. */
+  onEstimate?: (categoryId: string) => void
 }
 
 const HUE: Record<StatementHue, Hue> = { income: HUES.income, expense: HUES.expense, transfer: HUES.transfer, worth: HUES.worth, pool: HUES.pool }
@@ -130,6 +132,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
       )}
       {line.missingRate && <Chip tone="rose">no rate</Chip>}
       {line.net != null && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">net {formatAmount(line.net, ccy, locale)}</span>}
+      {line.budget != null && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">estimate {formatAmount(line.budget, ccy, locale)}</span>}
       {line.chip && <Chip tone="zinc">{line.chip}</Chip>}
       {line.adjustment != null && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">entered, {formatAmount(line.adjustment, ccy, locale, { sign: 'exceptZero' })} against the plan</span>}
       {line.skipped && <Chip tone="zinc">skipped</Chip>}
@@ -148,6 +151,8 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
     const working = !ctx.closed && !!ctx.doneOf
     const d = working ? ctx.doneOf!(line) : null
     const editable = !ctx.closed && !!ctx.onEdit && !!line.rowId && !line.automatic
+    // what is left of a category's estimate is worked out, so the line opens the estimate it comes from
+    const estimateOf = !ctx.closed && ctx.onEstimate ? line.estimateFor : undefined
     const busy = ctx.busy != null && (ctx.busy === line.id || ctx.busy === line.rowId || ctx.busy.startsWith(`${line.rowId}:`))
     const said = `${fullLabel}: ${line.empty ? 'empty' : amountText}${shaded ? ', an estimate' : ''}`
     const body = (
@@ -173,9 +178,9 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
           {working && (d ? (
             <Tick done={d.done} total={d.total} state={d.state} label={`${fullLabel} done`} disabled={busy} onToggle={() => ctx.onTick?.(line, d.state !== 'all')} className={cn(TICK_SLOT, 'md:rounded')} dotClassName="md:size-3" />
           ) : <span className={TICK_SLOT} aria-hidden />)}
-          {editable ? (
+          {editable || estimateOf ? (
             <button
-              type="button" aria-label={said} onClick={() => ctx.onEdit!(line.rowId!)}
+              type="button" aria-label={said} onClick={() => (estimateOf ? ctx.onEstimate!(estimateOf) : ctx.onEdit!(line.rowId!))}
               className="-mr-2 flex min-w-0 flex-1 items-center gap-1.5 self-stretch rounded pr-2 text-left outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
             >
               {body}

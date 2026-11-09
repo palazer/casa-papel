@@ -255,6 +255,17 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   the kind and the thing it tracks already chosen. A goal's detail carries an `xs ghost` `Edit`. An account's balance
   is a button named `<account> balance: <amount>` (`, entered` once it is) that opens the Grid's `BalanceDialog`; the
   line for the current accounts is calculated and has none.
+  **Category estimates.** An expense category can carry an estimate: what it should come to in a month, typed before
+  its rows are known. The category line then reads `estimate €1,450.00` in muted `text-[11px]` after its name, and
+  its last line is `Not broken down yet` with the `automatic` chip, the estimate minus the category's rows, on the
+  estimate shade until it is ticked or the month closes. It shrinks as rows are added and is gone at zero; once the
+  rows add up to more, the category shows their sum and still names its estimate, with no mark for being over. The
+  line is a button that opens the estimate it comes from, and the opened category's foot holds `Set estimate` /
+  `Change estimate` beside `Add row to <category>`. `Add category` under Expenses takes an optional estimate
+  (`Estimate`, `EUR per month, optional`), so a category can be a name and a number and count at once. The engine
+  keeps the estimate on a row of kind `category-estimate` in that category, so every screen counts the same rest:
+  the Grid and the Month view show it as an automatic row named `<category> – Not broken down yet`. "No category"
+  and income categories have none.
 
 ## 8. Controls
 
@@ -303,6 +314,11 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   with no line to explain it. Ticked for a balance typed now, unticked when the dialog opens on an older difference.
   Other accounts never see it: for a card that records only its payments it would count the money twice
   (`setCardBalanceBooked` in `src/store/actions.ts`).
+- The estimate dialog (`src/features/statement/EstimateDialog.tsx`), titled `Estimate for <category> · <month>`: one
+  amount in the household currency with an (i) (`row.categoryEstimate`), then two read-only lines that follow what
+  is typed (`Rows this month`, `Not broken down yet`; a muted sentence when the rows already add up to more), then
+  "Applies to" as the cell editor's `Segmented` (`This month and onwards` / `Only this month`). Footer: a ghost
+  `Remove estimate` when there is one, Cancel, Save. A closed month disables it.
 - Dialogs are shadcn `Dialog`; the confirm step lives inside the dialog, never behind it. Errors appear beside the field
   that caused them, `role="alert"`.
 - Removing anything goes through one `RemoveDialog` (`src/features/remove/RemoveDialog.tsx`), reached from a row's

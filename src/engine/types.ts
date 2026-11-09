@@ -40,6 +40,12 @@ export interface CellResult {
   missingRate: boolean
   /** The base-currency value used a projected (drifted) rate. */
   rateProjected: boolean
+  /**
+   * A category's estimate row only: what was typed for the whole category, in the row's currency and in the base
+   * currency. `value` and `valueBase` are what its other rows have not explained yet.
+   */
+  estimate?: Money
+  estimateBase?: Money
   cell: Cell | null
 }
 
