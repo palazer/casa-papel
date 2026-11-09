@@ -60,7 +60,7 @@ function Shell() {
     void sync.start()
     return () => sync.stop()
   }, [sync])
-  // housekeeping at start: the change log keeps a year; a failure here costs nothing and the next start tries again
+  // housekeeping at start: logged edits older than a year go; a failure here costs nothing and the next start tries again
   useEffect(() => {
     void store.pruneEvents().catch(() => undefined)
   }, [store])

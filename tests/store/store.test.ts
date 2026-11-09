@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CellSchema, RowSchema, SCHEMA_VERSION, newId, type Row } from '@/model'
 import { CasaDb, EVENT_RETENTION_MS, Store } from '@/store'
-import { DELETE_HORIZON_MS } from '@/sync/snapshot'
 
 function fresh() {
   return new Store(new CasaDb(`test-${newId()}`))
@@ -88,20 +87,23 @@ describe('store', () => {
     expect(await s.db.cells.get([row.id, '2026-11'])).toMatchObject({ value: 120000 })
   })
 
-  it('keeps a year of the change log and drops what is older, leaving the data alone', async () => {
+  it('keeps a year of logged edits and drops older ones, but never a deletion, and leaves the data alone', async () => {
     const s = fresh()
     const row = makeRow('Rent')
     await s.commit([{ op: 'put', table: 'rows', record: row }])
     const [recent] = await s.db.events.toArray()
     const day = 86_400_000
+    const old = now - EVENT_RETENTION_MS - day
+    const oldDelete = { ...recent, id: newId(), ts: old, type: 'delete' as const, record: null }
     await s.db.events.bulkAdd([
-      { ...recent, id: newId(), ts: now - EVENT_RETENTION_MS - day },
+      { ...recent, id: newId(), ts: old },
       { ...recent, id: newId(), ts: now - EVENT_RETENTION_MS + day },
+      oldDelete,
     ])
     expect(await s.pruneEvents(now)).toBe(1)
-    expect(await s.db.events.count()).toBe(2)
+    expect(await s.db.events.count()).toBe(3)
+    // an import merge removes a record only when the file carries its deletion, however old that is
+    expect(await s.db.events.get(oldDelete.id)).toMatchObject({ type: 'delete' })
     expect(await s.db.rows.get(row.id)).toMatchObject({ name: 'Rent' })
-    // sync reads its deletions from this log, so the log must reach back at least as far as sync does
-    expect(EVENT_RETENTION_MS).toBeGreaterThanOrEqual(DELETE_HORIZON_MS)
   })
 })

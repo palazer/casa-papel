@@ -70,7 +70,8 @@ export function DataScreen() {
       a.href = url
       a.download = name
       a.click()
-      URL.revokeObjectURL(url)
+      // not at once: Safari starts the download a moment after the click (later still when it asks first), and a link that is already gone cancels it
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
       setMessage(`Exported ${name}`)
     } catch (e) {
       // the export is the backup: a failure must not look like a button that did nothing

@@ -59,10 +59,19 @@ test('the built page carries its content security policy and no screen trips it'
     await page.getByRole('link', { name: screen, exact: true }).click()
     await expect(page.getByRole('heading', { level: 1, name: screen })).toBeVisible()
   }
-  // a cell editor and a dropdown: the UI library's popups are where a runtime <style> or inline handler would show up
+  // a cell editor: the UI library's dialogs are where an inline handler or script would show up
   await page.getByRole('button', { name: /^The flat – Rent Nov 2026/ }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
   expect(violations).toEqual([])
+
+  // the check itself has to work, or "no violations" proves nothing: an inline script is refused and lands in the list
+  await page.evaluate(() => {
+    const s = document.createElement('script')
+    s.textContent = 'window.inlineScriptRan = true'
+    document.head.append(s)
+  })
+  await expect.poll(() => violations.length).toBeGreaterThan(0)
+  expect(await page.evaluate(() => 'inlineScriptRan' in window)).toBe(false)
 })
 
 test('real store and demo sandbox are separate databases', async ({ page }) => {

@@ -9,10 +9,13 @@ const BASE = '/casa-papel/'
 /**
  * The built page's content security policy. The household key and all the data live in the browser, so the page
  * only runs scripts from its own origin and only talks to the sync server and the rate service: a script that
- * should not be there (a poisoned dependency) cannot simply send the data elsewhere.
+ * should not be there (a poisoned dependency) cannot fetch from or post to another server. It is a limit, not a
+ * wall: nothing here stops such a script from navigating the page away with the data in the address.
  *
  * A <meta> tag because GitHub Pages cannot send headers. Build only: the dev server needs inline scripts and a
- * websocket. Styles allow 'unsafe-inline' because a UI library inserts a <style> element at runtime.
+ * websocket. Styles allow 'unsafe-inline' as a margin, not out of need: React writes styles through the CSSOM,
+ * which the policy does not police, and nothing in today's bundle inserts a <style> element. A UI popup that
+ * starts to would otherwise lose its styling silently, and a style cannot run code.
  */
 function contentSecurityPolicy(supabaseUrl: string | undefined): Plugin {
   const connect = ["'self'", 'https://api.frankfurter.dev']

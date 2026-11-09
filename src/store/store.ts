@@ -6,9 +6,10 @@ import type { CasaDb } from './db'
 import { primaryKeyOf, type PrimaryKey } from './keys'
 
 /**
- * How long the change log is kept. Undo only reaches back to the last reload and sync sends 180 days of
- * deletions (`DELETE_HORIZON_MS`), so nothing reads older entries; without a limit every export file
- * would carry a before-and-after copy of every change ever made.
+ * How long the change log keeps the before-and-after copies of edits. Undo only reaches back to the last
+ * reload, so nothing reads older copies; without a limit every export file would carry one for every change
+ * ever made. Deletions are kept for good: an import merge removes a record only when the file carries its
+ * deletion, so dropping one would let a device that merges rarely bring the record back.
  */
 export const EVENT_RETENTION_MS = 365 * 86_400_000
 
@@ -116,9 +117,9 @@ export class Store {
     return true
   }
 
-  /** Drop change-log entries older than the retention period (app start). The data tables are not touched. Returns how many went. */
+  /** Drop logged edits older than the retention period (app start). Deletions stay, and the data tables are not touched. Returns how many went. */
   async pruneEvents(now: number = Date.now()): Promise<number> {
-    return this.db.events.where('ts').below(now - EVENT_RETENTION_MS).delete()
+    return this.db.events.where('ts').below(now - EVENT_RETENTION_MS).and((e) => e.type === 'put').delete()
   }
 
   private async eventsOf(txId: string): Promise<StoreEvent[]> {
