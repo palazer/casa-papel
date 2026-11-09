@@ -17,10 +17,10 @@ export function monogram(name: string): string {
 }
 
 /** The rail's tile: lime for the open screen, faint white for the others (DESIGN.md §2). */
-export const tileClass = (active: boolean, size: 'rail' | 'tabs' = 'rail') =>
+export const tileClass = (active: boolean, size: 'rail' | 'tabs' | 'small' = 'rail') =>
   cn(
     'flex items-center justify-center rounded-lg transition-colors',
-    size === 'rail' ? 'h-[30px] w-10' : 'h-7 w-12',
+    size === 'rail' ? 'h-[30px] w-10' : size === 'small' ? 'h-[26px] w-8' : 'h-7 w-12',
     active ? 'bg-primary text-primary-foreground' : 'text-white/70 group-hover:bg-white/10 group-hover:text-white',
   )
 

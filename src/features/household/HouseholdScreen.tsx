@@ -1,4 +1,5 @@
 import { MonthField } from '@/components/MonthField'
+import { GroupTabs } from '@/components/GroupTabs'
 import { PageHeader } from '@/components/PageHeader'
 import { RecurringList } from '@/features/recurring/RecurringList'
 import { FxCard } from './FxCard'
@@ -49,6 +50,7 @@ export function HouseholdScreen() {
       <PageHeader title="Household" subline={`${household.name} · ${people} ${people === 1 ? 'person or thing' : 'people & things'} · ${accounts} ${accounts === 1 ? 'account' : 'accounts'}`}>
         {error && <p role="alert" className="basis-full text-destructive">{error}</p>}
       </PageHeader>
+      <GroupTabs />
       <SettingsCard household={household} tables={tables} onSave={(p) => act(() => updateHousehold(store, p))} onMonthly={(key, value, scope) => act(() => setMonthlyDefault(store, key, value, scope, monthOfDate()))} />
       {household.moneyMode === 'proportional' && <SharesCard household={household} tables={tables} engine={engine} onError={setError} />}
       <EntitiesCard household={household} tables={tables} entities={tables.entities.filter((e) => !e.deletedAt)} onError={setError} />
@@ -74,7 +76,7 @@ function SettingsCard({ household: h, tables, onSave, onMonthly }: { household: 
   const [buffer, setBuffer] = useState(amountToInput(effective('cashBuffer'), h.baseCurrency, h.locale))
   const money = (s: string) => (s.trim() ? parseAmount(s, h.baseCurrency, h.locale) ?? 0 : 0)
   return (
-    <Island air title="Settings" description="Closed months keep the values they were closed with.">
+    <Island air title="Household settings" description="Closed months keep the values they were closed with.">
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="s-name">Household name</Label>

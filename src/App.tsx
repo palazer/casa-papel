@@ -9,6 +9,7 @@ import { AppRail } from '@/components/AppRail'
 import { BottomTabs } from '@/components/BottomTabs'
 import { DataScreen } from '@/features/data/DataScreen'
 import { GridScreen } from '@/features/grid/GridScreen'
+import { GuideScreen } from '@/features/guide/GuideScreen'
 import { HomeScreen } from '@/features/home/HomeScreen'
 import { HouseholdScreen } from '@/features/household/HouseholdScreen'
 import { MonthScreen } from '@/features/month/MonthScreen'
@@ -82,7 +83,8 @@ function Shell() {
   }, [store])
 
   if (tables === undefined) return null
-  const showHome = !household && screen !== 'data'
+  // Data and the Guide read without a household; every other screen needs one
+  const showHome = !household && screen !== 'data' && screen !== 'guide'
 
   return (
     <ScreenContext.Provider value={nav}>
@@ -93,6 +95,7 @@ function Shell() {
             {showHome ? (
               <HomeScreen onOpenData={() => go('data')} onCreated={() => go(isPhone() ? 'month' : 'grid')} syncAvailable={!!sync} onSignIn={() => openAccount('signin')} onJoin={() => openAccount('join')} notice={notice} />
             ) : screen === 'data' ? <DataScreen />
+              : screen === 'guide' ? <GuideScreen />
               : screen === 'month' ? <MonthScreen />
               : screen === 'moves' ? <MovesScreen />
               : screen === 'household' ? <HouseholdScreen />

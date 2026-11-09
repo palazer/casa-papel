@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { Input } from '@/components/ui/input'
 import { Island } from '@/components/ui/island'
+import { GroupTabs } from '@/components/GroupTabs'
 import { PageHeader } from '@/components/PageHeader'
 import { isDemoMode, leaveDemoSandbox, openDemoSandbox, useStore } from '@/app/store'
 import { loadDemo } from '@/demo/loadDemo'
@@ -108,6 +109,7 @@ export function DataScreen() {
   return (
     <div className="mx-auto max-w-2xl space-y-4 text-xs">
       <PageHeader title="Data" subline={h ? `${h.name} · export, import, sync` : 'Export, import, sync'} />
+      <GroupTabs />
       {message && (
         <Alert>
           <AlertTitle>Done</AlertTitle>

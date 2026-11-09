@@ -37,7 +37,7 @@ Page header      header flex flex-col gap-y-2 > h1 text-2xl font-semibold leadin
                           Undo Redo (icon-xs ghost) · the screen's controls · the sync cloud at ml-auto
                           a basis-full child (an alert, a notice) wraps onto its own line under the controls
 Grid frame       the table in its own scroll box: relative isolate max-h-[calc(100dvh-var(--page-chrome))] overflow-auto rounded-lg border bg-card
-Reading page     mx-auto max-w-3xl space-y-4 text-xs of air islands (Household, Data, Moves)
+Reading page     mx-auto max-w-3xl space-y-4 text-xs of air islands (Household, Data, Moves, Guide)
 Phone list       mx-auto max-w-xl space-y-4 of dense islands, rows text-sm and min-h-11 (the Month view)
 ```
 
@@ -47,13 +47,21 @@ Phone list       mx-auto max-w-xl space-y-4 of dense islands, rows text-sm and m
   it and `getByRole('link', { name: 'Household' })` stays unambiguous), then one tile per screen: a 40 × 30 `rounded-lg` tile holding a 20 px lucide icon over a `text-[10px] font-semibold`
   label. The open screen's tile is `bg-primary text-primary-foreground` with `aria-current="page"`; the others are
   `text-white/70`, hover `bg-white/10`. Items are real links (`?screen=…`, every other parameter kept, so `?demo=1`
-  survives); a plain click opens in place, Cmd-click opens a tab.
-- **Bottom tabs** (`src/components/BottomTabs.tsx`): the same five tiles as a bar along the bottom edge, 56 px tall plus
-  the safe-area inset, `md:hidden`.
+  survives); a plain click opens in place, Cmd-click opens a tab. The rail's order is `RAIL`: Grid, Month, Moves, then
+  **Settings**, a group after nfl-fantasy's Research: a `<button aria-expanded aria-controls="rail-settings">` tile with a
+  caret in its label, and when unfolded a `role="group"` block on `bg-white/5` holding its pages Household, Data and Guide
+  as ordinary links with smaller 32 × 26 tiles. A click on it folded unfolds it and opens the group's page open last
+  (`casa.settings.page`, Household at first); a click on it unfolded only folds it (`casa.settings.open`, unfolded until
+  someone folds it). Folded while one of its pages is open, the Settings tile wears the lime and `aria-current`.
+- **Bottom tabs** (`src/components/BottomTabs.tsx`): the rail's four tiles (Grid, Month, Moves, Settings) as a bar along
+  the bottom edge, 56 px tall plus the safe-area inset, `md:hidden`. The Settings tab opens the group's page open last;
+  on phones the group's pages switch through `GroupTabs` (`src/components/GroupTabs.tsx`), a `TabBar` named
+  `Settings pages` on a hairline right under the page header of Household, Data and Guide, `md:hidden`.
 - **Screen state** (`src/app/screens.ts`): `?screen=` wins, then the screen open last (`casa.screen`), then the device's
   natural first screen (Month on a phone, Grid otherwise). `rememberScreen` writes both; the address bar follows through
-  `history.replaceState`, so Back never walks through screen changes. Data is never remembered as the screen to land on:
-  it is a utility, so a fresh visit opens the household (or the welcome screen when there is none).
+  `history.replaceState`, so Back never walks through screen changes. Data and the Guide are never remembered as the
+  screen to land on: they are utilities, so a fresh visit opens the household (or the welcome screen when there is
+  none); the Guide also opens without a household.
 - **Page header** (`src/components/PageHeader.tsx`): every screen opens with it. The H1 is the screen's name (the rail's
   label); the subline names the frame of reference (`The Demo Household · Sep 2026 – Nov 2027`, `· closed` as a chip).
   The toolbar holds Undo and Redo first, then the controls (`MonthPicker`, Close month, Add <year>), then the
@@ -263,7 +271,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 
 ## 10. New-screen checklist
 
-1. Its key, label and lucide icon in `SCREENS` (`src/app/screens.ts`); its line in `App.tsx`'s switch.
+1. Its key, label and lucide icon in `SCREENS` and its place in `RAIL`, as a page or inside the Settings group
+   (`src/app/screens.ts`); its line in `App.tsx`'s switch.
 2. It opens with `PageHeader` (name, subline, toolbar); every panel is an `Island` (`air` on a reading page), every tag a
    `Chip`, every number `tabular-nums`.
 3. Colours only from §5: money through `HUES`, states through the dots and chips, lime for the pressed control alone.
