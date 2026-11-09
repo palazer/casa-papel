@@ -39,6 +39,9 @@ Page header      header flex flex-col gap-y-2 > h1 text-2xl font-semibold leadin
 Grid frame       the table in its own scroll box: relative isolate max-h-[calc(100dvh-var(--page-chrome))] overflow-auto rounded-lg border bg-card
 Reading page     mx-auto max-w-3xl space-y-4 text-xs of air islands (Household, Data, Moves, Guide)
 Phone list       mx-auto max-w-xl space-y-4 of dense islands, rows text-sm and min-h-11 (the Month view)
+Statement frame  full width, space-y-4 of dense islands, one per half; an island's body is grid grid-cols-1 lg:grid-cols-2
+                 lg:divide-x (max-lg:divide-y): two sides, each a flex column whose total sits at mt-auto, so from
+                 1024 px both totals share a line; below it the sides stack and each keeps its own total
 ```
 
 - **Rail** (`src/components/AppRail.tsx`, after FantasyPros' and nfl's): a `<nav aria-label="Screens">`, 72 px, one
@@ -47,13 +50,13 @@ Phone list       mx-auto max-w-xl space-y-4 of dense islands, rows text-sm and m
   it and `getByRole('link', { name: 'Household' })` stays unambiguous), then one tile per screen: a 40 × 30 `rounded-lg` tile holding a 20 px lucide icon over a `text-[10px] font-semibold`
   label. The open screen's tile is `bg-primary text-primary-foreground` with `aria-current="page"`; the others are
   `text-white/70`, hover `bg-white/10`. Items are real links (`?screen=…`, every other parameter kept, so `?demo=1`
-  survives); a plain click opens in place, Cmd-click opens a tab. The rail's order is `RAIL`: Grid, Month, Moves, then
+  survives); a plain click opens in place, Cmd-click opens a tab. The rail's order is `RAIL`: Statement, Grid, Month, Moves, then
   **Settings**, a group after nfl-fantasy's Research: a `<button aria-expanded aria-controls="rail-settings">` tile with a
   caret in its label, and when unfolded a `role="group"` block on `bg-white/5` holding its pages Household, Data and Guide
   as ordinary links with smaller 32 × 26 tiles. A click on it folded unfolds it and opens the group's page open last
   (`casa.settings.page`, Household at first); a click on it unfolded only folds it (`casa.settings.open`, unfolded until
   someone folds it). Folded while one of its pages is open, the Settings tile wears the lime and `aria-current`.
-- **Bottom tabs** (`src/components/BottomTabs.tsx`): the rail's four tiles (Grid, Month, Moves, Settings) as a bar along
+- **Bottom tabs** (`src/components/BottomTabs.tsx`): the rail's five tiles (Statement, Grid, Month, Moves, Settings) as a bar along
   the bottom edge, 56 px tall plus the safe-area inset, `md:hidden`. The Settings tab opens the group's page open last;
   on phones the group's pages switch through `GroupTabs` (`src/components/GroupTabs.tsx`), a `TabBar` named
   `Settings pages` on a hairline right under the page header of Household, Data and Guide, `md:hidden`.
@@ -211,6 +214,26 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   `aria-live` text (`7 of 21 done · €… still to pay · €… to come in`, `All 21 done`, `Closed · all done`) and a small
   `Hide done` switch; a section whose lines are all hidden says `All done`.
 - **Progress bars** (goals): `h-2 rounded-full bg-goal-tint` with a `bg-goal` fill, `bg-income` once reached.
+- **Statement lines** (`src/features/statement/`, figures from `buildStatement` in `src/engine/statement.ts`): the
+  Statement is one month in accounting form, two halves that each balance. "The month": Money in beside Money out,
+  closed by the rest (to savings) or the leftover; a month that overruns shows "To cover the month" on the left.
+  "At the end of the month": Assets beside Debts and net worth, closed by Free, with a muted `change` column before
+  the balance on both sides (`+€460.00`, a `·` for none) and the day as the balance column's head. A side opens with
+  its name in small caps and closes with its total in `font-semibold` over a hairline. Lines are `min-h-11 text-sm`
+  on phones and `md:min-h-7 md:text-xs`, separated by `divide-border/60`, amounts in a fixed right-aligned column:
+  a **group** (Income, Expenses, Set aside, pay off, Debts, Net worth) is a heading in its hue on the hue's `tint`
+  with its lines always under it; a **category**, an account that holds pool accounts and an itemized row open as an
+  accordion (a chevron button with `aria-expanded`, each level 20 px further in, items on `bg-muted/20` with the
+  `Repeat` icon when scheduled); a category's amount is the sum of its rows. Tags follow the name and wrap under it
+  when there is no room: a zinc chip with the currency code and the original amount in muted `text-[11px]` for a
+  line in another currency (the amount column is always the household currency), a rose `no rate` chip, `net €…`
+  on an income with deductions, and a zinc chip for what the line is (`automatic`, `the rest`, `calculated`,
+  `counted when bought` on a card payment that is shown muted and left out of the sum). Pool accounts sit by name
+  under the savings account that holds them, with `Not set aside` for the rest of it; the right side sums them in
+  one `Set aside` line. A line a goal watches carries the goal mark: a 12 px `Target` icon in the goal hue and the
+  percentage in muted `text-[11px]`, the income hue once reached, a rose `late` chip when late; opening the line
+  shows the goal's name, its bar and the Goals card's sentence (`goalStatusLine`). The toolbar holds the
+  `MonthPicker` and `Open all` / `Close all`.
 
 ## 8. Controls
 
@@ -273,7 +296,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   found with `getByLabel(name, { exact: true })`, since the (i)'s name contains the field's): `TipLabel` pairs a form label with one,
   `Island`, `StatTile`, the Month view's `Stat` and the grid's `derivedRow` take a `help` key, the grid's row label puts
   it between the name and the row menu. Where it goes: section titles, every total and balance the app works out,
-  automatic and following rows, stat labels, the cell editor's "Applies to", "How sure", "Comes out of", its rate line and its deductions block, a row's currency, who a row belongs to, what it is deducted from and its share of a followed row, the `in EUR` balance line, the
+  automatic and following rows, stat labels, the cell editor's "Applies to", "How sure", "Comes out of", its rate line and its deductions block, a row's currency, who a row belongs to, what it is deducted from and its share of a followed row, the `in EUR` balance line, the Statement's two halves, its Set aside group, its main account line, Net worth and Free, the
   household settings, "Track the balance", the Archived list, Goals and the schedules' status column.
 - Every text lives in `src/app/help.ts`: `HELP[key] = { title, text }`, keys `area.name`, titles up to 40 characters,
   texts two or three plain sentences up to 360 characters in the app's own words (pool accounts, people & things,

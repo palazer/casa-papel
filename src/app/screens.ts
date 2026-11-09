@@ -1,8 +1,8 @@
 import { createContext, useContext } from 'react'
-import { ArrowLeftRight, BookOpen, CalendarDays, Database, Settings, Table2, Users, type LucideIcon } from 'lucide-react'
+import { ArrowLeftRight, BookOpen, CalendarDays, Database, Scale, Settings, Table2, Users, type LucideIcon } from 'lucide-react'
 import { readPref, writePref } from './prefs'
 
-export type Screen = 'grid' | 'month' | 'moves' | 'household' | 'data' | 'guide'
+export type Screen = 'statement' | 'grid' | 'month' | 'moves' | 'household' | 'data' | 'guide'
 
 export interface ScreenDef {
   key: Screen
@@ -14,6 +14,7 @@ export interface ScreenDef {
 
 /** Every screen, in rail order; the last three are the Settings group's pages. */
 export const SCREENS: ScreenDef[] = [
+  { key: 'statement', label: 'Statement', icon: Scale },
   { key: 'grid', label: 'Grid', icon: Table2 },
   { key: 'month', label: 'Month', icon: CalendarDays },
   { key: 'moves', label: 'Moves', icon: ArrowLeftRight },
@@ -32,8 +33,9 @@ export const SETTINGS_PAGES: Screen[] = ['household', 'data', 'guide']
 
 export type RailItem = { kind: 'page'; key: Screen } | { kind: 'group'; key: 'settings'; label: string; icon: LucideIcon; pages: Screen[] }
 
-/** The rail and the phone bar (DESIGN.md §2): three pages, then Settings, which groups Household, Data and the Guide. */
+/** The rail and the phone bar (DESIGN.md §2): four pages, then Settings, which groups Household, Data and the Guide. */
 export const RAIL: RailItem[] = [
+  { kind: 'page', key: 'statement' },
   { kind: 'page', key: 'grid' },
   { kind: 'page', key: 'month' },
   { kind: 'page', key: 'moves' },

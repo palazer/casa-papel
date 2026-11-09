@@ -3,11 +3,12 @@ import { Button } from '@/components/ui/button'
 import { Island } from '@/components/ui/island'
 import { cn } from '@/lib/utils'
 import { HUES } from '@/app/hues'
-import { formatAmount, formatMonth, formatPercent } from '@/app/format'
-import { computeGoals, type EngineOutput, type GoalProgress } from '@/engine'
+import { formatPercent } from '@/app/format'
+import { computeGoals, type EngineOutput } from '@/engine'
 import { monthDiff, type Goal, type Household, type MonthKey, type Tables } from '@/model'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
 import { GoalDialog } from './GoalDialog'
+import { goalStatusLine } from './goalText'
 
 interface Props {
   household: Household
@@ -27,35 +28,13 @@ export function GoalsCard({ household, tables, engine, month, compact = false }:
   if (compact && goals.length === 0) return null
   const horizon = engine.months.length ? monthDiff(month, engine.months[engine.months.length - 1]) : 0
 
-  function statusLine(p: GoalProgress): { text: string; cls: string } {
-    const f = (v: number) => formatAmount(v, p.currency, locale)
-    const fm = (m: MonthKey) => formatMonth(m, locale)
-    const target = p.goal.targetMonth ? ` (target ${fm(p.goal.targetMonth)})` : ''
-    if (p.problem) return { text: p.problem, cls: HUES.expense.text }
-    const payOff = p.goal.kind === 'pay-off'
-    const where = payOff ? `${f(p.current)} still owed, down from ${f(p.startValue)}` : `${f(p.current)} of ${f(p.target)}`
-    switch (p.status) {
-      case 'reached':
-        return { text: payOff ? `Nothing owed. Cleared in ${fm(p.reachedMonth!)}.` : `Reached in ${fm(p.reachedMonth!)}.`, cls: HUES.income.text }
-      case 'on-track':
-        return { text: `${where} · ${payOff ? 'cleared' : 'reached'} by ${fm(p.reachedMonth!)}${target}`, cls: 'text-muted-foreground' }
-      case 'late':
-        return {
-          text: p.reachedMonth ? `${where} · ${payOff ? 'cleared' : 'reached'} by ${fm(p.reachedMonth)}, after the target of ${fm(p.goal.targetMonth!)}` : `${where} · not reached in the next ${horizon} months${target}`,
-          cls: HUES.expense.text,
-        }
-      default:
-        return { text: `${where} · not reached in the next ${horizon} months`, cls: 'text-muted-foreground' }
-    }
-  }
-
   const body = (
     <div className={cn('space-y-3', compact && 'space-y-2')}>
       {goals.length === 0 && (
         <p className="text-muted-foreground">No goals yet. Pick a number to reach or a debt to clear; the bar shows how the current plan gets there.</p>
       )}
       {goals.map((p) => {
-        const line = statusLine(p)
+        const line = goalStatusLine(p, locale, horizon)
         const pct = Math.round(p.progress * 100)
         return (
           <div key={p.goal.id} className="space-y-1">

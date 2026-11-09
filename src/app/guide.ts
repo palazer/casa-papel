@@ -308,7 +308,7 @@ export const GUIDE: GuideTopic[] = [
       '"Hide done" to see only what is still open.',
       '"Close month" when everything has moved: the month gets a lock and a "closed" chip, and its grid column greys out. "Reopen month" undoes it (also from a month name in the Grid and "Reopen <Month>" in the editor).',
     ],
-    tips: ['month.progress', 'cell.howSure', 'row.automatic', 'stat.toSavings', 'derived.keptInAccount', 'derived.leftover'],
+    tips: ['month.progress', 'cell.howSure', 'row.automatic', 'stat.toSavings', 'derived.keptInAccount', 'derived.leftover', 'statement.month', 'statement.position', 'statement.setAside', 'statement.mainAccount', 'statement.netWorth', 'statement.free'],
     open: 'month',
   },
   {

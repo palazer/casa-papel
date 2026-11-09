@@ -69,7 +69,7 @@ test.describe('shell on a phone', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Month' })).toBeVisible()
     const tabs = page.getByRole('navigation', { name: 'Screens' })
     await expect(tabs).toHaveCount(1)
-    await expect(tabs.getByRole('link')).toHaveText(['Grid', 'Month', 'Moves', 'Settings'])
+    await expect(tabs.getByRole('link')).toHaveText(['Statement', 'Grid', 'Month', 'Moves', 'Settings'])
     await expect(tabs.getByRole('link', { name: 'Month' })).toHaveAttribute('aria-current', 'page')
     const box = await tabs.boundingBox()
     expect(box && box.y + box.height).toBeGreaterThan(800)

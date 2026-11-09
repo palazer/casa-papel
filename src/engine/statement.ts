@@ -49,6 +49,8 @@ export interface StatementLine {
   calculated?: boolean
   /** Shown for the record and left out of every sum. */
   memo?: boolean
+  /** A short lowercase tag beside the name: `automatic`, `the rest`, `calculated`. */
+  chip?: string
   skipped?: boolean
   scheduled?: boolean
   missingRate?: boolean
@@ -149,7 +151,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
       : []
     return {
       id: row.id, kind: 'row', label: row.name, amount, children, status: c.status, estimate: !empty && c.status === 'projected', empty,
-      automatic: c.source === 'derived', missingRate: c.missingRate || undefined,
+      automatic: c.source === 'derived', chip: c.source === 'derived' ? 'automatic' : undefined, missingRate: c.missingRate || undefined,
       native: c.currency !== base ? { amount: c.value, currency: c.currency } : undefined,
       net: row.section === 'income' && c.deductionsBase > 0 ? c.netBase : undefined,
       rowId: row.id, ...over,
@@ -216,14 +218,14 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
         break
       case 'memo':
         // paying an itemized card moves no new money: its purchases were counted when they were made
-        setAside.push(rowLine(row, c, v, { memo: true }))
+        setAside.push(rowLine(row, c, v, { memo: true, chip: 'counted when bought' }))
         break
       case 'to-savings': {
         // under the plug the first row carries the rest and the others are idle
         if (savingsPlug && row.id !== toSavingsRows[0]?.id) break
         const over: Partial<StatementLine> = savingsPlug ? { balancing: true } : {}
         if (v < 0) cover.push(rowLine(row, c, -v, { ...over, label: 'From savings' }))
-        else setAside.push(rowLine(row, c, v, over))
+        else setAside.push(rowLine(row, c, v, savingsPlug ? { ...over, chip: 'the rest' } : over))
         break
       }
     }
@@ -231,7 +233,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   if (savingsPlug && toSavingsRows.length === 0 && t.toSavings !== 0) {
     // the rest has no row to sit in: still part of the month, so the half keeps balancing
     warnings.push('The rest of the month has no "To savings" row to go to.')
-    const line: StatementLine = { id: 'rest', kind: 'figure', label: t.toSavings < 0 ? 'From savings' : 'To savings', amount: Math.abs(t.toSavings), children: [], balancing: true, automatic: true }
+    const line: StatementLine = { id: 'rest', kind: 'figure', label: t.toSavings < 0 ? 'From savings' : 'To savings', amount: Math.abs(t.toSavings), children: [], balancing: true, automatic: true, chip: t.toSavings < 0 ? 'automatic' : 'the rest' }
     if (t.toSavings < 0) cover.push(line)
     else setAside.push(line)
   }
@@ -288,7 +290,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
     if (mm.cardPaid !== 0) parts.push({ id: 'main:paid', kind: 'note', label: 'Paid to the card', amount: -mm.cardPaid, children: [] })
     assets.push({
       id: 'main', kind: 'account', label: single?.name ?? (main.accountIds.length > 1 ? 'Current accounts' : 'Main account'), amount: mm.balance, change: mm.balance - mm.start,
-      children: parts, calculated: true, missingRate: main.missingRate || undefined,
+      children: parts, calculated: true, chip: 'calculated', missingRate: main.missingRate || undefined,
     })
   }
 

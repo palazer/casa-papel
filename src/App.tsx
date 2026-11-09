@@ -14,6 +14,7 @@ import { HomeScreen } from '@/features/home/HomeScreen'
 import { HouseholdScreen } from '@/features/household/HouseholdScreen'
 import { MonthScreen } from '@/features/month/MonthScreen'
 import { MovesScreen } from '@/features/moves/MovesScreen'
+import { StatementScreen } from '@/features/statement/StatementScreen'
 import { AccountDialog, type AccountStep } from '@/features/sync/AccountDialog'
 import { planRecurringPosts } from '@/store'
 import { SyncContext, createSyncEngine, useSyncEngine } from '@/sync/useSync'
@@ -100,6 +101,7 @@ function Shell() {
               <HomeScreen onOpenData={() => go('data')} onCreated={() => go(isPhone() ? 'month' : 'grid')} syncAvailable={!!sync} onSignIn={() => openAccount('signin')} onJoin={() => openAccount('join')} notice={notice} />
             ) : screen === 'data' ? <DataScreen />
               : screen === 'guide' ? <GuideScreen />
+              : screen === 'statement' ? <StatementScreen />
               : screen === 'month' ? <MonthScreen />
               : screen === 'moves' ? <MovesScreen />
               : screen === 'household' ? <HouseholdScreen />

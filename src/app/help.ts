@@ -74,6 +74,14 @@ export const HELP = {
   'setup.owner': { title: 'Belongs to', text: 'Whose account it is. A child\'s account feeds their long-term savings row by default; an adult\'s own account stays theirs when costs are split. The household\'s accounts belong to everyone.' },
   'remove.archiveFrom': { title: 'Archive from', text: 'From this month on the thing is hidden and stops counting. Every earlier month stays exactly as it was, closed months included; that is why anything with amounts in a closed month can only be archived, never deleted.' },
 
+  // The Statement
+  'statement.month': { title: 'The month', text: 'Money in on the left, money out on the right, and the two totals always agree. What is neither spent nor set aside closes the right side as the rest; a month that overruns shows on the left what it took from savings or from the account.' },
+  'statement.position': { title: 'At the end of the month', text: 'What you have on the left. On the right, whose it is: debts first, then your net worth, split into what is set aside in pool accounts and what is free. The change column shows how the month moved each figure.' },
+  'statement.setAside': { title: 'Set aside, pay off', text: 'Money that leaves the main account but stays yours: into savings, investments and pool accounts, or off a loan or a card. Loan payments sit here; the Grid counts them under Expenses.' },
+  'statement.mainAccount': { title: 'Main account', text: 'Worked out, not a bank balance: what your current accounts started with, plus what each month kept or fell short, plus money waiting for a card bill. In a household that passes everything on it never moves.' },
+  'statement.netWorth': { title: 'Net worth', text: 'Assets minus debts. Unlike the Grid\'s figure it counts the main account, so its change is the month\'s result: income minus spending, plus what investments earned.' },
+  'statement.free': { title: 'Free', text: 'The part of your net worth that no pool account has set aside. It closes the right side, which is why both sides agree.' },
+
   // Goals and schedules
   'goal.status': { title: 'Goal status', text: 'Measured against the plan in the grid, so the bar moves when the plan changes. On track: reached by the target month. Late: reached after it, or not within the months shown. Reached: already there.' },
   'schedule.status': { title: 'Status this month', text: 'Due: lands in this month and is not ticked yet. Paid: ticked done. Skipped: left out for this month only; the schedule continues. A dash means nothing is due this month.' },
