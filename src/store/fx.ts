@@ -3,11 +3,15 @@
  * Frankfurter, no key, only currency codes and dates leave the device), manual overrides,
  * and the drift settings used to project future months.
  */
+import { withDeadline } from '@/lib/deadline'
 import { FxRateSchema, type FxMonthRate, type Household, type MonthKey, type Tables } from '@/model'
 import type { Mutation, Store } from './store'
 import { loadTables, updateHousehold } from './actions'
 
 const now = () => Date.now()
+
+/** How long the rate service gets to answer before "Fetch rates" gives up. */
+export const RATE_TIMEOUT_MS = 20_000
 
 /** Currencies other than the base that appear in rows, accounts or schedules. */
 export function neededCurrencies(tables: Tables): string[] {
@@ -71,15 +75,17 @@ export async function fetchEcbRates(
   store: Store,
   opts: { base: string; symbols: string[]; from: MonthKey; to: MonthKey; policy: FxMonthRate; replaceManual?: boolean },
   fetchFn: typeof fetch = fetch,
+  timeoutMs: number = RATE_TIMEOUT_MS,
 ): Promise<FetchResult> {
   const today = new Date().toISOString().slice(0, 10)
   const start = `${opts.from}-01`
   const end = lastDay(opts.to) < today ? lastDay(opts.to) : today
   if (start > end || opts.symbols.length === 0) return { written: 0, months: [], unsupported: [] }
+  const get = withDeadline(fetchFn, timeoutMs, 'The rate service did not answer. Try again.')
 
   async function getDaily(symbols: string[]): Promise<Record<string, Record<string, number>> | null> {
     const url = `https://api.frankfurter.dev/v1/${start}..${end}?base=${encodeURIComponent(opts.base)}&symbols=${encodeURIComponent(symbols.join(','))}`
-    const res = await fetchFn(url)
+    const res = await get(url)
     if (res.status === 404 || res.status === 422) return null
     if (!res.ok) throw new Error(`The rate service answered ${res.status}. Try again later.`)
     const json = (await res.json()) as { rates?: Record<string, Record<string, number>> }

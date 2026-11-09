@@ -96,6 +96,12 @@ describe('currency rates: the ECB again when the service fails', () => {
     expect((await restoreEcbRate(store, 'EUR/USD', '2099-01', vi.fn() as unknown as typeof fetch)).written).toBe(0)
     expect((await loadTables(store)).fxRates.some((r) => r.month === '2099-01')).toBe(false)
   })
+  it('gives up on a rate service that never answers, and writes nothing', async () => {
+    const store = await fresh()
+    const silent = (() => new Promise<Response>(() => {})) as unknown as typeof fetch
+    await expect(fetchEcbRates(store, { base: 'EUR', symbols: ['USD'], from: '2026-01', to: '2026-01', policy: 'first' }, silent, 20)).rejects.toThrow('The rate service did not answer. Try again.')
+    expect((await loadTables(store)).fxRates).toEqual([])
+  })
 })
 
 describe('currency rates: the ECB again keeps what it cannot replace', () => {

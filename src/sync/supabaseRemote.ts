@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { withDeadline } from '@/lib/deadline'
 import type { SyncConfig } from './config'
 import type { KdfParams, Wrapped } from './crypto'
 import { OfflineError, StaleSchemaError, SyncConflictError, type Invite, type MemberKeys, type Membership, type RemoteUser, type SnapshotRow, type SyncRemote } from './remote'
@@ -27,13 +28,20 @@ interface InviteRow {
   used_at: string | null
 }
 
+/** Long enough for a snapshot upload on a slow mobile link, short enough that a dead request frees the sync queue before the next poll. */
+export const REQUEST_TIMEOUT_MS = 60_000
+
 /** The real server: Supabase auth, PostgREST tables, RPCs and the `account` function. */
 export class SupabaseRemote implements SyncRemote {
   readonly client: SupabaseClient
 
-  constructor(cfg: SyncConfig) {
-    // detectSessionInUrl off: no email links exist, and the app owns its URL handling
-    this.client = createClient(cfg.url, cfg.anonKey, { auth: { detectSessionInUrl: false, persistSession: true, autoRefreshToken: true } })
+  constructor(cfg: SyncConfig, timeoutMs: number = REQUEST_TIMEOUT_MS) {
+    this.client = createClient(cfg.url, cfg.anonKey, {
+      // detectSessionInUrl off: no email links exist, and the app owns its URL handling
+      auth: { detectSessionInUrl: false, persistSession: true, autoRefreshToken: true },
+      // every request (auth, tables, RPCs, the account function) gives up after the deadline instead of blocking the sync queue
+      global: { fetch: withDeadline((input, init) => fetch(input, init), timeoutMs) },
+    })
   }
 
   /** The stored session's user, or null when none is stored. Throws when the check itself failed (an expired token that could not be refreshed offline). */
@@ -196,6 +204,7 @@ function toRemoteError(e: unknown): Error {
   const message = e instanceof Error ? e.message : String(e)
   if (/\bconflict\b/.test(message)) return new SyncConflictError()
   if (/stale_schema/.test(message)) return new StaleSchemaError()
-  if (/Failed to fetch|NetworkError|Load failed|fetch failed|Failed to send/i.test(message) || (typeof navigator !== 'undefined' && navigator.onLine === false)) return new OfflineError()
+  // a request that ran into its deadline is treated like no connection: the next trigger tries again
+  if (/Failed to fetch|NetworkError|Load failed|fetch failed|Failed to send|request timed out|\bAbortError\b/i.test(message) || (typeof navigator !== 'undefined' && navigator.onLine === false)) return new OfflineError()
   return e instanceof Error ? e : new Error(message)
 }

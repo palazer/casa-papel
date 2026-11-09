@@ -61,16 +61,22 @@ export function DataScreen() {
 
   async function doExport() {
     setError(null)
-    const file = await exportSnapshot(store)
-    const name = exportFileName(household?.[0]?.name ?? 'household')
-    const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = name
-    a.click()
-    URL.revokeObjectURL(url)
-    setMessage(`Exported ${name}`)
+    try {
+      const file = await exportSnapshot(store)
+      const name = exportFileName(household?.[0]?.name ?? 'household')
+      const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = name
+      a.click()
+      URL.revokeObjectURL(url)
+      setMessage(`Exported ${name}`)
+    } catch (e) {
+      // the export is the backup: a failure must not look like a button that did nothing
+      setMessage(null)
+      setError(`The export did not work: ${e instanceof Error ? e.message : 'unknown error'}. Nothing was saved to a file.`)
+    }
   }
 
   async function doWipe() {
