@@ -2,7 +2,7 @@
  * The Statement: one month in accounting form, read from numbers the engine already computes. Two halves, each with
  * two sides that agree to the cent:
  *
- *   the month      Money in  = Money out                closed by "the rest" (to savings) and what the account keeps
+ *   the month      Money in  = Money out                closed by the rest (to one savings account) or the leftover
  *   the position   Assets    = Debts and net worth      closed by "Free"
  *
  * The upper half is the main account's month. For both month-end rules the engine guarantees
@@ -13,13 +13,25 @@
  *   out = spending + set aside and paid off + max(0, toSavings) + max(0, leftover)
  * Rows are sorted into the same buckets the engine's totals use (compute.ts, pass 2), which is what keeps the cents.
  */
-import { addMonths, cardIsItemized, type Account, type Money, type MonthKey, type Row, type Section, type Tables } from '@/model'
+import { addMonths, canCarryRule, cardIsItemized, resolveRules, rowsFeeding, ruleLabel, type Account, type Money, type MonthKey, type Row, type Section, type Tables } from '@/model'
 import { computeGoals, type GoalProgress } from './goals'
 import { computeMainAccount, type MainAccountSeries } from './mainAccount'
 import { cellKey, type AccountSeries, type CellResult, type CellStatus, type EngineOutput } from './types'
 
 export type StatementHue = 'income' | 'expense' | 'transfer' | 'worth' | 'pool'
 export type StatementLineKind = 'group' | 'category' | 'row' | 'item' | 'source' | 'account' | 'pool' | 'figure' | 'note'
+
+/** The rule behind a transfer line, and behind the account or pool account that transfer feeds. */
+export interface StatementRule {
+  /** `idle`: a savings row that gets nothing because another takes the rest. `none`: no row feeds the account yet. */
+  kind: 'fixed' | 'share-of-income' | 'share-of-rest' | 'rest' | 'idle' | 'none'
+  /** The fraction of a share rule. */
+  share?: number
+  /** In the rule dialog's words: `a fixed amount`, `10 % of income`, `30 % of what is left`, `the rest`. */
+  label: string
+  /** The row the rule sits on; absent for `none`. */
+  rowId?: string
+}
 
 export interface StatementLine {
   id: string
@@ -58,6 +70,8 @@ export interface StatementLine {
   memo?: boolean
   /** A short lowercase tag beside the name: `automatic`, `the rest`, `calculated`. */
   chip?: string
+  /** The rule that works this line out, or that feeds this account. */
+  rule?: StatementRule
   skipped?: boolean
   scheduled?: boolean
   missingRate?: boolean
@@ -135,7 +149,14 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   const t = engine.totals[month]
   if (!household || !t) return null
   const base = household.baseCurrency
-  const savingsPlug = household.closingRule === 'savings-plug'
+  const rules = resolveRules(engine.rows, household.closingRule)
+  const ruleOf = (row: Row): StatementRule => {
+    const state = rules.byRow.get(row.id)
+    return { kind: state?.kind ?? 'fixed', share: state && state.share > 0 ? state.share : undefined, label: ruleLabel(state), rowId: row.id }
+  }
+  /** An account or pool account shows the rule of the one row that feeds it; fed by several, it shows none of its own. */
+  const ruleOfRows = (feeding: Row[]): StatementRule | undefined =>
+    feeding.length === 0 ? { kind: 'none', label: 'no rule yet' } : feeding.length === 1 ? ruleOf(feeding[0]) : undefined
   const accounts = tables.accounts.filter((a) => !a.deletedAt).sort(byOrder)
   const accountsById = new Map(accounts.map((a) => [a.id, a]))
   const poolsById = new Map(tables.pools.filter((p) => !p.deletedAt).map((p) => [p.id, p]))
@@ -158,7 +179,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
       : []
     return {
       id: row.id, kind: 'row', label: row.name, amount, children, status: c.status, estimate: !empty && c.status === 'projected', empty,
-      automatic: c.source === 'derived', chip: c.source === 'derived' ? 'automatic' : undefined, missingRate: c.missingRate || undefined,
+      automatic: c.source === 'derived', chip: c.source === 'derived' ? 'automatic' : undefined, rule: canCarryRule(row) ? ruleOf(row) : undefined, missingRate: c.missingRate || undefined,
       native: c.currency !== base ? { amount: c.value, currency: c.currency } : undefined,
       net: row.section === 'income' && c.deductionsBase > 0 ? c.netBase : undefined,
       rowId: row.id, ...over,
@@ -205,7 +226,6 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   const cover: StatementLine[] = []
   const fromSavings: StatementLine[] = []
   const fromPool = new Map<string, StatementLine[]>()
-  const toSavingsRows = engine.rows.filter((r) => r.section !== 'income' && r.kind === 'to-savings')
   const estimates = new Map<string, { row: Row; cell: CellResult }>()
   const expenseCategories = new Set(tables.categories.filter((c) => !c.deletedAt && c.section === 'expense').map((c) => c.id))
 
@@ -254,23 +274,27 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
         setAside.push(rowLine(row, c, v, { memo: true, chip: 'counted when bought' }))
         break
       case 'to-savings': {
-        // under the plug the first row carries the rest and the others are idle
-        if (savingsPlug && row.id !== toSavingsRows[0]?.id) break
-        const over: Partial<StatementLine> = savingsPlug ? { balancing: true } : {}
+        const state = rules.byRow.get(row.id)
+        // a row that gets nothing because another takes the rest has nothing to show
+        if (state?.kind === 'idle') break
+        // the rest closes the month; in a month with a typed amount the same row is a plain line
+        const rest = state?.kind === 'rest' && c.source === 'derived'
+        const over: Partial<StatementLine> = rest ? { balancing: true } : {}
         if (v < 0) cover.push(rowLine(row, c, -v, { ...over, label: 'From savings' }))
-        else setAside.push(rowLine(row, c, v, savingsPlug ? { ...over, chip: 'the rest' } : over))
+        else setAside.push(rowLine(row, c, v, rest ? { ...over, chip: 'the rest' } : over))
         break
       }
     }
   }
-  if (savingsPlug && toSavingsRows.length === 0 && t.toSavings !== 0) {
+  if (t.rest != null && rules.restRowId === null && t.rest !== 0) {
     // the rest has no row to sit in: still part of the month, so the half keeps balancing
     warnings.push('The rest of the month has no "To savings" row to go to.')
-    const line: StatementLine = { id: 'rest', kind: 'figure', label: t.toSavings < 0 ? 'From savings' : 'To savings', amount: Math.abs(t.toSavings), children: [], balancing: true, automatic: true, chip: t.toSavings < 0 ? 'automatic' : 'the rest' }
-    if (t.toSavings < 0) cover.push(line)
+    const line: StatementLine = { id: 'rest', kind: 'figure', label: t.rest < 0 ? 'From savings' : 'To savings', amount: Math.abs(t.rest), children: [], balancing: true, automatic: true, chip: t.rest < 0 ? 'automatic' : 'the rest' }
+    if (t.rest < 0) cover.push(line)
     else setAside.push(line)
   }
-  if (savingsPlug) {
+  // `t.rest` says whether the rest was taken this month; a typed month on the rest row closes with the leftover instead
+  if (t.rest != null) {
     if (t.leftover !== 0) setAside.push({ id: 'kept', kind: 'figure', label: 'Kept in account', amount: t.leftover, children: [], automatic: true })
   } else if (t.leftover < 0) {
     cover.push({ id: 'leftover', kind: 'figure', label: 'From the account', amount: -t.leftover, children: [], balancing: true, automatic: true })
@@ -333,6 +357,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
     if (!s || !r) continue
     const change = changeOf(s, acc)
     const line: StatementLine = { id: `acc:${acc.id}`, kind: 'account', label: acc.name, amount: r.balanceBase, change, children: [], accountId: acc.id, missingRate: r.missingRate || undefined, native: s.currency !== base ? { amount: r.balance, currency: s.currency } : undefined }
+    if ((acc.type === 'savings' || acc.type === 'investment') && !acc.archivedMonth) line.rule = ruleOfRows(rowsFeeding(engine.rows, acc))
     if (r.adjustment !== 0 || r.projected === false) line.entered = true
     if (r.adjustment !== 0) line.adjustment = s.currency !== base && r.balance !== 0 ? Math.round(r.adjustment * (r.balanceBase / r.balance)) : r.adjustment
     accountLines.set(acc.id, line)
@@ -347,6 +372,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
       for (const p of held) {
         const pm = engine.pools[p.id].months[month]
         const poolLine: StatementLine = { id: `pool:${p.id}`, kind: 'pool', label: p.name, amount: pm.balance, change: pm.allocation - pm.spend, children: [], poolId: p.id }
+        if (!p.archivedMonth) poolLine.rule = ruleOfRows(engine.rows.filter((row) => row.id === p.allocationRowId && !row.archivedMonth))
         poolLines.set(p.id, poolLine)
         line.children.push(poolLine)
         inPools += pm.balance

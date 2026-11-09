@@ -25,9 +25,16 @@ describe('addRowOfKind under Transfers', () => {
     expect(out.accounts[fund.id].months['2026-02'].capital).toBe(200000)
   })
 
-  it('under the savings plug a second "to savings" row is refused; a pool account that lost its row can be filled again', async () => {
+  it('beside the row that takes the rest a second "to savings" row is typed and counts; a pool account that lost its row can be filled again', async () => {
     const { store, savings } = await fresh()
-    await expect(addRowOfKind(store, { section: 'transfer', name: 'More savings', categoryId: null, kind: 'to-savings', accountId: savings.id })).rejects.toThrow(/would stay at zero/)
+    const rainy = await addAccount(store, { name: 'Rainy day', type: 'savings', currency: 'EUR', openingMonth: '2026-01' })
+    const more = await addRowOfKind(store, { section: 'transfer', name: 'To Rainy day', categoryId: null, kind: 'to-savings', accountId: rainy.id })
+    expect(more).toMatchObject({ kind: 'to-savings', accountId: rainy.id, rule: 'fixed' })
+    await setCellValue(store, more.id, '2026-01', 20000, 'from-now-on')
+    const two = computeEngine({ tables: await loadTables(store), months })
+    expect(two.accounts[rainy.id].months['2026-02'].balance).toBe(40000)
+    // nothing comes in, so the rest account pays for it
+    expect(two.accounts[savings.id].months['2026-02'].balance).toBe(-40000)
     const pool = await addPool(store, { name: 'Travel', accountId: savings.id, openingBalance: 0 })
     await expect(addRowOfKind(store, { section: 'transfer', name: 'Travel again', categoryId: null, kind: 'pool-allocation', poolId: pool.id })).rejects.toThrow(/already filled/)
     await expect(addRowOfKind(store, { section: 'transfer', name: 'Travel again', categoryId: null, kind: 'pool-allocation', poolId: newId() })).rejects.toThrow(/Pick the pool account/)

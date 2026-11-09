@@ -111,8 +111,8 @@ test.describe('grid: add a transfer row', () => {
     await page.getByRole('button', { name: 'Add transfer row' }).click()
     const what = page.getByLabel('What the new transfer row does')
     await expect(what).toHaveValue('plain')
-    // the demo's month-end rule already fills "To savings", so that choice is not offered
-    await expect(what.locator('option[value="to-savings"]')).toHaveCount(0)
+    // "To savings" takes the rest already; a further savings row is offered and gets an amount of its own
+    await expect(what.locator('option[value="to-savings"]')).toHaveCount(1)
     await what.selectOption('to-investment')
     await expect(page.getByLabel('Account for the new transfer row')).toHaveValue(/./)
     await expect(page.getByText('deposited total and return')).toBeVisible()

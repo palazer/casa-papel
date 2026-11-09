@@ -21,6 +21,9 @@ const STEPS: Record<number, Step> = {
   // 4 → 5: the row kind 'category-estimate' (a category's estimate, counted as what its rows have not explained yet).
   // Nothing to rewrite; the version only keeps an older app from reading a row it would count in full.
   4: (raw) => raw,
+  // 5 → 6: `Row.rule` and `Row.ruleShare` (a share of income, a share of what is left, or the rest for a chosen
+  // savings row). Both fill in from their defaults; the version keeps an older app from typing over a worked-out row.
+  5: (raw) => raw,
 }
 
 export function migrateExport(raw: unknown): unknown {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { buildStatement, computeEngine, computeMainAccount, type EngineOutput, type Statement, type StatementLine } from '@/engine'
 import { CategorySchema, FxRateSchema, GoalSchema, monthRange, newId, poolRef, type Goal, type MonthKey, type Tables } from '@/model'
-import { applyMutations, planRecurringPosts } from '@/store'
+import { applyMutations, planRecurringPosts, ruleMutations, type RuleChoice, type RuleTarget } from '@/store'
 import { buildDemoTables } from '@/demo/demoHousehold'
 import type { RawFixture } from './fixtures/rawFixture'
 import { v2ToTables } from './fixtures/v2Adapter'
@@ -46,7 +46,8 @@ function expectSound(t: Tables, range: MonthKey[]) {
     const amountOf = (sideKey: 'in' | 'out', id: string) => topLine(s, sideKey, id)?.amount ?? 0
     expect(amountOf('in', 'income') + amountOf('in', 'from-investment'), `${m} income`).toBe(tot.income)
     expect(amountOf('in', 'sources'), `${m} from savings`).toBe(tot.fromSavingsDerived)
-    expect(s.flow.right.total - Math.max(0, tot.toSavings) - Math.max(0, tot.leftover), `${m} outflows`).toBe(tot.expensesTotal + tot.allocations + tot.toInvestment)
+    // what covers a short month sits on the left; taken back out, the right side is the engine's outflows and closing figures
+    expect(s.flow.right.total - amountOf('in', 'cover'), `${m} outflows`).toBe(tot.expensesTotal + tot.allocations + tot.toInvestment + tot.toSavings + tot.leftover)
     const mainBalance = find(s, 'main')?.amount ?? 0
     expect(topLine(s, 'claims', 'net-worth')!.amount - mainBalance, `${m} net worth`).toBe(out.netWorth[m] ?? 0)
   }
@@ -66,6 +67,30 @@ describe('the Statement balances', () => {
 
   it.each(['savings-plug', 'leftover-plug'] as const)('for every month of the public fixture (%s)', (rule) => {
     expectSound(withRule(v2.tables, rule), v2.months)
+  })
+
+  it.each(['savings-plug', 'leftover-plug'] as const)('with a rule on every account from a month on, and the months before it as they were (%s)', (rule) => {
+    const rainy = account({ name: 'Rainy day', type: 'savings', openingMonth: '2026-09', order: 'zz' })
+    const start: Tables = { ...withRule(posted, rule), accounts: [...posted.accounts, rainy] }
+    const from: MonthKey = '2027-01'
+    const named = (name: string) => start.rows.find((r) => r.name === name)!
+    let t = start
+    const set = (target: RuleTarget, choice: RuleChoice) => { t = applyMutations(t, ruleMutations(t, target, choice, from).mutations) }
+    set({ rowId: named('To investments').id }, { kind: 'share-of-income', share: 0.1 })
+    set({ rowId: named('Travel pool').id }, { kind: 'share-of-rest', share: 0.25 })
+    set({ rowId: named('Clothing pool').id }, { kind: 'fixed', amount: 9000 })
+    // the rest moves to a second savings account (or is taken for the first time), and the first one gets half of what is left
+    set({ accountId: rainy.id }, { kind: 'rest' })
+    set({ rowId: named('To savings').id }, { kind: 'share-of-rest', share: 0.5 })
+    expect(t.household[0].closingRule).toBe('savings-plug')
+    expectSound(t, demoMonths)
+    const was = computeEngine({ tables: start, months: demoMonths })
+    const now = computeEngine({ tables: t, months: demoMonths })
+    expect(now.totals['2027-02'].rest).not.toBeNull()
+    for (const m of demoMonths.filter((x) => x < from)) {
+      expect(now.netWorth[m], m).toBe(was.netWorth[m])
+      expect({ ...now.totals[m], rest: null, leftForShares: 0 }, m).toEqual({ ...was.totals[m], rest: null, leftForShares: 0 })
+    }
   })
 
   it.each(['savings-plug', 'leftover-plug'] as const)('and the change in net worth is the month: income minus spending plus what investments earned (%s)', (rule) => {

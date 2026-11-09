@@ -8,7 +8,7 @@ import { FUNDED_BY_PATTERN } from './fundedBy'
 z.config({ jitless: true })
 
 /** Bump when the shape of stored data changes; add a migration in migrations.ts. */
-export const SCHEMA_VERSION = 5
+export const SCHEMA_VERSION = 6
 
 // ---------- primitives ----------
 export const IdSchema = z.string().regex(ID_PATTERN, 'expected ULID')
@@ -136,6 +136,13 @@ export const RowKindSchema = z.enum([
   'category-estimate',
 ])
 
+/**
+ * How the transfer that feeds a savings account, an investment account or a pool account is worked out each month:
+ * a typed amount that carries forward, a share of the month's take-home income, a share of what the month has left,
+ * or the rest of the month (one savings row). `model/rules.ts` reads it for the engine, the store and the screens.
+ */
+export const RowRuleSchema = z.enum(['fixed', 'share-of-income', 'share-of-rest', 'rest'])
+
 export const RowSchema = BaseRecord.extend({
   name: z.string().min(1),
   section: SectionSchema,
@@ -159,6 +166,14 @@ export const RowSchema = BaseRecord.extend({
   followShare: FractionSchema.nullable().default(null),
   /** Expense rows only: the income row this is taken out of (tax, a pension contribution). The income's net is what the shares count. */
   deductedFromRowId: IdSchema.nullable().default(null),
+  /**
+   * The row's rule (see `RowRuleSchema`). null = as before rules existed: the amount is typed, and under the
+   * savings-plug month-end rule the first "to savings" row takes the rest. A month with a typed amount shows that
+   * amount whatever the rule says; that is how the months before a rule started keep theirs.
+   */
+  rule: RowRuleSchema.nullable().default(null),
+  /** With a share rule: the fraction of its base (0.1 = 10 %). */
+  ruleShare: FractionSchema.nullable().default(null),
   archivedMonth: MonthKeySchema.nullable().default(null),
   order: z.string().default('a0'),
 })
@@ -356,6 +371,7 @@ export type AccountMonth = z.infer<typeof AccountMonthSchema>
 export type Category = z.infer<typeof CategorySchema>
 export type Row = z.infer<typeof RowSchema>
 export type RowKind = z.infer<typeof RowKindSchema>
+export type RowRule = z.infer<typeof RowRuleSchema>
 export type Section = z.infer<typeof SectionSchema>
 export type Cell = z.infer<typeof CellSchema>
 /** A cell as written, before defaults fill in: what `putCell` and the demo build. */

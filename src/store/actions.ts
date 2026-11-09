@@ -1,7 +1,7 @@
 import { generateKeyBetween } from 'fractional-indexing'
 import { computeEngine, cellKey, sortRows, type EngineOutput } from '@/engine'
 import {
-  ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RowSchema, addMonths, cardIsItemized, compareMonths, monthKey, monthOfDate, monthRange, newId, parseMonth, poolIdOf,
+  ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RowSchema, addMonths, canCarryRule, cardIsItemized, compareMonths, monthKey, monthOfDate, monthRange, newId, parseMonth, poolIdOf, sharePercent,
   type Account, type Category, type Cell, type CellInput, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Pool, type Row, type RowKind, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
@@ -117,7 +117,7 @@ function groupRows(tables: Tables, r: Pick<Row, 'section' | 'categoryId'>): Row[
 }
 
 /** The put for a new row at the end of its group, or right after `afterRowId`; the caller commits. */
-function newRowMutation(tables: Tables, input: Partial<Row> & { name: string; section: Row['section'] }, afterRowId?: string): { row: Row; mutation: Mutation } {
+export function newRowMutation(tables: Tables, input: Partial<Row> & { name: string; section: Row['section'] }, afterRowId?: string): { row: Row; mutation: Mutation } {
   const after = afterRowId ? tables.rows.find((r) => r.id === afterRowId && !r.deletedAt) : undefined
   const categoryId = input.categoryId !== undefined ? input.categoryId : after?.categoryId ?? null
   if (categoryId && groupKey(tables, { section: input.section, categoryId }) === null) throw new Error('That category is not in this section.')
@@ -166,6 +166,7 @@ export function rowTargets(tables: Tables, household: Household | undefined) {
     /** pool accounts whose row was deleted, so they can be filled again */
     orphanPools: live(tables.pools).filter((p) => !p.allocationRowId || !rows.some((r) => r.id === p.allocationRowId)),
     adults: live(tables.entities).filter((e) => e.kind === 'adult'),
+    /** the rest of the month already has its row: a further "to savings" row gets a fixed amount of its own */
     plugTaken: household?.closingRule === 'savings-plug' && rows.some((r) => r.kind === 'to-savings'),
   }
 }
@@ -209,9 +210,10 @@ export async function addRowOfKind(store: Store, input: RowOfKindInput): Promise
     if (!targets.cardsItemized.some((a) => a.id === acc.id)) throw new Error(`"${acc.name}" records only its payment, as spending: add it under Expenses with "Pays off a loan or card".`)
     base.accountId = acc.id
   } else if (input.kind === 'to-savings' || input.kind === 'to-investment') {
-    if (input.kind === 'to-savings' && targets.plugTaken) throw new Error('The month-end rule already fills a "to savings" row; a second one would stay at zero.')
     const acc = checkAccountForRow(tables, { kind: input.kind, name: input.name }, input.accountId ?? null)
     if (acc) base.accountId = acc.id
+    // beside the row that takes the rest, a further savings row is typed: said outright, or it would read as idle
+    if (input.kind === 'to-savings' && targets.plugTaken) base.rule = 'fixed'
   } else if (input.kind === 'pocket-money') {
     const adult = targets.adults.find((e) => e.id === input.adultId)
     if (!adult) throw new Error('Pick the adult the pocket money is for.')
@@ -629,7 +631,12 @@ export function planRowFundedBy(tables: Tables, row: Row, fundedBy: FundedBy, sc
 /** Why a row has no amount of its own to mirror or replace, or null when it is an ordinary row. */
 export function derivedRowReason(row: Row, closingRule: Household['closingRule']): string | null {
   if (row.kind === 'category-estimate') return `"${row.name}" is what is left of its category's estimate.`
-  if (row.kind === 'to-savings' && closingRule === 'savings-plug') return `"${row.name}" is worked out by the app from the rest of the month.`
+  const rule = row.rule ?? null
+  if (canCarryRule(row) && (rule === 'share-of-income' || rule === 'share-of-rest')) {
+    return `"${row.name}" is worked out by its rule: ${sharePercent(row.ruleShare ?? 0)} of ${rule === 'share-of-income' ? 'income' : 'what is left'}.`
+  }
+  // the row that takes the rest, and the idle ones beside it; a savings row with a fixed amount is typed like any other
+  if (row.kind === 'to-savings' && closingRule === 'savings-plug' && rule !== 'fixed') return `"${row.name}" is worked out by the app from the rest of the month.`
   if (row.kind === 'pocket-money' && row.pocketMode === 'share-of-pocket-total') return `"${row.name}" is a share of the pocket total.`
   return null
 }
