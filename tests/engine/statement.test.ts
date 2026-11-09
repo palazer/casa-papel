@@ -6,7 +6,7 @@ import { applyMutations, planRecurringPosts } from '@/store'
 import { buildDemoTables } from '@/demo/demoHousehold'
 import type { RawFixture } from './fixtures/rawFixture'
 import { v2ToTables } from './fixtures/v2Adapter'
-import { T0, account, cellItems, cellValue, household, pool, row, tables } from './helpers'
+import { T0, account, actual, cellItems, cellValue, household, pool, row, tables } from './helpers'
 
 const months = monthRange('2026-01', '2026-03')
 const fixture = JSON.parse(readFileSync(new URL('./golden/v2-raw.json', import.meta.url), 'utf8')) as RawFixture
@@ -321,6 +321,29 @@ describe('the Statement, the position', () => {
     expect(find(statementFor(t, '2026-02').s, `acc:${usd.id}`)).toMatchObject({ amount: 800_00, change: -100_00 })
     const noRate = statementFor({ ...t, fxRates: [] }, '2026-01').s
     expect(find(noRate, `acc:${usd.id}`)).toMatchObject({ missingRate: true, amount: 1000_00 })
+  })
+
+  it('marks a balance someone entered, and how far it is from the plan', () => {
+    const savings = account({ name: 'Savings', type: 'savings', openingBalance: 1000_00 })
+    const visa = account({ name: 'Visa', type: 'credit-card', openingBalance: 300_00, card: { cardMode: 'lump' }, order: 'a1' })
+    const usd = account({ name: 'Dollars', type: 'savings', currency: 'USD', openingBalance: 500_00, order: 'a2' })
+    const t = tables({
+      household: [household()], accounts: [savings, visa, usd], fxRates: [fx('USD/EUR', '2026-01', 0.9)],
+      accountMonths: [actual(savings.id, '2026-01', 1000_00), actual(visa.id, '2026-01', 700_00), actual(usd.id, '2026-01', 600_00)],
+    })
+    const jan = statementFor(t, '2026-01').s
+    // entered and equal to the plan: nothing to explain (a savings account cannot tell that case from no entry)
+    expect(find(jan, `acc:${savings.id}`)).toMatchObject({ amount: 1000_00, change: 0 })
+    expect(find(jan, `acc:${savings.id}`)!.adjustment).toBeUndefined()
+    // a card that records only its payments: the new debt arrives with the entered balance
+    expect(find(jan, `acc:${visa.id}`)).toMatchObject({ amount: 700_00, change: 400_00, entered: true, adjustment: 400_00 })
+    // another currency: the difference is told in the household currency
+    expect(find(jan, `acc:${usd.id}`)).toMatchObject({ amount: 540_00, entered: true, adjustment: 90_00 })
+    // the month after carries on from the real number, with nothing entered
+    const feb = statementFor(t, '2026-02').s
+    expect(find(feb, `acc:${visa.id}`)).toMatchObject({ amount: 700_00, change: 0 })
+    expect(find(feb, `acc:${visa.id}`)!.entered).toBeUndefined()
+    expectSound(t, months)
   })
 
   it('has nothing to say about a month the engine did not compute', () => {

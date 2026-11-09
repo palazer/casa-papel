@@ -156,7 +156,8 @@ Truncation idiom: a `min-w-0` parent, `truncate` on the name, `shrink-0` on sibl
   blocker. Chip copy is lowercase.
 - **Lime** (`--primary`): the pressed control only (§1). Never a status.
 - **Closed months**: the column's cells on `bg-muted/60`, a lock before the month name, `closed` chip in the sublines.
-- **Adjusted balances** (a real balance entered): a dotted underline on the amount.
+- **Adjusted balances** (a real balance entered): a dotted underline on the amount. On the Statement the line also
+  says how far it is from the plan in muted `text-[11px]` after the name: `entered, +€270.84 against the plan`.
 - Never `text-red-600` or `text-green-700`; use the tokens or the chip tones above.
 
 ## 6. The grid
@@ -251,7 +252,9 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   opens its category and, in an open month, the cell editor for its first amount. In the lower half a line that can
   have a goal (an account, a pool account, a debt, Net worth) shows a 20 px ghost `Target` button after its name on
   hover or focus, always where the pointer is a finger, named `Set a goal for <line>`; it opens the goal dialog with
-  the kind and the thing it tracks already chosen. A goal's detail carries an `xs ghost` `Edit`.
+  the kind and the thing it tracks already chosen. A goal's detail carries an `xs ghost` `Edit`. An account's balance
+  is a button named `<account> balance: <amount>` (`, entered` once it is) that opens the Grid's `BalanceDialog`; the
+  line for the current accounts is calculated and has none.
 
 ## 8. Controls
 
@@ -293,6 +296,13 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   (`SHEET_CLASS`: `max-sm:bottom-0 … rounded-t-2xl` with safe-area padding): amount, date (today in the current month),
   certainty as a `Segmented` with Done preselected, note, then `Open full editor`, Cancel and Save. Saving changes this
   month only.
+- The balance dialog (`src/features/grid/BalanceDialog.tsx`) of a card whose purchases are expense rows offers, when the
+  typed balance is above the expected one, a `rounded-md border` block (`data-testid="book-difference"`) with a
+  `Check` "Count the €400.00 difference as spending this month" and one muted sentence saying where it goes (a done
+  item "Not recorded" on the row `<card> – Not recorded`, paid from the card) or, unticked, that the debt rises
+  with no line to explain it. Ticked for a balance typed now, unticked when the dialog opens on an older difference.
+  Other accounts never see it: for a card that records only its payments it would count the money twice
+  (`setCardBalanceBooked` in `src/store/actions.ts`).
 - Dialogs are shadcn `Dialog`; the confirm step lives inside the dialog, never behind it. Errors appear beside the field
   that caused them, `role="alert"`.
 - Removing anything goes through one `RemoveDialog` (`src/features/remove/RemoveDialog.tsx`), reached from a row's

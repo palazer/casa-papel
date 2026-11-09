@@ -1,7 +1,7 @@
 import { generateKeyBetween } from 'fractional-indexing'
 import { computeEngine, cellKey, sortRows, type EngineOutput } from '@/engine'
 import {
-  ACCOUNT_TYPE_INFO, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RowSchema, addMonths, cardIsItemized, compareMonths, monthKey, monthOfDate, monthRange, newId, parseMonth, poolIdOf,
+  ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RowSchema, addMonths, cardIsItemized, compareMonths, monthKey, monthOfDate, monthRange, newId, parseMonth, poolIdOf,
   type Account, type Cell, type CellInput, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Pool, type Row, type RowKind, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
@@ -230,6 +230,50 @@ export async function addRowOfKind(store: Store, input: RowOfKindInput): Promise
   if (pool) mutations.push({ op: 'put', table: 'pools', record: PoolSchema.parse({ ...pool, allocationRowId: row.id, updatedAt: now() }) })
   await store.commit(mutations)
   return row
+}
+
+/** The row a card's unrecorded spending is booked on: named after the card and paid from it. */
+export const unrecordedRowName = (card: Pick<Account, 'name'>): string => `${card.name} – Not recorded`
+
+/**
+ * Pin what is really owed on a card and, when that is more than the plan expects, book the difference as that month's
+ * spending on the card, so the month's expenses and the debt agree. Only for a card whose purchases are expense rows:
+ * on any other card the payment is the recorded spending, and booking purchases as well would count them twice.
+ * The difference lands as a done item "Not recorded" on the card's own "<card> – Not recorded" row (made on first use);
+ * the following month is held at zero so the amount does not carry forward. One commit, so one undo takes it all back.
+ * Returns what was booked, 0 when the real balance is not above the expected one.
+ */
+export async function setCardBalanceBooked(store: Store, accountId: string, month: MonthKey, actualBalance: Money): Promise<Money> {
+  const { tables, engine, household } = await engineUpTo(store, month)
+  assertOpen(tables, month)
+  const card = tables.accounts.find((a) => a.id === accountId && !a.deletedAt)
+  if (!card || !cardIsItemized(card)) throw new Error('Only a card whose purchases are expense rows can count a difference as spending.')
+  const expected = engine.accounts[card.id]?.months[month]?.computed
+  if (expected == null) throw new Error(`"${card.name}" has no balance in ${month}.`)
+  const extra = actualBalance - expected
+  const mutations: Mutation[] = []
+  if (extra > 0) {
+    const name = unrecordedRowName(card)
+    let row = tables.rows.find((r) => !r.deletedAt && !r.archivedMonth && r.section === 'expense' && r.kind === 'plain' && r.accountId === card.id && r.name === name)
+    if (!row) {
+      const made = newRowMutation(tables, { name, section: 'expense', categoryId: null, accountId: card.id, currency: card.currency === household.baseCurrency ? null : card.currency, defaultStatus: 'committed' })
+      row = made.row
+      mutations.push(made.mutation)
+    }
+    const existing = cellOf(tables, row.id, month)
+    const kept: CellItem[] = existing?.mode === 'items' ? [...existing.items]
+      : existing?.mode === 'value' && existing.value ? [{ id: newId(), label: '', amount: existing.value, status: row.defaultStatus, fundedBy: row.defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }]
+      : []
+    const booked: CellItem = { id: newId(), label: 'Not recorded', amount: extra, status: 'done', fundedBy: 'cash', date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }
+    mutations.push(putCell({ rowId: row.id, month, mode: 'items', value: null, items: [...kept, booked], note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, updatedAt: now() }))
+    const next = addMonths(month, 1)
+    const nextCell = cellOf(tables, row.id, next)
+    if (!nextCell || nextCell.mode === 'inherit') mutations.push(putCell({ rowId: row.id, month: next, mode: 'value', value: 0, items: [], note: nextCell?.note ?? null, currencyOverride: nextCell?.currencyOverride ?? null, updatedAt: now() }))
+  }
+  const known = tables.accountMonths.find((a) => a.accountId === accountId && a.month === month)
+  mutations.push({ op: 'put', table: 'accountMonths', record: AccountMonthSchema.parse({ ...known, accountId, month, actualBalance, updatedAt: now() }) })
+  await store.commit(mutations)
+  return Math.max(0, extra)
 }
 
 export async function updateRow(store: Store, rowId: string, patch: Partial<Omit<Row, 'id' | 'createdAt'>>): Promise<void> {

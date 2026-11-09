@@ -46,6 +46,10 @@ export interface StatementLine {
   balancing?: boolean
   /** Derived from other figures, not a balance anyone entered. */
   calculated?: boolean
+  /** A real balance was entered for this month. */
+  entered?: boolean
+  /** How far the entered balance is from what the plan expected, in the base currency; left out when it is not. */
+  adjustment?: Money
   /** Shown for the record and left out of every sum. */
   memo?: boolean
   /** A short lowercase tag beside the name: `automatic`, `the rest`, `calculated`. */
@@ -311,6 +315,8 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
     if (!s || !r) continue
     const change = changeOf(s, acc)
     const line: StatementLine = { id: `acc:${acc.id}`, kind: 'account', label: acc.name, amount: r.balanceBase, change, children: [], accountId: acc.id, missingRate: r.missingRate || undefined, native: s.currency !== base ? { amount: r.balance, currency: s.currency } : undefined }
+    if (r.adjustment !== 0 || r.projected === false) line.entered = true
+    if (r.adjustment !== 0) line.adjustment = s.currency !== base && r.balance !== 0 ? Math.round(r.adjustment * (r.balanceBase / r.balance)) : r.adjustment
     accountLines.set(acc.id, line)
     if (s.liability) {
       debts.push(line)

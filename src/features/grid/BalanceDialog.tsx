@@ -3,11 +3,12 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Check } from '@/components/Check'
 import { amountToInput, formatAmount, formatMonth, formatPercent, parseAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import type { AccountMonthResult } from '@/engine'
-import type { Account, MonthKey } from '@/model'
-import { setAccountActual } from '@/store'
+import { cardIsItemized, type Account, type MonthKey } from '@/model'
+import { setAccountActual, setCardBalanceBooked, unrecordedRowName } from '@/store'
 
 interface Props {
   account: Account
@@ -18,7 +19,11 @@ interface Props {
   onClose: () => void
 }
 
-/** Pin what an account really held at the end of a month. The engine shows the gap and continues from the real number. */
+/**
+ * Pin what an account really held at the end of a month. The engine shows the gap and continues from the real number.
+ * For a card whose purchases are expense rows, owing more than the plan expects means spending that was never typed:
+ * the dialog offers to count the difference as that month's spending, so expenses and the debt agree.
+ */
 export function BalanceDialog({ account, month, result, locale, closed, onClose }: Props) {
   const store = useStore()
   const ccy = account.currency
@@ -27,12 +32,18 @@ export function BalanceDialog({ account, month, result, locale, closed, onClose 
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const isInvestment = account.type === 'investment'
+  // ticked for a balance typed now; an old difference is only counted when someone asks for it
+  const [book, setBook] = useState(!hasActual)
+  const typed = text.trim() === '' ? null : parseAmount(text, ccy, locale)
+  const extra = typed != null ? typed - result.computed : 0
+  const canBook = cardIsItemized(account) && !closed && extra > 0
 
   async function save(value: number | null) {
     setBusy(true)
     setError(null)
     try {
-      await setAccountActual(store, account.id, month, value)
+      if (value != null && canBook && book) await setCardBalanceBooked(store, account.id, month, value)
+      else await setAccountActual(store, account.id, month, value)
       onClose()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save.')
@@ -67,6 +78,16 @@ export function BalanceDialog({ account, month, result, locale, closed, onClose 
           <Input id="real-balance" autoFocus inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} placeholder="leave empty to use the expected amount" disabled={closed} />
           {closed && <p className="text-xs text-muted-foreground">This month is closed. Reopen it from the month header to change the balance.</p>}
         </div>
+        {canBook && (
+          <div className="space-y-1 rounded-md border p-2.5" data-testid="book-difference">
+            <Check label={`Count the ${formatAmount(extra, ccy, locale)} difference as spending this month`} checked={book} onChange={(e) => setBook(e.target.checked)} />
+            <p className="text-xs text-muted-foreground">
+              {book
+                ? `It is added as "Not recorded" on the row "${unrecordedRowName(account)}", paid from this card, so the month's expenses and what is owed agree. Rename it or split it into items any time.`
+                : 'Only the balance changes. What is owed rises without a line of spending to explain it.'}
+            </p>
+          </div>
+        )}
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         <DialogFooter className="flex-row flex-wrap gap-2 sm:justify-between">
           <Button variant="ghost" onClick={() => void save(null)} disabled={busy || closed || !hasActual}>Use expected</Button>

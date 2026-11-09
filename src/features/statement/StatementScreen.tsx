@@ -14,6 +14,7 @@ import { addPlanYear, setCellDone, setDerivedDone, setItemStatus } from '@/store
 import { GoalDialog } from '@/features/goals/GoalDialog'
 import { goalStatusLine } from '@/features/goals/goalText'
 import { AddRowInline } from '@/features/grid/AddRowInline'
+import { BalanceDialog } from '@/features/grid/BalanceDialog'
 import { CellEditor } from '@/features/grid/CellEditor'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
 import { AddCategoryInline } from './AddCategoryInline'
@@ -42,6 +43,7 @@ export function StatementScreen() {
   /** The goal dialog: an existing goal, or a new one starting on the line it was asked from. */
   const [goalEdit, setGoalEdit] = useState<{ goal: Goal | null; preset?: { kind: GoalKind; accountId?: string | null; poolId?: string | null } } | null>(null)
   const [removingGoal, setRemovingGoal] = useState<Goal | null>(null)
+  const [balanceFor, setBalanceFor] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -56,6 +58,8 @@ export function StatementScreen() {
   const horizon = engine.months.length ? monthDiff(m, engine.months[engine.months.length - 1]) : 0
   const goalText = (g: GoalProgress) => goalStatusLine(g, locale, horizon)
   const editing = editorRow ? engine.rows.find((r) => r.id === editorRow) : undefined
+  const balanceAccount = balanceFor ? tables.accounts.find((a) => a.id === balanceFor) : undefined
+  const balanceResult = balanceFor ? engine.accounts[balanceFor]?.months[m] : undefined
 
   /** A row counts its items; an item is done or not; an empty line has nothing to tick. */
   function doneOf(line: StatementLine): { done: number; total: number; state: DoneState } | null {
@@ -98,7 +102,7 @@ export function StatementScreen() {
     if (line.id === 'set-aside') return addRow('transfer')
     if (line.kind === 'category' && line.id.startsWith('cat:')) {
       const [, section, categoryId] = line.id.split(':')
-      return addRow(section as Section, { label: `Add row to ${line.label}`, defaultCategoryId: categoryId === 'none' ? '' : categoryId })
+      return addRow(section as Section, categoryId === 'none' ? { label: 'Add row without a category' } : { label: `Add row to ${line.label}`, defaultCategoryId: categoryId })
     }
     return null
   }
@@ -113,7 +117,7 @@ export function StatementScreen() {
 
   const base = { locale, ccy, isOpen, onToggle, goalText }
   const flowCtx: LineContext = { ...base, withChange: false, closed: statement.closed, doneOf, onTick, onEdit: setEditorRow, busy, footer }
-  const positionCtx: LineContext = { ...base, withChange: true, onGoal }
+  const positionCtx: LineContext = { ...base, withChange: true, onGoal, onBalance: setBalanceFor }
   const day = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${lastDayOfMonth(m)}T00:00:00Z`))
   const foldable = walk([...statement.flow.left.lines, ...statement.flow.right.lines, ...statement.position.left.lines, ...statement.position.right.lines])
     .filter((l) => l.kind !== 'group' && (l.children.length > 0 || !!l.goals?.length))
@@ -142,6 +146,9 @@ export function StatementScreen() {
           household={household} tables={tables} goal={goalEdit.goal} preset={goalEdit.preset} onClose={() => setGoalEdit(null)}
           onRemove={goalEdit.goal ? () => { setRemovingGoal(goalEdit.goal); setGoalEdit(null) } : undefined}
         />
+      )}
+      {balanceAccount && balanceResult && (
+        <BalanceDialog key={`${balanceAccount.id}:${m}`} account={balanceAccount} month={m} result={balanceResult} locale={locale} closed={statement.closed} onClose={() => setBalanceFor(null)} />
       )}
       {removingGoal && <RemoveDialog target={{ kind: 'goal', id: removingGoal.id }} tables={tables} household={household} onClose={() => setRemovingGoal(null)} />}
     </div>

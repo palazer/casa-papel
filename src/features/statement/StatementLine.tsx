@@ -34,6 +34,8 @@ export interface LineContext {
   footer?: (line: Line) => ReactNode
   /** Set a goal on a line that can have one, or edit the one it has. */
   onGoal?: (line: Line, goal?: GoalProgress) => void
+  /** Enter what an account really held at the end of the month. */
+  onBalance?: (accountId: string) => void
 }
 
 const HUE: Record<StatementHue, Hue> = { income: HUES.income, expense: HUES.expense, transfer: HUES.transfer, worth: HUES.worth, pool: HUES.pool }
@@ -129,6 +131,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
       {line.missingRate && <Chip tone="rose">no rate</Chip>}
       {line.net != null && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">net {formatAmount(line.net, ccy, locale)}</span>}
       {line.chip && <Chip tone="zinc">{line.chip}</Chip>}
+      {line.adjustment != null && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">entered, {formatAmount(line.adjustment, ccy, locale, { sign: 'exceptZero' })} against the plan</span>}
       {line.skipped && <Chip tone="zinc">skipped</Chip>}
       {line.goals?.map((g) => <GoalMark key={g.goal.id} goal={g} locale={locale} />)}
     </>
@@ -216,7 +219,14 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
           )}
         </div>
         {ctx.withChange && <span className={cn(CHANGE_COL, 'text-muted-foreground', group && 'font-medium')}>{line.change != null ? changeText(line.change, ccy, locale) : ''}</span>}
-        {amount}
+        {ctx.onBalance && line.accountId ? (
+          <button
+            type="button" aria-label={`${line.label} balance: ${amountText}${line.entered ? ', entered' : ''}`} onClick={() => ctx.onBalance!(line.accountId!)}
+            className={cn(AMOUNT_COL, '-my-1 rounded py-1 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring', line.amount < 0 && 'text-expense', line.entered && 'underline decoration-dotted underline-offset-4')}
+          >
+            {amountText}
+          </button>
+        ) : amount}
       </div>
       {below}
     </li>

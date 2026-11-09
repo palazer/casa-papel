@@ -198,6 +198,52 @@ test.describe('working the month in the Statement', () => {
     await page.screenshot({ path: 'e2e/output/statement-adding.png', fullPage: true })
   })
 
+  test('a real balance is entered from its line; a card owing more than planned counts the difference as spending', async ({ page }) => {
+    await openStatement(page)
+    await goToMonth(page, 'November 2026')
+    const moneyOut = page.getByRole('region', { name: 'Money out' })
+    const claims = page.getByRole('region', { name: 'Debts and net worth' })
+    const assets = page.getByRole('region', { name: 'Assets' })
+    const dlg = page.getByRole('dialog')
+    const expensesBefore = euros(await moneyOut.locator('[data-line="expenses"]').innerText())
+    const restBefore = euros(await moneyOut.locator('[data-line]').filter({ hasText: 'the rest' }).innerText())
+    const amountOf = async (line: string) => euros((await claims.locator(`[data-line="${line}"]`).innerText()).split('\n').pop()!)
+    const netWorthBefore = await amountOf('net-worth')
+
+    // the card: the statement says 478 is owed, the plan expected 78
+    await claims.getByRole('button', { name: /^Credit card balance:/ }).click()
+    await expect(dlg.getByRole('heading', { name: 'Credit card · November 2026' })).toBeVisible()
+    await expect(dlg.getByTestId('book-difference')).toHaveCount(0)
+    await dlg.getByLabel('Real balance in EUR').fill('478')
+    await expect(dlg.getByRole('checkbox', { name: 'Count the €400.00 difference as spending this month' })).toBeChecked()
+    await expect(dlg.getByTestId('book-difference')).toContainText('Credit card – Not recorded')
+    await page.screenshot({ path: 'e2e/output/statement-card-balance.png' })
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+
+    // the debt is 478, entered, and nothing is left unexplained: the 400 is a line of spending
+    await expect(claims.getByRole('button', { name: /^Credit card balance:/ })).toHaveAccessibleName('Credit card balance: €478.00, entered')
+    await expect(claims.getByText(/against the plan/)).toHaveCount(0)
+    expect(euros(await moneyOut.locator('[data-line="expenses"]').innerText())).toBe(expensesBefore + 400)
+    expect(euros(await moneyOut.locator('[data-line]').filter({ hasText: 'the rest' }).innerText())).toBe(restBefore - 400)
+    await moneyOut.getByRole('button', { name: 'No category', exact: true }).click()
+    await expect(moneyOut.getByRole('button', { name: /^Credit card – Not recorded:/ })).toHaveAccessibleName('Credit card – Not recorded: €400.00')
+    await expect(page.getByRole('checkbox', { name: 'Credit card – Not recorded done' })).toBeChecked()
+    expect(await amountOf('net-worth')).toBe(netWorthBefore - 400)
+    expect((await total(page, 'in').innerText()).replace(/^Total in\s*/, '')).toBe((await total(page, 'out').innerText()).replace(/^Total out\s*/, ''))
+    expect((await total(page, 'assets').innerText()).replace(/^Total\s*/, '')).toBe((await total(page, 'claims').innerText()).replace(/^Total\s*/, ''))
+
+    // any other account: the balance is pinned and the line says how far it is from the plan
+    await assets.getByRole('button', { name: /^Index fund balance:/ }).click()
+    await dlg.getByLabel('Real balance in EUR').fill('14000')
+    await expect(dlg.getByTestId('book-difference')).toHaveCount(0)
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(assets.getByRole('button', { name: /^Index fund balance:/ })).toHaveAccessibleName('Index fund balance: €14,000.00, entered')
+    await expect(assets.locator('[data-line^="acc:"]').filter({ hasText: 'Index fund' })).toContainText(/entered, \+€[\d.,]+ against the plan/)
+    await page.screenshot({ path: 'e2e/output/statement-balances.png', fullPage: true })
+  })
+
   test('a goal is set from the line it watches, which then carries its mark and opens to the bar', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'September 2026')
