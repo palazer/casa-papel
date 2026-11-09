@@ -243,7 +243,15 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   a button named `<line>: <amount>` (`, an estimate` when shaded) that opens the cell editor for that row and month.
   An itemized row's chevron is a button of its own, `Items of <row>`. An automatic row has the tick (it marks the
   money as moved) but no button; a closed month has neither. The island's head carries the legend, a shaded `an
-  estimate` with an (i). The lower half is read-only.
+  estimate` with an (i).
+  Things are added where they will appear: the foot of Income and Expenses holds the Grid's `AddRowInline` (`Add row`)
+  and `AddCategoryInline` (`Add category`, a name and Enter), the foot of Set aside, pay off holds `Add row`, and an
+  opened category ends with `Add row to <category>` with that category already chosen. A category is a line from
+  the moment it exists, its amount a faint `·` until it has a row, so its first row is added inside it. A new row
+  opens its category and, in an open month, the cell editor for its first amount. In the lower half a line that can
+  have a goal (an account, a pool account, a debt, Net worth) shows a 20 px ghost `Target` button after its name on
+  hover or focus, always where the pointer is a finger, named `Set a goal for <line>`; it opens the goal dialog with
+  the kind and the thing it tracks already chosen. A goal's detail carries an `xs ghost` `Edit`.
 
 ## 8. Controls
 

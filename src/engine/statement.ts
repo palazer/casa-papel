@@ -14,7 +14,6 @@
  * Rows are sorted into the same buckets the engine's totals use (compute.ts, pass 2), which is what keeps the cents.
  */
 import { addMonths, cardIsItemized, type Account, type Money, type MonthKey, type Row, type Section, type Tables } from '@/model'
-import { groupRowsByCategory } from './compute'
 import { computeGoals, type GoalProgress } from './goals'
 import { computeMainAccount, type MainAccountSeries } from './mainAccount'
 import { cellKey, type AccountSeries, type CellResult, type CellStatus, type EngineOutput } from './types'
@@ -158,15 +157,27 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
     }
   }
 
-  /** Rows under their categories, when the section has any; a category's amount is its rows' sum. */
+  /**
+   * Rows under their categories, when the section has any; a category's amount is its rows' sum. Every live category
+   * of the section is listed in its own order, one without rows too (it is where its first row gets added); rows
+   * without a category come last, as in `groupRowsByCategory`.
+   */
   function categorised(section: Section, lines: Array<{ row: Row; line: StatementLine }>): StatementLine[] {
-    const labelled = tables.categories.some((c) => !c.deletedAt && c.section === section)
-    if (!labelled) return lines.map((l) => l.line)
-    const lineOf = new Map(lines.map((l) => [l.row.id, l.line]))
-    return groupRowsByCategory(lines.map((l) => l.row), tables.categories).map((g) => {
-      const children = g.rows.map((r) => lineOf.get(r.id)!)
-      return { id: `cat:${section}:${g.category?.id ?? 'none'}`, kind: 'category' as const, label: g.category?.name ?? 'No category', amount: sum(children), children, estimate: anyEstimate(children) }
-    })
+    const cats = tables.categories.filter((c) => !c.deletedAt && c.section === section).sort(byOrder)
+    if (cats.length === 0) return lines.map((l) => l.line)
+    const known = new Set(cats.map((c) => c.id))
+    const under = new Map<string, StatementLine[]>()
+    for (const { row, line } of lines) {
+      const key = row.categoryId && known.has(row.categoryId) ? row.categoryId : 'none'
+      under.set(key, [...(under.get(key) ?? []), line])
+    }
+    const category = (key: string, label: string): StatementLine => {
+      const children = under.get(key) ?? []
+      return { id: `cat:${section}:${key}`, kind: 'category', label, amount: sum(children), children, estimate: anyEstimate(children), empty: children.length === 0 || undefined }
+    }
+    const out = cats.map((c) => category(c.id, c.name))
+    if (under.has('none')) out.push(category('none', 'No category'))
+    return out
   }
 
   // ---------- the month ----------

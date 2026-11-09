@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
@@ -9,10 +9,14 @@ import { doneness, type DoneState } from '@/app/display'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { buildStatement, cellKey, computeMainAccount, type GoalProgress, type StatementLine } from '@/engine'
-import { lastDayOfMonth, monthDiff, monthOfDate, type MonthKey } from '@/model'
+import { lastDayOfMonth, monthDiff, monthOfDate, type Goal, type GoalKind, type MonthKey, type Row, type Section } from '@/model'
 import { addPlanYear, setCellDone, setDerivedDone, setItemStatus } from '@/store'
+import { GoalDialog } from '@/features/goals/GoalDialog'
 import { goalStatusLine } from '@/features/goals/goalText'
+import { AddRowInline } from '@/features/grid/AddRowInline'
 import { CellEditor } from '@/features/grid/CellEditor'
+import { RemoveDialog } from '@/features/remove/RemoveDialog'
+import { AddCategoryInline } from './AddCategoryInline'
 import { StatementBand } from './StatementBand'
 import { ESTIMATE_SHADE, type LineContext } from './StatementLine'
 
@@ -35,6 +39,9 @@ export function StatementScreen() {
   /** Lines someone opened or closed; the rest follow their own default. */
   const [openLines, setOpenLines] = useState<Record<string, boolean>>({})
   const [editorRow, setEditorRow] = useState<string | null>(null)
+  /** The goal dialog: an existing goal, or a new one starting on the line it was asked from. */
+  const [goalEdit, setGoalEdit] = useState<{ goal: Goal | null; preset?: { kind: GoalKind; accountId?: string | null; poolId?: string | null } } | null>(null)
+  const [removingGoal, setRemovingGoal] = useState<Goal | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -75,9 +82,38 @@ export function StatementScreen() {
     run.catch((e) => setError(e instanceof Error ? e.message : 'Action failed')).finally(() => setBusy(null))
   }
 
+  /** A new row opens its category and, in an open month, the editor for its first amount. */
+  function onAdded(row: Row) {
+    setOpenLines((s) => ({ ...s, [`cat:${row.section}:${row.categoryId ?? 'none'}`]: true }))
+    if (!statement!.closed) setEditorRow(row.id)
+  }
+  const categoriesOf = (section: Section) => tables!.categories.filter((c) => !c.deletedAt && c.section === section)
+  const addRow = (section: Section, over: { label?: string; defaultCategoryId?: string } = {}) => (
+    <AddRowInline section={section} categories={categoriesOf(section)} tables={tables!} household={household!} onError={setError} onAdded={onAdded} {...over} />
+  )
+  /** Things are added where they will appear: at the foot of a group, and inside a category for a row of that category. */
+  function footer(line: StatementLine): ReactNode {
+    if (line.id === 'income') return <>{addRow('income')}<AddCategoryInline section="income" onError={setError} /></>
+    if (line.id === 'expenses') return <>{addRow('expense')}<AddCategoryInline section="expense" onError={setError} /></>
+    if (line.id === 'set-aside') return addRow('transfer')
+    if (line.kind === 'category' && line.id.startsWith('cat:')) {
+      const [, section, categoryId] = line.id.split(':')
+      return addRow(section as Section, { label: `Add row to ${line.label}`, defaultCategoryId: categoryId === 'none' ? '' : categoryId })
+    }
+    return null
+  }
+
+  /** A goal starts on the line it was asked from: a pool account, an account to grow, a debt to clear, or net worth. */
+  function onGoal(line: StatementLine, g?: GoalProgress) {
+    if (g) return setGoalEdit({ goal: g.goal })
+    if (line.poolId) return setGoalEdit({ goal: null, preset: { kind: 'pool-balance', poolId: line.poolId } })
+    if (line.accountId) return setGoalEdit({ goal: null, preset: { kind: engine!.accounts[line.accountId]?.liability ? 'pay-off' : 'account-balance', accountId: line.accountId } })
+    setGoalEdit({ goal: null, preset: { kind: 'net-worth' } })
+  }
+
   const base = { locale, ccy, isOpen, onToggle, goalText }
-  const flowCtx: LineContext = { ...base, withChange: false, closed: statement.closed, doneOf, onTick, onEdit: setEditorRow, busy }
-  const positionCtx: LineContext = { ...base, withChange: true }
+  const flowCtx: LineContext = { ...base, withChange: false, closed: statement.closed, doneOf, onTick, onEdit: setEditorRow, busy, footer }
+  const positionCtx: LineContext = { ...base, withChange: true, onGoal }
   const day = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${lastDayOfMonth(m)}T00:00:00Z`))
   const foldable = walk([...statement.flow.left.lines, ...statement.flow.right.lines, ...statement.position.left.lines, ...statement.position.right.lines])
     .filter((l) => l.kind !== 'group' && (l.children.length > 0 || !!l.goals?.length))
@@ -101,6 +137,13 @@ export function StatementScreen() {
       <StatementBand title="At the end of the month" help="statement.position" band={statement.position} ctx={positionCtx} totals={['Total', 'Total']} amountHead={day} />
 
       {editing && <CellEditor key={`${editing.id}:${m}`} tables={tables} engine={engine} household={household} row={editing} month={m} onClose={() => setEditorRow(null)} />}
+      {goalEdit && (
+        <GoalDialog
+          household={household} tables={tables} goal={goalEdit.goal} preset={goalEdit.preset} onClose={() => setGoalEdit(null)}
+          onRemove={goalEdit.goal ? () => { setRemovingGoal(goalEdit.goal); setGoalEdit(null) } : undefined}
+        />
+      )}
+      {removingGoal && <RemoveDialog target={{ kind: 'goal', id: removingGoal.id }} tables={tables} household={household} onClose={() => setRemovingGoal(null)} />}
     </div>
   )
 }

@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useStore } from '@/app/store'
-import type { Account, Category, Household, Section, Tables } from '@/model'
+import type { Account, Category, Household, Row, Section, Tables } from '@/model'
 import { addRow, addRowOfKind, rowTargets, type ExpenseRowKind, type TransferRowKind } from '@/store'
 import { NativeSelect } from '@/components/NativeSelect'
 
@@ -48,12 +48,19 @@ const KINDS: Kind[] = [
   },
 ]
 
-/** "Add row" at the foot of a section: a name, a category when the section has any, and under Transfers and Expenses what the row does. */
-export function AddRowInline({ section, categories, tables, household, onError }: { section: Section; categories: Category[]; tables: Tables; household: Household; onError: (msg: string) => void }) {
+/**
+ * "Add row" at the foot of a section: a name, a category when the section has any, and under Transfers and Expenses what
+ * the row does. The Statement also puts one inside each category: `defaultCategoryId` starts it there, `label` names
+ * the button ("Add row to Housing"), and `onAdded` hands back the new row so the screen can open it.
+ */
+export function AddRowInline({ section, categories, tables, household, onError, defaultCategoryId = '', label, onAdded }: {
+  section: Section; categories: Category[]; tables: Tables; household: Household; onError: (msg: string) => void
+  defaultCategoryId?: string; label?: string; onAdded?: (row: Row) => void
+}) {
   const store = useStore()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
-  const [categoryId, setCategoryId] = useState('')
+  const [categoryId, setCategoryId] = useState(defaultCategoryId)
   const [choice, setChoice] = useState<Choice>('plain')
   const [targetId, setTargetId] = useState('')
 
@@ -68,6 +75,7 @@ export function AddRowInline({ section, categories, tables, household, onError }
 
   const reset = () => {
     setName('')
+    setCategoryId(defaultCategoryId)
     setChoice('plain')
     setTargetId('')
     setOpen(false)
@@ -77,18 +85,20 @@ export function AddRowInline({ section, categories, tables, household, onError }
     const n = name.trim()
     if (!n || missing) return
     try {
+      let row: Row
       if (kind) {
         const id = chosen?.id ?? null
-        await addRowOfKind(store, {
+        row = await addRowOfKind(store, {
           section: kind.section, name: n, categoryId: categoryId || null, kind: kind.key,
           accountId: kind.field === 'accountId' ? id : null,
           poolId: kind.field === 'poolId' ? id : null,
           adultId: kind.field === 'adultId' ? id : null,
         })
       } else {
-        await addRow(store, { name: n, section, categoryId: categoryId || null })
+        row = await addRow(store, { name: n, section, categoryId: categoryId || null })
       }
       reset()
+      onAdded?.(row)
     } catch (e) {
       onError(e instanceof Error ? e.message : 'Could not add row')
     }
@@ -96,8 +106,8 @@ export function AddRowInline({ section, categories, tables, household, onError }
 
   if (!open) {
     return (
-      <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setOpen(true)} aria-label={`Add ${section} row`}>
-        <Plus /> Add row
+      <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setOpen(true)} aria-label={label ?? `Add ${section} row`}>
+        <Plus /> {label ?? 'Add row'}
       </Button>
     )
   }

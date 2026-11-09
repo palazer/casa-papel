@@ -14,6 +14,8 @@ interface Props {
   household: Household
   tables: Tables
   goal: Goal | null
+  /** A new goal opened from the thing it will watch (the Statement's lines): the kind and what it tracks start there. */
+  preset?: { kind: GoalKind; accountId?: string | null; poolId?: string | null }
   onClose: () => void
   /** "Delete…" hands the goal to the remove dialog; the card opens it after this one closes. */
   onRemove?: () => void
@@ -22,13 +24,13 @@ interface Props {
 const ASSET_TYPES = ['savings', 'investment', 'other-asset']
 const DEBT_TYPES = ['credit-card', 'loan']
 
-export function GoalDialog({ household, tables, goal, onClose, onRemove }: Props) {
+export function GoalDialog({ household, tables, goal, preset, onClose, onRemove }: Props) {
   const store = useStore()
   const { locale, baseCurrency } = household
   const [name, setName] = useState(goal?.name ?? '')
-  const [kind, setKind] = useState<GoalKind>(goal?.kind ?? 'account-balance')
-  const [accountId, setAccountId] = useState(goal?.accountId ?? '')
-  const [poolId, setPoolId] = useState(goal?.poolId ?? '')
+  const [kind, setKind] = useState<GoalKind>(goal?.kind ?? preset?.kind ?? 'account-balance')
+  const [accountId, setAccountId] = useState(goal?.accountId ?? preset?.accountId ?? '')
+  const [poolId, setPoolId] = useState(goal?.poolId ?? preset?.poolId ?? '')
   const [target, setTarget] = useState(goal && goal.kind !== 'pay-off' ? amountToInput(goal.target, currencyFor(goal.kind, goal.accountId), locale) : '')
   const [targetMonth, setTargetMonth] = useState(goal?.targetMonth ?? '')
   const [notes, setNotes] = useState(goal?.notes ?? '')

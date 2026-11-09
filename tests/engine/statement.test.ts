@@ -239,6 +239,15 @@ describe('the Statement, the month', () => {
     const grouped = statementFor(tables({ household: [household()], categories: [housing], rows: [salary, { ...rent, categoryId: housing.id }, food], cells }), '2026-01').s
     expect(topLine(grouped, 'out', 'expenses')!.children.map((c) => [c.kind, c.label, c.amount])).toEqual([['category', 'Housing', 1000_00], ['category', 'No category', 400_00]])
     expect(topLine(grouped, 'in', 'income')!.children.map((c) => c.kind)).toEqual(['row'])
+    // a category shows before it has a row, in its own place, so its first row can be added to it
+    const hobbies = CategorySchema.parse({ id: newId(), createdAt: T0, updatedAt: T0, name: 'Hobbies', section: 'expense', order: 'a1' })
+    const pay = CategorySchema.parse({ id: newId(), createdAt: T0, updatedAt: T0, name: 'Pay', section: 'income', order: 'a0' })
+    const t = tables({ household: [household()], categories: [hobbies, housing, pay], rows: [salary, { ...rent, categoryId: housing.id }, food], cells })
+    const withEmpty = statementFor(t, '2026-01').s
+    expect(topLine(withEmpty, 'out', 'expenses')!.children.map((c) => [c.label, c.amount, !!c.empty, c.children.length])).toEqual([['Housing', 1000_00, false, 1], ['Hobbies', 0, true, 0], ['No category', 400_00, false, 1]])
+    expect(topLine(withEmpty, 'in', 'income')!.children.map((c) => [c.label, c.amount, !!c.empty])).toEqual([['Pay', 0, true], ['No category', 3000_00, false]])
+    expect(find(withEmpty, `cat:expense:${hobbies.id}`)).toMatchObject({ kind: 'category', estimate: false })
+    expectSound(t, months)
   })
 })
 

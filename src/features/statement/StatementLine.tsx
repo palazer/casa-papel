@@ -1,4 +1,6 @@
+import type { ReactNode } from 'react'
 import { ChevronRight, Repeat, Target } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { InfoTip } from '@/components/InfoTip'
 import { Tick } from '@/components/Tick'
@@ -28,6 +30,10 @@ export interface LineContext {
   onEdit?: (rowId: string) => void
   /** The line (or row) a tick is being saved for. */
   busy?: string | null
+  /** What sits at the foot of a group or an opened category: the controls that add a row or a category there. */
+  footer?: (line: Line) => ReactNode
+  /** Set a goal on a line that can have one, or edit the one it has. */
+  onGoal?: (line: Line, goal?: GoalProgress) => void
 }
 
 const HUE: Record<StatementHue, Hue> = { income: HUES.income, expense: HUES.expense, transfer: HUES.transfer, worth: HUES.worth, pool: HUES.pool }
@@ -75,7 +81,10 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
   const group = line.kind === 'group'
   const item = line.kind === 'item'
   const rowLike = line.kind === 'row' || item
-  const expandable = !group && (line.children.length > 0 || !!line.goals?.length)
+  const foot = (group || line.kind === 'category') ? ctx.footer?.(line) : null
+  // a category opens even while it is empty: its first row is added inside it
+  const expandable = !group && (line.children.length > 0 || !!line.goals?.length || (line.kind === 'category' && !!foot))
+  const canGoal = !!ctx.onGoal && (line.kind === 'pool' || (line.kind === 'account' && !!line.accountId) || line.id === 'net-worth')
   const open = group || (expandable && ctx.isOpen(line))
   const listId = `st-${line.id}`
   const hue = line.hue ? HUE[line.hue] : undefined
@@ -124,10 +133,11 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
       {line.goals?.map((g) => <GoalMark key={g.goal.id} goal={g} locale={locale} />)}
     </>
   )
-  const below = open && (line.children.length > 0 || !!line.goals?.length) && (
-    <div id={group ? undefined : listId} className="border-t border-border/60">
-      {!!line.goals?.length && <GoalDetail goals={line.goals} level={inner} ctx={ctx} />}
+  const below = open && (line.children.length > 0 || !!line.goals?.length || !!foot) && (
+    <div id={group ? undefined : listId} className="divide-y divide-border/60 border-t border-border/60">
+      {!!line.goals?.length && <GoalDetail goals={line.goals} line={line} level={inner} ctx={ctx} />}
       {line.children.length > 0 && <StatementLines lines={line.children} level={inner} ctx={ctx} parent={line} />}
+      {foot && <div className={cn('flex flex-wrap items-center gap-x-1 gap-y-1 py-1 pr-2 text-xs', INDENT[Math.min(inner, INDENT.length - 1)])}>{foot}</div>}
     </div>
   )
 
@@ -191,11 +201,19 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
 
   return (
     <li>
-      <div className={cn(ROW, pad, group && hue?.tint)} data-line={line.id}>
+      <div className={cn(ROW, pad, 'group/line', group && hue?.tint)} data-line={line.id}>
         <div className={LABEL}>
           {head}
           {tags}
           {tip && <InfoTip help={tip} />}
+          {canGoal && !line.goals?.length && (
+            <button
+              type="button" aria-label={`Set a goal for ${line.label}`} title="Set a goal" onClick={() => ctx.onGoal!(line)}
+              className="inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 outline-none hover:bg-muted hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover/line:opacity-100 pointer-coarse:size-8 pointer-coarse:opacity-100"
+            >
+              <Target className="size-3.5" aria-hidden />
+            </button>
+          )}
         </div>
         {ctx.withChange && <span className={cn(CHANGE_COL, 'text-muted-foreground', group && 'font-medium')}>{line.change != null ? changeText(line.change, ccy, locale) : ''}</span>}
         {amount}
@@ -222,7 +240,7 @@ function GoalMark({ goal, locale }: { goal: GoalProgress; locale: string }) {
 }
 
 /** Under an opened line: each goal's name, its bar and the sentence the Goals card uses. */
-function GoalDetail({ goals, level, ctx }: { goals: GoalProgress[]; level: number; ctx: LineContext }) {
+function GoalDetail({ goals, line: owner, level, ctx }: { goals: GoalProgress[]; line: Line; level: number; ctx: LineContext }) {
   return (
     <div className={cn('space-y-2 bg-muted/20 py-2 pr-2 text-xs', INDENT[Math.min(level, INDENT.length - 1)])}>
       {goals.map((g) => {
@@ -232,7 +250,10 @@ function GoalDetail({ goals, level, ctx }: { goals: GoalProgress[]; level: numbe
           <div key={g.goal.id} className="max-w-md space-y-1 pl-5">
             <div className="flex items-baseline justify-between gap-3">
               <span className="font-medium">{g.goal.name}</span>
-              <span className={cn('tabular-nums', g.status === 'reached' && HUES.income.text)}>{formatPercent(g.progress, ctx.locale)}</span>
+              <span className="flex items-center gap-2">
+                <span className={cn('tabular-nums', g.status === 'reached' && HUES.income.text)}>{formatPercent(g.progress, ctx.locale)}</span>
+                {ctx.onGoal && <Button size="xs" variant="ghost" aria-label={`Edit goal ${g.goal.name}`} onClick={() => ctx.onGoal!(owner, g)}>Edit</Button>}
+              </span>
             </div>
             <div role="progressbar" aria-label={g.goal.name} aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} className="h-2 w-full overflow-hidden rounded-full bg-goal-tint">
               <div className={cn('h-full rounded-full', HUES.goal.fill, g.status === 'reached' && HUES.income.fill)} style={{ width: `${pct}%` }} />

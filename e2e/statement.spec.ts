@@ -157,21 +157,68 @@ test.describe('working the month in the Statement', () => {
     await expect(page.getByRole('checkbox', { name: 'Health done' })).toHaveAttribute('aria-checked', 'mixed')
   })
 
-  test('a line a goal watches carries its mark and opens to the bar and the sentence', async ({ page }) => {
+  test('rows and categories are added where they will appear', async ({ page }) => {
     await openStatement(page)
-    await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Moves' }).click()
+    await goToMonth(page, 'November 2026')
+    const moneyIn = page.getByRole('region', { name: 'Money in' })
+    const moneyOut = page.getByRole('region', { name: 'Money out' })
     const dlg = page.getByRole('dialog')
-    await page.getByRole('button', { name: 'Add goal' }).click()
+    const totalIn = euros(await total(page, 'in').innerText())
+
+    // a category appears as a line before it has a row
+    await moneyOut.getByRole('button', { name: 'Add expense category' }).click()
+    await moneyOut.getByLabel('New expense category name').fill('Hobbies')
+    await moneyOut.getByLabel('New expense category name').press('Enter')
+    const hobbies = moneyOut.locator('[data-line^="cat:expense"]').filter({ hasText: 'Hobbies' })
+    await expect(hobbies).toBeVisible()
+
+    // its first row is added inside it, and the editor opens for the amount
+    await moneyOut.getByRole('button', { name: 'Hobbies', exact: true }).click()
+    await moneyOut.getByRole('button', { name: 'Add row to Hobbies' }).click()
+    await expect(moneyOut.getByLabel('Category for the new expense row')).toHaveValue(/.+/)
+    await moneyOut.getByLabel('New expense row name').fill('Climbing')
+    await moneyOut.getByRole('button', { name: 'Add', exact: true }).click()
+    await expect(dlg.getByRole('heading', { name: /Climbing/ })).toBeVisible()
+    await dlg.getByLabel('Amount in EUR').fill('40')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(moneyOut.getByRole('button', { name: /^Climbing:/ })).toHaveAccessibleName('Climbing: €40.00, an estimate')
+    await expect(hobbies).toContainText('€40.00')
+
+    // a row added at the foot of Income opens the editor too; the total follows and the sides still agree
+    await moneyIn.getByRole('button', { name: 'Add income row' }).click()
+    await moneyIn.getByLabel('New income row name').fill('Side job')
+    await moneyIn.getByLabel('New income row name').press('Enter')
+    await expect(dlg.getByRole('heading', { name: /Side job/ })).toBeVisible()
+    await dlg.getByLabel('Amount in EUR').fill('200')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    expect(euros(await total(page, 'in').innerText())).toBe(totalIn + 200)
+    expect(euros(await total(page, 'out').innerText())).toBe(totalIn + 200)
+    await page.screenshot({ path: 'e2e/output/statement-adding.png', fullPage: true })
+  })
+
+  test('a goal is set from the line it watches, which then carries its mark and opens to the bar', async ({ page }) => {
+    await openStatement(page)
+    await goToMonth(page, 'September 2026')
+    const assets = page.getByRole('region', { name: 'Assets' })
+    const dlg = page.getByRole('dialog')
+
+    // a debt offers a goal to clear it
+    await page.getByRole('region', { name: 'Debts and net worth' }).getByRole('button', { name: 'Set a goal for Credit card' }).click()
+    await expect(dlg.getByRole('heading', { name: 'New goal' })).toBeVisible()
+    await expect(dlg.getByLabel('Kind')).toHaveValue('pay-off')
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+
+    // a pool account: the dialog opens with the line already chosen
+    await assets.getByRole('button', { name: 'Set a goal for Travel' }).click()
+    await expect(dlg.getByLabel('Kind')).toHaveValue('pool-balance')
+    await expect(dlg.getByLabel('Tracks').locator('option:checked')).toHaveText('Travel')
     await dlg.getByLabel('Name').fill('Travel fund')
-    await dlg.getByLabel('Kind').selectOption('pool-balance')
-    await dlg.getByLabel('Tracks').selectOption({ label: 'Travel' })
     await dlg.getByLabel(/^Target \(EUR\)/).fill('10000')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-
-    await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
-    await goToMonth(page, 'September 2026')
-    const assets = page.getByRole('region', { name: 'Assets' })
+    await expect(assets.getByRole('button', { name: 'Set a goal for Travel' })).toHaveCount(0)
     // 800 of 10,000
     await expect(assets.locator('[data-line^="pool:"]').filter({ hasText: 'Travel' })).toContainText('Goal Travel fund:8%')
     await expect(page.getByRole('progressbar', { name: 'Travel fund' })).toHaveCount(0)
@@ -179,6 +226,11 @@ test.describe('working the month in the Statement', () => {
     await expect(page.getByRole('progressbar', { name: 'Travel fund' })).toHaveAttribute('aria-valuenow', '8')
     await expect(assets.getByText(/€800\.00 of €10,000\.00/)).toBeVisible()
     await page.screenshot({ path: 'e2e/output/statement-goal.png', fullPage: true })
+    // the goal is edited from the same place
+    await assets.getByRole('button', { name: 'Edit goal Travel fund' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Edit goal' })).toBeVisible()
+    await expect(dlg.getByLabel('Name')).toHaveValue('Travel fund')
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
   })
 })
 
