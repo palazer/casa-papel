@@ -65,13 +65,15 @@ function Topic({ topic, words, go }: { topic: GuideTopic; words: string[]; go: (
  * The Guide (DESIGN.md §2): a reading page that opens without a household. The lead says what Casa Papel is, the
  * contents list the topics, and each topic is an island with its paragraphs, numbered steps naming the controls, the
  * model's own option texts where it explains a choice, the related (i) texts from `HELP`, and an "Open <screen>"
- * button. The search field in the header filters the topics as you type over all of that and marks the words.
+ * button. The search field in the header filters the topics as you type over all of that and marks the words; a
+ * results list under it (title, hit count, one gray line around the first hit) jumps to each topic.
  */
 export function GuideScreen() {
   const { go } = useScreen()
   const [query, setQuery] = useState('')
   const words = useMemo(() => queryWords(query), [query])
-  const topics = useMemo(() => searchGuide(GUIDE, query, HELP), [query])
+  const hits = useMemo(() => searchGuide(GUIDE, query, HELP), [query])
+  const topics = useMemo(() => hits.map((h) => h.topic), [hits])
   const searching = words.length > 0
 
   // the address's hash names a topic (`#guide-marks` from the legend, `#guide-pools` from the contents): scroll to it on
@@ -122,6 +124,23 @@ export function GuideScreen() {
               ))}
             </nav>
           </Island>
+        )}
+        {searching && hits.length > 0 && (
+          <nav aria-label="Results" className="rounded-lg border bg-card">
+            <ul className="divide-y divide-border/60">
+              {hits.map((h) => (
+                <li key={h.topic.key}>
+                  <a href={`#guide-${h.topic.key}`} className="block rounded-lg px-4 py-2 outline-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring">
+                    <span className="flex items-baseline gap-3">
+                      <span className="text-sm font-medium text-foreground"><Highlight text={h.topic.title} words={words} /></span>
+                      <span className="ml-auto text-xs tabular-nums text-muted-foreground">{h.count}</span>
+                    </span>
+                    <span className="block text-xs leading-4 text-muted-foreground"><Highlight text={h.snippet} words={words} /></span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
         )}
         {topics.map((t) => <Topic key={t.key} topic={t} words={words} go={go} />)}
       </div>

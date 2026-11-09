@@ -86,7 +86,10 @@ Phone list       mx-auto max-w-xl space-y-4 of dense islands, rows text-sm and m
   month-end rules, the sharing choices), "Related tips" as a `<dl>` straight from `HELP`, and a footer with
   `Open <screen>` (`xs outline`, `useScreen().go`) and `Topics` (`xs ghost`, `#guide-topics`). A search matches every
   typed word somewhere in those texts, hides the lead and the contents, and wraps the words in `<mark>` on
-  `bg-primary/30`. `screenHref` keeps the hash, so `#guide-marks` from the legend lands on its topic; leaving the Guide
+  `bg-primary/30`. The hits come first as a results list (`<nav aria-label="Results">`, a bordered `divide-y` list of
+  links to `#guide-<key>`: the title with the hit count at the right in muted tabular figures, under it one gray line
+  around the first hit cut at word boundaries with "…"), best first (a hit in the title, then the most hits, ties in
+  guide order), with the matching islands beneath in the same order. `screenHref` keeps the hash, so `#guide-marks` from the legend lands on its topic; leaving the Guide
   drops a `#guide-…` hash. Every `HELP` key is quoted by at least one topic (`tests/app/guide.test.ts`).
 - Nothing floats over the content except popovers, menus and dialogs (`z-50`); the rail and tabs are `z-40`.
 
