@@ -42,7 +42,7 @@ function RailGroup({ item, screen, go }: { item: Extract<RailItem, { kind: 'grou
   }
   return (
     <>
-      <button type="button" onClick={toggle} aria-expanded={open} aria-controls="rail-settings" aria-current={tile ? 'page' : undefined} title={open ? `${item.label} · fold` : item.label} className={ITEM}>
+      <button type="button" onClick={toggle} aria-expanded={open} aria-controls={open ? 'rail-settings' : undefined} aria-current={tile ? 'page' : undefined} title={open ? `${item.label} · fold` : item.label} className={ITEM}>
         <span className={tileClass(tile)}>
           <Icon size={20} strokeWidth={tile ? 2.5 : 2} aria-hidden />
         </span>

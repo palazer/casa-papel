@@ -169,12 +169,15 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   (`data-testid="deductions"`, each `−€…`, then a Net line) above the error line.
 - "Add row" at a section's foot is inline (`src/features/grid/AddRowInline.tsx`): a name and, when the section has any,
   a category. Under Transfers it also asks what the row does (moves money between your accounts, goes into a savings
-  account, deposits into an investment account, fills a pool account that lost its row, pocket money for an adult), with
-  a second select for the target and one muted sentence under the controls for the chosen kind. A choice without a
+  account, deposits into an investment account, fills a pool account that lost its row, pocket money for an adult, pays
+  off a card whose purchases are expense rows), with a second select for the target and one muted sentence under the controls for the chosen kind. A choice without a
   possible target is left out (a second "to savings" under the savings plug, a pool row when every pool account has one)
   or the sentence says what to add first and Add is disabled. Under Expenses the same select offers "A normal expense" or
-  "Pays off a loan or card" with the loan and card accounts as targets (the account's type picks the row kind). The
-  store checks the same rules (`addRowOfKind`, `rowTargets`).
+  "Pays off a loan or card" with the loans and the cards whose payment is the recorded spending as targets (the
+  account's type picks the row kind). A card whose purchases are expense rows gets "Pays off a credit card" under
+  Transfers instead, because its payment only moves money (`cardIsItemized` in `src/model/cards.ts` is the one reading
+  of that setting for the engine, the split, the store and the grid). The store checks the same rules (`addRowOfKind`,
+  `rowTargets`); a choice the lists no longer offer falls back to the first one, and Cancel forgets the choice.
 - Section header rows: the chevron and the title in `text-xs font-semibold` in the section's hue; no bar, no fill.
 - Categories (`groupRowsByCategory`): inside a section rows sort by category, then by their own order; rows without
   one come last. When the section has categories, each group opens with a label row (`text-[10px] font-semibold

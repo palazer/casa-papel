@@ -27,6 +27,8 @@ describe('searching the guide', () => {
     expect(highlightRanges('pools', ['pool', 'pools'])).toEqual([[0, 5]])
     expect(highlightRanges('nothing here', ['xyz'])).toEqual([])
     expect(highlightRanges('abc', [])).toEqual([])
+    // a letter whose lowercase form is longer (İ → i̇) must not shift the marks after it
+    expect(highlightRanges('İstanbul pool', ['pool'])).toEqual([[9, 13]])
   })
 
   it('a topic is searched by its related tips too, so every (i) text can be found', () => {

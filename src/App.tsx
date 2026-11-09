@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ErrorBoundary } from '@/app/ErrorBoundary'
-import { ScreenContext, isPhone, readScreen, rememberScreen, type Screen } from '@/app/screens'
+import { ScreenContext, isPhone, isUtility, readScreen, rememberScreen, type Screen } from '@/app/screens'
 import { createAppStore, isDemoMode, useStore } from '@/app/store'
 import { StoreProvider } from '@/app/StoreProvider'
 import { takeInviteFromUrl } from '@/app/url'
@@ -40,9 +40,9 @@ function Shell() {
   const tables = useTables()
   const household = activeHousehold(tables)
   const [screen, setScreen] = useState<Screen>(readScreen)
-  const go = useCallback((s: Screen) => {
+  const go = useCallback((s: Screen, hash?: string) => {
     setScreen(s)
-    rememberScreen(s)
+    rememberScreen(s, hash)
   }, [])
   const nav = useMemo(() => ({ screen, go }), [screen, go])
   const sync = useSyncEngine()
@@ -84,7 +84,7 @@ function Shell() {
 
   if (tables === undefined) return null
   // Data and the Guide read without a household; every other screen needs one
-  const showHome = !household && screen !== 'data' && screen !== 'guide'
+  const showHome = !household && !isUtility(screen)
 
   return (
     <ScreenContext.Provider value={nav}>

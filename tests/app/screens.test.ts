@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { RAIL, SCREENS, SETTINGS_PAGES, groupOf, screenDef, type Screen } from '@/app/screens'
+import { RAIL, SCREENS, SETTINGS_PAGES, groupOf, isUtility, screenDef, type Screen } from '@/app/screens'
 
 describe('screens and the rail', () => {
   it('the rail covers every screen exactly once: three pages, then the Settings group', () => {
@@ -12,5 +12,10 @@ describe('screens and the rail', () => {
   it('knows which screens live under Settings', () => {
     const grouped: Record<Screen, 'settings' | null> = { grid: null, month: null, moves: null, household: 'settings', data: 'settings', guide: 'settings' }
     for (const [k, v] of Object.entries(grouped)) expect(groupOf(k as Screen)).toBe(v)
+  })
+  it('Data and the Guide are the utilities: they open without a household and are never the screen to land on', () => {
+    expect(SCREENS.filter((s) => s.utility).map((s) => s.key)).toEqual(['data', 'guide'])
+    expect(isUtility('guide')).toBe(true)
+    expect(isUtility('household')).toBe(false)
   })
 })

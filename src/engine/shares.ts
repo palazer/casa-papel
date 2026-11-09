@@ -5,6 +5,7 @@
  * view of income, own spending and pocket money.
  */
 import type { Entity, Money, MonthKey, Row, Tables } from '@/model'
+import { cardIsItemized } from '@/model'
 import { cellKey, type CellResult, type EngineOutput } from './types'
 
 export interface ShareLine {
@@ -79,9 +80,14 @@ function split(amount: Money, adults: Entity[], shares: Record<string, number>):
   return out
 }
 
+/** Cards whose purchases are expense rows: their payment only moves money, so nobody is charged for it a second time. */
+const itemizedCards = (tables: Tables): Set<string> => new Set(tables.accounts.filter((a) => !a.deletedAt && cardIsItemized(a)).map((a) => a.id))
+
 /** What the row asks the household to pay this month, in base currency. */
-function amountToPay(row: Row, c: CellResult): Money {
+function amountToPay(row: Row, c: CellResult, itemized: Set<string>): Money {
   if (row.section === 'income') return 0
+  // a payment to a card whose purchases are already expense rows is a transfer, whichever section it sits in
+  if (row.kind === 'card-payment') return row.accountId && itemized.has(row.accountId) ? 0 : c.valueBase
   if (row.section === 'expense' && row.kind !== 'debt-payment') return c.funding.cash
   return c.valueBase
 }
@@ -135,11 +141,12 @@ export function computeContributions(tables: Tables, out: EngineOutput, month: M
   }
 
   // ---- outflow lines
+  const itemized = itemizedCards(tables)
   const lines: ShareLine[] = []
   for (const r of rows) {
     const c = cellOf(r)
     if (!c || c.source === 'archived' || isDeduction(r)) continue
-    const total = amountToPay(r, c)
+    const total = amountToPay(r, c, itemized)
     if (total === 0) continue
     const { adultId, routing } = ownerOf(r, tables, adultIds)
     const byAdult = adultId ? Object.fromEntries(adults.map((a) => [a.id, a.id === adultId ? total : 0])) : split(total, adults, shares)
@@ -166,6 +173,7 @@ export function computePersonBudgets(tables: Tables, out: EngineOutput, month: M
   const adultIds = new Set(adults.map((a) => a.id))
   const rows = out.rows.filter((r) => !(r.archivedMonth && r.archivedMonth <= month))
   const isDeduction = deductionTest(rows)
+  const itemized = itemizedCards(tables)
   return adults.map((a) => {
     let income = 0
     let ownSpend = 0
@@ -177,6 +185,7 @@ export function computePersonBudgets(tables: Tables, out: EngineOutput, month: M
       if (adultId !== a.id) continue
       if (r.section === 'income') income += c.netBase
       else if (r.kind === 'pocket-money') pocket += c.valueBase
+      else if (r.kind === 'card-payment' && r.accountId && itemized.has(r.accountId)) continue // moves money; the purchases were the spending
       else if (r.section === 'expense' && !isDeduction(r)) ownSpend += c.valueBase
     }
     return { entityId: a.id, name: a.name, income, ownSpend, pocket, contribution: income - ownSpend - pocket }

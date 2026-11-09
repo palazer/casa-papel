@@ -1,7 +1,7 @@
 import { generateKeyBetween } from 'fractional-indexing'
 import { computeEngine, cellKey, sortRows, type EngineOutput } from '@/engine'
 import {
-  ACCOUNT_TYPE_INFO, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RowSchema, addMonths, compareMonths, monthKey, monthOfDate, monthRange, newId, parseMonth, poolIdOf,
+  ACCOUNT_TYPE_INFO, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RowSchema, addMonths, cardIsItemized, compareMonths, monthKey, monthOfDate, monthRange, newId, parseMonth, poolIdOf,
   type Account, type Cell, type CellInput, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Pool, type Row, type RowKind, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
@@ -142,8 +142,8 @@ export async function addRow(store: Store, input: Partial<Row> & { name: string;
   return row
 }
 
-/** What a new row under Transfers does; `plain` just moves money between your accounts. */
-export type TransferRowKind = 'plain' | 'to-savings' | 'to-investment' | 'pool-allocation' | 'pocket-money'
+/** What a new row under Transfers does; `plain` just moves money between your accounts, `card-payment` pays a card whose purchases are already expense rows. */
+export type TransferRowKind = 'plain' | 'to-savings' | 'to-investment' | 'pool-allocation' | 'pocket-money' | 'card-payment'
 /** What a new row under Expenses does: a normal expense, or a payment that brings a loan or card down. */
 export type ExpenseRowKind = 'plain' | 'pay-off'
 
@@ -158,8 +158,10 @@ export function rowTargets(tables: Tables, household: Household | undefined) {
   return {
     savings: accounts.filter((a) => a.type === 'savings'),
     investments: accounts.filter((a) => a.type === 'investment'),
-    /** loans and credit cards a payment row can bring down */
-    payoff: accounts.filter((a) => a.type === 'loan' || a.type === 'credit-card'),
+    /** what a payment row under Expenses brings down: loans, and cards whose payment is the recorded spending */
+    payoff: accounts.filter((a) => a.type === 'loan' || (a.type === 'credit-card' && !cardIsItemized(a))),
+    /** cards whose purchases are expense rows: their payment is a transfer, so it is offered under Transfers */
+    cardsItemized: accounts.filter(cardIsItemized),
     /** pool accounts whose row was deleted, so they can be filled again */
     orphanPools: live(tables.pools).filter((p) => !p.allocationRowId || !rows.some((r) => r.id === p.allocationRowId)),
     adults: live(tables.entities).filter((e) => e.kind === 'adult'),
@@ -185,7 +187,7 @@ export interface RowOfKindInput {
 export async function addRowOfKind(store: Store, input: RowOfKindInput): Promise<Row> {
   const tables = await loadTables(store)
   const targets = rowTargets(tables, tables.household.find((h) => !h.deletedAt))
-  const transferOnly: string[] = ['to-savings', 'to-investment', 'pool-allocation', 'pocket-money']
+  const transferOnly: string[] = ['to-savings', 'to-investment', 'pool-allocation', 'pocket-money', 'card-payment']
   if ((input.section === 'expense' && transferOnly.includes(input.kind)) || (input.section === 'transfer' && input.kind === 'pay-off')) {
     throw new Error('That kind of row does not belong in this section.')
   }
@@ -195,8 +197,15 @@ export async function addRowOfKind(store: Store, input: RowOfKindInput): Promise
     const acc = tables.accounts.find((a) => a.id === input.accountId && !a.deletedAt)
     if (!acc) throw new Error('Pick the loan or card this row pays off.')
     if (acc.archivedMonth) throw new Error(`"${acc.name}" is archived.`)
+    if (cardIsItemized(acc)) throw new Error(`Purchases on "${acc.name}" are recorded as expense rows, so its payment is a transfer: add it under Transfers with "Pays off a credit card".`)
     if (!targets.payoff.some((a) => a.id === acc.id)) throw new Error(`"${acc.name}" is not a loan or a credit card.`)
     base.kind = acc.type === 'loan' ? 'debt-payment' : 'card-payment'
+    base.accountId = acc.id
+  } else if (input.kind === 'card-payment') {
+    const acc = tables.accounts.find((a) => a.id === input.accountId && !a.deletedAt)
+    if (!acc) throw new Error('Pick the card this row pays off.')
+    if (acc.archivedMonth) throw new Error(`"${acc.name}" is archived.`)
+    if (!targets.cardsItemized.some((a) => a.id === acc.id)) throw new Error(`"${acc.name}" records only its payment, as spending: add it under Expenses with "Pays off a loan or card".`)
     base.accountId = acc.id
   } else if (input.kind === 'to-savings' || input.kind === 'to-investment') {
     if (input.kind === 'to-savings' && targets.plugTaken) throw new Error('The month-end rule already fills a "to savings" row; a second one would stay at zero.')
@@ -222,9 +231,6 @@ export async function addRowOfKind(store: Store, input: RowOfKindInput): Promise
   await store.commit(mutations)
   return row
 }
-
-/** The Transfers section's "Add row" (kept for callers and tests): `addRowOfKind` with `section: 'transfer'`. */
-export const addTransferRow = (store: Store, input: Omit<RowOfKindInput, 'section' | 'kind'> & { kind: TransferRowKind }): Promise<Row> => addRowOfKind(store, { ...input, section: 'transfer' })
 
 export async function updateRow(store: Store, rowId: string, patch: Partial<Omit<Row, 'id' | 'createdAt'>>): Promise<void> {
   const tables = await loadTables(store)

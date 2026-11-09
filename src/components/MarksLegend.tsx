@@ -34,11 +34,8 @@ function Mark({ sample, children }: { sample: ReactNode; children: ReactNode }) 
  */
 export function MarksLegend({ neg }: { neg: boolean }) {
   const { go } = useScreen()
-  // the hash names the topic; `rememberScreen` keeps it in the address, and the Guide scrolls there on arrival
-  const moreInGuide = () => {
-    window.history.replaceState(null, '', '#guide-marks')
-    go('guide')
-  }
+  // the hash names the Guide topic; the Guide scrolls there on arrival
+  const moreInGuide = () => go('guide', '#guide-marks')
   return (
     <Popover>
       <PopoverTrigger render={<Button size="xs" variant="outline" />}>What the colours and marks mean</PopoverTrigger>

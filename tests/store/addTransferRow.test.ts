@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { cellKey, computeEngine, computePersonBudgets } from '@/engine'
 import { monthRange, newId } from '@/model'
-import { CasaDb, Store, addAccount, addEntity, addPool, addRowOfKind, addTransferRow, loadTables, planArchive, planRemoval, quickCreateHousehold, rowTargets, setCellValue } from '@/store'
+import { CasaDb, Store, addAccount, addEntity, addPool, addRowOfKind, loadTables, planArchive, planRemoval, quickCreateHousehold, rowTargets, setCellValue } from '@/store'
 
 const months = monthRange('2026-01', '2026-03')
 
@@ -12,13 +12,13 @@ async function fresh() {
   return { store, savings: t.accounts.find((a) => a.type === 'savings')! }
 }
 
-describe('addTransferRow', () => {
+describe('addRowOfKind under Transfers', () => {
   it('a deposit row needs an investment account and then feeds it', async () => {
     const { store, savings } = await fresh()
-    await expect(addTransferRow(store, { name: 'Broker', categoryId: null, kind: 'to-investment', accountId: null })).rejects.toThrow(/needs an account of type Investments\./)
-    await expect(addTransferRow(store, { name: 'Broker', categoryId: null, kind: 'to-investment', accountId: savings.id })).rejects.toThrow(/is of type Savings/)
+    await expect(addRowOfKind(store, { section: 'transfer', name: 'Broker', categoryId: null, kind: 'to-investment', accountId: null })).rejects.toThrow(/needs an account of type Investments\./)
+    await expect(addRowOfKind(store, { section: 'transfer', name: 'Broker', categoryId: null, kind: 'to-investment', accountId: savings.id })).rejects.toThrow(/is of type Savings/)
     const fund = await addAccount(store, { name: 'Fund', type: 'investment', currency: 'EUR', openingMonth: '2026-01' })
-    const row = await addTransferRow(store, { name: 'Broker', categoryId: null, kind: 'to-investment', accountId: fund.id })
+    const row = await addRowOfKind(store, { section: 'transfer', name: 'Broker', categoryId: null, kind: 'to-investment', accountId: fund.id })
     expect(row).toMatchObject({ section: 'transfer', kind: 'to-investment', accountId: fund.id, defaultStatus: 'committed' })
     await setCellValue(store, row.id, '2026-01', 100000, 'from-now-on')
     const out = computeEngine({ tables: await loadTables(store), months })
@@ -27,13 +27,13 @@ describe('addTransferRow', () => {
 
   it('under the savings plug a second "to savings" row is refused; a pool account that lost its row can be filled again', async () => {
     const { store, savings } = await fresh()
-    await expect(addTransferRow(store, { name: 'More savings', categoryId: null, kind: 'to-savings', accountId: savings.id })).rejects.toThrow(/would stay at zero/)
+    await expect(addRowOfKind(store, { section: 'transfer', name: 'More savings', categoryId: null, kind: 'to-savings', accountId: savings.id })).rejects.toThrow(/would stay at zero/)
     const pool = await addPool(store, { name: 'Travel', accountId: savings.id, openingBalance: 0 })
-    await expect(addTransferRow(store, { name: 'Travel again', categoryId: null, kind: 'pool-allocation', poolId: pool.id })).rejects.toThrow(/already filled/)
-    await expect(addTransferRow(store, { name: 'Travel again', categoryId: null, kind: 'pool-allocation', poolId: newId() })).rejects.toThrow(/Pick the pool account/)
+    await expect(addRowOfKind(store, { section: 'transfer', name: 'Travel again', categoryId: null, kind: 'pool-allocation', poolId: pool.id })).rejects.toThrow(/already filled/)
+    await expect(addRowOfKind(store, { section: 'transfer', name: 'Travel again', categoryId: null, kind: 'pool-allocation', poolId: newId() })).rejects.toThrow(/Pick the pool account/)
     let t = await loadTables(store)
     await store.commit(planRemoval(t, { kind: 'row', id: pool.allocationRowId! }, Date.now()))
-    const row = await addTransferRow(store, { name: 'Travel again', categoryId: null, kind: 'pool-allocation', poolId: pool.id })
+    const row = await addRowOfKind(store, { section: 'transfer', name: 'Travel again', categoryId: null, kind: 'pool-allocation', poolId: pool.id })
     t = await loadTables(store)
     expect(t.pools.find((p) => p.id === pool.id)?.allocationRowId).toBe(row.id)
     expect(row.accountId).toBe(savings.id)
@@ -44,16 +44,16 @@ describe('addTransferRow', () => {
 
   it('pocket money is a fixed amount kept by one adult; a plain row is just a transfer', async () => {
     const { store } = await fresh()
-    await expect(addTransferRow(store, { name: 'Pocket', categoryId: null, kind: 'pocket-money', adultId: newId() })).rejects.toThrow(/Pick the adult/)
+    await expect(addRowOfKind(store, { section: 'transfer', name: 'Pocket', categoryId: null, kind: 'pocket-money', adultId: newId() })).rejects.toThrow(/Pick the adult/)
     const pat = await addEntity(store, { kind: 'adult', name: 'Pat' })
-    const pocket = await addTransferRow(store, { name: 'Pat – Pocket', categoryId: null, kind: 'pocket-money', adultId: pat.id })
+    const pocket = await addRowOfKind(store, { section: 'transfer', name: 'Pat – Pocket', categoryId: null, kind: 'pocket-money', adultId: pat.id })
     expect(pocket).toMatchObject({ kind: 'pocket-money', scope: pat.id, pocketMode: 'fixed', entityTags: [pat.id] })
     await setCellValue(store, pocket.id, '2026-01', 5000, 'from-now-on')
     const t = await loadTables(store)
     const out = computeEngine({ tables: t, months })
     expect(out.cells[cellKey(pocket.id, '2026-02')].value).toBe(5000)
     expect(computePersonBudgets(t, out, '2026-01').find((p) => p.entityId === pat.id)?.pocket).toBe(5000)
-    const plain = await addTransferRow(store, { name: 'To the joint account', categoryId: null, kind: 'plain' })
+    const plain = await addRowOfKind(store, { section: 'transfer', name: 'To the joint account', categoryId: null, kind: 'plain' })
     expect(plain).toMatchObject({ kind: 'plain', accountId: null, defaultStatus: 'projected' })
   })
 })
@@ -68,7 +68,7 @@ describe('rowTargets', () => {
     t = await loadTables(store)
     expect(rowTargets(t, t.household[0]).investments).toEqual([])
     expect(rowTargets(t, t.household[0]).plugTaken).toBe(true)
-    await expect(addTransferRow(store, { name: 'Late deposits', categoryId: null, kind: 'to-investment', accountId: fund.id })).rejects.toThrow(/is archived/)
+    await expect(addRowOfKind(store, { section: 'transfer', name: 'Late deposits', categoryId: null, kind: 'to-investment', accountId: fund.id })).rejects.toThrow(/is archived/)
   })
 })
 
@@ -76,10 +76,16 @@ describe('addRowOfKind under Expenses', () => {
   it('a payment row takes its kind from the account: loans and cards only, never archived, never under Transfers', async () => {
     const { store, savings } = await fresh()
     const loan = await addAccount(store, { name: 'Car loan', type: 'loan', currency: 'EUR', openingMonth: '2026-01', openingBalance: 500000 })
-    const card = await addAccount(store, { name: 'Visa', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01' })
+    const card = await addAccount(store, { name: 'Visa', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01', card: { cardMode: 'lump' } })
+    const itemized = await addAccount(store, { name: 'Amex', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01' })
     const old = await addAccount(store, { name: 'Old loan', type: 'loan', currency: 'EUR', openingMonth: '2026-01' })
     let t = await loadTables(store)
+    // a card whose purchases are expense rows (the default) belongs under Transfers: its payment is not spending
     expect(rowTargets(t, t.household[0]).payoff.map((a) => a.name)).toEqual(['Car loan', 'Visa', 'Old loan'])
+    expect(rowTargets(t, t.household[0]).cardsItemized.map((a) => a.name)).toEqual(['Amex'])
+    await expect(addRowOfKind(store, { section: 'expense', name: 'Amex', categoryId: null, kind: 'pay-off', accountId: itemized.id })).rejects.toThrow(/add it under Transfers/)
+    await expect(addRowOfKind(store, { section: 'transfer', name: 'Visa', categoryId: null, kind: 'card-payment', accountId: card.id })).rejects.toThrow(/add it under Expenses/)
+    expect(await addRowOfKind(store, { section: 'transfer', name: 'Amex payment', categoryId: null, kind: 'card-payment', accountId: itemized.id })).toMatchObject({ section: 'transfer', kind: 'card-payment', accountId: itemized.id, defaultStatus: 'committed' })
     await expect(addRowOfKind(store, { section: 'expense', name: 'Loan', categoryId: null, kind: 'pay-off', accountId: savings.id })).rejects.toThrow(/not a loan or a credit card/)
     await expect(addRowOfKind(store, { section: 'expense', name: 'Loan', categoryId: null, kind: 'pay-off', accountId: null })).rejects.toThrow(/Pick the loan or card/)
     await expect(addRowOfKind(store, { section: 'transfer', name: 'Loan', categoryId: null, kind: 'pay-off', accountId: loan.id })).rejects.toThrow(/does not belong/)

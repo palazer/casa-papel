@@ -8,6 +8,8 @@ export interface ScreenDef {
   key: Screen
   label: string
   icon: LucideIcon
+  /** A utility, not a place to land: it opens without a household and is never remembered as the screen to return to. */
+  utility?: boolean
 }
 
 /** Every screen, in rail order; the last three are the Settings group's pages. */
@@ -16,11 +18,14 @@ export const SCREENS: ScreenDef[] = [
   { key: 'month', label: 'Month', icon: CalendarDays },
   { key: 'moves', label: 'Moves', icon: ArrowLeftRight },
   { key: 'household', label: 'Household', icon: Users },
-  { key: 'data', label: 'Data', icon: Database },
-  { key: 'guide', label: 'Guide', icon: BookOpen },
+  { key: 'data', label: 'Data', icon: Database, utility: true },
+  { key: 'guide', label: 'Guide', icon: BookOpen, utility: true },
 ]
 
 export const screenDef = (s: Screen): ScreenDef => SCREENS.find((d) => d.key === s) ?? SCREENS[0]
+
+/** Data and the Guide: they work without a household and a fresh visit never lands on them. */
+export const isUtility = (s: Screen): boolean => !!screenDef(s).utility
 
 /** The pages behind the rail's Settings entry, in order. */
 export const SETTINGS_PAGES: Screen[] = ['household', 'data', 'guide']
@@ -51,11 +56,16 @@ export function readScreen(): Screen {
   return isPhone() ? 'month' : 'grid'
 }
 
-/** The address of a screen, keeping every other parameter (`?demo=1` picks the database). */
-export function screenHref(s: Screen): string {
+/**
+ * The address of a screen, keeping every other parameter (`?demo=1` picks the database). The hash is kept too, unless
+ * it names a Guide topic (`#guide-…`) and the screen is not the Guide; `hash` sets it outright (the legend's jump).
+ */
+export function screenHref(s: Screen, hash?: string): string {
   const params = new URLSearchParams(window.location.search)
   params.set('screen', s)
-  return `${window.location.pathname}?${params.toString()}${window.location.hash}`
+  const current = window.location.hash
+  const kept = hash ?? (current.startsWith('#guide-') && s !== 'guide' ? '' : current)
+  return `${window.location.pathname}?${params.toString()}${kept}`
 }
 
 /** The Settings page open last on this device (Household at first): the group's tile and the phone tab return to it. */
@@ -70,15 +80,15 @@ export const setSettingsOpen = (open: boolean): void => writePref('settings.open
 
 /**
  * Remember the open screen and let the address bar follow, so every screen is bookmarkable and Back never walks through
- * screen changes. Data and the Guide are utilities, not places to land: a reload keeps them through the address, a
+ * screen changes. Utility screens (Data, the Guide) are not places to land: a reload keeps them through the address, a
  * fresh visit opens the household (or the welcome screen when there is none). The Settings group remembers its own
- * page, so its tile returns to it.
+ * page, so its tile returns to it. `hash` names a spot on the new screen (a Guide topic).
  */
-export function rememberScreen(s: Screen): void {
-  if (s !== 'data' && s !== 'guide') writePref('screen', s)
+export function rememberScreen(s: Screen, hash?: string): void {
+  if (!isUtility(s)) writePref('screen', s)
   if (groupOf(s)) writePref('settings.page', s)
-  window.history.replaceState(null, '', screenHref(s))
+  window.history.replaceState(null, '', screenHref(s, hash))
 }
 
-export const ScreenContext = createContext<{ screen: Screen; go: (s: Screen) => void }>({ screen: 'grid', go: () => undefined })
+export const ScreenContext = createContext<{ screen: Screen; go: (s: Screen, hash?: string) => void }>({ screen: 'grid', go: () => undefined })
 export const useScreen = () => useContext(ScreenContext)

@@ -74,8 +74,8 @@ export function GuideScreen() {
   const topics = useMemo(() => searchGuide(GUIDE, query, HELP), [query])
   const searching = words.length > 0
 
-  // the address's hash names a topic (`#guide-marks` from the legend): scroll to it on arrival and when it changes;
-  // leaving the Guide drops the hash so the next screen's address stays clean
+  // the address's hash names a topic (`#guide-marks` from the legend, `#guide-pools` from the contents): scroll to it on
+  // arrival and when it changes; `screenHref` drops a `#guide-…` hash when another screen opens
   useEffect(() => {
     const jump = () => {
       const id = window.location.hash.slice(1)
@@ -83,10 +83,7 @@ export function GuideScreen() {
     }
     jump()
     window.addEventListener('hashchange', jump)
-    return () => {
-      window.removeEventListener('hashchange', jump)
-      if (window.location.hash.startsWith('#guide-')) window.history.replaceState(null, '', window.location.pathname + window.location.search)
-    }
+    return () => window.removeEventListener('hashchange', jump)
   }, [])
 
   const shown = query.trim()

@@ -32,9 +32,12 @@ export const searchGuide = (topics: GuideTopic[], query: string, help: Record<He
   return topics.filter((t) => topicMatches(t, words, help))
 }
 
+/** Lowercase that keeps every index in place: a character whose lowercase form is longer (İ) stays as it is. */
+const fold = (s: string): string => Array.from(s, (ch) => { const l = ch.toLowerCase(); return l.length === ch.length ? l : ch }).join('')
+
 /** Where the words occur in one text, as non-overlapping ranges in order, longer words first so "pool" inside "pools" is one mark. */
 export function highlightRanges(text: string, words: string[]): Range[] {
-  const lower = text.toLowerCase()
+  const lower = fold(text)
   const found: Range[] = []
   for (const w of [...words].sort((a, b) => b.length - a.length)) {
     if (!w) continue

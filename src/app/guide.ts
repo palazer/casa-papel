@@ -186,7 +186,7 @@ export const GUIDE: GuideTopic[] = [
     steps: [
       'Household → "Household settings" → "Month-end rule".',
       'Set "Pocket money per month, all adults (EUR)" and "Cash kept in the account at month end (EUR)"; "Pocket money and cash buffer changes apply to" picks "This month and onwards (earlier months keep what they show)", "Only this month" or "Every open month".',
-      'Grid → Transfers → "Add row" → say what the row does: "Moves money between your accounts", "Goes into a savings account", "Deposits into an investment account", "Fills a pool account" or "Pocket money for an adult", then pick the "Account", "Pool account" or "Adult" and press "Add".',
+      'Grid → Transfers → "Add row" → say what the row does: "Moves money between your accounts", "Goes into a savings account", "Deposits into an investment account", "Fills a pool account", "Pocket money for an adult" or, for a card whose purchases are expense rows, "Pays off a credit card", then pick the "Account", "Pool account" or "Adult" and press "Add".',
       'Row menu → "Goes into…" changes a deposit row\'s account for every month.',
       'Moves → "Transfers to make" lists them for the month; automatic ones carry the "automatic" chip.',
     ],
@@ -221,14 +221,14 @@ export const GUIDE: GuideTopic[] = [
     title: 'Debts & cards',
     summary: 'Loans come down with their instalments; a card\'s balance grows with what you put on it and shrinks when you pay it.',
     what: [
-      'A "Loan" account shows "<Name> · outstanding" under Balances, and a payment row that names it brings the amount down. A "Credit card" shows "<Name> · owed". "How you record card spending" offers two ways: "Purchases are expense rows paid from this card; the card payment is a transfer", or "Only the card payment is recorded, as an expense".',
+      'A "Loan" account shows "<Name> · outstanding" under Balances, and a payment row that names it brings the amount down. A "Credit card" shows "<Name> · owed". "How you record card spending" offers two ways: "Purchases are expense rows paid from this card; the card payment is a transfer", or "Only the card payment is recorded, as an expense". Where the payment row lives follows from that: under Transfers for the first, under Expenses for the second.',
       'Interest is not modelled. Click a balance cell now and then to enter the real amount; later months continue from it. "Net worth" subtracts cards and loans from what you own.',
     ],
     steps: [
       'Household → "Accounts" → "Add account" → "Type": "Loan" or "Credit card"; "Opening balance" is what you owed in the "Opening month".',
       'For a card choose "How you record card spending", then "Save".',
       'Point spending rows at a card: row menu → "Paid from…" → the card (in the demo, "Subscriptions" is paid from "Credit card").',
-      'Make the payment row: Grid → Expenses → "Add row" → "Pays off a loan or card" → the account → "Add". A vehicle\'s or company\'s "Suggested rows…" offers one too.',
+      'Make the payment row. For a loan, or a card where only the payment is recorded: Grid → Expenses → "Add row" → "Pays off a loan or card" → the account → "Add". For a card whose purchases are expense rows: Grid → Transfers → "Add row" → "Pays off a credit card" → the card. A vehicle\'s or company\'s "Suggested rows…" offers a loan row too.',
       'Row menu → "Pays off…" re-points a payment row at another loan or card.',
       'Click "<Name> · owed" or "<Name> · outstanding" in a month → "Real balance in EUR" to correct the balance.',
     ],

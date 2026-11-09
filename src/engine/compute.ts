@@ -1,5 +1,5 @@
 import {
-  compareMonths, fromMinor, monthRange, poolIdOf, scaleMoney, toMinor,
+  cardIsItemized, compareMonths, fromMinor, monthRange, poolIdOf, scaleMoney, toMinor,
   type Account, type Category, type Cell, type Money, type MonthKey, type Row, type Section,
 } from '@/model'
 import { buildFxIndex, convertMoney } from './fx'
@@ -279,7 +279,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
           break
         case 'card-payment': {
           const acc = row.accountId ? accountsById.get(row.accountId) : undefined
-          if (!acc || acc.card?.cardMode !== 'itemized') t.debt += v
+          if (!acc || !cardIsItemized(acc)) t.debt += v
           break
         }
         case 'from-investment':
@@ -445,7 +445,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
       let inflow: Money = 0
       let outflow: Money = 0
       if (acc.type === 'credit-card') {
-        const itemized = (acc.card?.cardMode ?? 'itemized') === 'itemized'
+        const itemized = cardIsItemized(acc)
         for (const row of rows) {
           if (row.accountId !== acc.id) continue
           const c = cells[cellKey(row.id, m)]

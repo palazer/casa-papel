@@ -163,3 +163,41 @@ describe('a shared income with the split flag', () => {
     expect(c.adults.map((x) => x.share)).toEqual([0.75, 0.25])
   })
 })
+
+describe('card payments in the split', () => {
+  it('a payment to a card whose purchases are expense rows charges nobody; a lump-mode card payment is charged like a loan instalment', () => {
+    const a = ent('adult', 'A', null, 'a0')
+    const b = ent('adult', 'B', null, 'a1')
+    const itemized = account({ name: 'Visa', type: 'credit-card', card: { cardMode: 'itemized' } })
+    const lump = account({ name: 'Amex', type: 'credit-card', card: { cardMode: 'lump' } })
+    const salaryA = row({ name: 'A salary', section: 'income', kind: 'salary', scope: a.id, inShareBasis: true })
+    const salaryB = row({ name: 'B salary', section: 'income', kind: 'salary', scope: b.id, inShareBasis: true, order: 'a1' })
+    const groceries = row({ name: 'Groceries', section: 'expense', accountId: itemized.id, order: 'b0' })
+    const visaPay = row({ name: 'Visa payment', section: 'transfer', kind: 'card-payment', accountId: itemized.id, order: 'c0' })
+    const visaPayOld = row({ name: 'Visa payment (old row)', section: 'expense', kind: 'card-payment', accountId: itemized.id, order: 'b1' })
+    const amexPay = row({ name: 'Amex payment', section: 'expense', kind: 'card-payment', accountId: lump.id, order: 'b2' })
+    const t = tables({
+      household: [household({ moneyMode: 'proportional', closingRule: 'leftover-plug' })],
+      entities: [a, b], accounts: [itemized, lump],
+      rows: [salaryA, salaryB, groceries, visaPay, visaPayOld, amexPay],
+      cells: [
+        cellValue(salaryA.id, M, 1000_00), cellValue(salaryB.id, M, 1000_00), cellValue(groceries.id, M, 300_00),
+        cellValue(visaPay.id, M, 300_00), cellValue(visaPayOld.id, M, 300_00), cellValue(amexPay.id, M, 200_00),
+      ],
+    })
+    const out = computeEngine({ tables: t, months: [M] })
+    const c = computeContributions(t, out, M)
+    const ids = c.lines.map((l) => l.rowId)
+    expect(ids).toContain(groceries.id)
+    expect(ids).not.toContain(visaPay.id)
+    expect(ids).not.toContain(visaPayOld.id)
+    expect(c.lines.find((l) => l.rowId === amexPay.id)?.byAdult).toEqual({ [a.id]: 100_00, [b.id]: 100_00 })
+    expect(c.adults.find((x) => x.entityId === a.id)?.owed).toBe(150_00 + 100_00)
+
+    // pooled: the itemized card's payment is not an adult's own spending either
+    const own = row({ name: 'A card payment', section: 'expense', kind: 'card-payment', accountId: itemized.id, scope: a.id, order: 'b3' })
+    const t2 = tables({ ...t, rows: [...t.rows, own], cells: [...t.cells, cellValue(own.id, M, 50_00)] })
+    const out2 = computeEngine({ tables: t2, months: [M] })
+    expect(computePersonBudgets(t2, out2, M).find((p) => p.entityId === a.id)?.ownSpend).toBe(0)
+  })
+})
