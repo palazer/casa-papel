@@ -287,6 +287,19 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   nothing is owed. A new savings or investment account opens the rule dialog as soon as it is saved, on `The rest`
   for a savings account while nothing takes the rest yet; a new pool account asks for its monthly amount in its own
   dialog, counting from the month on screen.
+  **Suggestions.** `Suggestions` in the toolbar (a pressed button with an (i); on while a household is being set up,
+  off otherwise, disabled in a closed month) shows the rows a household like this one usually has, where they will
+  appear: above the add controls of Income, Expenses and Set aside, pay off, and inside the category a row belongs
+  to. A category with a usual suggestion opens by itself. A suggestion is not a row, so it is drawn as an add
+  control, not as a line: a muted `+`, the row's name in muted medium weight, its one-sentence description in muted
+  `text-[11px]`, then a 28 px amount field (`per month`, named `Amount per month for <row>`), an `xs outline` `Add`
+  and a ghost `×` named `Dismiss <row>`. Enter in the field adds the row with that amount from the month on screen
+  on; `Add` with the field empty adds it without one; no dialog opens. An amount that cannot be read shows its error
+  under the line and disables `Add`. A suggestion that needs an account the household does not have shows a zinc
+  chip (`needs a loan account`) in place of the field and the button. Under the usual ones a dotted-underlined link
+  `More suggestions (n)` opens the rarer and the dismissed ones, which have no `×`. Each block is a group named
+  `Suggestions for <part>`. Under Assets the same line offers an account most households have (`Main account`,
+  `Savings`); its `Add` opens the account dialog with the name and type filled in.
   **Category estimates.** An expense category can carry an estimate: what it should come to in a month, typed before
   its rows are known. The category line then reads `estimate €1,450.00` in muted `text-[11px]` after its name, and
   its last line is `Not broken down yet` with the `automatic` chip, the estimate minus the category's rows, on the

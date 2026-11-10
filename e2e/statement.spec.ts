@@ -529,6 +529,76 @@ test.describe('working the month in the Statement', () => {
     await page.screenshot({ path: 'e2e/output/statement-accounts.png', fullPage: true })
   })
 
+  test('suggested rows are offered where they will appear: one is added with its amount, one is dismissed and waits behind "More suggestions"', async ({ page }) => {
+    await openStatement(page)
+    await goToMonth(page, 'November 2026')
+    const moneyIn = page.getByRole('region', { name: 'Money in' })
+    const moneyOut = page.getByRole('region', { name: 'Money out' })
+    const toggle = page.getByRole('button', { name: 'Suggestions', exact: true })
+    const group = (name: string) => page.getByRole('group', { name: `Suggestions for ${name}` })
+
+    // a household that is set up sees none until it asks for them
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    await expect(page.getByTestId('suggestions')).toHaveCount(0)
+    await toggle.click()
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+
+    // a category with something usual to offer opens by itself; each line says what the row is for
+    const transport = group('Transport')
+    await expect(transport.locator('[data-suggestion]')).toHaveText([/^The car – Fuel & parking/, /^Transport/])
+    await expect(transport).toContainText('Fuel or charging, parking, tolls.')
+    await expect(transport.getByRole('button', { name: 'More suggestions (2)' })).toBeVisible()
+    // the demo already has its salaries, so Income only has the rarer ones to offer
+    await expect(group('Income').locator('[data-suggestion]')).toHaveCount(0)
+    await expect(moneyIn.getByRole('button', { name: 'More suggestions (2)' })).toBeVisible()
+    // the accounts every household has are there already
+    await expect(page.getByTestId('account-suggestions')).toHaveCount(0)
+    await page.screenshot({ path: 'e2e/output/statement-suggestions.png', fullPage: true })
+
+    // an amount that cannot be read stays on its line
+    await transport.getByLabel('Amount per month for The car – Fuel & parking').fill('abc')
+    await expect(transport.getByRole('alert')).toHaveText('That is not an amount I can read.')
+    await expect(transport.getByRole('button', { name: 'Add The car – Fuel & parking' })).toBeDisabled()
+
+    // the amount and Enter: the row is there, from this month on, and its suggestion is gone
+    await transport.getByLabel('Amount per month for The car – Fuel & parking').fill('90')
+    await transport.getByLabel('Amount per month for The car – Fuel & parking').press('Enter')
+    await expect(moneyOut.getByRole('button', { name: /^The car – Fuel & parking: €90\.00/ })).toBeVisible()
+    await expect(transport.locator('[data-suggestion]')).toHaveText([/^Transport/])
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Next month' }).click()
+    await expect(moneyOut.getByRole('button', { name: /^The car – Fuel & parking: €90\.00/ })).toBeVisible()
+    await page.getByRole('button', { name: 'Previous month' }).click()
+
+    // "×": not for us. It waits behind "More suggestions" with the rarer ones, and can still be added from there
+    await transport.getByRole('button', { name: 'Dismiss Transport' }).click()
+    await expect(transport.locator('[data-suggestion]')).toHaveCount(0)
+    await transport.getByRole('button', { name: 'More suggestions (3)' }).click()
+    await expect(transport.locator('[data-suggestion]')).toHaveText([/^The car – Tax & inspection/, /^The car – Maintenance/, /^Transport/])
+    await expect(transport.getByRole('button', { name: /^Dismiss / })).toHaveCount(0)
+    await transport.getByRole('button', { name: 'Add Transport', exact: true }).click()
+    await expect(moneyOut.getByRole('button', { name: /^Transport: / })).toBeVisible()
+
+    // one that needs an account the household does not have says so and cannot be added yet
+    const setAside = group('Set aside, pay off')
+    await setAside.getByRole('button', { name: 'More suggestions (2)' }).click()
+    const loan = setAside.locator('[data-suggestion$=":v.loan"]')
+    await expect(loan).toContainText('needs a loan account')
+    await expect(loan.getByRole('button', { name: /^Add / })).toHaveCount(0)
+
+    // one undo takes the last added row back, and its suggestion returns
+    await page.getByRole('button', { name: 'Undo' }).click()
+    await expect(moneyOut.getByRole('button', { name: /^Transport: / })).toHaveCount(0)
+
+    // a closed month takes no new rows, so it offers none
+    await goToMonth(page, 'September 2026')
+    await expect(page.getByTestId('suggestions')).toHaveCount(0)
+    await expect(toggle).toBeDisabled()
+    await goToMonth(page, 'November 2026')
+    await toggle.click()
+    await expect(page.getByTestId('suggestions')).toHaveCount(0)
+  })
+
   test('money taken from an account by hand has its own section; what expenses took from savings and pool accounts is marked calculated', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'November 2026')

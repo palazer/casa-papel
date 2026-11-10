@@ -10,7 +10,7 @@ import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { buildStatement, cellKey, computeMainAccount, type GoalProgress, type StatementLine } from '@/engine'
 import { canCarryRule, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type MonthKey, type Row, type Section } from '@/model'
-import { addPlanYear, setCellDone, setDerivedDone, setItemStatus, type RuleChoice, type RuleTarget } from '@/store'
+import { accountSuggestions, addPlanYear, rowSuggestions, setCellDone, setDerivedDone, setItemStatus, type RowSuggestion, type RuleChoice, type RuleTarget } from '@/store'
 import { GoalDialog } from '@/features/goals/GoalDialog'
 import { goalStatusLine } from '@/features/goals/goalText'
 import { AddRowInline } from '@/features/grid/AddRowInline'
@@ -23,6 +23,7 @@ import { RuleDialog } from '@/features/rules/RuleDialog'
 import { AddCategoryInline } from './AddCategoryInline'
 import { EstimateDialog } from './EstimateDialog'
 import { StatementBand } from './StatementBand'
+import { AccountSuggestionLines, SuggestionLines } from './SuggestionLines'
 import { TopUpDialog } from './TopUpDialog'
 import { ESTIMATE_SHADE, type LineContext } from './StatementLine'
 
@@ -62,6 +63,8 @@ export function StatementScreen() {
   /** An account being added from the lower half: where it was asked from says which types are on offer. */
   const [accountNew, setAccountNew] = useState<{ name?: string; type?: AccountType; types: AccountType[] } | null>(null)
   const [poolNew, setPoolNew] = useState(false)
+  /** "Suggestions" in the toolbar, once it was pressed; until then they show while the household is being set up. */
+  const [suggest, setSuggest] = useState<boolean | null>(null)
   /** The pool account being topped up. */
   const [topUpFor, setTopUpFor] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -87,8 +90,17 @@ export function StatementScreen() {
     const grown = Object.keys(shortNow).find((id) => shortNow[id] > (seen.short[id] ?? 0))
     if (grown) setTopUpFor(grown)
   }, [m, shortNow, closedNow])
-  const isOpen = useCallback((line: StatementLine) => openLines[line.id] ?? line.open ?? false, [openLines])
-  const onToggle = useCallback((line: StatementLine) => setOpenLines((s) => ({ ...s, [line.id]: !(s[line.id] ?? line.open ?? false) })), [])
+  // Suggested rows sit where they will appear: under a group, or inside the category they belong to
+  const showing = (suggest ?? household?.setupOpen ?? false) && !closedNow
+  const suggestions = useMemo(() => {
+    const byPlace = new Map<string, RowSuggestion[]>()
+    if (tables) for (const s of rowSuggestions(tables)) byPlace.set(s.place, [...(byPlace.get(s.place) ?? []), s])
+    return byPlace
+  }, [tables])
+  /** A category that has something usual to offer opens by itself, so the offer is seen. */
+  const autoOpen = useMemo(() => new Set(showing ? [...suggestions].filter(([, list]) => list.some((s) => s.usual)).map(([place]) => place) : []), [showing, suggestions])
+  const isOpen = useCallback((line: StatementLine) => openLines[line.id] ?? ((line.open ?? false) || autoOpen.has(line.id)), [openLines, autoOpen])
+  const onToggle = useCallback((line: StatementLine) => setOpenLines((s) => ({ ...s, [line.id]: !(s[line.id] ?? ((line.open ?? false) || autoOpen.has(line.id))) })), [autoOpen])
 
   if (!tables || !household || !engine || !statement) return null
   const { locale, baseCurrency: ccy } = household
@@ -130,6 +142,13 @@ export function StatementScreen() {
     if (canCarryRule(row)) setRuleFor({ rowId: row.id })
     else setEditorRow(row.id)
   }
+  /** A suggested row came with its amount, so no editor opens; its category stays open once its suggestions are gone. */
+  function onSuggested(row: Row) {
+    setOpenLines((s) => ({ ...s, [`cat:${row.section}:${row.categoryId ?? 'none'}`]: true }))
+  }
+  const suggested = (line: StatementLine) => (showing && m
+    ? <SuggestionLines suggestions={suggestions.get(line.id) ?? []} label={line.label} month={m} currency={household!.baseCurrency} locale={household!.locale} onAdded={onSuggested} onError={setError} />
+    : null)
   /**
    * A new savings or investment account is asked straight away how much goes to it. While nothing takes the rest of
    * the month yet, a savings account is offered it.
@@ -152,16 +171,17 @@ export function StatementScreen() {
   )
   /** Things are added where they will appear: at the foot of a group, and inside a category for a row of that category. */
   function footer(line: StatementLine): ReactNode {
-    if (line.id === 'income') return <>{addRow('income')}<AddCategoryInline section="income" onError={setError} /></>
-    if (line.id === 'expenses') return <>{addRow('expense')}<AddCategoryInline section="expense" onError={setError} estimate={statement!.closed ? undefined : { month: m, currency: ccy, locale }} /></>
+    if (line.id === 'income') return <>{suggested(line)}{addRow('income')}<AddCategoryInline section="income" onError={setError} /></>
+    if (line.id === 'expenses') return <>{suggested(line)}{addRow('expense')}<AddCategoryInline section="expense" onError={setError} estimate={statement!.closed ? undefined : { month: m, currency: ccy, locale }} /></>
     // money taken out of an account has a section of its own on the left, so the right side does not offer it
-    if (line.id === 'set-aside') return addRow('transfer', { without: ['from-savings', 'from-investment'] })
+    if (line.id === 'set-aside') return <>{suggested(line)}{addRow('transfer', { without: ['from-savings', 'from-investment'] })}</>
     if (line.id === 'from-accounts') return addRow('transfer', { only: ['from-savings', 'from-investment'] })
     if (line.kind === 'category' && line.id.startsWith('cat:')) {
       const [, section, categoryId] = line.id.split(':')
       if (categoryId === 'none') return addRow(section as Section, { label: 'Add row without a category' })
       return (
         <>
+          {suggested(line)}
           {addRow(section as Section, { label: `Add row to ${line.label}`, defaultCategoryId: categoryId })}
           {section === 'expense' && !statement!.closed && (
             <Button variant="ghost" size="sm" className="text-muted-foreground" aria-label={`${line.budget != null ? 'Change' : 'Set'} estimate for ${line.label}`} onClick={() => setEstimateFor(categoryId)}>
@@ -195,13 +215,14 @@ export function StatementScreen() {
   const positionCtx: LineContext = { ...base, withChange: true, onGoal, onBalance: setBalanceFor, footer: (line) => (line.id === 'debts' ? debtsFoot : null) }
   const day = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${lastDayOfMonth(m)}T00:00:00Z`))
   const foldable = walk([...statement.flow.left.lines, ...statement.flow.right.lines, ...statement.position.left.lines, ...statement.position.right.lines])
-    .filter((l) => l.kind !== 'group' && (l.children.length > 0 || !!l.goals?.length))
+    .filter((l) => l.kind !== 'group' && (l.children.length > 0 || !!l.goals?.length || autoOpen.has(l.id)))
   const setAll = (open: boolean) => setOpenLines(Object.fromEntries(foldable.map((l) => [l.id, open])))
   const act = (fn: () => Promise<unknown>) => void fn().catch((e) => setError(e instanceof Error ? e.message : 'Action failed'))
   // Accounts are added where they will show: what the household has under Assets, what it owes under Debts
   const savingsAccounts = tables.accounts.filter((a) => a.type === 'savings' && !a.deletedAt && !a.archivedMonth)
   const assetsFoot = (
     <>
+      {showing && <AccountSuggestionLines suggestions={accountSuggestions(tables)} onAdd={(s) => setAccountNew({ name: s.name, type: s.type, types: ASSET_TYPES })} onError={setError} />}
       <Button variant="ghost" size="sm" className={ADD} onClick={() => setAccountNew({ types: ASSET_TYPES })}><Plus /> Add account</Button>
       {savingsAccounts.length > 0 && <Button variant="ghost" size="sm" className={ADD} onClick={() => setPoolNew(true)}><Plus /> Add pool account</Button>}
     </>
@@ -215,6 +236,10 @@ export function StatementScreen() {
         <MonthPicker months={months} month={m} onChange={setMonth} locale={locale} onAddYear={() => act(() => addPlanYear(store))} />
         <Button size="xs" variant="outline" onClick={() => setAll(true)}>Open all</Button>
         <Button size="xs" variant="outline" onClick={() => setAll(false)}>Close all</Button>
+        <span className="flex items-center gap-1">
+          <Button size="xs" variant={showing ? 'default' : 'outline'} aria-pressed={showing} disabled={statement.closed} title={statement.closed ? 'A closed month takes no new rows.' : undefined} onClick={() => setSuggest(!showing)}>Suggestions</Button>
+          <InfoTip help="statement.suggestions" />
+        </span>
         {error && <p role="alert" className="basis-full text-destructive">{error}</p>}
         {statement.warnings.map((w) => <p key={w} className="basis-full text-amber-700">{w}</p>)}
       </PageHeader>
