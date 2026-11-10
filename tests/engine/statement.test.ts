@@ -163,7 +163,7 @@ describe('the Statement, the month', () => {
     const { s } = statementFor(t, '2026-01')
     const cover = topLine(s, 'in', 'cover')!
     expect(cover.label).toBe('To cover the month')
-    expect(cover.children.map((c) => [c.label, c.amount, c.balancing, c.rowId])).toEqual([['From savings', 550_00, true, toSavings.id]])
+    expect(cover.children.map((c) => [c.label, c.amount, c.balancing, c.rowId])).toEqual([['From Savings', 550_00, true, toSavings.id]])
     expect(topLine(s, 'out', 'set-aside')!.children.map((c) => [c.label, c.amount])).toEqual([['Kept in account', 50_00]])
     expect([s.flow.left.total, s.flow.right.total]).toEqual([1550_00, 1550_00])
     expect(find(s, `acc:${savings.id}`)).toMatchObject({ amount: 1450_00, change: -550_00 })

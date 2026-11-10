@@ -158,6 +158,9 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   const accounts = tables.accounts.filter((a) => !a.deletedAt).sort(byOrder)
   const accountsById = new Map(accounts.map((a) => [a.id, a]))
   const poolsById = new Map(tables.pools.filter((p) => !p.deletedAt).map((p) => [p.id, p]))
+  /** What a transfer feeds, by name: its pool account, else its account, else the row itself. */
+  const fedBy = (row: Row): string =>
+    tables.pools.find((p) => !p.deletedAt && p.allocationRowId === row.id)?.name ?? (row.accountId ? accountsById.get(row.accountId)?.name : undefined) ?? row.name
   const warnings: string[] = []
 
   const cellOf = (row: Row): CellResult | null => {
@@ -265,7 +268,13 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
       case 'moved':
         moved.push(rowLine(row, c, v))
         break
-      case 'set-aside':
+      case 'set-aside': {
+        // the rest on an investment or a pool account closes the month; in a month that overruns it comes back from there
+        const over: Partial<StatementLine> = rules.byRow.get(row.id)?.kind === 'rest' && c.source === 'derived' ? { balancing: true } : {}
+        if (v < 0) cover.push(rowLine(row, c, -v, { ...over, label: `From ${fedBy(row)}` }))
+        else setAside.push(rowLine(row, c, v, over))
+        break
+      }
       case 'pay-off':
         setAside.push(rowLine(row, c, v))
         break
@@ -279,7 +288,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
         if (state?.kind === 'idle') break
         // the rest closes the month; in a month with a typed amount the same row is a plain line
         const over: Partial<StatementLine> = state?.kind === 'rest' && c.source === 'derived' ? { balancing: true } : {}
-        if (v < 0) cover.push(rowLine(row, c, -v, { ...over, label: 'From savings' }))
+        if (v < 0) cover.push(rowLine(row, c, -v, { ...over, label: row.accountId && accountsById.has(row.accountId) ? `From ${fedBy(row)}` : 'From savings' }))
         else setAside.push(rowLine(row, c, v, over))
         break
       }

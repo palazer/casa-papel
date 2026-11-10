@@ -304,7 +304,7 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
           </div>
           {followed && <InfoTip help="row.follows" text={`${shareTag ? `${shareTag}the amount of` : 'Same amount as'} "${followed.name}" every month. Edit that row; this one has no amount of its own.`} />}
           {deductedFrom && <InfoTip help="row.deductedFrom" />}
-          {automatic && <InfoTip help={rule?.kind === 'share-of-income' || rule?.kind === 'share-of-rest' ? 'row.rule' : row.kind === 'to-savings' ? 'row.toSavingsPlug' : row.kind === 'category-estimate' ? 'row.categoryEstimate' : 'row.pocketShare'} />}
+          {automatic && <InfoTip help={rule?.kind === 'share-of-income' || rule?.kind === 'share-of-rest' || (rule?.kind === 'rest' && row.kind !== 'to-savings') ? 'row.rule' : row.kind === 'to-savings' ? 'row.toSavingsPlug' : row.kind === 'category-estimate' ? 'row.categoryEstimate' : 'row.pocketShare'} />}
           <RowMenu row={row} tables={tables} household={household} onError={onError} />
         </div>
       </th>

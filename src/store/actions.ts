@@ -1,7 +1,7 @@
 import { generateKeyBetween } from 'fractional-indexing'
 import { computeEngine, cellKey, sortRows, type EngineOutput } from '@/engine'
 import {
-  ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RowSchema, addMonths, canCarryRule, cardIsItemized, compareMonths, monthKey, monthOfDate, monthRange, newId, parseMonth, poolIdOf, sharePercent,
+  ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RowSchema, addMonths, canCarryRule, cardIsItemized, compareMonths, monthKey, monthOfDate, monthRange, newId, parseMonth, poolIdOf, resolveRules, sharePercent,
   type Account, type Category, type Cell, type CellInput, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Pool, type Row, type RowKind, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
@@ -167,7 +167,7 @@ export function rowTargets(tables: Tables, household: Household | undefined) {
     orphanPools: live(tables.pools).filter((p) => !p.allocationRowId || !rows.some((r) => r.id === p.allocationRowId)),
     adults: live(tables.entities).filter((e) => e.kind === 'adult'),
     /** the rest of the month already has its row: a further "to savings" row gets a fixed amount of its own */
-    plugTaken: household?.closingRule === 'savings-plug' && rows.some((r) => r.kind === 'to-savings'),
+    plugTaken: !!household && resolveRules(sortRows(rows, tables.categories), household.closingRule).restRowId !== null,
   }
 }
 
@@ -635,8 +635,10 @@ export function derivedRowReason(row: Row, closingRule: Household['closingRule']
   if (canCarryRule(row) && (rule === 'share-of-income' || rule === 'share-of-rest')) {
     return `"${row.name}" is worked out by its rule: ${sharePercent(row.ruleShare ?? 0)} of ${rule === 'share-of-income' ? 'income' : 'what is left'}.`
   }
-  // the row that takes the rest, and the idle ones beside it; a savings row with a fixed amount is typed like any other
-  if (row.kind === 'to-savings' && closingRule === 'savings-plug' && rule !== 'fixed') return `"${row.name}" is worked out by the app from the rest of the month.`
+  // the row that takes the rest (a transfer to any account), and under the first-savings-row default the idle ones
+  // beside it; a savings row with a fixed amount is typed like any other
+  const takesRest = closingRule === 'savings-plug' && ((canCarryRule(row) && rule === 'rest') || (row.kind === 'to-savings' && rule !== 'fixed'))
+  if (takesRest) return `"${row.name}" is worked out by the app from the rest of the month.`
   if (row.kind === 'pocket-money' && row.pocketMode === 'share-of-pocket-total') return `"${row.name}" is a share of the pocket total.`
   return null
 }

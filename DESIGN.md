@@ -332,8 +332,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   "Applies to" as the cell editor's `Segmented` (`This month and onwards` / `Only this month`). Footer: a ghost
   `Remove estimate` when there is one, Cancel, Save. A closed month disables it.
 - The rule dialog (`src/features/rules/RuleDialog.tsx`), titled `How much goes to <account>?`: "Rule" as a
-  `Segmented` (`A fixed amount`, `A percentage of income`, `A percentage of what is left`, and `The rest` for a
-  savings account) with the chosen option's sentence under it, then that option's one field (`Amount per month in
+  `Segmented` (`A fixed amount`, `A percentage of income`, `A percentage of what is left`, `The rest`) with the
+  chosen option's sentence under it (for the rest, also what a month that overruns does to that account), then that option's one field (`Amount per month in
   <CCY>` or the percentage), then "Counts from" as a `MonthField` with an (i) and the sentence that earlier months
   keep their amounts. It opens on the month it was called from, or on the first month after the last closed one.
   Two read-only lines follow what is typed: what the account gets in that month, with the sum the percentage is

@@ -29,7 +29,7 @@ const KINDS: Array<{ value: Kind; label: string; text: string }> = [
   { value: 'fixed', label: 'A fixed amount', text: 'The same amount every month until you change it.' },
   { value: 'share-of-income', label: 'A percentage of income', text: 'A share of the month\'s take-home income: what comes in, minus what is deducted from it. Money taken out of investments does not count.' },
   { value: 'share-of-rest', label: 'A percentage of what is left', text: 'A share of what the month has left after spending, fixed amounts, percentages of income and the cash kept in the account. Nothing in a month that overruns.' },
-  { value: 'rest', label: 'The rest', text: 'Everything that is left after all of that. A month that overruns takes the difference back from this account. One account can take the rest.' },
+  { value: 'rest', label: 'The rest', text: 'Everything that is left after all of that. One account can take the rest, and the same account fills the gap in a month that overruns.' },
 ]
 
 /**
@@ -73,7 +73,12 @@ export function RuleDialog({ tables, household, target: given, month, onClose }:
   const pool = 'poolId' in target ? tables.pools.find((p) => p.id === target.poolId) : row ? tables.pools.find((p) => !p.deletedAt && p.allocationRowId === row.id) : undefined
   const account = 'accountId' in target ? tables.accounts.find((a) => a.id === target.accountId) : row?.accountId ? tables.accounts.find((a) => a.id === row.accountId) : undefined
   const name = pool?.name ?? account?.name ?? row?.name ?? 'this account'
-  const canRest = row ? row.kind === 'to-savings' : !pool && account?.type === 'savings'
+  /** What a month that overruns does to the account that takes the rest, in that account's own terms. */
+  const shortMonth = pool
+    ? `A month that overruns takes the difference back out of ${name}.`
+    : account?.type === 'investment'
+      ? `A month that overruns takes the difference back out of ${name}: it shows as money taken out of the investments.`
+      : `A month that overruns takes the difference back from ${name}.`
   const ccy = row?.currency ?? base
 
   /** The rule the row has now, who takes the rest, and what the other accounts take of what is left. */
@@ -142,9 +147,8 @@ export function RuleDialog({ tables, household, target: given, month, onClose }:
           <div className="space-y-4">
             <fieldset className="space-y-1.5">
               <legend className="flex items-center gap-1 text-sm font-medium">Rule <InfoTip help="row.rule" /></legend>
-              <Segmented label="Rule" value={kind} onChange={(v) => setKind(v as Kind)} options={KINDS.filter((k) => k.value !== 'rest' || canRest).map(({ value, label }) => ({ value, label }))} />
-              <p className="text-xs text-muted-foreground">{KINDS.find((k) => k.value === kind)?.text}</p>
-              {!canRest && <p className="text-xs text-muted-foreground">Only a savings account can take the rest.</p>}
+              <Segmented label="Rule" value={kind} onChange={(v) => setKind(v as Kind)} options={KINDS.map(({ value, label }) => ({ value, label }))} />
+              <p className="text-xs text-muted-foreground">{KINDS.find((k) => k.value === kind)?.text}{kind === 'rest' ? ` ${shortMonth}` : ''}</p>
             </fieldset>
 
             {kind === 'fixed' && (
@@ -176,11 +180,11 @@ export function RuleDialog({ tables, household, target: given, month, onClose }:
             {figures && (
               <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm" data-testid="rule-preview">
                 <dt className="text-muted-foreground">
-                  {name} in {monthName}
+                  {figures.amount < 0 ? `Taken back from ${name}` : name} in {monthName}
                   {kind === 'share-of-income' && typedShare != null && <> · {formatShare(typedShare, locale)} of {money(figures.takeHome)} take-home income</>}
                   {kind === 'share-of-rest' && typedShare != null && <> · {formatShare(typedShare, locale)} of {money(figures.left)} left</>}
                 </dt>
-                <dd className="text-right tabular-nums" data-testid="rule-amount">{money(figures.amount)}</dd>
+                <dd className="text-right tabular-nums" data-testid="rule-amount">{money(Math.abs(figures.amount))}</dd>
                 {kind !== 'rest' && (
                   <>
                     <dt className="text-muted-foreground">{figures.rest != null ? (figures.rest < 0 ? 'Then taken back from the rest account' : `Then the rest${restRowName ? ` ("${restRowName}")` : ''}`) : figures.leftover < 0 ? 'Then short in the main account' : 'Then left in the main account'}</dt>

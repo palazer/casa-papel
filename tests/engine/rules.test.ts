@@ -85,7 +85,7 @@ describe('rules: how a transfer is worked out', () => {
     const s = buildStatement(short, out, '2026-02')!
     const cover = s.flow.left.lines.find((l) => l.id === 'cover')!
     expect(cover.children).toHaveLength(1)
-    expect(cover.children[0]).toMatchObject({ rowId: r.toSavings.id, label: 'From savings', amount: 130000, balancing: true })
+    expect(cover.children[0]).toMatchObject({ rowId: r.toSavings.id, label: 'From Savings', amount: 130000, balancing: true })
     expectIdentity(out)
     expectBalanced(short, out)
   })
@@ -130,6 +130,50 @@ describe('rules: how a transfer is worked out', () => {
     expect(out.cells[cellKey(fixed.r.toSavings.id, '2026-03')].source).toBe('inherit')
     expect(value(out, fixed.r.toRainy, '2026-03')).toBe(170000)
     expect(out.accounts[fixed.rainy.id].months['2026-02'].balance).toBe(340000)
+    expectIdentity(out)
+    expectBalanced(t, out)
+  })
+
+  it('gives the rest to an investment account, and a month that overruns takes the gap back out of it', () => {
+    const { t, r, broker, rainy } = world({ rows: () => ({ toBroker: { rule: 'rest', ruleShare: null }, toSavings: { rule: 'fixed' } }) })
+    const short = { ...t, cells: [...t.cells, cellValue(r.rent.id, '2026-02', 480000), cellValue(r.rent.id, '2026-03', 150000)] }
+    const out = run(short)
+    expect(resolveRules(out.rows, 'savings-plug').restRowId).toBe(r.toBroker.id)
+    // January: 2,400 left after the buffer, a quarter to Rainy day, the rest to the Broker
+    expect(value(out, r.toRainy, '2026-01')).toBe(60000)
+    expect(value(out, r.toBroker, '2026-01')).toBe(180000)
+    expect(out.totals['2026-01']).toMatchObject({ rest: 180000, toInvestment: 180000, toSavings: 60000, leftover: 10000 })
+    expect(out.accounts[broker.id].months['2026-01']).toMatchObject({ capital: 180000, inflow: 180000, outflow: 0 })
+    // February overruns by 900: nothing for Rainy day, and the Broker gives it back as money taken out
+    expect(value(out, r.toBroker, '2026-02')).toBe(-90000)
+    expect(out.totals['2026-02']).toMatchObject({ rest: -90000, toInvestment: -90000, toSavings: 0, leftover: 10000 })
+    expect(out.accounts[broker.id].months['2026-02']).toMatchObject({ capital: 90000, inflow: 0, outflow: 90000 })
+    expect(out.accounts[rainy.id].months['2026-02'].balance).toBe(60000)
+    expect(out.accounts[broker.id].months['2026-03'].capital).toBe(270000)
+    const s = buildStatement(short, out, '2026-02')!
+    expect(s.flow.left.lines.find((l) => l.id === 'cover')!.children).toMatchObject([{ rowId: r.toBroker.id, label: 'From Broker', amount: 90000, balancing: true }])
+    expect(all(buildStatement(short, out, '2026-01')!).find((l) => l.id === r.toBroker.id)).toMatchObject({ amount: 180000, balancing: true, rule: { kind: 'rest' } })
+    expectIdentity(out)
+    expectBalanced(short, out)
+  })
+
+  it('gives the rest to a pool account, which pays back in a month that overruns', () => {
+    const base = world({ rows: () => ({ toSavings: { rule: 'fixed' }, toRainy: { rule: 'fixed', ruleShare: null }, toBroker: { rule: 'fixed', ruleShare: null } }) })
+    const travel = pool({ name: 'Travel', accountId: base.savings.id, order: 'a0' })
+    const alloc = row({ name: 'Travel pool', section: 'transfer', kind: 'pool-allocation', accountId: base.savings.id, order: 'a3', rule: 'rest' })
+    travel.allocationRowId = alloc.id
+    const t: Tables = { ...base.t, pools: [travel], rows: [...base.t.rows, alloc], cells: [...base.t.cells, cellValue(base.r.rent.id, '2026-02', 480000), cellValue(base.r.rent.id, '2026-03', 150000)] }
+    const out = run(t)
+    expect(resolveRules(out.rows, 'savings-plug').restRowId).toBe(alloc.id)
+    expect(value(out, alloc, '2026-01')).toBe(240000)
+    expect(out.totals['2026-01']).toMatchObject({ rest: 240000, allocations: 240000, toSavings: 0 })
+    expect(out.pools[travel.id].months['2026-01'].balance).toBe(240000)
+    expect(value(out, alloc, '2026-02')).toBe(-90000)
+    expect(out.pools[travel.id].months['2026-02'].balance).toBe(150000)
+    // the pool account lives in the savings account, which moves with it
+    expect(out.accounts[base.savings.id].months['2026-02'].balance).toBe(150000)
+    const s = buildStatement(t, out, '2026-02')!
+    expect(s.flow.left.lines.find((l) => l.id === 'cover')!.children).toMatchObject([{ rowId: alloc.id, label: 'From Travel', amount: 90000, balancing: true }])
     expectIdentity(out)
     expectBalanced(t, out)
   })

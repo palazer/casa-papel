@@ -58,7 +58,8 @@ function makeRuleRow(tables: Tables, target: { accountId: string } | { poolId: s
  * A rule has no start month of its own. Instead a month with a typed amount shows that amount (see the engine), so:
  * the months before `from` get what they showed written down, the typed amounts from `from` on are cleared, and the
  * rule fills what is left open. Moving the rest does the same for the row that had it, which then gets nothing until
- * it has a rule of its own; `closingRule` follows (the rest is taken, or it stays in the main account).
+ * it has a rule of its own; `closingRule` follows (the rest is taken, or it stays in the main account). Any account a
+ * rule can feed may take the rest, one at a time.
  */
 export function ruleMutations(tables: Tables, target: RuleTarget, choice: RuleChoice, from: MonthKey, ts: number = Date.now()): { row: Row; mutations: Mutation[] } {
   const household = tables.household.find((h) => !h.deletedAt)
@@ -87,7 +88,6 @@ export function ruleMutations(tables: Tables, target: RuleTarget, choice: RuleCh
   }
   const row = found
   if (!canCarryRule(row)) throw new Error(`"${row.name}" cannot have a rule: only the transfer to a savings account, an investment account or a pool account can.`)
-  if (choice.kind === 'rest' && row.kind !== 'to-savings') throw new Error('Only a savings account can take the rest.')
 
   const liveRows = sortRows(working.rows.filter((r) => !r.deletedAt), working.categories)
   const before = resolveRules(liveRows, household.closingRule)
@@ -157,9 +157,11 @@ export function ruleMutations(tables: Tables, target: RuleTarget, choice: RuleCh
     }
     if (closingRule !== 'savings-plug') {
       closingRule = 'savings-plug'
-      // the other "to savings" rows were typed until now and stay so: without this they would read as idle, or as the rest
+      // the rows that were typed until now stay so: without this a "to savings" row would read as idle, and a row
+      // someone once set to take the rest would take it again
       for (const r of liveRows) {
-        if (r.id !== row.id && r.kind === 'to-savings' && ((r.rule ?? null) === null || r.rule === 'rest')) rowPatches.set(r.id, { rule: 'fixed', ruleShare: null })
+        if (r.id === row.id) continue
+        if ((r.kind === 'to-savings' && (r.rule ?? null) === null) || (canCarryRule(r) && r.rule === 'rest')) rowPatches.set(r.id, { rule: 'fixed', ruleShare: null })
       }
     }
   } else if (wasRest) {

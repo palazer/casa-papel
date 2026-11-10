@@ -7,7 +7,8 @@ import type { Account, Household, Row } from './schema'
  *   typed            the amount is typed and carries forward (`rule` 'fixed', or no rule on a row that is not the rest)
  *   share-of-income  a share of the month's take-home income
  *   share-of-rest    a share of what the month has left after spending, typed amounts, income shares and the buffer
- *   rest             what is left after all of that; one "to savings" row, and only under the savings-plug rule
+ *   rest             what is left after all of that; one row, and only under the savings-plug rule. In a month that
+ *                    overruns the same row takes the difference back
  *   idle             a "to savings" row without a rule beside the rest row: stays at zero, as it always did
  */
 export interface RuleState {
@@ -53,18 +54,18 @@ export function resolveRules(rows: Row[], closingRule: Household['closingRule'])
   const unruled: Row[] = []
   for (const row of rows) {
     const rule = row.rule ?? null
-    if (row.kind === 'to-savings' && plug) {
-      if (rule === 'rest') {
-        if (!rest) rest = row
-        else warnings.push(`"${rest.name}" and "${row.name}" are both set to take the rest; "${rest.name}" takes it.`)
-        continue
-      }
-      if (rule === null) {
-        unruled.push(row)
-        continue
-      }
+    const carries = canCarryRule(row)
+    // any transfer that feeds an account can be chosen for the rest; the first one chosen takes it
+    if (plug && carries && rule === 'rest') {
+      if (!rest) rest = row
+      else warnings.push(`"${rest.name}" and "${row.name}" are both set to take the rest; "${rest.name}" takes it.`)
+      continue
     }
-    if (!canCarryRule(row)) continue
+    if (plug && row.kind === 'to-savings' && rule === null) {
+      unruled.push(row)
+      continue
+    }
+    if (!carries) continue
     if (rule === 'share-of-income' || rule === 'share-of-rest') byRow.set(row.id, { kind: rule, share: row.ruleShare ?? 0, typedCounts: true })
   }
   const idle: RuleState = { kind: 'idle', share: 0, typedCounts: false }

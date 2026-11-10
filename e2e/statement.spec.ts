@@ -386,8 +386,8 @@ test.describe('working the month in the Statement', () => {
     await expect(dlg.getByRole('heading', { name: 'How much goes to Index fund?' })).toBeVisible()
     await expect(dlg.getByRole('radio', { name: 'A fixed amount' })).toBeChecked()
     await expect(dlg.getByLabel('Amount per month in EUR')).toHaveValue('500')
-    // an investment account cannot take the rest
-    await expect(dlg.getByRole('radio', { name: 'The rest' })).toHaveCount(0)
+    // every account a rule can feed may take the rest
+    await expect(dlg.getByRole('radio', { name: 'The rest' })).toBeVisible()
     await dlg.getByRole('radio', { name: 'A percentage of income' }).click()
     await expect(dlg.getByRole('button', { name: 'Save' })).toBeDisabled()
     await dlg.getByLabel('Percentage of income').fill('120')
@@ -497,6 +497,18 @@ test.describe('working the month in the Statement', () => {
     await goToMonth(page, 'November 2026')
     await expect(moneyOut.getByRole('button', { name: 'Rule for To savings: the rest' })).toBeVisible()
     await expect(assets.getByRole('button', { name: 'Set a rule for Rainy day' })).toBeVisible()
+
+    // an investment account can take the rest too: its own €500 goes back into what is left first
+    await assets.getByRole('button', { name: 'Rule for Index fund: a fixed amount' }).click()
+    await dlg.getByRole('radio', { name: 'The rest' }).click()
+    await expect(dlg).toContainText('A month that overruns takes the difference back out of Index fund: it shows as money taken out of the investments.')
+    await expect(dlg.getByTestId('rule-amount')).toHaveText('€2,869.00')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(moneyOut.getByRole('button', { name: 'To investments: €2,869.00' })).toBeVisible()
+    await expect(assets.getByRole('button', { name: 'Rule for Index fund: the rest' })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: 'To savings: €0.00' })).toBeVisible()
+    expect((await total(page, 'in').innerText()).replace(/^Total in\s*/, '')).toBe((await total(page, 'out').innerText()).replace(/^Total out\s*/, ''))
   })
 })
 

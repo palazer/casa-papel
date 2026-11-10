@@ -390,13 +390,20 @@ export function computeEngine(input: EngineInput): EngineOutput {
     }
     if (shareOfRest > 1.000001) warnOnce('share-of-rest', 'The percentages of what is left add up to more than 100%.')
     if (plugged) {
-      t.rest = t.income - outflows() - userToSavings - t.buffer
-      t.toSavings = userToSavings + t.rest
+      const rest = t.income - outflows() - userToSavings - t.buffer
+      t.rest = rest
       t.leftover = t.buffer
-      if (restCell) {
-        restCell.c.value = t.rest
-        restCell.c.valueBase = t.rest
-        restCell.c.netBase = t.rest
+      if (restCell && restCell.row.kind !== 'to-savings') {
+        // the rest goes to an investment or a pool account: it joins that row's own sum, also when it is negative
+        fill(restCell, rest)
+        t.toSavings = userToSavings
+      } else {
+        t.toSavings = userToSavings + rest
+        if (restCell) {
+          restCell.c.value = rest
+          restCell.c.valueBase = rest
+          restCell.c.netBase = rest
+        }
       }
     } else {
       t.toSavings = userToSavings
@@ -484,8 +491,12 @@ export function computeEngine(input: EngineInput): EngineOutput {
         if (row.accountId !== acc.id) continue
         const c = cells[cellKey(row.id, m)]
         if (!c || c.value === 0) continue
-        if (row.kind === 'to-investment') deposit += toAccountCurrency(c, m)
-        else if (row.kind === 'from-investment') withdrawal += toAccountCurrency(c, m)
+        if (row.kind === 'to-investment') {
+          // a negative deposit is money taken out: the rest in a month that overran, or a typed correction
+          const v = toAccountCurrency(c, m)
+          if (v >= 0) deposit += v
+          else withdrawal -= v
+        } else if (row.kind === 'from-investment') withdrawal += toAccountCurrency(c, m)
       }
       if (am?.actualDeposit != null) deposit = am.actualDeposit
       const rate = inv.projectionMode === 'historical-average' && realised.length > 0 ? realised.reduce((a, b) => a + b, 0) / realised.length : fixedMonthly
