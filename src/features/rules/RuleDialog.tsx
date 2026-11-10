@@ -20,6 +20,8 @@ interface Props {
   target: RuleTarget
   /** The month the dialog was opened from: the rule counts from there unless another month is picked. */
   month: MonthKey
+  /** For an account that was just added: the choice the dialog opens on, instead of what its transfer has now. */
+  start?: RuleChoice['kind']
   onClose: () => void
 }
 
@@ -57,7 +59,7 @@ const shareInput = (share: number): string => String(Math.round(share * 1000) / 
  * is left, or the rest. The rule counts from a month on; the dialog runs it on a copy first, so the figure it shows
  * and every refusal are the ones saving would give.
  */
-export function RuleDialog({ tables, household, target: given, month, onClose }: Props) {
+export function RuleDialog({ tables, household, target: given, month, start, onClose }: Props) {
   const store = useStore()
   // one dialog, one target: held so a parent that builds the object on every render does not rerun the engine
   const [target] = useState(given)
@@ -96,7 +98,7 @@ export function RuleDialog({ tables, household, target: given, month, onClose }:
   const lastClosed = tables.monthStates.filter((s) => s.closed).map((s) => s.month).sort().at(-1)
   const earliest = compareMonths(month, household.startMonth) < 0 ? household.startMonth : month
   const [from, setFrom] = useState<MonthKey>(lastClosed && compareMonths(lastClosed, earliest) >= 0 ? addMonths(lastClosed, 1) : earliest)
-  const [kind, setKind] = useState<Kind>(current)
+  const [kind, setKind] = useState<Kind>(start ?? current)
   /** What the row shows in the month the dialog was opened from: the amount a fixed rule starts from. */
   const shown = useMemo(() => (row ? computeEngine({ tables, months: [month] }).cells[cellKey(row.id, month)] : undefined), [tables, row, month])
   const [amountText, setAmountText] = useState(current === 'fixed' && shown && shown.value > 0 ? amountToInput(shown.value, shown.currency, locale) : '')

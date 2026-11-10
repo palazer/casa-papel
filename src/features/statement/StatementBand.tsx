@@ -11,7 +11,7 @@ import { AMOUNT_COL, CHANGE_COL, StatementLines, changeText, type LineContext } 
  * 1024 px and stacked below it. Each side is a column whose total sits at the bottom, so on a wide screen the two
  * totals share a line, the way a T-account closes.
  */
-export function StatementBand({ title, help, band, ctx, totals, amountHead, right }: {
+export function StatementBand({ title, help, band, ctx, totals, amountHead, right, feet }: {
   title: string
   help: HelpKey
   band: Band
@@ -21,12 +21,14 @@ export function StatementBand({ title, help, band, ctx, totals, amountHead, righ
   /** The amount column's heading: the day the balances are read on. */
   amountHead?: string
   right?: ReactNode
+  /** What can be added to each side, under its lines: the left side's controls, then the right side's. */
+  feet?: [ReactNode, ReactNode]
 }) {
   return (
     <Island title={title} help={help} right={right} bodyClassName="px-0 pb-0 pt-1" data-testid={`band-${band.left.key}`}>
       <div className="grid grid-cols-1 divide-border/60 max-lg:divide-y lg:grid-cols-2 lg:divide-x">
-        <Side side={band.left} total={totals[0]} ctx={ctx} amountHead={amountHead} />
-        <Side side={band.right} total={totals[1]} ctx={ctx} amountHead={amountHead} />
+        <Side side={band.left} total={totals[0]} ctx={ctx} amountHead={amountHead} foot={feet?.[0]} />
+        <Side side={band.right} total={totals[1]} ctx={ctx} amountHead={amountHead} foot={feet?.[1]} />
       </div>
       {band.difference !== 0 && (
         <p role="alert" className="border-t px-2 py-1.5 text-xs text-destructive">
@@ -37,7 +39,7 @@ export function StatementBand({ title, help, band, ctx, totals, amountHead, righ
   )
 }
 
-function Side({ side, total, ctx, amountHead }: { side: StatementSide; total: string; ctx: LineContext; amountHead?: string }) {
+function Side({ side, total, ctx, amountHead, foot }: { side: StatementSide; total: string; ctx: LineContext; amountHead?: string; foot?: ReactNode }) {
   return (
     <section aria-label={side.label} className="flex min-w-0 flex-col">
       <div className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -48,6 +50,7 @@ function Side({ side, total, ctx, amountHead }: { side: StatementSide; total: st
       <div className="border-t border-border/60">
         <StatementLines lines={side.lines} level={0} ctx={ctx} />
       </div>
+      {foot && <div className="flex flex-wrap items-center gap-x-1 gap-y-0.5 border-t border-border/60 px-2 py-1" data-testid={`foot-${side.key}`}>{foot}</div>}
       <div className="mt-auto flex min-h-11 items-center gap-1.5 border-t px-2 text-sm font-semibold md:min-h-8 md:text-xs" data-testid={`total-${side.key}`}>
         <span className="min-w-0 flex-1 truncate">{total}</span>
         {ctx.withChange && <span className={cn(CHANGE_COL, 'text-muted-foreground')}>{changeText(side.change ?? 0, ctx.ccy, ctx.locale)}</span>}

@@ -18,8 +18,11 @@ test.describe('wave 1c', () => {
     const dlg = page.getByRole('dialog')
     await dlg.getByLabel('Name', { exact: true }).fill('Broker')
     await dlg.getByLabel('Type').selectOption('investment')
+    // the short form asks the name, the type and what it holds; the rest waits behind "More options"
+    await expect(dlg.getByLabel('Growth per year (%)')).toHaveCount(0)
+    await dlg.getByRole('button', { name: /^More options/ }).click()
     await dlg.getByLabel('Currency').fill('USD')
-    await dlg.getByLabel('Opening balance').fill('10000')
+    await dlg.getByLabel('Holds at the start of September 2026 (USD)').fill('10000')
     await expect(dlg.getByLabel('Growth per year (%)')).toBeVisible()
     await dlg.getByLabel('Growth per year (%)').fill('6')
     await dlg.getByRole('button', { name: 'Save' }).click()

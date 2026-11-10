@@ -281,6 +281,12 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   what the goal watches settled, so the dialog asks for the amount only. A goal's detail carries an `xs ghost` `Edit`. An account's balance
   is a button named `<account> balance: <amount>` (`, entered` once it is) that opens the Grid's `BalanceDialog`; the
   line for the current accounts is calculated and has none.
+  **Accounts are added in the lower half too**, in the same ghost `+` buttons as rows: the foot of the Assets side
+  holds `Add account` (current, joint, savings, investments, other asset, cash) and, once a savings account exists,
+  `Add pool account`; `Add a card or loan` sits at the foot of the Debts group, and at the foot of that side while
+  nothing is owed. A new savings or investment account opens the rule dialog as soon as it is saved, on `The rest`
+  for a savings account while nothing takes the rest yet; a new pool account asks for its monthly amount in its own
+  dialog, counting from the month on screen.
   **Category estimates.** An expense category can carry an estimate: what it should come to in a month, typed before
   its rows are known. The category line then reads `estimate €1,450.00` in muted `text-[11px]` after its name, and
   its last line is `Not broken down yet` with the `automatic` chip, the estimate minus the category's rows, on the
@@ -361,6 +367,16 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   amount, pre-filled with what is missing; and under `<month> will then show` the lines the save will leave (`Money
   in · From <account>`, `Money out · <pool account> pool, this month`, the pool account's balance), worked out on a
   copy. Footer: a ghost `Not now` on the left, `Top up` on the right. `Not now` changes nothing.
+- The account dialog (`src/features/household/HouseholdAccountDialog.tsx`), one for the Household screen and the
+  Statement. The short form asks what every account needs: `Name`, `Type` with the type's sentence under it, and
+  one amount whose label says what it is and when: `Holds at the start of <Month> (<CCY>)`, `Owed at the start of
+  …` for a card or loan, `Worth at the start of …` for another asset. A card adds "What do you record for this
+  card?" as a `Segmented` (`Everything I buy with it` / `Only what I pay to it`) with the chosen answer's sentence.
+  Everything that has a usual default sits behind a `More options` disclosure (a chevron button that names what it
+  holds while closed): currency, opening month, owner, tracking, and for investments growth, projection and when
+  deposits count. It is closed for a new account and open when editing. Opened from a place that says what the
+  account is (Assets, Debts, a suggestion), the type list holds only the types that belong there. Errors show in the
+  dialog. Footer: a ghost `Archive or delete…` on the left when editing, Cancel, Save.
 - The goal dialog (`src/features/goals/GoalDialog.tsx`). A goal has two kinds: `Fill an account` (an account or a
   pool account reaches an amount) and `Pay down a debt` (a card or loan comes down to an amount, zero unless another
   is typed); net worth is a third, set only from its own line. Opened from a line of the Statement it is titled

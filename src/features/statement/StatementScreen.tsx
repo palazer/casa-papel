@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
-import { Lock } from 'lucide-react'
+import { Lock, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { InfoTip } from '@/components/InfoTip'
@@ -9,13 +9,15 @@ import { doneness, type DoneState } from '@/app/display'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { buildStatement, cellKey, computeMainAccount, type GoalProgress, type StatementLine } from '@/engine'
-import { canCarryRule, lastDayOfMonth, monthDiff, monthOfDate, type Goal, type GoalKind, type MonthKey, type Row, type Section } from '@/model'
-import { addPlanYear, setCellDone, setDerivedDone, setItemStatus, type RuleTarget } from '@/store'
+import { canCarryRule, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type MonthKey, type Row, type Section } from '@/model'
+import { addPlanYear, setCellDone, setDerivedDone, setItemStatus, type RuleChoice, type RuleTarget } from '@/store'
 import { GoalDialog } from '@/features/goals/GoalDialog'
 import { goalStatusLine } from '@/features/goals/goalText'
 import { AddRowInline } from '@/features/grid/AddRowInline'
 import { BalanceDialog } from '@/features/grid/BalanceDialog'
 import { CellEditor } from '@/features/grid/CellEditor'
+import { HouseholdAccountDialog } from '@/features/household/HouseholdAccountDialog'
+import { PoolDialog } from '@/features/household/PoolsCard'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
 import { RuleDialog } from '@/features/rules/RuleDialog'
 import { AddCategoryInline } from './AddCategoryInline'
@@ -25,6 +27,10 @@ import { TopUpDialog } from './TopUpDialog'
 import { ESTIMATE_SHADE, type LineContext } from './StatementLine'
 
 const walk = (lines: StatementLine[]): StatementLine[] => lines.flatMap((l) => [l, ...walk(l.children)])
+/** What "Add account" offers under Assets, and "Add a card or loan" under Debts. */
+const ASSET_TYPES: AccountType[] = ['checking', 'joint', 'savings', 'investment', 'other-asset', 'cash']
+const DEBT_TYPES: AccountType[] = ['credit-card', 'loan']
+const ADD = 'text-muted-foreground'
 
 /**
  * One month in accounting form (DESIGN.md §2 and §7): the month on top, money in beside money out, and under it where
@@ -51,6 +57,11 @@ export function StatementScreen() {
   const [estimateFor, setEstimateFor] = useState<string | null>(null)
   /** The transfer, account or pool account whose rule is being set. */
   const [ruleFor, setRuleFor] = useState<RuleTarget | null>(null)
+  /** For an account added a moment ago: the choice its rule dialog opens on. */
+  const [ruleStart, setRuleStart] = useState<RuleChoice['kind'] | undefined>(undefined)
+  /** An account being added from the lower half: where it was asked from says which types are on offer. */
+  const [accountNew, setAccountNew] = useState<{ name?: string; type?: AccountType; types: AccountType[] } | null>(null)
+  const [poolNew, setPoolNew] = useState(false)
   /** The pool account being topped up. */
   const [topUpFor, setTopUpFor] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -119,6 +130,16 @@ export function StatementScreen() {
     if (canCarryRule(row)) setRuleFor({ rowId: row.id })
     else setEditorRow(row.id)
   }
+  /**
+   * A new savings or investment account is asked straight away how much goes to it. While nothing takes the rest of
+   * the month yet, a savings account is offered it.
+   */
+  function onAccountSaved(account: Account) {
+    if (statement!.closed || (account.type !== 'savings' && account.type !== 'investment')) return
+    const restTaken = resolveRules(engine!.rows, household!.closingRule).restRowId !== null
+    setRuleStart(account.type === 'savings' && !restTaken ? 'rest' : undefined)
+    setRuleFor({ accountId: account.id })
+  }
   /** The rule sits on a row; an account or a pool account that no row feeds yet gets one when the rule is saved. */
   function onRule(line: StatementLine) {
     if (line.rule?.rowId) setRuleFor({ rowId: line.rule.rowId })
@@ -168,12 +189,25 @@ export function StatementScreen() {
   const estimateCategory = estimateFor ? tables.categories.find((c) => c.id === estimateFor && !c.deletedAt) : undefined
   const estimateLine = estimateFor ? walk(statement.flow.right.lines).find((l) => l.id === `cat:expense:${estimateFor}`) : undefined
   const estimateRest = estimateLine?.children.find((l) => l.estimateFor != null)?.amount ?? 0
-  const positionCtx: LineContext = { ...base, withChange: true, onGoal, onBalance: setBalanceFor }
+  // a card or a loan is added under Debts; while the household owes nothing, at the foot of that side
+  const hasDebts = statement.position.right.lines.some((l) => l.id === 'debts')
+  const debtsFoot = <Button variant="ghost" size="sm" className={ADD} onClick={() => setAccountNew({ types: DEBT_TYPES })}><Plus /> Add a card or loan</Button>
+  const positionCtx: LineContext = { ...base, withChange: true, onGoal, onBalance: setBalanceFor, footer: (line) => (line.id === 'debts' ? debtsFoot : null) }
   const day = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${lastDayOfMonth(m)}T00:00:00Z`))
   const foldable = walk([...statement.flow.left.lines, ...statement.flow.right.lines, ...statement.position.left.lines, ...statement.position.right.lines])
     .filter((l) => l.kind !== 'group' && (l.children.length > 0 || !!l.goals?.length))
   const setAll = (open: boolean) => setOpenLines(Object.fromEntries(foldable.map((l) => [l.id, open])))
   const act = (fn: () => Promise<unknown>) => void fn().catch((e) => setError(e instanceof Error ? e.message : 'Action failed'))
+  // Accounts are added where they will show: what the household has under Assets, what it owes under Debts
+  const savingsAccounts = tables.accounts.filter((a) => a.type === 'savings' && !a.deletedAt && !a.archivedMonth)
+  const assetsFoot = (
+    <>
+      <Button variant="ghost" size="sm" className={ADD} onClick={() => setAccountNew({ types: ASSET_TYPES })}><Plus /> Add account</Button>
+      {savingsAccounts.length > 0 && <Button variant="ghost" size="sm" className={ADD} onClick={() => setPoolNew(true)}><Plus /> Add pool account</Button>}
+    </>
+  )
+  // the account a rule is asked for may have been saved a moment ago: wait until it is on the page
+  const ruleReady = !!ruleFor && (!('accountId' in ruleFor) || tables.accounts.some((a) => a.id === ruleFor.accountId))
 
   return (
     <div className="space-y-4">
@@ -189,7 +223,7 @@ export function StatementScreen() {
         title="The month" help="statement.month" band={statement.flow} ctx={flowCtx} totals={['Total in', 'Total out']}
         right={<span className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><span className={ESTIMATE_SHADE}>an estimate</span><InfoTip help="statement.estimate" /></span>}
       />
-      <StatementBand title="At the end of the month" help="statement.position" band={statement.position} ctx={positionCtx} totals={['Total', 'Total']} amountHead={day} />
+      <StatementBand title="At the end of the month" help="statement.position" band={statement.position} ctx={positionCtx} totals={['Total', 'Total']} amountHead={day} feet={[assetsFoot, hasDebts ? null : debtsFoot]} />
 
       {editing && <CellEditor key={`${editing.id}:${m}`} tables={tables} engine={engine} household={household} row={editing} month={m} onClose={() => setEditorRow(null)} />}
       {goalEdit && (
@@ -207,7 +241,14 @@ export function StatementScreen() {
           current={estimateLine?.budget ?? 0} rows={(estimateLine?.amount ?? 0) - estimateRest} onClose={() => setEstimateFor(null)}
         />
       )}
-      {ruleFor && <RuleDialog key={JSON.stringify(ruleFor)} tables={tables} household={household} target={ruleFor} month={m} onClose={() => setRuleFor(null)} />}
+      {ruleFor && ruleReady && <RuleDialog key={JSON.stringify(ruleFor)} tables={tables} household={household} target={ruleFor} month={m} start={ruleStart} onClose={() => { setRuleFor(null); setRuleStart(undefined) }} />}
+      {accountNew && (
+        <HouseholdAccountDialog
+          account={null} entities={tables.entities} baseCurrency={ccy} locale={locale} startMonth={household.startMonth} preset={accountNew}
+          onClose={() => setAccountNew(null)} onSaved={onAccountSaved}
+        />
+      )}
+      {poolNew && <PoolDialog pool={null} savings={savingsAccounts} baseCurrency={ccy} locale={locale} fromMonth={statement.closed ? undefined : m} onClose={() => setPoolNew(false)} onError={setError} />}
       {topUpFor && <TopUpDialog key={`${topUpFor}:${m}`} tables={tables} engine={engine} household={household} poolId={topUpFor} month={m} onClose={() => setTopUpFor(null)} />}
       {removingGoal && <RemoveDialog target={{ kind: 'goal', id: removingGoal.id }} tables={tables} household={household} onClose={() => setRemovingGoal(null)} />}
     </div>

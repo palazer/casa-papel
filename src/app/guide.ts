@@ -205,8 +205,8 @@ export const GUIDE: GuideTopic[] = [
       'Click a value cell to enter what the broker says; later months continue from your number. With "Average of the real returns I enter" the projection follows your own history instead of a fixed rate. An account in another currency gets an "in EUR" line beneath its value. The setup wizard offers a "To <account>" row for every investment account you add, each with its own monthly amount, and an account that "Belongs to" a child feeds their long-term savings row.',
     ],
     steps: [
-      'Household → "Accounts" → "Add account" → "Type": "Investments"; fill "Name", "Currency", "Opening balance", "Opening month", "Owner".',
-      'Set "Growth per year (%)" and "Projection" ("Use the yearly growth" or "Average of the real returns I enter"), and "Deposits count" ("At the start of the month (they grow this month too)" or "At the end of the month (they grow from next month)").',
+      'Statement → "Assets" → "Add account" (or Household → "Accounts" → "Add account") → "Type": "Investments"; fill "Name" and "Holds at the start of <Month>". "More options" holds "Currency", "Opening month" and "Owner". After "Save" on the Statement, "How much goes to <account>?" asks for its monthly rule.',
+      'Under "More options" set "Growth per year (%)" and "Projection" ("Use the yearly growth" or "Average of the real returns I enter"), and "Deposits count" ("At the start of the month (they grow this month too)" or "At the end of the month (they grow from next month)").',
       'For a foreign-currency account choose "Convert deposits": "At that month\'s rate" or "At a fixed rate" with "1 EUR = ? USD". Then "Save".',
       'Grid → Transfers → "Add row" → "Deposits into an investment account" → the account; type the monthly deposit.',
       'Click "<Name> · value" in a month → "Real balance in EUR" → "Save" ("Use expected" clears it), or Household → Accounts → "Real balances" for a whole table ("Month", "Computed", "Real balance").',
@@ -222,12 +222,12 @@ export const GUIDE: GuideTopic[] = [
     title: 'Debts & cards',
     summary: 'Loans come down with their instalments; a card\'s balance grows with what you put on it and shrinks when you pay it.',
     what: [
-      'A "Loan" account shows "<Name> · outstanding" under Balances, and a payment row that names it brings the amount down. A "Credit card" shows "<Name> · owed". "How you record card spending" offers two ways: "Purchases are expense rows paid from this card; the card payment is a transfer", or "Only the card payment is recorded, as an expense". Where the payment row lives follows from that: under Transfers for the first, under Expenses for the second.',
+      'A "Loan" account shows "<Name> · outstanding" under Balances, and a payment row that names it brings the amount down. A "Credit card" shows "<Name> · owed". "What do you record for this card?" has two answers: "Everything I buy with it" (each purchase is an expense row that names the card, and the payment only moves money) or "Only what I pay to it" (the payment is the spending). Where the payment row lives follows from that: under Transfers for the first, under Expenses for the second.',
       'Interest is not modelled. Click a balance cell now and then to enter the real amount; later months continue from it. "Net worth" subtracts cards and loans from what you own.',
     ],
     steps: [
-      'Household → "Accounts" → "Add account" → "Type": "Loan" or "Credit card"; "Opening balance" is what you owed in the "Opening month".',
-      'For a card choose "How you record card spending", then "Save".',
+      'Statement → "Debts and net worth" → "Add a card or loan" (or Household → "Accounts" → "Add account"): "Name", "Type" ("Loan" or "Credit card") and "Owed at the start of <Month>", what you owed when that month began.',
+      'For a card answer "What do you record for this card?", then "Save".',
       'Point spending rows at a card: row menu → "Paid from…" → the card (in the demo, "Subscriptions" is paid from "Credit card").',
       'Make the payment row. For a loan, or a card where only the payment is recorded: Grid → Expenses → "Add row" → "Pays off a loan or card" → the account → "Add". For a card whose purchases are expense rows: Grid → Transfers → "Add row" → "Pays off a credit card" → the card. A vehicle\'s or company\'s "Suggested rows…" offers a loan row too.',
       'Row menu → "Pays off…" re-points a payment row at another loan or card.',

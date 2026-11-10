@@ -52,7 +52,7 @@ test.describe('wave 2a', () => {
     await page.getByRole('button', { name: 'Add account' }).click()
     await dlg.getByLabel('Name', { exact: true }).fill('Car loan')
     await dlg.getByLabel('Type').selectOption('loan')
-    await dlg.getByLabel('Opening balance').fill('5000')
+    await dlg.getByLabel(/^Owed at the start of/).fill('5000')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
     await page.screenshot({ path: 'e2e/output/wave2a-household.png', fullPage: true })

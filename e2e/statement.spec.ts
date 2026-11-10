@@ -467,6 +467,68 @@ test.describe('working the month in the Statement', () => {
     await dlg.getByRole('button', { name: 'Cancel' }).click()
   })
 
+  test('accounts, pool accounts, cards and loans are added in the lower half; a new savings account is asked how much goes to it', async ({ page }) => {
+    await openStatement(page)
+    await goToMonth(page, 'November 2026')
+    const moneyOut = page.getByRole('region', { name: 'Money out' })
+    const assets = page.getByRole('region', { name: 'Assets' })
+    const claims = page.getByRole('region', { name: 'Debts and net worth' })
+    const dlg = page.getByRole('dialog')
+
+    // under Assets: what the household has. The short form asks the name, the type and what it holds
+    await assets.getByRole('button', { name: 'Add account' }).click()
+    await expect(dlg.getByRole('heading', { name: 'New account' })).toBeVisible()
+    await expect(dlg.getByLabel('Type').locator('option')).toHaveText(['Current account', 'Joint account', 'Savings', 'Investments', 'Other asset', 'Cash'])
+    await dlg.getByLabel('Name', { exact: true }).fill('Rainy day')
+    await dlg.getByLabel('Type').selectOption('savings')
+    await dlg.getByLabel('Holds at the start of September 2026 (EUR)').fill('1000')
+    await expect(dlg.getByLabel('Currency')).toHaveCount(0)
+    await dlg.getByRole('button', { name: /^More options/ }).click()
+    await expect(dlg.getByLabel('Currency')).toHaveValue('EUR')
+    await expect(dlg).toHaveCSS('opacity', '1')
+    await page.screenshot({ path: 'e2e/output/statement-account-dialog.png' })
+    await dlg.getByRole('button', { name: 'Save' }).click()
+
+    // a savings account is asked straight away how much goes to it; the rest is already taken, so it starts on an amount
+    await expect(dlg.getByRole('heading', { name: 'How much goes to Rainy day?' })).toBeVisible()
+    await expect(dlg.getByRole('radio', { name: 'A fixed amount' })).toBeChecked()
+    await dlg.getByLabel('Amount per month in EUR').fill('50')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    // 1,000 when September began, and 50 a month from November on
+    await expect(assets.locator('[data-line^="acc:"]').filter({ hasText: 'Rainy day' })).toContainText('€1,050.00')
+    await expect(moneyOut.getByRole('button', { name: 'To Rainy day: €50.00' })).toBeVisible()
+    await expect(assets.getByRole('button', { name: 'Rule for Rainy day: a fixed amount' })).toBeVisible()
+
+    // a pool account inside it, set aside from the month on screen
+    await assets.getByRole('button', { name: 'Add pool account' }).click()
+    await expect(dlg.getByRole('heading', { name: 'New pool account' })).toBeVisible()
+    await dlg.getByLabel('Name').fill('Gifts')
+    await dlg.getByLabel('Held in').selectOption({ label: 'Rainy day' })
+    await expect(dlg.getByLabel('Set aside each month (EUR)')).toHaveAttribute('placeholder', 'optional, from Nov 2026 on')
+    await dlg.getByLabel('Set aside each month (EUR)').fill('20')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(assets.locator('[data-line^="pool:"]').filter({ hasText: 'Gifts' })).toContainText('€20.00')
+    await expect(moneyOut.getByRole('button', { name: 'Gifts pool: €20.00' })).toBeVisible()
+
+    // under Debts: a card or a loan, and nothing else
+    await claims.getByRole('button', { name: 'Add a card or loan' }).click()
+    await expect(dlg.getByLabel('Type').locator('option')).toHaveText(['Credit card', 'Loan'])
+    await expect(dlg.getByRole('radio', { name: 'Everything I buy with it' })).toBeChecked()
+    await dlg.getByLabel('Name', { exact: true }).fill('Car loan')
+    await dlg.getByLabel('Type').selectOption('loan')
+    await expect(dlg.getByRole('radiogroup', { name: 'What do you record for this card?' })).toHaveCount(0)
+    await dlg.getByLabel('Owed at the start of September 2026 (EUR)').fill('5000')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    // a debt has no rule to ask for
+    await expect(dlg).toBeHidden()
+    await expect(claims.locator('[data-line^="acc:"]').filter({ hasText: 'Car loan' })).toContainText('€5,000.00')
+    const assetsTotal = (await total(page, 'assets').innerText()).replace(/^Total\s*/, '')
+    expect(assetsTotal).toBe((await total(page, 'claims').innerText()).replace(/^Total\s*/, ''))
+    await page.screenshot({ path: 'e2e/output/statement-accounts.png', fullPage: true })
+  })
+
   test('money taken from an account by hand has its own section; what expenses took from savings and pool accounts is marked calculated', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'November 2026')

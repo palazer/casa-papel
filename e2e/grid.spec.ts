@@ -134,7 +134,7 @@ test.describe('grid: a row that pays off a loan', () => {
     const dlg = page.getByRole('dialog')
     await dlg.getByLabel('Name', { exact: true }).fill('Car loan')
     await dlg.getByLabel('Type').selectOption('loan')
-    await dlg.getByLabel('Opening balance').fill('5000')
+    await dlg.getByLabel(/^Owed at the start of/).fill('5000')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
 

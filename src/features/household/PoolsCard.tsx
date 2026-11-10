@@ -9,7 +9,7 @@ import { NativeSelect } from '@/components/NativeSelect'
 import { amountToInput, formatAmount, formatMonth, parseAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import type { EngineOutput } from '@/engine'
-import { monthOfDate, type Account, type Household, type Pool, type Tables } from '@/model'
+import { monthOfDate, type Account, type Household, type MonthKey, type Pool, type Tables } from '@/model'
 import { addPool, restorePool, updatePool } from '@/store'
 import { HUES } from '@/app/hues'
 import { InfoTip } from '@/components/InfoTip'
@@ -79,7 +79,18 @@ export function PoolsCard({ household, tables, engine, onError }: { household: H
   )
 }
 
-function PoolDialog({ pool, savings, baseCurrency, locale, onClose, onError, onRemove }: { pool: Pool | null; savings: Account[]; baseCurrency: string; locale: string; onClose: () => void; onError: (m: string) => void; onRemove?: () => void }) {
+/**
+ * A pool account: its name, the savings account that holds it, what is already in it, and for a new one what is set
+ * aside each month. The Statement opens it too, with the month on screen as the month the set-aside starts in.
+ */
+export function PoolDialog({ pool, savings, baseCurrency, locale, fromMonth, onClose, onError, onRemove, onSaved }: {
+  pool: Pool | null; savings: Account[]; baseCurrency: string; locale: string
+  /** A new pool account: the month its monthly amount starts in; this month when left out. */
+  fromMonth?: MonthKey
+  onClose: () => void; onError: (m: string) => void; onRemove?: () => void
+  /** A new pool account was saved. */
+  onSaved?: (pool: Pool) => void
+}) {
   const store = useStore()
   const [name, setName] = useState(pool?.name ?? '')
   const [accountId, setAccountId] = useState(pool?.accountId ?? savings[0]?.id ?? '')
@@ -92,9 +103,9 @@ function PoolDialog({ pool, savings, baseCurrency, locale, onClose, onError, onR
     if (openingBalance == null) return setError('Opening balance is not a number I can read.')
     const monthlyAllocation = monthly.trim() ? parseAmount(monthly, baseCurrency, locale) : null
     if (monthly.trim() && monthlyAllocation == null) return setError('The monthly amount is not a number I can read.')
-    const p = pool
+    const p: Promise<unknown> = pool
       ? updatePool(store, pool.id, { name: name.trim(), accountId, openingBalance })
-      : addPool(store, { name: name.trim(), accountId, openingBalance, monthlyAllocation, createSpendRow: spendRow })
+      : addPool(store, { name: name.trim(), accountId, openingBalance, monthlyAllocation, fromMonth, createSpendRow: spendRow }).then((made) => onSaved?.(made))
     p.then(onClose).catch((e) => onError(e instanceof Error ? e.message : 'Failed'))
   }
   return (
@@ -110,7 +121,7 @@ function PoolDialog({ pool, savings, baseCurrency, locale, onClose, onError, onR
           <div className="space-y-1.5"><Label htmlFor="pool-open">Already in it ({baseCurrency})</Label><Input id="pool-open" inputMode="decimal" value={opening} onChange={(e) => setOpening(e.target.value)} placeholder="0" /></div>
           {!pool && (
             <>
-              <div className="space-y-1.5"><Label htmlFor="pool-monthly">Set aside each month ({baseCurrency})</Label><Input id="pool-monthly" inputMode="decimal" value={monthly} onChange={(e) => setMonthly(e.target.value)} placeholder="optional, from this month on" /></div>
+              <div className="space-y-1.5"><Label htmlFor="pool-monthly">Set aside each month ({baseCurrency})</Label><Input id="pool-monthly" inputMode="decimal" value={monthly} onChange={(e) => setMonthly(e.target.value)} placeholder={fromMonth ? `optional, from ${formatMonth(fromMonth, locale)} on` : 'optional, from this month on'} /></div>
               <Check label={`Also add a spending row "${name.trim() || 'Pool account'}" that comes out of it`} checked={spendRow} onChange={(e) => setSpendRow(e.target.checked)} />
             </>
           )}
