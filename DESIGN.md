@@ -298,6 +298,18 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   nothing is owed. A new savings or investment account opens the rule dialog as soon as it is saved, on `The rest`
   for a savings account while nothing takes the rest yet; a new pool account asks for its monthly amount in its own
   dialog, counting from the month on screen.
+  **Changing and removing.** What is added on the Statement is changed and removed there too. In an open month a
+  row, a category, an account and a pool account carry a `…` after their name and tags: a 20 px ghost icon button
+  (`LINE_MENU`: shown while the line is hovered or the control has the focus, always and finger-sized where the
+  pointer is a finger), 20 px so the line keeps its height. On a row it is the Grid's own `RowMenu` (`Row menu for
+  <row>`), unchanged. On a category it is `CategoryMenu` (`Category menu for <category>`): `Rename…` (a small dialog
+  whose error stays beside the field), `Move up`, `Move down`, and removing; its rows are kept. On an account or a
+  pool account it is named `Edit <name>` and opens the account or pool account dialog, which removes at its foot;
+  the calculated line for the current accounts opens the one account behind it, or lists them (`Edit a current
+  account`) when there are several. So that a line can hold these beside its own action, every row line that opens
+  something is built the way a line with a rule symbol is: its button is its name, stretched over the whole line,
+  and the symbol and the menu sit above it. A menu behind an icon is as wide as its longest entry (`w-max`), never
+  as narrow as the icon. A closed month shows none of this.
   **Suggestions.** `Suggestions` in the toolbar (a pressed button with an (i); on while a household is being set up,
   off otherwise, disabled in a closed month) shows the rows a household like this one usually has, where they will
   appear: above the add controls of Income, Expenses and Set aside, pay off, and inside the category a row belongs

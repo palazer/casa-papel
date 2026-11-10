@@ -42,6 +42,10 @@ export interface LineContext {
   onRule?: (line: Line) => void
   /** Top up a pool account that is short this month. */
   onTopUp?: (poolId: string) => void
+  /** The "…" after a row's name: the Grid's row menu (rename, category, archive or delete, …). */
+  rowMenu?: (rowId: string) => ReactNode
+  /** The "…" after any other line's name: a category's menu, or the way into an account's or pool account's dialog. */
+  menu?: (line: Line) => ReactNode
 }
 
 const HUE: Record<StatementHue, Hue> = { income: HUES.income, expense: HUES.expense, transfer: HUES.transfer, worth: HUES.worth, pool: HUES.pool }
@@ -62,6 +66,11 @@ export const CHANGE_COL = 'w-20 shrink-0 text-right tabular-nums md:w-24'
 export const AMOUNT_COL = 'w-24 shrink-0 text-right tabular-nums md:w-28'
 /** The light yellow an estimate sits on (DESIGN.md §5). */
 export const ESTIMATE_SHADE = 'rounded bg-estimate px-1 py-0.5'
+/**
+ * A line's "…": 20 px so the line keeps its height, shown while the line is hovered or the control has the focus, and
+ * always (and finger-sized) where the pointer is a finger.
+ */
+export const LINE_MENU = 'size-5 opacity-0 group-hover/line:opacity-100 focus:opacity-100 focus-visible:opacity-100 data-popup-open:opacity-100 pointer-coarse:size-8 pointer-coarse:opacity-100'
 const ROW = 'flex min-h-11 items-center gap-1.5 pr-2 text-sm md:min-h-7 md:text-xs'
 /** The name with its tags: one line where there is room, the tags on a second line where there is not. */
 const LABEL = 'flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5 py-1'
@@ -170,36 +179,40 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
     const estimateOf = !ctx.closed && ctx.onEstimate ? line.estimateFor : undefined
     const busy = ctx.busy != null && (ctx.busy === line.id || ctx.busy === line.rowId || ctx.busy.startsWith(`${line.rowId}:`))
     const said = `${fullLabel}: ${line.empty ? 'empty' : amountText}${shaded ? ', an estimate' : ''}`
-    const body = (
+    // a row carries its menu; what is left of an estimate is not a row of its own, and a closed month changes nothing
+    const menu = !ctx.closed && line.kind === 'row' && line.rowId && line.estimateFor == null ? ctx.rowMenu?.(line.rowId) : null
+    const press = ruleOpens ? () => ctx.onRule!(line) : estimateOf ? () => ctx.onEstimate!(estimateOf) : editable ? () => ctx.onEdit!(line.rowId!) : null
+    // A line that opens something can hold more controls: the rule symbol, the menu. So the line's button is its name,
+    // stretched over the whole line, and the other controls sit above it.
+    const main = press ? (
+      <div className="relative -mr-2 flex min-w-0 flex-1 items-center gap-1.5 self-stretch rounded pr-2 hover:bg-muted">
+        <span className={LABEL}>
+          <button
+            type="button" aria-label={said} onClick={press}
+            className={cn('min-w-0 truncate rounded text-left outline-none after:absolute after:inset-0 after:rounded focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring', quiet && 'text-muted-foreground', line.skipped && 'line-through')}
+          >
+            {line.label}
+          </button>
+          {tags}
+          {line.rule && <RuleMark line={line} ctx={ctx} className="relative z-10" />}
+          {menu && <span className="relative z-10 inline-flex">{menu}</span>}
+        </span>
+        {amount}
+      </div>
+    ) : (
       <>
         <span className={LABEL}>
           {name}
           {tags}
           {line.rule && <RuleMark line={line} ctx={{ ...ctx, onRule: undefined }} />}
+          {menu}
         </span>
         {amount}
       </>
     )
-    // A line with a rule holds two controls: the line itself and the rule symbol. The line's button is its name, stretched
-    // over the whole line; the symbol sits above it.
-    const ruled = line.rule && (editable || ruleOpens) ? (
-      <div className="relative -mr-2 flex min-w-0 flex-1 items-center gap-1.5 self-stretch rounded pr-2 hover:bg-muted">
-        <span className={LABEL}>
-          <button
-            type="button" aria-label={said} onClick={() => (ruleOpens ? ctx.onRule!(line) : ctx.onEdit!(line.rowId!))}
-            className="min-w-0 truncate rounded text-left outline-none after:absolute after:inset-0 after:rounded focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring"
-          >
-            {line.label}
-          </button>
-          {tags}
-          <RuleMark line={line} ctx={ctx} className="relative z-10" />
-        </span>
-        {amount}
-      </div>
-    ) : null
     return (
       <li>
-        <div className={cn(ROW, pad, item && 'bg-muted/20')} data-line={line.id}>
+        <div className={cn(ROW, pad, 'group/line', item && 'bg-muted/20')} data-line={line.id}>
           {expandable ? (
             <button
               type="button" aria-label={`Items of ${line.label}`} aria-expanded={open} aria-controls={listId} onClick={() => ctx.onToggle(line)}
@@ -211,14 +224,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
           {working && (d ? (
             <Tick done={d.done} total={d.total} state={d.state} label={`${fullLabel} done`} disabled={busy} onToggle={() => ctx.onTick?.(line, d.state !== 'all')} className={cn(TICK_SLOT, 'md:rounded')} dotClassName="md:size-3" />
           ) : <span className={TICK_SLOT} aria-hidden />)}
-          {ruled ?? (editable || estimateOf ? (
-            <button
-              type="button" aria-label={said} onClick={() => (estimateOf ? ctx.onEstimate!(estimateOf) : ctx.onEdit!(line.rowId!))}
-              className="-mr-2 flex min-w-0 flex-1 items-center gap-1.5 self-stretch rounded pr-2 text-left outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-            >
-              {body}
-            </button>
-          ) : body)}
+          {main}
         </div>
         {below}
       </li>
@@ -259,6 +265,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
               <Target className="size-3.5" aria-hidden />
             </button>
           )}
+          {!ctx.closed && ctx.menu?.(line)}
         </div>
         {ctx.withChange && <span className={cn(CHANGE_COL, 'text-muted-foreground', group && 'font-medium')}>{line.change != null ? changeText(line.change, ccy, locale) : ''}</span>}
         {ctx.onBalance && line.accountId ? (

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
-import { Lock, Plus } from 'lucide-react'
+import { Lock, MoreHorizontal, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { InfoTip } from '@/components/InfoTip'
 import { MonthPicker } from '@/components/MonthPicker'
 import { PageHeader } from '@/components/PageHeader'
@@ -11,23 +12,25 @@ import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { buildStatement, cellKey, computeMainAccount, type GoalProgress, type StatementLine } from '@/engine'
 import { canCarryRule, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type MonthKey, type Row, type Section } from '@/model'
-import { accountSuggestions, addPlanYear, rowSuggestions, setCellDone, setDerivedDone, setItemStatus, setupSteps, updateHousehold, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupStepKey } from '@/store'
+import { accountSuggestions, addPlanYear, rowSuggestions, setCellDone, setDerivedDone, setItemStatus, setupSteps, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupStepKey } from '@/store'
 import { GoalDialog } from '@/features/goals/GoalDialog'
 import { goalStatusLine } from '@/features/goals/goalText'
 import { AddRowInline } from '@/features/grid/AddRowInline'
 import { BalanceDialog } from '@/features/grid/BalanceDialog'
 import { CellEditor } from '@/features/grid/CellEditor'
+import { RowMenu } from '@/features/grid/RowMenu'
 import { HouseholdAccountDialog } from '@/features/household/HouseholdAccountDialog'
 import { PoolDialog } from '@/features/household/PoolsCard'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
 import { RuleDialog } from '@/features/rules/RuleDialog'
 import { AddCategoryInline } from './AddCategoryInline'
+import { CategoryMenu } from './CategoryMenu'
 import { EstimateDialog } from './EstimateDialog'
 import { SetupStrip } from './SetupStrip'
 import { StatementBand } from './StatementBand'
 import { AccountSuggestionLines, SuggestionLines } from './SuggestionLines'
 import { TopUpDialog } from './TopUpDialog'
-import { ESTIMATE_SHADE, type LineContext } from './StatementLine'
+import { ESTIMATE_SHADE, LINE_MENU, type LineContext } from './StatementLine'
 
 const walk = (lines: StatementLine[]): StatementLine[] => lines.flatMap((l) => [l, ...walk(l.children)])
 /** What "Add account" offers under Assets, and "Add a card or loan" under Debts. */
@@ -66,6 +69,11 @@ export function StatementScreen() {
   /** An account being added from the lower half: where it was asked from says which types are on offer. */
   const [accountNew, setAccountNew] = useState<{ name?: string; type?: AccountType; types: AccountType[] } | null>(null)
   const [poolNew, setPoolNew] = useState(false)
+  /** An account or a pool account opened from the "…" on its line. */
+  const [accountEdit, setAccountEdit] = useState<string | null>(null)
+  const [poolEdit, setPoolEdit] = useState<string | null>(null)
+  /** What "Archive or delete…" in one of those dialogs was pressed for. */
+  const [removing, setRemoving] = useState<RemovalTarget | null>(null)
   /** "Suggestions" in the toolbar, once it was pressed; until then they show while the household is being set up. */
   const [suggest, setSuggest] = useState<boolean | null>(null)
   /** The pool account being topped up. */
@@ -228,9 +236,45 @@ export function StatementScreen() {
     setGoalEdit({ goal: null, preset: { kind: 'net-worth' } })
   }
 
+  /** The "…" after a row's name: the Grid's own row menu. */
+  function rowMenu(rowId: string): ReactNode {
+    const row = engine!.rows.find((r) => r.id === rowId)
+    return row ? <RowMenu row={row} tables={tables!} household={household!} onError={setError} triggerClassName={LINE_MENU} /> : null
+  }
+  const editButton = (label: string, onClick: () => void) => (
+    <Button variant="ghost" size="icon" className={LINE_MENU} aria-label={`Edit ${label}`} title="Edit" onClick={onClick}><MoreHorizontal /></Button>
+  )
+  /** The "…" after any other line's name: a category's menu, or the way into an account's or a pool account's dialog. */
+  function lineMenu(line: StatementLine): ReactNode {
+    if (statement!.closed) return null
+    if (line.kind === 'category' && line.id.startsWith('cat:')) {
+      const category = tables!.categories.find((c) => c.id === line.id.split(':')[2] && !c.deletedAt)
+      return category ? <CategoryMenu category={category} tables={tables!} household={household!} onError={setError} triggerClassName={LINE_MENU} /> : null
+    }
+    if (line.kind === 'pool' && line.poolId) return editButton(line.label, () => setPoolEdit(line.poolId!))
+    if (line.kind === 'account' && line.accountId) return editButton(line.label, () => setAccountEdit(line.accountId!))
+    // the calculated line stands for the current accounts: one opens straight away, several are listed
+    if (line.id === 'main') {
+      const current = (main?.accountIds ?? []).map((id) => tables!.accounts.find((a) => a.id === id && !a.deletedAt)).filter((a): a is Account => !!a)
+      if (current.length === 0) return null
+      if (current.length === 1) return editButton(current[0].name, () => setAccountEdit(current[0].id))
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className={LINE_MENU} aria-label="Edit a current account" />}><MoreHorizontal /></DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-max">
+            {current.map((a) => <DropdownMenuItem key={a.id} onClick={() => setAccountEdit(a.id)}>Edit {a.name}…</DropdownMenuItem>)}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )
+    }
+    return null
+  }
+  const accountEditing = accountEdit ? tables.accounts.find((a) => a.id === accountEdit && !a.deletedAt) : undefined
+  const poolEditing = poolEdit ? tables.pools.find((p) => p.id === poolEdit && !p.deletedAt) : undefined
+
   // a closed month shows its rules and changes none
   const base = { locale, ccy, isOpen, onToggle, goalText, onRule: statement.closed ? undefined : onRule, onTopUp: statement.closed ? undefined : setTopUpFor }
-  const flowCtx: LineContext = { ...base, withChange: false, closed: statement.closed, doneOf, onTick, onEdit: setEditorRow, busy, footer, onEstimate: setEstimateFor }
+  const flowCtx: LineContext = { ...base, withChange: false, closed: statement.closed, doneOf, onTick, onEdit: setEditorRow, busy, footer, onEstimate: setEstimateFor, rowMenu, menu: lineMenu }
   // the estimate dialog reads the category's line: what the month shows now, and what its rows explain
   const estimateCategory = estimateFor ? tables.categories.find((c) => c.id === estimateFor && !c.deletedAt) : undefined
   const estimateLine = estimateFor ? walk(statement.flow.right.lines).find((l) => l.id === `cat:expense:${estimateFor}`) : undefined
@@ -238,7 +282,7 @@ export function StatementScreen() {
   // a card or a loan is added under Debts; while the household owes nothing, at the foot of that side
   const hasDebts = statement.position.right.lines.some((l) => l.id === 'debts')
   const debtsFoot = <Button variant="ghost" size="sm" className={ADD} onClick={() => setAccountNew({ types: DEBT_TYPES })}><Plus /> Add a card or loan</Button>
-  const positionCtx: LineContext = { ...base, withChange: true, onGoal, onBalance: setBalanceFor, footer: (line) => (line.id === 'debts' ? debtsFoot : null) }
+  const positionCtx: LineContext = { ...base, withChange: true, onGoal, onBalance: setBalanceFor, footer: (line) => (line.id === 'debts' ? debtsFoot : null), menu: lineMenu }
   const day = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${lastDayOfMonth(m)}T00:00:00Z`))
   const foldable = walk([...statement.flow.left.lines, ...statement.flow.right.lines, ...statement.position.left.lines, ...statement.position.right.lines])
     .filter((l) => l.kind !== 'group' && (l.children.length > 0 || !!l.goals?.length || autoOpen.has(l.id)))
@@ -309,6 +353,19 @@ export function StatementScreen() {
       )}
       {poolNew && <PoolDialog pool={null} savings={savingsAccounts} baseCurrency={ccy} locale={locale} fromMonth={statement.closed ? undefined : m} onClose={() => setPoolNew(false)} onError={setError} />}
       {topUpFor && <TopUpDialog key={`${topUpFor}:${m}`} tables={tables} engine={engine} household={household} poolId={topUpFor} month={m} onClose={() => setTopUpFor(null)} />}
+      {accountEditing && (
+        <HouseholdAccountDialog
+          key={accountEditing.id} account={accountEditing} entities={tables.entities} baseCurrency={ccy} locale={locale} startMonth={household.startMonth}
+          onClose={() => setAccountEdit(null)} onRemove={() => { setRemoving({ kind: 'account', id: accountEditing.id }); setAccountEdit(null) }}
+        />
+      )}
+      {poolEditing && (
+        <PoolDialog
+          key={poolEditing.id} pool={poolEditing} savings={savingsAccounts} baseCurrency={ccy} locale={locale} onError={setError}
+          onClose={() => setPoolEdit(null)} onRemove={() => { setRemoving({ kind: 'pool', id: poolEditing.id }); setPoolEdit(null) }}
+        />
+      )}
+      {removing && <RemoveDialog target={removing} tables={tables} household={household} onClose={() => setRemoving(null)} />}
       {removingGoal && <RemoveDialog target={{ kind: 'goal', id: removingGoal.id }} tables={tables} household={household} onClose={() => setRemovingGoal(null)} />}
     </div>
   )

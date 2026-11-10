@@ -100,7 +100,9 @@ test.describe('working the month in the Statement', () => {
     await moneyOut.getByRole('button', { name: 'Housing', exact: true }).click()
     const utilities = moneyOut.getByRole('button', { name: /^The flat – Utilities:/ })
     await expect(utilities).toHaveAccessibleName('The flat – Utilities: €210.00, an estimate')
-    await expect(utilities.locator('[data-estimate]')).toHaveText('€210.00')
+    // the shade sits on the amount, beside the line's button
+    const utilitiesLine = moneyOut.locator('[data-line]').filter({ has: page.getByRole('button', { name: /^The flat – Utilities:/ }) })
+    await expect(utilitiesLine.locator('[data-estimate]')).toHaveText('€210.00')
     // a certain amount is plain
     await expect(moneyOut.getByRole('button', { name: /^The flat – Rent:/ })).toHaveAccessibleName('The flat – Rent: €1,650.00')
     const rest = moneyOut.locator('[data-line]').filter({ has: page.locator('[data-rule="rest"]') })
@@ -115,7 +117,7 @@ test.describe('working the month in the Statement', () => {
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
     await expect(utilities).toHaveAccessibleName('The flat – Utilities: €199.00')
-    await expect(utilities.locator('[data-estimate]')).toHaveCount(0)
+    await expect(utilitiesLine.locator('[data-estimate]')).toHaveCount(0)
     await expect(housing.locator('[data-estimate]')).toHaveCount(0)
     await expect(housing).toContainText('€1,849.00')
     // the 11 saved goes to the rest, and the two sides still agree
@@ -597,6 +599,86 @@ test.describe('working the month in the Statement', () => {
     await goToMonth(page, 'November 2026')
     await toggle.click()
     await expect(page.getByTestId('suggestions')).toHaveCount(0)
+  })
+
+  test('rows, categories, accounts and pool accounts are changed and removed from their line', async ({ page }) => {
+    await openStatement(page)
+    await goToMonth(page, 'November 2026')
+    const moneyOut = page.getByRole('region', { name: 'Money out' })
+    const assets = page.getByRole('region', { name: 'Assets' })
+    const dlg = page.getByRole('dialog')
+    const menu = page.getByRole('menu')
+
+    // a row: the Grid's own menu, behind the "…" after its name
+    await moneyOut.getByRole('button', { name: 'Living', exact: true }).click()
+    await moneyOut.getByRole('button', { name: 'Row menu for Groceries' }).click()
+    await expect(menu.getByRole('menuitem')).toContainText(['Rename…', 'Move up', 'Move down', 'Category…', 'Belongs to…'])
+    await expect(menu).toHaveCSS('opacity', '1')
+    await page.screenshot({ path: 'e2e/output/statement-row-menu.png' })
+    await menu.getByRole('menuitem', { name: 'Rename…' }).click()
+    await dlg.getByRole('textbox').fill('Food')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(moneyOut.getByRole('button', { name: /^Food: €700\.00/ })).toBeVisible()
+    // the line itself still opens the editor, and the menu does not
+    await moneyOut.getByRole('button', { name: /^Food: €700\.00/ }).click()
+    await expect(dlg.getByLabel('Amount in EUR')).toHaveValue('700')
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+    // a household that is set up removes through the dialog: archive from a month, or delete
+    await moneyOut.getByRole('button', { name: 'Row menu for Food' }).click()
+    await menu.getByRole('menuitem', { name: 'Archive or delete…' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Row "Food"' })).toBeVisible()
+    await expect(dlg.getByRole('button', { name: /^Archive from / })).toBeVisible()
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+    await expect(moneyOut.getByRole('button', { name: /^Food: €700\.00/ })).toBeVisible()
+
+    // a category: rename, move, remove. Its rows are kept
+    await moneyOut.getByRole('button', { name: 'Category menu for Housing' }).click()
+    await expect(menu.getByRole('menuitem')).toHaveText(['Rename…', 'Move up', 'Move down', 'Remove…'])
+    await expect(menu.getByRole('menuitem', { name: 'Move up' })).toBeDisabled()
+    await menu.getByRole('menuitem', { name: 'Rename…' }).click()
+    await dlg.getByLabel('Category name').fill('Living')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg.getByRole('alert')).toBeVisible()
+    await dlg.getByLabel('Category name').fill('Home')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(moneyOut.getByRole('button', { name: 'Home', exact: true })).toBeVisible()
+    await moneyOut.getByRole('button', { name: 'Category menu for Home' }).click()
+    await menu.getByRole('menuitem', { name: 'Remove…' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Category "Home"' })).toBeVisible()
+    await dlg.getByRole('button', { name: 'Delete', exact: true }).click()
+    await expect(dlg).toBeHidden()
+    await expect(moneyOut.getByRole('button', { name: 'Home', exact: true })).toHaveCount(0)
+    await moneyOut.getByRole('button', { name: 'No category', exact: true }).click()
+    await expect(moneyOut.getByRole('button', { name: /^The flat – Rent: €1,650\.00/ })).toBeVisible()
+    await page.getByRole('button', { name: 'Undo' }).click()
+    await expect(moneyOut.getByRole('button', { name: 'Home', exact: true })).toBeVisible()
+
+    // an account and a pool account open their dialog, which removes at its foot
+    await assets.getByRole('button', { name: 'Edit Index fund' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Edit account' })).toBeVisible()
+    await expect(dlg.getByLabel('Name', { exact: true })).toHaveValue('Index fund')
+    await dlg.getByRole('button', { name: 'Archive or delete…' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Account "Index fund"' })).toBeVisible()
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+    await assets.getByRole('button', { name: 'Edit Travel' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Edit pool account' })).toBeVisible()
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+    // the calculated line stands for the current accounts, so it lists them
+    await assets.getByRole('button', { name: 'Edit a current account' }).click()
+    await expect(menu.getByRole('menuitem')).toHaveText(['Edit Main account…', 'Edit Joint account…'])
+    await menu.getByRole('menuitem', { name: 'Edit Joint account…' }).click()
+    await expect(dlg.getByLabel('Name', { exact: true })).toHaveValue('Joint account')
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+
+    // a closed month changes nothing, so it offers no menus
+    await goToMonth(page, 'September 2026')
+    // (Living is still open from before; in a closed month its rows are plain lines)
+    await expect(moneyOut.getByText('Food', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^Row menu for / })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /^Category menu for / })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /^Edit / })).toHaveCount(0)
   })
 
   test('money taken from an account by hand has its own section; what expenses took from savings and pool accounts is marked calculated', async ({ page }) => {

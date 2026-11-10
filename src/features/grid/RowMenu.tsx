@@ -17,7 +17,14 @@ import { accountVerb } from './rowAccount'
 
 type Open = 'rename' | 'category' | 'scope' | 'currency' | 'source' | 'deduction' | 'account' | 'follow' | 'rule' | 'remove' | null
 
-export function RowMenu({ row, tables, household, onError }: { row: Row; tables: Tables; household: Household; onError: (msg: string) => void }) {
+/** In the Grid the "…" shows while its row is hovered; another screen says when it shows on its own lines. */
+const GRID_TRIGGER = 'size-6 opacity-0 group-hover:opacity-100 focus:opacity-100 data-popup-open:opacity-100'
+
+/**
+ * Everything that can be done to a row, behind the "…" beside its name. The Grid and the Statement show the same
+ * menu; `triggerClassName` is the one thing that differs, when the "…" is visible.
+ */
+export function RowMenu({ row, tables, household, onError, triggerClassName = GRID_TRIGGER }: { row: Row; tables: Tables; household: Household; onError: (msg: string) => void; triggerClassName?: string }) {
   const store = useStore()
   const [open, setOpen] = useState<Open>(null)
   const [name, setName] = useState(row.name)
@@ -32,10 +39,10 @@ export function RowMenu({ row, tables, household, onError }: { row: Row; tables:
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="size-6 opacity-0 group-hover:opacity-100 focus:opacity-100 data-popup-open:opacity-100" aria-label={`Row menu for ${row.name}`} />}>
+        <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className={triggerClassName} aria-label={`Row menu for ${row.name}`} />}>
           <MoreHorizontal />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start">
+        <DropdownMenuContent align="start" className="w-max">
           <DropdownMenuItem onClick={() => { setName(row.name); setOpen('rename') }}>Rename…</DropdownMenuItem>
           <DropdownMenuItem onClick={act(() => moveRow(store, row.id, 'up'))}>Move up</DropdownMenuItem>
           <DropdownMenuItem onClick={act(() => moveRow(store, row.id, 'down'))}>Move down</DropdownMenuItem>
