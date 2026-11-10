@@ -75,7 +75,7 @@ describe('categories', () => {
     await expect(addRow(store, { name: 'Bonus', section: 'income', categoryId: housing.id })).rejects.toThrow(/not in this section/)
   })
 
-  it('seeds the usual categories once; a new household from the wizard files its suggested rows into them', async () => {
+  it('seeds the usual categories once; a new household files its suggested rows into them', async () => {
     const { store } = await fresh()
     expect(await seedDefaultCategories(store)).toBe(DEFAULT_CATEGORIES.length)
     expect(await seedDefaultCategories(store)).toBe(0)

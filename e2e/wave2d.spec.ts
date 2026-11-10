@@ -9,7 +9,7 @@ async function loadDemo(page: import('@playwright/test').Page) {
   await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
 }
 
-test('the welcome screen offers three ways to start, and the wizard can go back to it', async ({ page }) => {
+test('the welcome screen offers three ways to start, and the first setup screen can go back to it', async ({ page }) => {
   await page.goto('/')
   for (const name of ['Start on this device', 'Sign in', 'I have an invite', 'Look at the demo first', 'Import a file']) {
     await expect(page.getByRole('button', { name, exact: true })).toBeVisible()

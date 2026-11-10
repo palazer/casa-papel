@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BASIS_HELP, HELP, MODE_HELP, RULE_HELP } from '@/app/help'
+import { BASIS_HELP, HELP, MODE_HELP } from '@/app/help'
 import { ACCOUNT_TYPE_INFO, ENTITY_KIND_HELP, GOAL_KIND_INFO, SECTION_INFO } from '@/model'
 
 describe('help texts', () => {
@@ -19,11 +19,10 @@ describe('help texts', () => {
 
   it('covers every section and every option of the household settings', () => {
     for (const s of Object.keys(SECTION_INFO)) expect(HELP).toHaveProperty(`section.${s}`)
-    for (const [k, v] of Object.entries({ ...RULE_HELP, ...MODE_HELP, ...BASIS_HELP })) {
+    for (const [k, v] of Object.entries({ ...MODE_HELP, ...BASIS_HELP })) {
       expect(v.trim().length, k).toBeGreaterThan(20)
       expect(v.trim().endsWith('.'), k).toBe(true)
     }
-    expect(Object.keys(RULE_HELP)).toEqual(['savings-plug', 'leftover-plug'])
     expect(Object.keys(MODE_HELP)).toEqual(['pooled', 'proportional'])
     expect(Object.keys(BASIS_HELP)).toEqual(['basis-rows', 'all-income', 'manual'])
   })

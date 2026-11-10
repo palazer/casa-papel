@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ErrorBoundary } from '@/app/ErrorBoundary'
-import { ScreenContext, isPhone, isUtility, readScreen, rememberScreen, type Screen } from '@/app/screens'
+import { ScreenContext, isUtility, readScreen, rememberScreen, type Screen } from '@/app/screens'
 import { createAppStore, isDemoMode, useStore } from '@/app/store'
 import { StoreProvider } from '@/app/StoreProvider'
 import { takeInviteFromUrl } from '@/app/url'
@@ -98,7 +98,7 @@ function Shell() {
         <main className="min-w-0 flex-1 p-4 pb-24 text-sm md:p-6 md:pb-6">
           <div className="mx-auto max-w-[1800px]">
             {showHome ? (
-              <HomeScreen onOpenData={() => go('data')} onCreated={() => go(isPhone() ? 'month' : 'grid')} syncAvailable={!!sync} onSignIn={() => openAccount('signin')} onJoin={() => openAccount('join')} notice={notice} />
+              <HomeScreen onOpenData={() => go('data')} onCreated={() => go('statement')} syncAvailable={!!sync} onSignIn={() => openAccount('signin')} onJoin={() => openAccount('join')} notice={notice} />
             ) : screen === 'data' ? <DataScreen />
               : screen === 'guide' ? <GuideScreen />
               : screen === 'statement' ? <StatementScreen />

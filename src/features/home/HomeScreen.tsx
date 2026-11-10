@@ -6,7 +6,7 @@ import { useScreen } from '@/app/screens'
 import { isDemoMode, leaveDemoSandbox, openDemoSandbox, useStore } from '@/app/store'
 import { loadDemo } from '@/demo/loadDemo'
 import { ImportPanel } from '@/features/data/ImportPanel'
-import { SetupWizard } from '@/features/setup/SetupWizard'
+import { SetupStart } from '@/features/setup/SetupStart'
 import { describeSync } from '@/features/sync/syncText'
 import { useSyncView } from '@/sync/useSync'
 
@@ -23,15 +23,15 @@ interface Props {
 
 /**
  * The first screen when no household exists yet (DESIGN.md §2 "Welcome"): three ways to start, each explained in one
- * sentence, quiet links beneath, and the setup wizard once a path is chosen. In the demo sandbox the first path loads
- * the demo. Signed in with nothing on the device, the wizard shows at once with a note that it uploads; a locked or
+ * sentence, quiet links beneath, and the first setup screen once a path is chosen. In the demo sandbox the first path
+ * loads the demo. Signed in with nothing on the device, that screen shows at once with a note that it uploads; a locked or
  * undecided cloud copy sends the user to Data instead, so no second household is started under it.
  */
 export function HomeScreen({ onOpenData, onCreated, syncAvailable = false, onSignIn, onJoin, notice = null }: Props) {
   const store = useStore()
   const { go } = useScreen()
   const view = useSyncView()
-  const [mode, setMode] = useState<'choose' | 'wizard'>('choose')
+  const [mode, setMode] = useState<'choose' | 'setup'>('choose')
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const signedIn = !!view && view.status !== 'off'
@@ -39,7 +39,7 @@ export function HomeScreen({ onOpenData, onCreated, syncAvailable = false, onSig
   const demo = isDemoMode()
   // the dialog's words only make sense while the account is still signed in; after "Sign out and wipe" they go
   const status = message ?? (signedIn ? notice : null)
-  const showWizard = !blocked && (signedIn || mode === 'wizard')
+  const showSetup = !blocked && (signedIn || mode === 'setup')
 
   const links = (
     <div className="flex flex-wrap items-center gap-2">
@@ -72,9 +72,9 @@ export function HomeScreen({ onOpenData, onCreated, syncAvailable = false, onSig
             </Path>
           </ul>
         </Island>
-      ) : showWizard ? (
+      ) : showSetup ? (
         <>
-          <SetupWizard
+          <SetupStart
             onCreated={onCreated}
             onBack={signedIn ? undefined : () => setMode('choose')}
             notice={signedIn && view ? <>Signed in as <strong>{view.email}</strong>{view.status !== 'idle' && view.status !== 'syncing' ? ` (${describeSync(view).toLowerCase()})` : ''}. This household is uploaded to your account when you finish.</> : undefined}
@@ -89,7 +89,7 @@ export function HomeScreen({ onOpenData, onCreated, syncAvailable = false, onSig
                 A made-up household with two adults, a child, a dog and a car, so you can click around. Nothing here touches your own data.
               </Path>
             )}
-            <Path label="Start on this device" primary={!demo} onClick={() => setMode('wizard')}>
+            <Path label="Start on this device" primary={!demo} onClick={() => setMode('setup')}>
               {syncAvailable
                 ? 'Set up your household here. Everything stays in this browser; you can sign in later from Data to keep an encrypted copy in the cloud.'
                 : 'Set up your household here. Everything stays in this browser.'}

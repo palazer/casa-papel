@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { buildSetupMutations } from '@/store'
 import type { Account } from '@/model'
 
-describe('setup wizard accounts', () => {
+describe('setup: accounts', () => {
   it('an account keeps the currency it was given; the others take the household currency', () => {
     const { mutations, household } = buildSetupMutations({
       household: { name: 'T', baseCurrency: 'EUR', locale: 'en-IE', startMonth: '2026-11' },
@@ -18,7 +18,7 @@ describe('setup wizard accounts', () => {
   })
 })
 
-describe('setup wizard: owners, destinations, first amounts, deposits and own rows', () => {
+describe('setup: owners, destinations, first amounts, deposits and own rows', () => {
   const input = {
     household: { name: 'T', baseCurrency: 'EUR', locale: 'en-IE', startMonth: '2026-11' },
     adults: [{ name: 'A' }],

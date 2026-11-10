@@ -1,5 +1,5 @@
-import { ACCOUNT_TYPE_INFO, ENTITY_KIND_HELP, ENTITY_KIND_LABEL, GOAL_KIND_INFO, type EntityKind } from '@/model'
-import { BASIS_HELP, MODE_HELP, RULE_HELP, type HelpKey } from './help'
+import { ACCOUNT_TYPE_INFO, ENTITY_KIND_HELP, ENTITY_KIND_LABEL, GOAL_KIND_INFO, RULE_KIND_INFO, type EntityKind } from '@/model'
+import { BASIS_HELP, MODE_HELP, type HelpKey } from './help'
 import type { Screen } from './screens'
 
 /**
@@ -44,10 +44,7 @@ export interface GuideTopic {
 }
 
 const kinds: GuideFact[] = (Object.keys(ENTITY_KIND_LABEL) as EntityKind[]).map((k) => ({ label: ENTITY_KIND_LABEL[k], text: ENTITY_KIND_HELP[k] }))
-const rules: GuideFact[] = [
-  { label: 'Leftover goes to savings', text: RULE_HELP['savings-plug'] },
-  { label: 'I decide the savings amount', text: RULE_HELP['leftover-plug'] },
-]
+const rules: GuideFact[] = RULE_KIND_INFO.map((r) => ({ label: r.label, text: r.help }))
 const sharing: GuideFact[] = [
   { label: 'Pooled, with pocket money', text: MODE_HELP.pooled },
   { label: 'In proportion to income', text: MODE_HELP.proportional },
@@ -69,6 +66,7 @@ export const GUIDE: GuideTopic[] = [
       'The demo sandbox is a separate store with a made-up household, so you can try everything there without touching your own numbers.',
     ],
     steps: [
+      'A new household: "Start on this device" on the welcome screen, then "Household name", "Currency", "Number and date format", "First month" and the people and things, and "Open the Statement". The Statement opens on the first month with a "Setting up" strip; type an amount on a suggested line and press Enter, and add accounts under "Assets".',
       'Click a cell, "Groceries" in this month, say; type in "Amount in EUR" and press "Save".',
       'Under "Applies to", keep "This month and onwards" to change this month and every later month that still follows it, or pick "Only this month".',
       'Add a row with "Add row" at the foot of a section: a "Row name", a category when the section has any, then "Add".',
@@ -76,7 +74,7 @@ export const GUIDE: GuideTopic[] = [
       'Undo with the arrow in the toolbar or Cmd/Ctrl+Z; Shift redoes.',
       'Try things first: "Look at the demo first" on the welcome screen or "Open the demo sandbox" under Data; "Leave the demo" brings you back.',
     ],
-    tips: ['section.income', 'section.expense', 'section.transfer', 'derived.incomeTotal', 'derived.expensesTotal', 'derived.netWorth', 'cell.appliesTo', 'setup.amount'],
+    tips: ['section.income', 'section.expense', 'section.transfer', 'derived.incomeTotal', 'derived.expensesTotal', 'derived.netWorth', 'cell.appliesTo'],
     open: 'grid',
   },
   {
@@ -90,7 +88,7 @@ export const GUIDE: GuideTopic[] = [
     steps: [
       'Household → "People & things" → "Add adult", "Add child", "Add pet", "Add vehicle", "Add home", "Add company" or "Add other".',
       'Type the name, choose "Who pays" for anyone but an adult, then "Add".',
-      'Open "Suggested rows…" beside the new entry, tick the rows you want and press "Add 3 rows" (the count follows your ticks).',
+      'Open "Suggested rows…" beside the new entry, tick the rows you want and press "Add 3 rows" (the count follows your ticks). Or Statement → "Suggestions": the same rows are offered where they will appear, each with a field for its monthly amount.',
       'To move a row to someone else, open the row menu (the … at the right of its name) → "Belongs to…" → "This row is for": "The household (shared)", an adult, or a name under "Other people & things".',
       'Change "Paid by …" later from the same list under Household.',
     ],
@@ -176,24 +174,24 @@ export const GUIDE: GuideTopic[] = [
   },
   {
     key: 'transfers',
-    title: 'Transfers & the month-end rule',
-    summary: 'Transfers move money between your accounts; the month-end rule decides what happens to what is left.',
+    title: 'Transfers & the rest of the month',
+    summary: 'Transfers move money between your accounts; a rule per account says how much goes to it, and one account can take the rest.',
     what: [
       'Deposits into savings or investments, pool rows and pocket money are transfers: not spending, so they never count as an expense; they show up as balances instead.',
-      'The "Month-end rule" under "Household settings" has two settings. "Leftover goes to savings": the app works out "To savings" for you and the total row reads "Kept in account", the cash buffer you keep. "I decide the savings amount": you type "To savings" and the total reads "Leftover".',
+      'Every transfer into a savings account, an investment account or a pool account has a rule that says how its amount is worked out. One account at a time can take "The rest", and the same account fills the gap in a month that overruns. While an account takes the rest, the total row reads "Kept in account", the cash buffer you keep; while none does, it reads "Leftover".',
       'A pooled household splits "Pocket money per month, all adults (EUR)" equally into automatic rows like "Sam – Pocket" and "Alex – Pocket". Automatic rows carry an (i), can be ticked when the money has moved, and cannot be typed into.',
     ],
     steps: [
-      'Household → "Household settings" → "Month-end rule".',
+      'Statement → "Assets" → the symbol beside an account or a pool account opens "How much goes to <account>?"; so does the symbol after a transfer\'s name under "Set aside, pay off", and Grid → row menu → "Rule…".',
+      'Pick "A fixed amount", "A percentage of income", "A percentage of what is left" or "The rest"; "Counts from" is the month the rule starts in, and earlier months keep their amounts.',
       'Set "Pocket money per month, all adults (EUR)" and "Cash kept in the account at month end (EUR)"; "Pocket money and cash buffer changes apply to" picks "This month and onwards (earlier months keep what they show)", "Only this month" or "Every open month".',
       'Grid → Transfers → "Add row" → say what the row does: "Moves money between your accounts", "Goes into a savings account", "Deposits into an investment account", "Fills a pool account", "Pocket money for an adult" or, for a card whose purchases are expense rows, "Pays off a credit card", then pick the "Account", "Pool account" or "Adult" and press "Add".',
       'Row menu → "Goes into…" changes a deposit row\'s account for every month.',
-      'Statement → "Set aside, pay off" → the symbol after a transfer\'s name, or Grid → row menu → "Rule…", says how the amount is worked out: "A fixed amount", "A percentage of income", "A percentage of what is left" or "The rest", with "Counts from" for the month it starts in.',
       'Moves → "Transfers to make" lists them for the month; automatic ones carry the "automatic" chip.',
     ],
-    factsTitle: 'The two rules',
+    factsTitle: 'The four rules',
     facts: rules,
-    tips: ['section.transfer', 'household.closingRule', 'derived.keptInAccount', 'derived.leftover', 'row.toSavingsPlug', 'row.pocketShare', 'household.pocket', 'household.buffer', 'household.pocketScope', 'row.automatic', 'row.rule', 'row.ruleFrom', 'stat.toSavings'],
+    tips: ['section.transfer', 'derived.keptInAccount', 'derived.leftover', 'row.toSavingsPlug', 'row.pocketShare', 'household.pocket', 'household.buffer', 'household.pocketScope', 'row.automatic', 'row.rule', 'row.ruleFrom', 'stat.toSavings'],
     open: 'household',
   },
   {
@@ -202,7 +200,7 @@ export const GUIDE: GuideTopic[] = [
     summary: 'Deposits grow at a yearly rate you set, or at the average of the real values you enter.',
     what: [
       'An account of type "Investments" gets a "<Name> · value" row under Balances with "Deposited" and "Return" beneath it. The demo\'s "Index fund" starts at €12,000 and grows 5% a year, fed by "To investments" at €500 a month.',
-      'Click a value cell to enter what the broker says; later months continue from your number. With "Average of the real returns I enter" the projection follows your own history instead of a fixed rate. An account in another currency gets an "in EUR" line beneath its value. The setup wizard offers a "To <account>" row for every investment account you add, each with its own monthly amount, and an account that "Belongs to" a child feeds their long-term savings row.',
+      'Click a value cell to enter what the broker says; later months continue from your number. With "Average of the real returns I enter" the projection follows your own history instead of a fixed rate. An account in another currency gets an "in EUR" line beneath its value. A savings or investment account added on the Statement is asked "How much goes to <account>?" as soon as it is saved, and an account whose "Owner" is a child feeds that child\'s long-term savings row.',
     ],
     steps: [
       'Statement → "Assets" → "Add account" (or Household → "Accounts" → "Add account") → "Type": "Investments"; fill "Name" and "Holds at the start of <Month>". "More options" holds "Currency", "Opening month" and "Owner". After "Save" on the Statement, "How much goes to <account>?" asks for its monthly rule.',
@@ -309,7 +307,7 @@ export const GUIDE: GuideTopic[] = [
       '"Hide done" to see only what is still open.',
       '"Close month" when everything has moved: the month gets a lock and a "closed" chip, and its grid column greys out. "Reopen month" undoes it (also from a month name in the Grid and "Reopen <Month>" in the editor).',
     ],
-    tips: ['month.progress', 'cell.howSure', 'row.automatic', 'stat.toSavings', 'derived.keptInAccount', 'derived.leftover', 'statement.month', 'statement.position', 'statement.setAside', 'statement.fromAccounts', 'statement.suggestions', 'statement.mainAccount', 'statement.netWorth', 'statement.free', 'statement.estimate'],
+    tips: ['month.progress', 'cell.howSure', 'row.automatic', 'stat.toSavings', 'derived.keptInAccount', 'derived.leftover', 'statement.month', 'statement.position', 'statement.setAside', 'statement.fromAccounts', 'statement.setup', 'statement.suggestions', 'statement.mainAccount', 'statement.netWorth', 'statement.free', 'statement.estimate'],
     open: 'month',
   },
   {

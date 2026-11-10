@@ -1,4 +1,4 @@
-import type { AccountType, EntityKind, GoalKind, RowKind, Section } from './schema'
+import type { AccountType, EntityKind, GoalKind, RowKind, RowRule, Section } from './schema'
 
 /** A suggested row. `{name}` in the title is replaced with the entity's name. */
 export interface RowTemplate {
@@ -20,7 +20,7 @@ export interface RowTemplate {
   account?: 'savings' | 'investment' | 'loan'
   /** Creates a pool with an allocation row; the row itself is the pool-funded spend. */
   pool?: boolean
-  /** Pre-ticked in the wizard. */
+  /** One of the usual rows: the Statement suggests it straight away, the others wait behind "More suggestions". */
   recommended?: boolean
   /** The usual expense category the row belongs to, by name, when the household has it. */
   category?: string
@@ -123,6 +123,14 @@ export const GOAL_KIND_INFO: Array<{ value: GoalFamily; label: string; help: str
   { value: 'fill', label: 'Fill an account', help: 'A savings, investment or other asset account, or a pool account, reaches an amount. An account is compared in its own currency.' },
   { value: 'pay-down', label: 'Pay down a debt', help: 'A card or loan comes down to an amount, zero unless you type another. Progress counts down from what was owed when you set the goal.' },
   { value: 'net-worth', label: 'Reach a net worth', help: 'Tracked assets minus tracked debts, in your base currency. Set it from the "Net worth" line on the Statement.' },
+]
+
+/** How the transfer into an account is worked out each month: the rule dialog's four choices, one sentence each. */
+export const RULE_KIND_INFO: Array<{ value: RowRule; label: string; help: string }> = [
+  { value: 'fixed', label: 'A fixed amount', help: 'The same amount every month until you change it.' },
+  { value: 'share-of-income', label: 'A percentage of income', help: 'A share of the month\'s take-home income: what comes in, minus what is deducted from it. Money taken out of investments does not count.' },
+  { value: 'share-of-rest', label: 'A percentage of what is left', help: 'A share of what the month has left after spending, fixed amounts, percentages of income and the cash kept in the account. Nothing in a month that overruns.' },
+  { value: 'rest', label: 'The rest', help: 'Everything that is left after all of that. One account can take the rest, and the same account fills the gap in a month that overruns.' },
 ]
 
 export const ACCOUNT_TYPE_INFO: Array<{ value: AccountType; label: string; help: string }> = [

@@ -14,6 +14,7 @@ const NEEDS: Record<NonNullable<RowSuggestion['needs']>, string> = {
   loan: 'needs a loan account',
 }
 const LINE = 'flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs'
+const CONTROLS = 'ml-auto flex shrink-0 items-center gap-1.5'
 const DISMISS = 'inline-flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:size-8'
 
 /**
@@ -73,21 +74,24 @@ function SuggestionLine({ suggestion: s, month, currency, locale, onAdded, onErr
       <Plus className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
       <span className="font-medium text-muted-foreground">{s.title}</span>
       <span className="min-w-0 flex-1 basis-40 text-[11px] text-muted-foreground">{s.pool ? `${s.description} The amount is what you set aside each month.` : s.description}</span>
-      {s.needs ? <Chip tone="zinc">{NEEDS[s.needs]}</Chip> : (
-        <>
-          <Input
-            aria-label={`${s.pool ? 'Set aside per month' : 'Amount per month'} for ${s.title}`} aria-invalid={unreadable || undefined}
-            className="h-7 w-28 text-right" inputMode="decimal" placeholder="per month"
-            value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add() }}
-          />
-          <Button size="xs" variant="outline" aria-label={`Add ${s.title}`} disabled={busy || unreadable} onClick={add}>Add</Button>
-        </>
-      )}
-      {dismissable && (
-        <button type="button" className={DISMISS} aria-label={`Dismiss ${s.title}`} title="Not for us" onClick={() => void dismissSuggestion(store, s.id).catch(fail)}>
-          <X className="size-3.5" aria-hidden />
-        </button>
-      )}
+      {/* the field and its buttons stay together: on a narrow screen they move under the name as one */}
+      <span className={CONTROLS}>
+        {s.needs ? <Chip tone="zinc">{NEEDS[s.needs]}</Chip> : (
+          <>
+            <Input
+              aria-label={`${s.pool ? 'Set aside per month' : 'Amount per month'} for ${s.title}`} aria-invalid={unreadable || undefined}
+              className="h-7 w-28 text-right" inputMode="decimal" placeholder="per month"
+              value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add() }}
+            />
+            <Button size="xs" variant="outline" aria-label={`Add ${s.title}`} disabled={busy || unreadable} onClick={add}>Add</Button>
+          </>
+        )}
+        {dismissable && (
+          <button type="button" className={DISMISS} aria-label={`Dismiss ${s.title}`} title="Not for us" onClick={() => void dismissSuggestion(store, s.id).catch(fail)}>
+            <X className="size-3.5" aria-hidden />
+          </button>
+        )}
+      </span>
       {unreadable && <p role="alert" className="basis-full text-destructive">That is not an amount I can read.</p>}
     </div>
   )
@@ -108,13 +112,15 @@ export function AccountSuggestionLines({ suggestions, onAdd, onError }: {
           <Plus className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
           <span className="font-medium text-muted-foreground">{s.name}</span>
           <span className="min-w-0 flex-1 basis-40 text-[11px] text-muted-foreground">{s.description}</span>
-          <Button size="xs" variant="outline" aria-label={`Add ${s.name}`} onClick={() => onAdd(s)}>Add</Button>
-          <button
-            type="button" className={DISMISS} aria-label={`Dismiss ${s.name}`} title="Not for us"
-            onClick={() => void dismissSuggestion(store, s.id).catch((e) => onError(e instanceof Error ? e.message : 'That did not work.'))}
-          >
-            <X className="size-3.5" aria-hidden />
-          </button>
+          <span className={CONTROLS}>
+            <Button size="xs" variant="outline" aria-label={`Add ${s.name}`} onClick={() => onAdd(s)}>Add</Button>
+            <button
+              type="button" className={DISMISS} aria-label={`Dismiss ${s.name}`} title="Not for us"
+              onClick={() => void dismissSuggestion(store, s.id).catch((e) => onError(e instanceof Error ? e.message : 'That did not work.'))}
+            >
+              <X className="size-3.5" aria-hidden />
+            </button>
+          </span>
         </div>
       ))}
     </div>

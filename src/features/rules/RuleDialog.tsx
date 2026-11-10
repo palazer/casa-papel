@@ -9,7 +9,7 @@ import { Segmented } from '@/components/Segmented'
 import { amountToInput, formatAmount, formatMonth, formatShare, parseAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import { cellKey, computeEngine, sortRows } from '@/engine'
-import { addMonths, compareMonths, parseMonth, resolveRules, type Household, type MonthKey, type Row, type Tables } from '@/model'
+import { RULE_KIND_INFO, addMonths, compareMonths, parseMonth, resolveRules, type Household, type MonthKey, type Row, type Tables } from '@/model'
 import { previewRule, ruleRowOf, setRule, type RuleChoice, type RuleTarget } from '@/store'
 import { useSave } from '@/features/grid/RowDialogs'
 
@@ -27,12 +27,7 @@ interface Props {
 
 type Kind = RuleChoice['kind']
 
-const KINDS: Array<{ value: Kind; label: string; text: string }> = [
-  { value: 'fixed', label: 'A fixed amount', text: 'The same amount every month until you change it.' },
-  { value: 'share-of-income', label: 'A percentage of income', text: 'A share of the month\'s take-home income: what comes in, minus what is deducted from it. Money taken out of investments does not count.' },
-  { value: 'share-of-rest', label: 'A percentage of what is left', text: 'A share of what the month has left after spending, fixed amounts, percentages of income and the cash kept in the account. Nothing in a month that overruns.' },
-  { value: 'rest', label: 'The rest', text: 'Everything that is left after all of that. One account can take the rest, and the same account fills the gap in a month that overruns.' },
-]
+const KINDS = RULE_KIND_INFO.map((k) => ({ value: k.value as Kind, label: k.label, text: k.help }))
 
 /**
  * What the fields say, as text (`fixed:30000`, `share-of-income:0.1`, `rest`): a plain value the preview can depend

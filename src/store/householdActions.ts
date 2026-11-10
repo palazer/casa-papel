@@ -142,9 +142,9 @@ export async function applyTemplates(store: Store, keys: string[], entityId?: st
   if (mutations.length) await store.commit(mutations)
 }
 
-// ---------- setup wizard ----------
+// ---------- setup ----------
 
-/** A template the wizard chose, with the account it points at (an index into `accounts`) and a first monthly amount. */
+/** A template chosen at setup, with the account it points at (an index into `accounts`) and a first monthly amount. */
 export interface TemplateChoice {
   key: string
   accountIndex?: number | null

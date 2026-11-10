@@ -75,8 +75,19 @@ Statement frame  full width, space-y-4 of dense islands, one per half; an island
   Casa Papel" lists the ways in as rows: a `sm` button (lime on the recommended path only, `outline` otherwise) and one
   muted sentence each; quiet `xs ghost` links beneath (the demo sandbox, Import a file). Signed out it offers Start on this
   device, Sign in, I have an invite; without sync only the first; in the sandbox it leads with Load the demo household; signed
-  in with no household it skips straight to the wizard with a "Signed in as …" line and no chooser; a locked or undecided
-  cloud copy offers Open Data instead of the wizard. The wizard's title row carries "Back to start" while the chooser exists. Its Accounts step is one box per account: name, type, an "Account currency" select that starts at "EUR (household currency)" and lists the other codes, the opening balance in that currency ("Opening USD" as the placeholder), then a second line with "Belongs to" (the household, a named adult or a named child; `setup.owner`) and the type's help, which adds "Kept in USD; the grid shows its EUR value beneath" for a foreign one. The Rows step shows only people and things with a name (or "Me"), so every preview is a row that will exist; every ticked row carries a `per month` amount field (`aria-label="<row> per month"`, the currency after it, an error line under the row) or the word "automatic" for the savings plug and pocket money (`setup.amount`); a template that needs an account shows an "into <account>" select when more than one account of its type exists, defaulting to the subject's own; the household's Moving money group lists one "To <account>" row per investment account (and per savings account under "I decide the savings amount") instead of a single "To investments", pre-ticked, or a muted line saying to add an investment account first. The Finish step previews what will be created: the accounts (type, owner, opening balance), the pool accounts and the rows by section as "Sam – Salary · €3,200.00 per month" or "To savings · automatic".
+  in with no household it skips straight to the first setup screen with a "Signed in as …" line and no chooser; a locked or
+  undecided cloud copy offers Open Data instead.
+- **The first setup screen** (`src/features/setup/SetupStart.tsx`, its checks in `start.ts`): one air island "Set up your
+  household", a single screen with no steps. It asks only what the Statement needs before it can open: "Household
+  name", "Currency", "Number and date format", "First month" (with the sentence that currency and first month cannot be
+  changed afterwards), then "People & things": the adults as name fields (`Adult 1 name`; blank names are skipped, no
+  named adult gives "Me") and one line per child, pet, vehicle, home, company or other (a kind select, a name, a bin),
+  added with `sm outline` `Add <kind>` buttons, each line with the first sentence of its kind's help. Nothing about
+  accounts, rules or how money is shared: those are added where they show. A name used twice is refused in an alert
+  under the list, because rows are named after their person or thing. The foot says in one muted sentence what will
+  be made ("Makes Sam, Alex, Robin and the usual expense categories. Nothing else yet.") beside the lime "Open the
+  Statement"; the title row carries "Back to start" while the chooser exists. The household then opens on the
+  Statement, on its first month, with the setup strip (§7).
 - **Guide** (`src/features/guide/GuideScreen.tsx`, words in `src/app/guide.ts`, no React there so a translation can
   follow): a reading page that opens without a household. Its header's toolbar holds one control, a `type="search"`
   Input "Search the guide" (`h-7 w-64`, full width under 768 px, Escape clears) and, while searching, a `role="status"`
@@ -86,7 +97,7 @@ Statement frame  full width, space-y-4 of dense islands, one per half; an island
   `#guide-<key>` (title over summary), then one air island per topic (`id="guide-<key>"`, the title as the heading, the
   summary as the description): one to three paragraphs, an `<ol>` of steps naming the controls in quotes, the model's
   own option texts as a `<dl>` where the topic explains a choice (account types, goal kinds, people & things kinds, the
-  month-end rules, the sharing choices), "Related tips" as a `<dl>` straight from `HELP`, and a footer with
+  four rules, the sharing choices), "Related tips" as a `<dl>` straight from `HELP`, and a footer with
   `Open <screen>` (`xs outline`, `useScreen().go`) and `Topics` (`xs ghost`, `#guide-topics`). A search matches every
   typed word somewhere in those texts, hides the lead and the contents, and wraps the words in `<mark>` on
   `bg-primary/30`. The hits come first as a results list (`<nav aria-label="Results">`, a bordered `divide-y` list of
@@ -118,7 +129,7 @@ air      h3  flex items-end gap-4 border-b px-4 pt-2 text-sm font-medium leading
   count or a small control, `toolbar` a non-scrolling filter row, `tabs` a `TabBar` in place of the title, `onFold` a
   caret that minimizes the island.
 - Dense islands for the phone's Month view and small stat panels; air islands for reading pages (Household, Data, Moves,
-  the setup wizard). Titles are sentence case with facts after a middle dot.
+  the first setup screen). Titles are sentence case with facts after a middle dot.
 
 ## 4. Typography
 
@@ -300,6 +311,15 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   `More suggestions (n)` opens the rarer and the dismissed ones, which have no `×`. Each block is a group named
   `Suggestions for <part>`. Under Assets the same line offers an account most households have (`Main account`,
   `Savings`); its `Add` opens the account dialog with the name and type filled in.
+  **The setup strip.** While a household is new (`Household.setupOpen`), a dense island "Setting up" with an (i)
+  sits between the toolbar and the month. It holds the parts of the page as pills in the order a household is
+  filled: `Income`, `Accounts`, `Expenses`, `Where the rest goes`, `Goals (optional)`. A pill is a rounded-full
+  outline button with a 14 px mark: an empty circle while its part is empty (the label in medium weight), a check in
+  the income hue once it has something in it (the label muted). Pressing one goes to its part with the cursor in the
+  first field; `Where the rest goes` opens the rule dialog on the savings account, or the account dialog for one
+  while there is none. Two muted sentences follow: what to do next (the first open step), and which month is being
+  filled. `Done` (`xs outline`, at the end of the title row) hides the strip for good and turns the suggestions
+  off; the page works the same without it. The Statement opens on the household's first month while the strip shows.
   **Category estimates.** An expense category can carry an estimate: what it should come to in a month, typed before
   its rows are known. The category line then reads `estimate €1,450.00` in muted `text-[11px]` after its name, and
   its last line is `Not broken down yet` with the `automatic` chip, the estimate minus the category's rows, on the
@@ -324,9 +344,9 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   way to an `xs outline` `Add <year>`, the Grid toolbar's action: the plan always ends in a December and grows a calendar
   year at a time (`planEnd` in `src/store/months.ts`; this year's December, next year's from October on).
 - One name per idea, the same in every control: a repeating amount is a **schedule** (dialog "New schedule" / "Edit
-  schedule", button "Add schedule", never "recurring item"); the month-end rule reads "Leftover goes to savings" /
-  "I decide the savings amount" and the sharing choice "Pooled, with pocket money" / "In proportion to income" in the
-  wizard and in Household settings alike; money set aside is a **pool account**, never an envelope.
+  schedule", button "Add schedule", never "recurring item"); how a transfer into an account is worked out is its **rule** ("A fixed amount", "A
+  percentage of income", "A percentage of what is left", "The rest"), set in the rule dialog and nowhere else; money
+  set aside is a **pool account**, never an envelope.
 - Rates are always spelled with both codes in the orientation whose number is ≥ 1 (`1 EUR = 1.08 USD`, `1 USD = 48.58 TRY`;
   `readableRate` in `src/features/household/fxDisplay.ts`); the rates table's columns read `1 EUR in USD` and store
   `base/foreign`. The cell editor's rate line (`src/features/grid/RateLine.tsx`) sits under an amount in another currency:
@@ -426,8 +446,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 - Every text lives in `src/app/help.ts`: `HELP[key] = { title, text }`, keys `area.name`, titles up to 40 characters,
   texts two or three plain sentences up to 360 characters in the app's own words (pool accounts, people & things,
   schedules, automatic). `balanceHelp(type)` picks the balance text for an account. Texts that belong to a model enum
-  (section blurbs, account types, entity kinds, goal kinds) stay in `src/model/templates.ts`; the wizard's rule and
-  mode lines (`RULE_HELP`, `MODE_HELP`, `BASIS_HELP`) stay inline because their words depend on the choice.
+  (section blurbs, account types, entity kinds, goal kinds, the four rules) stay in `src/model/templates.ts`; the
+  sharing lines (`MODE_HELP`, `BASIS_HELP`) stay inline because their words depend on the choice.
 - `MarksLegend` ("What the colours and marks mean", an `xs outline` button in the Grid and Month toolbars) is the legend:
   the six hue dots with their kinds of money, then the marks with a sample each: estimate, certain, done, this month's
   red and amber dots, the negative spending number when that setting is on, the amber draw, the dotted entered balance,

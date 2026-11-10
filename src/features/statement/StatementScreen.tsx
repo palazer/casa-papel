@@ -6,11 +6,12 @@ import { InfoTip } from '@/components/InfoTip'
 import { MonthPicker } from '@/components/MonthPicker'
 import { PageHeader } from '@/components/PageHeader'
 import { doneness, type DoneState } from '@/app/display'
+import { formatMonth } from '@/app/format'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { buildStatement, cellKey, computeMainAccount, type GoalProgress, type StatementLine } from '@/engine'
 import { canCarryRule, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type MonthKey, type Row, type Section } from '@/model'
-import { accountSuggestions, addPlanYear, rowSuggestions, setCellDone, setDerivedDone, setItemStatus, type RowSuggestion, type RuleChoice, type RuleTarget } from '@/store'
+import { accountSuggestions, addPlanYear, rowSuggestions, setCellDone, setDerivedDone, setItemStatus, setupSteps, updateHousehold, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupStepKey } from '@/store'
 import { GoalDialog } from '@/features/goals/GoalDialog'
 import { goalStatusLine } from '@/features/goals/goalText'
 import { AddRowInline } from '@/features/grid/AddRowInline'
@@ -22,6 +23,7 @@ import { RemoveDialog } from '@/features/remove/RemoveDialog'
 import { RuleDialog } from '@/features/rules/RuleDialog'
 import { AddCategoryInline } from './AddCategoryInline'
 import { EstimateDialog } from './EstimateDialog'
+import { SetupStrip } from './SetupStrip'
 import { StatementBand } from './StatementBand'
 import { AccountSuggestionLines, SuggestionLines } from './SuggestionLines'
 import { TopUpDialog } from './TopUpDialog'
@@ -46,7 +48,8 @@ export function StatementScreen() {
   const months = useMemo(() => (household && tables ? defaultMonths(household, tables) : []), [household, tables])
   const engine = useEngine(tables, months)
   const main = useMemo(() => (tables && engine ? computeMainAccount(tables, engine) : null), [tables, engine])
-  const [month, setMonth] = useState<MonthKey>(() => monthOfDate())
+  /** The month someone picked. Until then: today's month, or the first month while the household is being set up. */
+  const [picked, setMonth] = useState<MonthKey | null>(null)
   /** Lines someone opened or closed; the rest follow their own default. */
   const [openLines, setOpenLines] = useState<Record<string, boolean>>({})
   const [editorRow, setEditorRow] = useState<string | null>(null)
@@ -70,6 +73,8 @@ export function StatementScreen() {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  const settingUp = household?.setupOpen ?? false
+  const month = picked ?? (settingUp && household ? household.startMonth : monthOfDate())
   const idx = Math.max(0, months.indexOf(month) === -1 ? months.length - 1 : months.indexOf(month))
   const m = months[idx]
   const statement = useMemo(() => (tables && engine && m ? buildStatement(tables, engine, m, main) : null), [tables, engine, m, main])
@@ -142,9 +147,30 @@ export function StatementScreen() {
     if (canCarryRule(row)) setRuleFor({ rowId: row.id })
     else setEditorRow(row.id)
   }
+  /** A step of the setup strip: go to its part of the page, with the cursor in the first thing that can be filled. */
+  function jump(selector: string) {
+    const el = document.querySelector<HTMLElement>(selector)
+    if (!el) return
+    const part = el.closest('li') ?? el
+    part.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+    part.querySelector<HTMLElement>('input, [data-testid="suggestions"] button, [data-testid^="foot-"] button')?.focus({ preventScroll: true })
+  }
+  function onStep(key: SetupStepKey) {
+    if (key === 'income') return jump('[data-line="income"]')
+    if (key === 'expenses') return jump('[data-line="expenses"]')
+    if (key === 'accounts' || key === 'goals') return jump('[data-testid="band-assets"]')
+    // where the rest goes: the row that takes it, or the first savings account; without one, a savings account first
+    const restRowId = resolveRules(engine!.rows, household!.closingRule).restRowId
+    const savings = tables!.accounts.find((a) => a.type === 'savings' && !a.deletedAt && !a.archivedMonth)
+    if (statement!.closed) return jump('[data-testid="band-assets"]')
+    if (restRowId) return setRuleFor({ rowId: restRowId })
+    if (!savings) return setAccountNew({ name: 'Savings', type: 'savings', types: ASSET_TYPES })
+    setRuleStart('rest')
+    setRuleFor({ accountId: savings.id })
+  }
   /** A suggested row came with its amount, so no editor opens; its category stays open once its suggestions are gone. */
   function onSuggested(row: Row) {
-    setOpenLines((s) => ({ ...s, [`cat:${row.section}:${row.categoryId ?? 'none'}`]: true }))
+    setOpenLines((s) => ({ ...s, [row.kind === 'pocket-money' ? 'pocket' : `cat:${row.section}:${row.categoryId ?? 'none'}`]: true }))
   }
   const suggested = (line: StatementLine) => (showing && m
     ? <SuggestionLines suggestions={suggestions.get(line.id) ?? []} label={line.label} month={m} currency={household!.baseCurrency} locale={household!.locale} onAdded={onSuggested} onError={setError} />
@@ -244,6 +270,14 @@ export function StatementScreen() {
         {statement.warnings.map((w) => <p key={w} className="basis-full text-amber-700">{w}</p>)}
       </PageHeader>
 
+      {settingUp && (
+        <SetupStrip
+          steps={setupSteps(tables)} monthName={formatMonth(m, locale, 'long')} first={m === household.startMonth} noSavings={savingsAccounts.length === 0}
+          onStep={onStep}
+          // the month stays where it is once the strip is gone
+          onDone={() => { setMonth(m); act(() => updateHousehold(store, { setupOpen: false })) }}
+        />
+      )}
       <StatementBand
         title="The month" help="statement.month" band={statement.flow} ctx={flowCtx} totals={['Total in', 'Total out']}
         right={<span className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><span className={ESTIMATE_SHADE}>an estimate</span><InfoTip help="statement.estimate" /></span>}

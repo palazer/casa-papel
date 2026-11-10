@@ -61,7 +61,6 @@ export const HELP = {
 
   'row.categoryEstimate': { title: 'Category estimate', text: 'What you expect a category to come to in a month, before you know every row. Its rows are taken off it and what is left counts as "Not broken down yet"; once the rows add up to more, the category is their sum. Set it on the Statement, inside the category.' },
   // Household settings
-  'household.closingRule': { title: 'Month-end rule', text: 'What happens to the money left at the end of the month. Savings plug: the leftover moves to savings automatically and you never type "To savings". Leftover plug: you type what goes to savings and the rest is shown as leftover.' },
   'household.moneyMode': { title: 'How you share money', text: 'Pooled: all income is household money and each adult gets pocket money. Proportional: each adult pays a share of the shared costs in proportion to their income, and Moves shows who sends what where.' },
   'household.shareBasis': { title: 'What the split is based on', text: 'Salaries only: rows marked "counts for the split" set each adult\'s share. All income: everything each adult brings in. Manual: you set the percentages yourself.' },
   'household.pocketScope': { title: 'Where changes apply', text: 'Pocket money and the cash buffer can change from this month on, leaving earlier months as they were, for this month only, or for every open month at once. Closed months never change.' },
@@ -73,9 +72,9 @@ export const HELP = {
   'household.archived': { title: 'Archived', text: 'Out of the way but not gone: archived rows, accounts, pool accounts, people and things keep their history up to the month they were archived from, and can be restored any time.' },
   'data.export': { title: 'Export file', text: 'One file with every table and the whole change history, so a cleared browser or a new device can take over. Keep it anywhere you like; importing it merges or replaces what is here.' },
   'sync.privacy': { title: 'What leaves this device', text: 'Everything is encrypted on this device before it leaves, and only your password opens it. The server stores the encrypted copy, your email and timestamps. Apart from that, only currency codes and dates ever leave the device, when rates are fetched.' },
+  'statement.setup': { title: 'Setting up', text: 'Shown while a household is new. Each step is a part of this page and ticks itself once that part has something in it: income, accounts, expenses, and the account that takes the rest of each month. Press a step to go to its part. "Done" puts the strip away; the page works the same without it.' },
   'statement.suggestions': { title: 'Suggestions', text: 'Rows a household like yours usually has, offered where they will appear: for each person and thing, and for the household. Nothing exists until you add it. Type the usual monthly amount and press Enter, or add the row empty. "×" puts a suggestion behind "More suggestions", where the rarer ones wait too.' },
-  'setup.amount': { title: 'Per month', text: 'Optional: the usual monthly amount. It becomes the first month\'s value and carries forward until you change it in the grid. Leave it empty to type it later.' },
-  'setup.owner': { title: 'Belongs to', text: 'Whose account it is. A child\'s account feeds their long-term savings row by default; an adult\'s own account stays theirs when costs are split. The household\'s accounts belong to everyone.' },
+  'setup.owner': { title: 'Owner', text: 'Whose account it is. A child\'s account feeds their long-term savings row by default; an adult\'s own account stays theirs when costs are split. The household\'s accounts belong to everyone.' },
   'remove.archiveFrom': { title: 'Archive from', text: 'From this month on the thing is hidden and stops counting. Every earlier month stays exactly as it was, closed months included; that is why anything with amounts in a closed month can only be archived, never deleted.' },
 
   // The Statement
@@ -104,12 +103,6 @@ export function balanceHelp(type: AccountType | undefined): HelpKey {
     case 'other-asset': return 'balance.otherAsset'
     default: return 'balance.savings'
   }
-}
-
-/** The month-end rule, one line each, for the setting's own help line and the wizard. */
-export const RULE_HELP: Record<Household['closingRule'], string> = {
-  'savings-plug': 'Income minus spending minus pocket money is moved to savings. You never type "To savings".',
-  'leftover-plug': 'You type how much goes to savings. What remains is shown as leftover.',
 }
 
 /** How money is shared, one line each. */

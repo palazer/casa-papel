@@ -87,13 +87,6 @@ function SettingsCard({ household: h, tables, onSave, onMonthly }: { household: 
           <NativeSelect id="s-locale" className="w-full" value={h.locale} onChange={(e) => onSave({ locale: e.target.value })}>{LOCALES.map((l) => <option key={l} value={l}>{localeLabel(l)} — {localeExample(l)}</option>)}</NativeSelect>
         </div>
         <div className="space-y-1.5">
-          <TipLabel htmlFor="s-rule" help="household.closingRule">Month-end rule</TipLabel>
-          <NativeSelect id="s-rule" className="w-full" value={h.closingRule} onChange={(e) => onSave({ closingRule: e.target.value as Household['closingRule'] })}>
-            <option value="savings-plug">Leftover goes to savings</option>
-            <option value="leftover-plug">I decide the savings amount</option>
-          </NativeSelect>
-        </div>
-        <div className="space-y-1.5">
           <TipLabel htmlFor="s-mode" help="household.moneyMode">How you share money</TipLabel>
           <NativeSelect id="s-mode" className="w-full" value={h.moneyMode} onChange={(e) => onSave({ moneyMode: e.target.value as Household['moneyMode'] })}>
             <option value="pooled">Pooled, with pocket money</option>
