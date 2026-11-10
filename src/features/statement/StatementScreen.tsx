@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useState, type ComponentProps, type ReactNode } from 'react'
 import { Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
@@ -106,14 +106,16 @@ export function StatementScreen() {
     else if (line.accountId) setRuleFor({ accountId: line.accountId })
   }
   const categoriesOf = (section: Section) => tables!.categories.filter((c) => !c.deletedAt && c.section === section)
-  const addRow = (section: Section, over: { label?: string; defaultCategoryId?: string } = {}) => (
+  const addRow = (section: Section, over: Pick<ComponentProps<typeof AddRowInline>, 'label' | 'defaultCategoryId' | 'only' | 'without'> = {}) => (
     <AddRowInline section={section} categories={categoriesOf(section)} tables={tables!} household={household!} onError={setError} onAdded={onAdded} {...over} />
   )
   /** Things are added where they will appear: at the foot of a group, and inside a category for a row of that category. */
   function footer(line: StatementLine): ReactNode {
     if (line.id === 'income') return <>{addRow('income')}<AddCategoryInline section="income" onError={setError} /></>
     if (line.id === 'expenses') return <>{addRow('expense')}<AddCategoryInline section="expense" onError={setError} estimate={statement!.closed ? undefined : { month: m, currency: ccy, locale }} /></>
-    if (line.id === 'set-aside') return addRow('transfer')
+    // money taken out of an account has a section of its own on the left, so the right side does not offer it
+    if (line.id === 'set-aside') return addRow('transfer', { without: ['from-savings', 'from-investment'] })
+    if (line.id === 'from-accounts') return addRow('transfer', { only: ['from-savings', 'from-investment'] })
     if (line.kind === 'category' && line.id.startsWith('cat:')) {
       const [, section, categoryId] = line.id.split(':')
       if (categoryId === 'none') return addRow(section as Section, { label: 'Add row without a category' })

@@ -227,8 +227,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   the balance on both sides (`+€460.00`, a `·` for none) and the day as the balance column's head. A side opens with
   its name in small caps and closes with its total in `font-semibold` over a hairline. Lines are `min-h-11 text-sm`
   on phones and `md:min-h-7 md:text-xs`, separated by `divide-border/60`, amounts in a fixed right-aligned column:
-  a **group** (Income, Expenses, Set aside, pay off, Debts, Net worth) is a heading in its hue on the hue's `tint`
-  with its lines always under it; a **category**, an account that holds pool accounts and an itemized row open as an
+  a **group** (Income, Taken from accounts, Expenses, Set aside, pay off, Debts, Net worth) is a heading in its hue
+  on the hue's `tint` with its lines always under it; a **category**, an account that holds pool accounts and an itemized row open as an
   accordion (a chevron button with `aria-expanded`, each level 20 px further in, items on `bg-muted/20` with the
   `Repeat` icon when scheduled); a category's amount is the sum of its rows. Tags follow the name and wrap under it
   when there is no room: a zinc chip with the currency code and the original amount in muted `text-[11px]` for a
@@ -245,6 +245,12 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   An itemized row's chevron is a button of its own, `Items of <row>`. An automatic row has the tick (it marks the
   money as moved) but no button; a closed month has neither. The island's head carries the legend, a shaded `an
   estimate` with an (i).
+  **Money in from your own accounts** has two sections that must not be mixed up. `Taken from accounts` is typed:
+  rows that move money out of a savings or an investment account into the month, always shown (a faint `·` while
+  empty) with `Add row` at its foot offering only those two kinds. `From savings and pool accounts` is worked out
+  from the expenses that come straight out of them: its heading carries the `calculated` chip and an (i), and each
+  line names the expenses it paid for in muted `text-[11px]` (`for Weekend trip, Flights`, cut with an ellipsis,
+  the full list in the title).
   **The rule symbol.** A transfer that feeds a savings account, an investment account or a pool account, and that
   account in the lower half, say how the amount is worked out with one small symbol after the name, never a word
   tag: `ArrowDownToLine` (14 px) for the rest, the percentage in `text-[11px] tabular-nums` for a share of income

@@ -49,6 +49,24 @@ describe('addRowOfKind under Transfers', () => {
     expect(out.pools[pool.id].months['2026-02'].balance).toBe(10000)
   })
 
+  it('a row can take money out of a savings or an investment account into the month', async () => {
+    const { store, savings } = await fresh()
+    const fund = await addAccount(store, { name: 'Fund', type: 'investment', currency: 'EUR', openingMonth: '2026-01', openingBalance: 500000 })
+    await expect(addRowOfKind(store, { section: 'transfer', name: 'From Savings', categoryId: null, kind: 'from-savings', accountId: fund.id })).rejects.toThrow(/is of type Investments/)
+    await expect(addRowOfKind(store, { section: 'expense', name: 'From Savings', categoryId: null, kind: 'from-savings', accountId: savings.id })).rejects.toThrow(/does not belong in this section/)
+    const fromSavings = await addRowOfKind(store, { section: 'transfer', name: 'From Savings', categoryId: null, kind: 'from-savings', accountId: savings.id })
+    const fromFund = await addRowOfKind(store, { section: 'transfer', name: 'From Fund', categoryId: null, kind: 'from-investment', accountId: fund.id })
+    expect(fromSavings).toMatchObject({ section: 'transfer', kind: 'from-savings', accountId: savings.id, defaultStatus: 'committed' })
+    await setCellValue(store, fromSavings.id, '2026-02', 30000, 'this-month')
+    await setCellValue(store, fromFund.id, '2026-02', 20000, 'this-month')
+    const out = computeEngine({ tables: await loadTables(store), months })
+    expect(out.totals['2026-02']).toMatchObject({ income: 50000, fromAccounts: 50000, takeHome: 0 })
+    expect(out.accounts[fund.id].months['2026-02'].outflow).toBe(20000)
+    // 500 came into the month and went on to savings as the rest, 300 of it out of the same account
+    expect(out.accounts[savings.id].months['2026-02']).toMatchObject({ inflow: 50000, outflow: 30000, balance: 20000 })
+    expect(out.totals['2026-03'].fromAccounts).toBe(0)
+  })
+
   it('pocket money is a fixed amount kept by one adult; a plain row is just a transfer', async () => {
     const { store } = await fresh()
     await expect(addRowOfKind(store, { section: 'transfer', name: 'Pocket', categoryId: null, kind: 'pocket-money', adultId: newId() })).rejects.toThrow(/Pick the adult/)

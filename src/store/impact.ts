@@ -149,7 +149,7 @@ interface Described {
 }
 
 const TYPED_VERB: Partial<Record<Row['kind'], string>> = {
-  'to-savings': 'sends money to it', 'to-investment': 'sends money to it', 'from-investment': 'takes money from it',
+  'to-savings': 'sends money to it', 'to-investment': 'sends money to it', 'from-investment': 'takes money from it', 'from-savings': 'takes money from it',
   'debt-payment': 'pays it off', 'card-payment': 'pays it off',
 }
 

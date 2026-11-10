@@ -71,7 +71,9 @@ export interface MonthTotals {
   fromSavingsDerived: Money
   expensesTotal: Money
   transfersTotal: Money
-  /** Income minus what is deducted from it, without money taken out of investments: what a share of income counts. */
+  /** The part of `income` that was taken out of your own accounts by hand (savings, investments): money in, not earned. */
+  fromAccounts: Money
+  /** Income minus what is deducted from it, without money taken out of accounts: what a share of income counts. */
   takeHome: Money
   /** What the month had left for the shares of what is left: after spending, typed amounts, shares of income and the buffer; never below zero. */
   leftForShares: Money

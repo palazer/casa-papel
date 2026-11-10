@@ -51,6 +51,7 @@ const TIP: Record<string, HelpKey> = {
   'net-worth': 'statement.netWorth',
   'set-aside': 'statement.setAside',
   sources: 'derived.fromSavings',
+  'from-accounts': 'statement.fromAccounts',
 }
 
 /** Left padding by level. A group's lines stay on its level (their chevron slot indents them); anything else opens one level in. */
@@ -137,6 +138,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
       {line.net != null && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">net {formatAmount(line.net, ccy, locale)}</span>}
       {line.budget != null && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">estimate {formatAmount(line.budget, ccy, locale)}</span>}
       {line.chip && <Chip tone="zinc">{line.chip}</Chip>}
+      {!!line.paidFor?.length && <span className="min-w-0 max-w-64 truncate text-[11px] text-muted-foreground" title={line.paidFor.join(', ')}>for {line.paidFor.join(', ')}</span>}
       {line.adjustment != null && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">entered, {formatAmount(line.adjustment, ccy, locale, { sign: 'exceptZero' })} against the plan</span>}
       {line.skipped && <Chip tone="zinc">skipped</Chip>}
       {line.goals?.map((g) => <GoalMark key={g.goal.id} goal={g} locale={locale} />)}

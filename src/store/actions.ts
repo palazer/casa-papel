@@ -50,10 +50,12 @@ function freezeNext(tables: Tables, engine: EngineOutput, rowId: string, month: 
   const next = addMonths(month, 1)
   const nextCell = cellOf(tables, rowId, next)
   const current = engine.cells[cellKey(rowId, month)]
-  if (!current || current.source === 'empty') return []
+  if (!current) return []
   if (nextCell && nextCell.mode !== 'inherit') return []
-  // a category's estimate carries what was typed, not what its rows have left of it
-  return [putCell({ rowId, month: next, mode: 'value', value: current.estimate ?? current.value, items: [], note: null, currencyOverride: null, updatedAt: now() })]
+  // A row that had no amount yet goes back to none after this month: without the zero the new amount would carry on.
+  // A category's estimate carries what was typed, not what its rows have left of it.
+  const held = current.source === 'empty' ? 0 : current.estimate ?? current.value
+  return [putCell({ rowId, month: next, mode: 'value', value: held, items: [], note: null, currencyOverride: null, updatedAt: now() })]
 }
 
 export async function setCellValue(store: Store, rowId: string, month: MonthKey, value: Money, scope: EditScope): Promise<void> {
@@ -143,8 +145,11 @@ export async function addRow(store: Store, input: Partial<Row> & { name: string;
   return row
 }
 
-/** What a new row under Transfers does; `plain` just moves money between your accounts, `card-payment` pays a card whose purchases are already expense rows. */
-export type TransferRowKind = 'plain' | 'to-savings' | 'to-investment' | 'pool-allocation' | 'pocket-money' | 'card-payment'
+/**
+ * What a new row under Transfers does; `plain` just moves money between your accounts, `card-payment` pays a card whose
+ * purchases are already expense rows, `from-savings` and `from-investment` take money out of an account into the month.
+ */
+export type TransferRowKind = 'plain' | 'to-savings' | 'to-investment' | 'pool-allocation' | 'pocket-money' | 'card-payment' | 'from-savings' | 'from-investment'
 /** What a new row under Expenses does: a normal expense, or a payment that brings a loan or card down. */
 export type ExpenseRowKind = 'plain' | 'pay-off'
 
@@ -189,7 +194,7 @@ export interface RowOfKindInput {
 export async function addRowOfKind(store: Store, input: RowOfKindInput): Promise<Row> {
   const tables = await loadTables(store)
   const targets = rowTargets(tables, tables.household.find((h) => !h.deletedAt))
-  const transferOnly: string[] = ['to-savings', 'to-investment', 'pool-allocation', 'pocket-money', 'card-payment']
+  const transferOnly: string[] = ['to-savings', 'to-investment', 'pool-allocation', 'pocket-money', 'card-payment', 'from-savings', 'from-investment']
   if ((input.section === 'expense' && transferOnly.includes(input.kind)) || (input.section === 'transfer' && input.kind === 'pay-off')) {
     throw new Error('That kind of row does not belong in this section.')
   }
@@ -209,7 +214,7 @@ export async function addRowOfKind(store: Store, input: RowOfKindInput): Promise
     if (acc.archivedMonth) throw new Error(`"${acc.name}" is archived.`)
     if (!targets.cardsItemized.some((a) => a.id === acc.id)) throw new Error(`"${acc.name}" records only its payment, as spending: add it under Expenses with "Pays off a loan or card".`)
     base.accountId = acc.id
-  } else if (input.kind === 'to-savings' || input.kind === 'to-investment') {
+  } else if (input.kind === 'to-savings' || input.kind === 'to-investment' || input.kind === 'from-savings' || input.kind === 'from-investment') {
     const acc = checkAccountForRow(tables, { kind: input.kind, name: input.name }, input.accountId ?? null)
     if (acc) base.accountId = acc.id
     // beside the row that takes the rest, a further savings row is typed: said outright, or it would read as idle
@@ -714,7 +719,7 @@ export async function setRowDeductedFrom(store: Store, rowId: string, incomeRowI
 }
 
 const ACCOUNT_TYPE_FOR_KIND: Partial<Record<RowKind, Account['type']>> = {
-  'to-savings': 'savings', 'to-investment': 'investment', 'from-investment': 'investment', 'debt-payment': 'loan', 'card-payment': 'credit-card',
+  'to-savings': 'savings', 'to-investment': 'investment', 'from-investment': 'investment', 'from-savings': 'savings', 'debt-payment': 'loan', 'card-payment': 'credit-card',
 }
 
 /** The account type a row of this kind must point at, or null when any account (or none) will do. */

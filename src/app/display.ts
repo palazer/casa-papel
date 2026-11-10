@@ -5,7 +5,8 @@ import { formatAmount, formatShare } from './format'
 export type Flow = 'in' | 'out' | 'net'
 
 export function flowOf(row: Row): Flow {
-  if (row.section === 'income') return 'in'
+  // money taken out of an account comes into the month, wherever the row sits
+  if (row.section === 'income' || row.kind === 'from-savings' || row.kind === 'from-investment') return 'in'
   if (row.kind === 'to-savings') return 'net'
   return 'out'
 }

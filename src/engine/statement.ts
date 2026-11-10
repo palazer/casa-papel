@@ -13,7 +13,7 @@
  *   out = spending + set aside and paid off + max(0, toSavings) + max(0, leftover)
  * Rows are sorted into the same buckets the engine's totals use (compute.ts, pass 2), which is what keeps the cents.
  */
-import { addMonths, canCarryRule, cardIsItemized, resolveRules, rowsFeeding, type Account, type Money, type MonthKey, type Row, type Section, type Tables } from '@/model'
+import { addMonths, canCarryRule, cardIsItemized, isTakenFromAccount, resolveRules, rowsFeeding, type Account, type Money, type MonthKey, type Row, type Section, type Tables } from '@/model'
 import { computeGoals, type GoalProgress } from './goals'
 import { computeMainAccount, type MainAccountSeries } from './mainAccount'
 import { cellKey, type AccountSeries, type CellResult, type CellStatus, type EngineOutput } from './types'
@@ -68,6 +68,8 @@ export interface StatementLine {
   memo?: boolean
   /** A short lowercase tag beside the name: `automatic`, `the rest`, `calculated`. */
   chip?: string
+  /** A line of "From savings and pool accounts": the expenses it paid for, by name. */
+  paidFor?: string[]
   /** The rule that works this line out, or that feeds this account: shown as the rule symbol, which opens the rule dialog. */
   rule?: StatementRule
   skipped?: boolean
@@ -109,10 +111,12 @@ export interface Statement {
   warnings: string[]
 }
 
-type Bucket = 'income' | 'from-investment' | 'expense' | 'pocket' | 'moved' | 'set-aside' | 'pay-off' | 'to-savings' | 'memo'
+type Bucket = 'income' | 'from-account' | 'expense' | 'pocket' | 'moved' | 'set-aside' | 'pay-off' | 'to-savings' | 'memo'
 
 /** The engine's pass-2 switch, named. */
 function bucketOf(row: Row, accountsById: Map<string, Account>): Bucket {
+  // money taken out of an account is its own section, wherever the row was placed
+  if (isTakenFromAccount(row)) return 'from-account'
   if (row.section === 'income') return 'income'
   switch (row.kind) {
     case 'to-savings': return 'to-savings'
@@ -124,7 +128,6 @@ function bucketOf(row: Row, accountsById: Map<string, Account>): Bucket {
       const acc = row.accountId ? accountsById.get(row.accountId) : undefined
       return acc && cardIsItemized(acc) ? 'memo' : 'pay-off'
     }
-    case 'from-investment': return 'from-investment'
     default: return row.section === 'expense' ? 'expense' : 'moved'
   }
 }
@@ -221,7 +224,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
 
   // ---------- the month ----------
   const income: Array<{ row: Row; line: StatementLine }> = []
-  const fromInvestment: StatementLine[] = []
+  const fromAccounts: StatementLine[] = []
   const expense: Array<{ row: Row; line: StatementLine }> = []
   const pocket: StatementLine[] = []
   const moved: StatementLine[] = []
@@ -240,8 +243,8 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
       case 'income':
         income.push({ row, line: rowLine(row, c, v) })
         break
-      case 'from-investment':
-        fromInvestment.push(rowLine(row, c, v))
+      case 'from-account':
+        fromAccounts.push(rowLine(row, c, v))
         break
       case 'expense': {
         if (row.kind === 'category-estimate') {
@@ -310,13 +313,16 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
     setAside.push({ id: 'leftover', kind: 'figure', label: 'Leftover', amount: t.leftover, children: [], balancing: true, automatic: true })
   }
 
+  // what expenses took straight out of savings and pool accounts: each line names the expenses it paid for
+  const paidFor = (list: StatementLine[]): string[] => [...new Set(list.map((l) => l.label))]
   const sources: StatementLine[] = []
-  if (fromSavings.length) sources.push({ id: 'src:savings', kind: 'source', label: 'Savings', amount: sum(fromSavings), children: fromSavings })
-  for (const [pid, list] of fromPool) sources.push({ id: `src:${pid}`, kind: 'source', label: poolsById.get(pid)?.name ?? 'A removed pool account', amount: sum(list), children: list, poolId: pid })
+  if (fromSavings.length) sources.push({ id: 'src:savings', kind: 'source', label: 'Savings', amount: sum(fromSavings), children: fromSavings, paidFor: paidFor(fromSavings) })
+  for (const [pid, list] of fromPool) sources.push({ id: `src:${pid}`, kind: 'source', label: poolsById.get(pid)?.name ?? 'A removed pool account', amount: sum(list), children: list, poolId: pid, paidFor: paidFor(list) })
 
   const inLines: StatementLine[] = [group('income', 'Income', 'income', categorised('income', income))]
-  if (fromInvestment.length) inLines.push(group('from-investment', 'From investments', 'worth', fromInvestment))
-  if (sources.length) inLines.push(group('sources', 'From savings and pool accounts', 'pool', sources))
+  // always there: it is where money is taken out of savings or investments by hand, so its first row is added in it
+  inLines.push({ ...group('from-accounts', 'Taken from accounts', 'worth', fromAccounts), empty: fromAccounts.length === 0 || undefined })
+  if (sources.length) inLines.push({ ...group('sources', 'From savings and pool accounts', 'pool', sources), calculated: true, chip: 'calculated' })
   if (cover.length) inLines.push(group('cover', 'To cover the month', 'transfer', cover))
 
   const spending = categorised('expense', expense, estimates)

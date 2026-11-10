@@ -1,5 +1,5 @@
 import {
-  cardIsItemized, compareMonths, fromMinor, monthRange, poolIdOf, resolveRules, scaleMoney, toMinor,
+  cardIsItemized, compareMonths, fromMinor, isTakenFromAccount, monthRange, poolIdOf, resolveRules, scaleMoney, toMinor,
   type Account, type Category, type Cell, type Money, type MonthKey, type Row, type RuleState, type Section,
 } from '@/model'
 import { buildFxIndex, convertMoney } from './fx'
@@ -301,7 +301,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
       month: m, closed: isClosed(m), income: 0, cashExpense: 0, savingsFunded: 0, poolFunded: 0, poolFundedByPool: {},
       allocations: 0, allocationsByPool: {}, toInvestment: 0, pocket: 0, pocketTotal: pocketTotalFor(m), debt: 0,
       buffer: bufferFor(m), toSavings: 0, leftover: 0, fromSavingsDerived: 0, expensesTotal: 0, transfersTotal: 0,
-      takeHome: 0, leftForShares: 0, rest: null,
+      fromAccounts: 0, takeHome: 0, leftForShares: 0, rest: null,
     }
     /** Every "to savings" amount except the rest: typed ones here, shares below. */
     let userToSavings = 0
@@ -309,10 +309,15 @@ export function computeEngine(input: EngineInput): EngineOutput {
       const c = cells[cellKey(row.id, m)]
       if (!c || c.source === 'archived') continue
       const v = c.valueBase
+      if (isTakenFromAccount(row)) {
+        // money taken out of savings or investments is cash in wherever the row sits, but not income to take a share of
+        t.income += v
+        t.fromAccounts += v
+        continue
+      }
       if (row.section === 'income') {
         t.income += v
-        // what reaches the account: money taken out of investments is not income to take a share of
-        if (row.kind !== 'from-investment') t.takeHome += c.netBase
+        t.takeHome += c.netBase
         continue
       }
       switch (row.kind) {
@@ -339,10 +344,6 @@ export function computeEngine(input: EngineInput): EngineOutput {
           if (!acc || !cardIsItemized(acc)) t.debt += v
           break
         }
-        case 'from-investment':
-          // an inflow placed in the transfer section still counts as cash in
-          t.income += v
-          break
         default: {
           if (row.section === 'expense') {
             t.cashExpense += c.funding.cash
@@ -454,7 +455,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
       if (acc.archivedMonth && compareMonths(m, acc.archivedMonth) >= 0) break
       const start: Money = prevBalance ?? acc.openingBalance
       const inflow = savingsInflow(acc, m, rows, cells, pools, totals[m])
-      const outflow = savingsOutflow(acc, m, pools, totals[m], acc.id === primarySavingsId)
+      const outflow = savingsOutflow(acc, m, rows, cells, pools, totals[m], acc.id === primarySavingsId)
       const computed: Money = start + inflow - outflow
       const actual = actuals.get(`${acc.id}|${m}`)?.actualBalance ?? null
       const balance: Money = actual ?? computed
@@ -608,9 +609,15 @@ function savingsInflow(acc: Account, m: MonthKey, rows: Row[], cells: Record<str
   return inflow
 }
 
-function savingsOutflow(acc: Account, _m: MonthKey, pools: EngineInput['tables']['pools'], t: MonthTotals, isPrimary: boolean): Money {
+function savingsOutflow(acc: Account, m: MonthKey, rows: Row[], cells: Record<string, CellResult>, pools: EngineInput['tables']['pools'], t: MonthTotals, isPrimary: boolean): Money {
   let out = isPrimary ? t.savingsFunded : 0
   for (const pool of pools) if (pool.accountId === acc.id) out += t.poolFundedByPool[pool.id] ?? 0
+  // money taken out of this account into the month by hand
+  for (const row of rows) {
+    if (row.kind !== 'from-savings' || row.accountId !== acc.id) continue
+    const c = cells[cellKey(row.id, m)]
+    if (c && c.source !== 'archived') out += c.valueBase
+  }
   return out
 }
 

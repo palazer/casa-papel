@@ -11,7 +11,7 @@ import { readPref, writePref } from '@/app/prefs'
 import { useStore } from '@/app/store'
 import { cellKey, type EngineOutput } from '@/engine'
 import { RecurringDialog } from '@/features/recurring/RecurringDialog'
-import { compareMonths, describeCadence, newId, type CellItem, type Household, type ItemStatus, type MonthKey, type Row, type Tables } from '@/model'
+import { compareMonths, describeCadence, isTakenFromAccount, newId, type CellItem, type Household, type ItemStatus, type MonthKey, type Row, type Tables } from '@/model'
 import {
   changeRecurringFrom, clearCell, endRecurringFrom, itemsFromCurrent, reopenMonth, setCellItems, setCellValue, skipRecurringMonth,
   type EditScope,
@@ -55,7 +55,9 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
   const soloItem = cell?.source === 'items' && cell.items.length === 1 && cell.items[0].kind === 'normal' && !cell.items[0].label && !cell.items[0].recurringItemId && !cell.items[0].skipped ? cell.items[0] : null
   const [mode, setMode] = useState<Mode>(isRecurringRow || (cell?.source === 'items' && !soloItem) ? 'items' : 'value')
   const [text, setText] = useState(() => amountToInput(cell?.value ?? 0, currency, locale))
-  const [scope, setScope] = useState<EditScope>(() => readPref<EditScope>('editScope', 'from-now-on'))
+  // money taken out of an account is a one-off unless you say otherwise; any other row remembers the last choice
+  const oneOff = isTakenFromAccount(row)
+  const [scope, setScope] = useState<EditScope>(() => (oneOff ? 'this-month' : readPref<EditScope>('editScope', 'from-now-on')))
   const [status, setStatus] = useState<StatusChoice>(soloItem ? soloItem.status : 'default')
   const [fundedBy, setFundedBy] = useState<CellItem['fundedBy']>(soloItem ? soloItem.fundedBy : row.defaultFundedBy)
   const [items, setItems] = useState<CellItem[]>(() => itemsFromCurrent(cell, row.defaultFundedBy, row.defaultStatus))
@@ -73,8 +75,8 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
   const fundingOptions = useMemo(() => buildFundingOptions(tables.pools, [row.defaultFundedBy, ...items.map((i) => i.fundedBy)]), [tables.pools, row.defaultFundedBy, items])
 
   useEffect(() => {
-    writePref('editScope', scope)
-  }, [scope])
+    if (!oneOff) writePref('editScope', scope)
+  }, [scope, oneOff])
 
   const itemsTotal = items.filter((i) => !i.skipped).reduce((s, i) => s + (i.kind === 'carry' ? (cell?.items.find((x) => x.id === i.id)?.effectiveAmount ?? prevValue()) : i.amount), 0)
 

@@ -457,6 +457,46 @@ test.describe('working the month in the Statement', () => {
     await dlg.getByRole('button', { name: 'Cancel' }).click()
   })
 
+  test('money taken from an account by hand has its own section; what expenses took from savings and pool accounts is marked calculated', async ({ page }) => {
+    await openStatement(page)
+    await goToMonth(page, 'November 2026')
+    const moneyIn = page.getByRole('region', { name: 'Money in' })
+    const moneyOut = page.getByRole('region', { name: 'Money out' })
+    const dlg = page.getByRole('dialog')
+    const rest = async () => euros(await moneyOut.locator('[data-line]').filter({ has: page.locator('[data-rule="rest"]') }).innerText())
+
+    // worked out from the expenses: tagged, and each line names what it paid for
+    await expect(moneyIn.locator('[data-line="sources"]')).toContainText('calculated')
+    await expect(moneyIn.locator('[data-line^="src:"]').filter({ hasText: 'Clothing' })).toContainText('for Clothing')
+
+    // typed by hand: a section that is always there, empty until a row is added in it
+    const taken = moneyIn.locator('[data-line="from-accounts"]')
+    await expect(taken).toContainText('Taken from accounts')
+    await moneyIn.getByRole('button', { name: 'Add transfer row' }).click()
+    await expect(moneyIn.getByLabel('What the new transfer row does').locator('option')).toHaveText(['Taken from a savings account', 'Taken from an investment account'])
+    await moneyIn.getByLabel('New transfer row name').fill('From Savings')
+    await moneyIn.getByRole('button', { name: 'Add', exact: true }).click()
+    // the editor opens for the first amount, and for these rows it starts on this month only
+    await expect(dlg.getByRole('radio', { name: 'Only this month' })).toBeChecked()
+    await dlg.getByLabel('Amount in EUR').fill('400')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(moneyIn.getByRole('button', { name: 'From Savings: €400.00' })).toBeVisible()
+    await expect(taken).toContainText('€400.00')
+    // the month has 400 more, so the rest grows by it, and the two sides still agree
+    expect(await rest()).toBe(2769)
+    expect((await total(page, 'in').innerText()).replace(/^Total in\s*/, '')).toBe((await total(page, 'out').innerText()).replace(/^Total out\s*/, ''))
+    await page.screenshot({ path: 'e2e/output/statement-taken.png', fullPage: true })
+    // nothing is taken the month after
+    await goToMonth(page, 'December 2026')
+    await expect(moneyIn.getByRole('button', { name: /^From Savings:/ })).toHaveAccessibleName('From Savings: €0.00')
+    expect(await rest()).toBe(2369)
+    // the right side does not offer what has its own place on the left
+    await moneyOut.getByRole('button', { name: 'Add transfer row' }).click()
+    await expect(moneyOut.getByLabel('What the new transfer row does').locator('option[value="to-investment"]')).toHaveCount(1)
+    await expect(moneyOut.getByLabel('What the new transfer row does').locator('option[value="from-savings"]')).toHaveCount(0)
+  })
+
   test('the rest moves to a new savings account from its line in the lower half', async ({ page }) => {
     await page.goto('?demo=1')
     await page.getByRole('button', { name: 'Load the demo household' }).click()

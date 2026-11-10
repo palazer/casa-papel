@@ -7,6 +7,7 @@ export function accountVerb(row: Row): string {
     case 'to-investment':
       return 'Goes into'
     case 'from-investment':
+    case 'from-savings':
       return 'Comes from'
     case 'debt-payment':
     case 'card-payment':
@@ -24,6 +25,8 @@ export function accountHelp(row: Row): string {
       return 'The investment account the deposits go to. Its value, deposited total and return follow this row.'
     case 'from-investment':
       return 'The investment account the money is taken out of.'
+    case 'from-savings':
+      return 'The savings account the money is taken out of. Its balance under Balances falls by the amount.'
     case 'debt-payment':
       return 'The loan this row pays down. What is still owed falls by the amount.'
     case 'card-payment':

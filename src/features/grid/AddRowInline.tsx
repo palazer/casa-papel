@@ -37,6 +37,8 @@ const KINDS: Kind[] = [
   { key: 'to-investment', section: 'transfer', label: 'Deposits into an investment account', text: 'The account\'s value, deposited total and return under Balances follow this row.', targets: (t) => t.investments, targetLabel: 'Account', field: 'accountId', empty: () => 'Add an investment account under Household first.' },
   { key: 'pool-allocation', section: 'transfer', label: 'Fills a pool account', text: 'For a pool account that lost its row: the amount lands in the pool account every month.', targets: (t) => t.orphanPools, targetLabel: 'Pool account', field: 'poolId', empty: () => '', offered: (t) => t.orphanPools.length > 0 },
   { key: 'pocket-money', section: 'transfer', label: 'Pocket money for an adult', text: 'A fixed amount you type for that adult. It comes off the month\'s leftover, and in the proportional split it is theirs alone.', targets: (t) => t.adults, targetLabel: 'Adult', field: 'adultId', empty: () => 'Add an adult under Household first.' },
+  { key: 'from-savings', section: 'transfer', label: 'Taken from a savings account', text: 'Money you move out of that savings account into the month, to fill a gap or to top up a pool account. Its balance falls by the amount, and the month has that much more.', targets: (t) => t.savings, targetLabel: 'Account', field: 'accountId', empty: () => 'Add a savings account under Household first.' },
+  { key: 'from-investment', section: 'transfer', label: 'Taken from an investment account', text: 'Money you take out of that investment account into the month. Its value falls by the amount, and the month has that much more.', targets: (t) => t.investments, targetLabel: 'Account', field: 'accountId', empty: () => 'Add an investment account under Household first.' },
   { key: 'card-payment', section: 'transfer', label: 'Pays off a credit card', text: 'For a card whose purchases are expense rows: the payment only moves money, and what is owed on the card falls by it.', targets: (t) => t.cardsItemized, targetLabel: 'Account', field: 'accountId', empty: () => '', offered: (t) => t.cardsItemized.length > 0 },
   { key: 'plain', section: 'expense', label: 'A normal expense', text: 'Spending you type each month, as one amount or a list of items.', targets: null, targetLabel: 'Account', field: 'accountId', empty: () => '' },
   {
@@ -51,11 +53,14 @@ const KINDS: Kind[] = [
 /**
  * "Add row" at the foot of a section: a name, a category when the section has any, and under Transfers and Expenses what
  * the row does. The Statement also puts one inside each category: `defaultCategoryId` starts it there, `label` names
- * the button ("Add row to Housing"), and `onAdded` hands back the new row so the screen can open it.
+ * the button ("Add row to Housing"), and `onAdded` hands back the new row so the screen can open it. Where the place
+ * says what the row does (the Statement's "Taken from accounts"), `only` narrows the choices to those, and `without`
+ * leaves out the ones that have a place of their own.
  */
-export function AddRowInline({ section, categories, tables, household, onError, defaultCategoryId = '', label, onAdded }: {
+export function AddRowInline({ section, categories, tables, household, onError, defaultCategoryId = '', label, onAdded, only, without }: {
   section: Section; categories: Category[]; tables: Tables; household: Household; onError: (msg: string) => void
   defaultCategoryId?: string; label?: string; onAdded?: (row: Row) => void
+  only?: Choice[]; without?: Choice[]
 }) {
   const store = useStore()
   const [open, setOpen] = useState(false)
@@ -66,7 +71,7 @@ export function AddRowInline({ section, categories, tables, household, onError, 
 
   // the lists and rules the store applies in addRowOfKind, so what is offered is what is accepted
   const t = rowTargets(tables, household)
-  const kinds = KINDS.filter((k) => k.section === section && (k.offered?.(t) ?? true))
+  const kinds = KINDS.filter((k) => k.section === section && (k.offered?.(t) ?? true) && (!only || only.includes(k.key)) && !without?.includes(k.key))
   // a choice that is no longer offered (the plug got its row, the pool was filled elsewhere) falls back to the first one
   const kind: Kind | undefined = kinds.find((k) => k.key === choice) ?? kinds[0]
   const targets = kind?.targets?.(t) ?? null

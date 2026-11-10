@@ -24,6 +24,9 @@ const STEPS: Record<number, Step> = {
   // 5 → 6: `Row.rule` and `Row.ruleShare` (a share of income, a share of what is left, or the rest for a chosen
   // savings row). Both fill in from their defaults; the version keeps an older app from typing over a worked-out row.
   5: (raw) => raw,
+  // 6 → 7: the row kind 'from-savings' (money taken out of a savings account into the month). Nothing to rewrite; the
+  // version keeps an older app from reading such a row as an ordinary transfer out.
+  6: (raw) => raw,
 }
 
 export function migrateExport(raw: unknown): unknown {

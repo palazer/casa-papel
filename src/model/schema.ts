@@ -8,7 +8,7 @@ import { FUNDED_BY_PATTERN } from './fundedBy'
 z.config({ jitless: true })
 
 /** Bump when the shape of stored data changes; add a migration in migrations.ts. */
-export const SCHEMA_VERSION = 6
+export const SCHEMA_VERSION = 7
 
 // ---------- primitives ----------
 export const IdSchema = z.string().regex(ID_PATTERN, 'expected ULID')
@@ -134,6 +134,9 @@ export const RowKindSchema = z.enum([
   // An expense category's estimate: its cells hold what the whole category is expected to come to, and the engine
   // counts only what the category's other rows have not explained yet ("Not broken down yet"). One per category.
   'category-estimate',
+  // Money taken out of a savings account into the month by hand: to fill a gap, or to top up a pool account. The
+  // counterpart of 'from-investment'; both count as money in and lower the account they come from.
+  'from-savings',
 ])
 
 /**

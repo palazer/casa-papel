@@ -102,6 +102,31 @@ describe('rules: how a transfer is worked out', () => {
     expectBalanced(withSale, out)
   })
 
+  it('money taken from a savings account comes in, lowers that account, and is not income for a share', () => {
+    const { t, r, savings } = world()
+    const taken = row({ name: 'From Savings', section: 'transfer', kind: 'from-savings', accountId: savings.id, order: 'a5' })
+    const withTaken = { ...t, rows: [...t.rows, taken], cells: [...t.cells, cellValue(taken.id, '2026-02', 100000), cellValue(taken.id, '2026-03', 0)] }
+    const out = run(withTaken)
+    const tot = out.totals['2026-02']
+    expect(tot).toMatchObject({ income: 600000, fromAccounts: 100000, takeHome: 400000 })
+    expect(value(out, r.toBroker, '2026-02')).toBe(40000)
+    // the month has 1,000 more to share out: 3,000 left, a quarter to Rainy day, the rest to Savings
+    expect(tot.leftForShares).toBe(300000)
+    expect(value(out, r.toRainy, '2026-02')).toBe(75000)
+    expect(tot.rest).toBe(225000)
+    // Savings: 1,500 in January, then 2,250 in and 1,000 out
+    expect(out.accounts[savings.id].months['2026-02']).toMatchObject({ balance: 275000, inflow: 225000, outflow: 100000 })
+    const s = buildStatement(withTaken, out, '2026-02')!
+    const group = s.flow.left.lines.find((l) => l.id === 'from-accounts')!
+    expect(group).toMatchObject({ label: 'Taken from accounts', amount: 100000 })
+    expect(group.children).toMatchObject([{ kind: 'row', rowId: taken.id, label: 'From Savings', amount: 100000 }])
+    // nothing was earned by it: net worth grows by income minus spending, as in any other month
+    expect(s.position.right.lines.find((l) => l.id === 'net-worth')!.change).toBe(500000 - 250000)
+    expect(out.totals['2026-03'].fromAccounts).toBe(0)
+    expectIdentity(out)
+    expectBalanced(withTaken, out)
+  })
+
   it('a typed month shows the typed amount and the rule takes over again after it', () => {
     const { t, r } = world()
     const typed = { ...t, cells: [...t.cells, cellValue(r.toBroker.id, '2026-02', 99900), cellValue(r.toSavings.id, '2026-02', 1)] }
