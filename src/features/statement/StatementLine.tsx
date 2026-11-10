@@ -40,6 +40,8 @@ export interface LineContext {
   onEstimate?: (categoryId: string) => void
   /** Open the rule dialog for a transfer line, or for the account or pool account it feeds. Leave out to show the rule without the button. */
   onRule?: (line: Line) => void
+  /** Top up a pool account that is short this month. */
+  onTopUp?: (poolId: string) => void
 }
 
 const HUE: Record<StatementHue, Hue> = { income: HUES.income, expense: HUES.expense, transfer: HUES.transfer, worth: HUES.worth, pool: HUES.pool }
@@ -139,6 +141,11 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
       {line.budget != null && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">estimate {formatAmount(line.budget, ccy, locale)}</span>}
       {line.chip && <Chip tone="zinc">{line.chip}</Chip>}
       {!!line.paidFor?.length && <span className="min-w-0 max-w-64 truncate text-[11px] text-muted-foreground" title={line.paidFor.join(', ')}>for {line.paidFor.join(', ')}</span>}
+      {line.note && <span className="min-w-0 max-w-64 truncate text-[11px] text-muted-foreground" title={line.note}>{line.note}</span>}
+      {line.short != null && line.kind === 'pool' && <Chip tone="rose">short {formatAmount(line.short, ccy, locale)}</Chip>}
+      {line.short != null && line.kind === 'source' && (
+        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{formatAmount(line.short, ccy, locale)} more than it held{line.shortFrom ? `, taken from ${line.shortFrom}` : ''}</span>
+      )}
       {line.adjustment != null && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">entered, {formatAmount(line.adjustment, ccy, locale, { sign: 'exceptZero' })} against the plan</span>}
       {line.skipped && <Chip tone="zinc">skipped</Chip>}
       {line.goals?.map((g) => <GoalMark key={g.goal.id} goal={g} locale={locale} />)}
@@ -240,6 +247,9 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
           {head}
           {tags}
           {line.rule && <RuleMark line={line} ctx={ctx} />}
+          {line.short != null && line.poolId && ctx.onTopUp && (
+            <Button size="xs" variant="outline" aria-label={`Top up ${line.label}`} onClick={() => ctx.onTopUp!(line.poolId!)}>Top up…</Button>
+          )}
           {tip && <InfoTip help={tip} />}
           {canGoal && !line.goals?.length && (
             <button

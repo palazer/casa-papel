@@ -70,6 +70,12 @@ export interface StatementLine {
   chip?: string
   /** A line of "From savings and pool accounts": the expenses it paid for, by name. */
   paidFor?: string[]
+  /** A pool account that was asked for more than it held this month: by how much, on its own line and on the line of what it paid. */
+  short?: Money
+  /** With `short`: the savings account whose unassigned part covered it. */
+  shortFrom?: string
+  /** A row whose month is one labelled item that no schedule posted: the label, so a one-off (a top-up) says what it was without opening anything. */
+  note?: string
   /** The rule that works this line out, or that feeds this account: shown as the rule symbol, which opens the rule dialog. */
   rule?: StatementRule
   skipped?: boolean
@@ -185,6 +191,8 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
     const rule = canCarryRule(row) ? ruleOf(row) : undefined
     return {
       id: row.id, kind: 'row', label: row.name, amount, children, status: c.status, estimate: !empty && c.status === 'projected', empty,
+      // a one-off says what it was; a scheduled item only repeats its row's name
+      note: live.length === 1 && live[0].label && live[0].recurringItemId == null ? live[0].label : undefined,
       automatic: c.source === 'derived', chip: c.source === 'derived' && !rule ? 'automatic' : undefined, rule, missingRate: c.missingRate || undefined,
       native: c.currency !== base ? { amount: c.value, currency: c.currency } : undefined,
       net: row.section === 'income' && c.deductionsBase > 0 ? c.netBase : undefined,
@@ -317,7 +325,14 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   const paidFor = (list: StatementLine[]): string[] => [...new Set(list.map((l) => l.label))]
   const sources: StatementLine[] = []
   if (fromSavings.length) sources.push({ id: 'src:savings', kind: 'source', label: 'Savings', amount: sum(fromSavings), children: fromSavings, paidFor: paidFor(fromSavings) })
-  for (const [pid, list] of fromPool) sources.push({ id: `src:${pid}`, kind: 'source', label: poolsById.get(pid)?.name ?? 'A removed pool account', amount: sum(list), children: list, poolId: pid, paidFor: paidFor(list) })
+  for (const [pid, list] of fromPool) {
+    const pool = poolsById.get(pid)
+    const short = engine.pools[pid]?.months[month]?.short ?? 0
+    const line: StatementLine = { id: `src:${pid}`, kind: 'source', label: pool?.name ?? 'A removed pool account', amount: sum(list), children: list, poolId: pid, paidFor: paidFor(list) }
+    // it paid more than it held: the difference came out of the unassigned part of its savings account
+    if (short > 0) Object.assign(line, { short, shortFrom: pool ? accountsById.get(pool.accountId)?.name : undefined })
+    sources.push(line)
+  }
 
   const inLines: StatementLine[] = [group('income', 'Income', 'income', categorised('income', income))]
   // always there: it is where money is taken out of savings or investments by hand, so its first row is added in it
@@ -387,6 +402,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
         const pm = engine.pools[p.id].months[month]
         const poolLine: StatementLine = { id: `pool:${p.id}`, kind: 'pool', label: p.name, amount: pm.balance, change: pm.allocation - pm.spend, children: [], poolId: p.id }
         if (!p.archivedMonth) poolLine.rule = ruleOfRows(engine.rows.filter((row) => row.id === p.allocationRowId && !row.archivedMonth))
+        if (pm.short > 0) Object.assign(poolLine, { short: pm.short, shortFrom: acc.name })
         poolLines.set(p.id, poolLine)
         line.children.push(poolLine)
         inPools += pm.balance

@@ -497,6 +497,65 @@ test.describe('working the month in the Statement', () => {
     await expect(moneyOut.getByLabel('What the new transfer row does').locator('option[value="from-savings"]')).toHaveCount(0)
   })
 
+  test('a pool account that runs short stops at zero and offers a top-up that leaves a record', async ({ page }) => {
+    await openStatement(page)
+    await goToMonth(page, 'November 2026')
+    const moneyIn = page.getByRole('region', { name: 'Money in' })
+    const moneyOut = page.getByRole('region', { name: 'Money out' })
+    const assets = page.getByRole('region', { name: 'Assets' })
+    const dlg = page.getByRole('dialog')
+    const rest = async () => euros(await moneyOut.locator('[data-line]').filter({ has: page.locator('[data-rule="rest"]') }).innerText())
+    const balanced = async () => expect((await total(page, 'in').innerText()).replace(/^Total in\s*/, '')).toBe((await total(page, 'out').innerText()).replace(/^Total out\s*/, ''))
+    const poolLine = assets.locator('[data-line^="pool:"]').filter({ hasText: 'Clothing' })
+    await expect(poolLine).toContainText('€270.00')
+
+    // €3,000 of clothing out of a pool account that holds €450 this month
+    await page.getByRole('button', { name: 'Open all' }).click()
+    await moneyOut.getByRole('button', { name: /^Clothing: €180\.00/ }).click()
+    // the row holds one item this month, the winter coat
+    await dlg.getByLabel('Item amount').fill('3000')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+
+    // the top-up is offered straight away; "Not now" keeps the expense and leaves the pool account short
+    await expect(dlg.getByRole('heading', { name: 'Clothing is short in November 2026' })).toBeVisible()
+    await expect(dlg).toContainText('€3,000.00 comes out of Clothing this month and it holds €450.00: €2,550.00 is missing.')
+    await dlg.getByRole('button', { name: 'Not now' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(poolLine).toContainText('short €2,550.00')
+    await expect(poolLine).toContainText('€0.00')
+    await expect(moneyIn.locator('[data-line^="src:"]').filter({ hasText: 'Clothing' }).first()).toContainText('€2,550.00 more than it held, taken from Savings')
+    expect(await rest()).toBe(2369)
+    await balanced()
+    await page.screenshot({ path: 'e2e/output/statement-short.png', fullPage: true })
+
+    // from the tag: top it up from the savings it sits in
+    await assets.getByRole('button', { name: 'Top up Clothing' }).click()
+    await expect(dlg.getByRole('radio', { name: /^Savings, not set aside · €/ })).toBeChecked()
+    await expect(dlg.getByLabel('Amount in EUR')).toHaveValue('2550')
+    const preview = dlg.getByTestId('top-up-preview')
+    await expect(preview).toContainText('Money in · From Savings€2,550.00')
+    await expect(preview).toContainText('Money out · Clothing pool, this month€2,650.00')
+    await expect(dlg.getByTestId('top-up-balance')).toHaveText('€0.00')
+    await page.screenshot({ path: 'e2e/output/statement-top-up-dialog.png' })
+    await dlg.getByRole('button', { name: 'Top up' }).click()
+    await expect(dlg).toBeHidden()
+
+    // both lines are there, the tag is gone, and the rest of the month did not move
+    const fromSavings = moneyIn.getByRole('button', { name: 'From Savings: €2,550.00' })
+    await expect(fromSavings).toBeVisible()
+    await expect(moneyIn.locator('[data-line]').filter({ has: page.getByRole('button', { name: 'From Savings: €2,550.00' }) })).toContainText('Top-up for Clothing')
+    await expect(moneyOut.getByRole('button', { name: /^Clothing pool: €2,650\.00/ })).toBeVisible()
+    await expect(poolLine).not.toContainText('short')
+    await expect(assets.getByRole('button', { name: 'Top up Clothing' })).toHaveCount(0)
+    expect(await rest()).toBe(2369)
+    await balanced()
+    await page.screenshot({ path: 'e2e/output/statement-topped-up.png', fullPage: true })
+    // December is back to the usual €100, with nothing taken from savings
+    await goToMonth(page, 'December 2026')
+    await expect(moneyOut.getByRole('button', { name: /^Clothing pool: €100\.00/ })).toBeVisible()
+    await expect(moneyIn.getByRole('button', { name: /^From Savings:/ })).toHaveAccessibleName('From Savings: €0.00')
+  })
+
   test('the rest moves to a new savings account from its line in the lower half', async ({ page }) => {
     await page.goto('?demo=1')
     await page.getByRole('button', { name: 'Load the demo household' }).click()

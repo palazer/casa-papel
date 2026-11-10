@@ -27,8 +27,11 @@ test.describe('row sources, accounts and followers', () => {
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
 
-    // the pool went down by the groceries amount, and the cell reopens as a single amount from the pool
-    await expect.poll(async () => money(await travel.getByRole('cell').nth(novIdx).innerText())).toBe(before - 700)
+    // the pool account held less than the groceries: it stops at zero and says by how much it is short
+    expect(before).toBe(240)
+    await expect.poll(async () => money(await travel.getByRole('cell').nth(novIdx).innerText())).toBe(0)
+    await expect(travel.getByRole('cell').nth(novIdx)).toHaveAttribute('title', /^Short by €460\.00/)
+    // the cell reopens as a single amount from the pool
     await groceries.click()
     await expect(dlg.getByRole('tab', { name: 'Single amount' })).toHaveAttribute('aria-selected', 'true')
     await expect(dlg.getByLabel('Comes out of', { exact: true })).toHaveValue(/^pool:/)

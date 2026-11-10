@@ -251,6 +251,14 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   from the expenses that come straight out of them: its heading carries the `calculated` chip and an (i), and each
   line names the expenses it paid for in muted `text-[11px]` (`for Weekend trip, Flights`, cut with an ellipsis,
   the full list in the title).
+  **A pool account that is short.** A pool account never shows less than zero. In a month that takes more out of it
+  than it holds, its line in the lower half carries a rose `short €2,730.00` chip and an `xs outline` button `Top
+  up…` (named `Top up <pool account>`), and its line under "From savings and pool accounts" says `€2,730.00 more
+  than it held, taken from <savings account>` in muted `text-[11px]` with the same button. When a pool account
+  becomes short while its month is on screen, the top-up dialog opens by itself; one that was short already only
+  shows the chip. The Grid and the Month view show the balance at zero in the expense hue with the reason in the
+  title or sub-line. A row whose month is a single labelled item that no schedule posted (a top-up, a one-off purchase)
+  shows the label after its name in muted `text-[11px]`.
   **The rule symbol.** A transfer that feeds a savings account, an investment account or a pool account, and that
   account in the lower half, say how the amount is worked out with one small symbol after the name, never a word
   tag: `ArrowDownToLine` (14 px) for the rest, the percentage in `text-[11px] tabular-nums` for a share of income
@@ -346,6 +354,13 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   taken of, and what is then left for the rest (or as leftover). A muted sentence says so when the rest would
   move from another account or stop being taken. The figures and every refusal come from running the save on a
   copy, so the dialog never shows a number or allows a Save the store would not. Footer: Cancel, Save.
+- The top-up dialog (`src/features/statement/TopUpDialog.tsx`), titled `<pool account> is short in <month>`: one
+  sentence with what comes out, what it holds and what is missing; "Top it up from" as a `Segmented` (the pool
+  account's own savings account first, as `<account>, not set aside · <free amount>`, then the other savings and
+  investment accounts with their balance, then `This month's income`) with a sentence for the chosen source; the
+  amount, pre-filled with what is missing; and under `<month> will then show` the lines the save will leave (`Money
+  in · From <account>`, `Money out · <pool account> pool, this month`, the pool account's balance), worked out on a
+  copy. Footer: a ghost `Not now` on the left, `Top up` on the right. `Not now` changes nothing.
 - Dialogs are shadcn `Dialog`; the confirm step lives inside the dialog, never behind it. Errors appear beside the field
   that caused them, `role="alert"`.
 - Removing anything goes through one `RemoveDialog` (`src/features/remove/RemoveDialog.tsx`), reached from a row's

@@ -88,7 +88,7 @@ export function GridScreen() {
     /** `pick` returns null for a month the series does not reach (an archived account or pool account): the cell stays blank. */
     label: string, flow: Flow, pick: (m: MonthKey) => Money | null,
     /** `sub`: a detail line under the named parent row; indented and faded, with the parent's name read out but not shown. */
-    opts: { strong?: boolean; muted?: boolean; currency?: string; hue?: Hue; band?: boolean; sub?: string; help?: HelpKey; format?: (v: Money, m: MonthKey) => string; onClick?: (m: MonthKey) => void; mark?: (m: MonthKey) => boolean } = {},
+    opts: { strong?: boolean; muted?: boolean; currency?: string; hue?: Hue; band?: boolean; sub?: string; help?: HelpKey; format?: (v: Money, m: MonthKey) => string; onClick?: (m: MonthKey) => void; mark?: (m: MonthKey) => boolean; warn?: (m: MonthKey) => string | null } = {},
   ): ReactNode => (
     <tr key={opts.sub ? `${opts.sub} · ${label}` : label} className={cn(opts.band && (opts.hue ? opts.hue.tint : 'bg-muted/40'), opts.strong && 'font-medium')}>
       <th scope="row" className={cn('sticky left-0 z-10 px-2 py-0.5 text-left', opts.band ? (opts.hue ? opts.hue.tint : 'bg-muted') : 'bg-card', opts.hue && !opts.sub ? opts.hue.text : 'text-muted-foreground', opts.muted && 'text-[11px]', opts.sub && 'pl-6 font-normal')}>
@@ -102,8 +102,10 @@ export function GridScreen() {
         const d = amountDisplay(v, flow, opts.currency ?? ccy, locale, neg)
         const text = opts.format ? opts.format(v, m) : d.text
         const marked = opts.mark?.(m) ?? false
+        // a balance that needs attention (a pool account that was asked for more than it held) takes the expense hue and says why
+        const warning = opts.warn?.(m) ?? null
         return (
-          <td key={m} className={cn('p-0 text-right tabular-nums', toneClass[d.tone], opts.muted && 'text-[11px]', opts.sub && 'text-muted-foreground', engine.totals[m]?.closed && 'bg-muted/60')}>
+          <td key={m} title={warning ?? undefined} className={cn('p-0 text-right tabular-nums', toneClass[d.tone], warning && 'text-expense', opts.muted && 'text-[11px]', opts.sub && 'text-muted-foreground', engine.totals[m]?.closed && 'bg-muted/60')}>
             {opts.onClick ? (
               <button type="button" aria-label={`${label} ${formatMonth(m, locale)}: ${text}`} onClick={() => opts.onClick!(m)} className={cn('w-full px-1.5 py-0.5 text-right hover:bg-muted', marked && 'underline decoration-dotted underline-offset-4')}>
                 {text}
@@ -239,7 +241,10 @@ export function GridScreen() {
             })}
             {poolSeries.map((p) => {
               const pool = tables.pools.find((x) => x.id === p.poolId)
-              return derivedRow(`Pool account · ${pool?.name ?? ''}`, 'in', (m) => p.months[m]?.balance ?? null, { hue: HUES.pool, help: 'balance.pool' })
+              return derivedRow(`Pool account · ${pool?.name ?? ''}`, 'in', (m) => p.months[m]?.balance ?? null, {
+                hue: HUES.pool, help: 'balance.pool',
+                warn: (m) => (p.months[m]?.short ? `Short by ${formatAmount(p.months[m].short, ccy, locale)}: more came out of it than it held. Top it up on the Statement.` : null),
+              })
             })}
             {accountSeries.length > 0 && derivedRow('Net worth', 'in', (m) => (accountSeries.some((s) => s.months[m]) ? engine.netWorth[m] ?? 0 : null), { strong: true, hue: HUES.worth, band: true, help: 'derived.netWorth' })}
           </tbody>

@@ -426,8 +426,13 @@ export function computeEngine(input: EngineInput): EngineOutput {
       if (pool.archivedMonth && compareMonths(m, pool.archivedMonth) >= 0) break
       const allocation = totals[m].allocationsByPool[pool.id] ?? 0
       const spend = totals[m].poolFundedByPool[pool.id] ?? 0
-      bal = bal + allocation - spend
-      series.months[m] = { balance: bal, allocation, spend }
+      // A pool account never holds less than nothing. What is taken beyond what it holds comes out of the unassigned
+      // part of its savings account: that account's balance already falls by the whole amount, so only the split
+      // inside it changes. `short` names the month's shortfall until a top-up covers it.
+      const after: Money = bal + allocation - spend
+      const short: Money = after < 0 ? -after : 0
+      bal = after < 0 ? 0 : after
+      series.months[m] = { balance: bal, allocation, spend, short }
     }
     poolSeries[pool.id] = series
   }

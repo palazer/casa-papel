@@ -110,9 +110,12 @@ export interface AccountSeries {
 }
 
 export interface PoolMonthResult {
+  /** Never below zero: a pool account that is asked for more than it holds stops at nothing. */
   balance: Money
   allocation: Money
   spend: Money
+  /** What the month took beyond what the pool account held; it came out of the unassigned part of its savings account. */
+  short: Money
 }
 
 export interface PoolSeries {

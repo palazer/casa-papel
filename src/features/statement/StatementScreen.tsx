@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ComponentProps, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import { Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
@@ -21,6 +21,7 @@ import { RuleDialog } from '@/features/rules/RuleDialog'
 import { AddCategoryInline } from './AddCategoryInline'
 import { EstimateDialog } from './EstimateDialog'
 import { StatementBand } from './StatementBand'
+import { TopUpDialog } from './TopUpDialog'
 import { ESTIMATE_SHADE, type LineContext } from './StatementLine'
 
 const walk = (lines: StatementLine[]): StatementLine[] => lines.flatMap((l) => [l, ...walk(l.children)])
@@ -50,12 +51,31 @@ export function StatementScreen() {
   const [estimateFor, setEstimateFor] = useState<string | null>(null)
   /** The transfer, account or pool account whose rule is being set. */
   const [ruleFor, setRuleFor] = useState<RuleTarget | null>(null)
+  /** The pool account being topped up. */
+  const [topUpFor, setTopUpFor] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const idx = Math.max(0, months.indexOf(month) === -1 ? months.length - 1 : months.indexOf(month))
   const m = months[idx]
   const statement = useMemo(() => (tables && engine && m ? buildStatement(tables, engine, m, main) : null), [tables, engine, m, main])
+  /** What each pool account is short by in the month shown. */
+  const shortNow = useMemo(() => {
+    const out: Record<string, number> = {}
+    if (engine && m) for (const [id, s] of Object.entries(engine.pools)) out[id] = s.months[m]?.short ?? 0
+    return out
+  }, [engine, m])
+  const closedNow = statement?.closed ?? true
+  // A pool account that becomes short while this month is on screen (an expense was just typed, a set-aside lowered)
+  // gets its top-up offered straight away. One that was short already when the month came into view only shows its tag.
+  const seenShort = useRef<{ month: MonthKey | undefined; short: Record<string, number> }>({ month: undefined, short: {} })
+  useEffect(() => {
+    const seen = seenShort.current
+    seenShort.current = { month: m, short: shortNow }
+    if (seen.month !== m || closedNow) return
+    const grown = Object.keys(shortNow).find((id) => shortNow[id] > (seen.short[id] ?? 0))
+    if (grown) setTopUpFor(grown)
+  }, [m, shortNow, closedNow])
   const isOpen = useCallback((line: StatementLine) => openLines[line.id] ?? line.open ?? false, [openLines])
   const onToggle = useCallback((line: StatementLine) => setOpenLines((s) => ({ ...s, [line.id]: !(s[line.id] ?? line.open ?? false) })), [])
 
@@ -142,7 +162,7 @@ export function StatementScreen() {
   }
 
   // a closed month shows its rules and changes none
-  const base = { locale, ccy, isOpen, onToggle, goalText, onRule: statement.closed ? undefined : onRule }
+  const base = { locale, ccy, isOpen, onToggle, goalText, onRule: statement.closed ? undefined : onRule, onTopUp: statement.closed ? undefined : setTopUpFor }
   const flowCtx: LineContext = { ...base, withChange: false, closed: statement.closed, doneOf, onTick, onEdit: setEditorRow, busy, footer, onEstimate: setEstimateFor }
   // the estimate dialog reads the category's line: what the month shows now, and what its rows explain
   const estimateCategory = estimateFor ? tables.categories.find((c) => c.id === estimateFor && !c.deletedAt) : undefined
@@ -188,6 +208,7 @@ export function StatementScreen() {
         />
       )}
       {ruleFor && <RuleDialog key={JSON.stringify(ruleFor)} tables={tables} household={household} target={ruleFor} month={m} onClose={() => setRuleFor(null)} />}
+      {topUpFor && <TopUpDialog key={`${topUpFor}:${m}`} tables={tables} engine={engine} household={household} poolId={topUpFor} month={m} onClose={() => setTopUpFor(null)} />}
       {removingGoal && <RemoveDialog target={{ kind: 'goal', id: removingGoal.id }} tables={tables} household={household} onClose={() => setRemovingGoal(null)} />}
     </div>
   )

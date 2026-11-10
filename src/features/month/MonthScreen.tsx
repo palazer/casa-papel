@@ -113,7 +113,7 @@ export function MonthScreen() {
         })}
         {Object.values(engine.accounts).some((s) => s.months[m]) && <Stat label="Net worth" help="derived.netWorth" value={formatAmount(engine.netWorth[m] ?? 0, ccy, locale)} tone={(engine.netWorth[m] ?? 0) < 0 ? 'out' : 'neutral'} hue={HUES.worth} />}
         {Object.values(engine.pools).filter((p) => p.months[m]).map((p) => (
-          <Stat key={p.poolId} label={`Pool account · ${tables.pools.find((x) => x.id === p.poolId)?.name ?? ''}`} help="balance.pool" value={formatAmount(p.months[m].balance, ccy, locale)} tone={p.months[m].balance < 0 ? 'out' : 'neutral'} hue={HUES.pool} />
+          <Stat key={p.poolId} label={`Pool account · ${tables.pools.find((x) => x.id === p.poolId)?.name ?? ''}`} help="balance.pool" value={formatAmount(p.months[m].balance, ccy, locale)} sub={p.months[m].short > 0 ? `short by ${formatAmount(p.months[m].short, ccy, locale)}` : undefined} tone={p.months[m].short > 0 ? 'out' : 'neutral'} hue={HUES.pool} />
         ))}
       </Island>
 

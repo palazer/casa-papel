@@ -45,7 +45,7 @@ export const HELP = {
   'balance.cardOwed': { title: 'Owed on the card', text: 'What is on the card at month end: last month\'s amount plus purchases on the card minus the payment. Depends on how you record card spending in the account\'s settings.' },
   'balance.loanOutstanding': { title: 'Loan outstanding', text: 'What is still owed. Each instalment brings it down; interest is not modelled, so enter the real balance now and then to keep it honest.' },
   'balance.otherAsset': { title: 'Other asset', text: 'Something you own with a value, like a rental deposit. The balance only changes when you enter a new value; it counts towards net worth.' },
-  'balance.pool': { title: 'Pool account', text: 'Money set aside inside a savings account for one purpose: what goes in every month minus the spending that comes out of it. The savings balance already includes it.' },
+  'balance.pool': { title: 'Pool account', text: 'Money set aside inside a savings account for one purpose: what goes in every month minus the spending that comes out of it. The savings balance already includes it. It never goes below zero: when more comes out than it holds, the rest comes out of the unassigned savings and the pool account shows as short until you top it up on the Statement.' },
   'balance.inBase': { title: 'In the household currency', text: 'The balance converted at the month\'s rate, so it can be compared with the other balances and counted in net worth. The line above is in the account\'s own currency.' },
 
   // Stats on Month and Moves
