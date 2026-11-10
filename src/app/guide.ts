@@ -319,10 +319,11 @@ export const GUIDE: GuideTopic[] = [
       'The dialog lists "Deleting removes", "Also changes" and "Resolve these first" before you decide. Every removal is one undoable step, and archived things wait under Household with "Restore".',
     ],
     steps: [
-      'Row menu → "Archive or delete…".',
+      'Row menu (the "…" beside a row\'s name in the Grid and on the Statement) → "Archive or delete…". On the Statement a category, an account and a pool account have a "…" too.',
       'Choose "Archive from" a month → "Archive from <Month>"; or "Delete" once "Resolve these first" is empty.',
       'If it says "…has amounts in closed months (…), so it cannot be deleted. Archive it instead.", archive it.',
       'Changed your mind? Undo right after.',
+      'While a new household still shows "Setting up" on the Statement, the entry reads "Delete" and deletes at once; "Deleted …" appears at the foot of the window with "Undo". If more than the thing itself would change, the dialog still opens.',
       'Bring something back: "Archived rows", or the "Archived" line under "Accounts", "Pool accounts" and "People & things" → "Restore".',
     ],
     tips: ['remove.archiveFrom', 'household.archived'],

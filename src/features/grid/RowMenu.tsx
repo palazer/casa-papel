@@ -8,7 +8,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { useStore } from '@/app/store'
 import { canCarryRule, monthOfDate, type Household, type Row, type Tables } from '@/model'
-import { derivedRowReason, moveRow, renameRow, restoreRow, updateRow } from '@/store'
+import { derivedRowReason, moveRow, removeIfFree, renameRow, restoreRow, updateRow } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
 import { RuleDialog } from '@/features/rules/RuleDialog'
 import { RowAccountDialog, RowCurrencyDialog, RowDeductionDialog, RowFollowDialog, RowScopeDialog, RowSourceDialog } from './RowDialogs'
@@ -24,7 +24,12 @@ const GRID_TRIGGER = 'size-6 opacity-0 group-hover:opacity-100 focus:opacity-100
  * Everything that can be done to a row, behind the "…" beside its name. The Grid and the Statement show the same
  * menu; `triggerClassName` is the one thing that differs, when the "…" is visible.
  */
-export function RowMenu({ row, tables, household, onError, triggerClassName = GRID_TRIGGER }: { row: Row; tables: Tables; household: Household; onError: (msg: string) => void; triggerClassName?: string }) {
+export function RowMenu({ row, tables, household, onError, onDeleted, triggerClassName = GRID_TRIGGER }: {
+  row: Row; tables: Tables; household: Household; onError: (msg: string) => void
+  /** A row was deleted in one click (a household that is being set up); the screen can say so and offer the way back. */
+  onDeleted?: (name: string) => void
+  triggerClassName?: string
+}) {
   const store = useStore()
   const [open, setOpen] = useState<Open>(null)
   const [name, setName] = useState(row.name)
@@ -35,6 +40,14 @@ export function RowMenu({ row, tables, household, onError, triggerClassName = GR
 
   const act = (fn: () => Promise<unknown>) => () => void fn().catch((e) => onError(e instanceof Error ? e.message : 'Action failed'))
   const close = () => setOpen(null)
+  // While a household is being set up, deleting is cheap: one click, and undo is the way back. When more than the row
+  // would change, the dialog still opens and says what.
+  const cheap = household.setupOpen ?? false
+  const removeNow = async () => {
+    const name = await removeIfFree(store, { kind: 'row', id: row.id })
+    if (name == null) setOpen('remove')
+    else onDeleted?.(name)
+  }
 
   return (
     <>
@@ -64,7 +77,7 @@ export function RowMenu({ row, tables, household, onError, triggerClassName = GR
           {row.archivedMonth ? (
             <DropdownMenuItem onClick={act(() => restoreRow(store, row.id))}>Restore</DropdownMenuItem>
           ) : (
-            <DropdownMenuItem onClick={() => setOpen('remove')}>Archive or delete…</DropdownMenuItem>
+            <DropdownMenuItem onClick={cheap ? act(removeNow) : () => setOpen('remove')}>{cheap ? 'Delete' : 'Archive or delete…'}</DropdownMenuItem>
           )}
         </DropdownMenuContent>
       </DropdownMenu>

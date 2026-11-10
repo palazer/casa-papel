@@ -83,13 +83,15 @@ export function PoolsCard({ household, tables, engine, onError }: { household: H
  * A pool account: its name, the savings account that holds it, what is already in it, and for a new one what is set
  * aside each month. The Statement opens it too, with the month on screen as the month the set-aside starts in.
  */
-export function PoolDialog({ pool, savings, baseCurrency, locale, fromMonth, onClose, onError, onRemove, onSaved }: {
+export function PoolDialog({ pool, savings, baseCurrency, locale, fromMonth, onClose, onError, onRemove, onSaved, removeLabel = 'Archive or delete…' }: {
   pool: Pool | null; savings: Account[]; baseCurrency: string; locale: string
   /** A new pool account: the month its monthly amount starts in; this month when left out. */
   fromMonth?: MonthKey
   onClose: () => void; onError: (m: string) => void; onRemove?: () => void
   /** A new pool account was saved. */
   onSaved?: (pool: Pool) => void
+  /** What the remove button says: "Delete" where removing is one click. */
+  removeLabel?: string
 }) {
   const store = useStore()
   const [name, setName] = useState(pool?.name ?? '')
@@ -128,7 +130,7 @@ export function PoolDialog({ pool, savings, baseCurrency, locale, fromMonth, onC
         </div>
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         <DialogFooter className="flex-row flex-wrap gap-2 sm:justify-between">
-          <div>{pool && onRemove && <Button variant="ghost" size="sm" onClick={onRemove}>Archive or delete…</Button>}</div>
+          <div>{pool && onRemove && <Button variant="ghost" size="sm" onClick={onRemove}>{removeLabel}</Button>}</div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose}>Cancel</Button>
             <Button disabled={!name.trim() || !accountId} onClick={save}>Save</Button>

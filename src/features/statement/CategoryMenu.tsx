@@ -6,7 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Input } from '@/components/ui/input'
 import { useStore } from '@/app/store'
 import type { Category, Household, Tables } from '@/model'
-import { moveCategory, renameCategory } from '@/store'
+import { moveCategory, removeIfFree, renameCategory } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
 
 const byOrder = (a: Category, b: Category) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0)
@@ -16,8 +16,11 @@ const byOrder = (a: Category, b: Category) => (a.order < b.order ? -1 : a.order 
  * section's categories, remove it. Its rows are kept either way; removing moves them to "No category". The same
  * actions as the Categories card under Household.
  */
-export function CategoryMenu({ category, tables, household, onError, triggerClassName }: {
-  category: Category; tables: Tables; household: Household; onError: (msg: string) => void; triggerClassName?: string
+export function CategoryMenu({ category, tables, household, onError, onDeleted, triggerClassName }: {
+  category: Category; tables: Tables; household: Household; onError: (msg: string) => void
+  /** The category was deleted in one click (a household that is being set up). */
+  onDeleted?: (name: string) => void
+  triggerClassName?: string
 }) {
   const store = useStore()
   const [open, setOpen] = useState<'rename' | 'remove' | null>(null)
@@ -27,6 +30,13 @@ export function CategoryMenu({ category, tables, household, onError, triggerClas
   const at = siblings.findIndex((c) => c.id === category.id)
   const act = (fn: () => Promise<unknown>) => () => void fn().catch((e) => onError(e instanceof Error ? e.message : 'Action failed'))
   const close = () => setOpen(null)
+  // cheap while the household is being set up; a category that still has rows opens the dialog, which says they are kept
+  const cheap = household.setupOpen ?? false
+  const removeNow = async () => {
+    const deleted = await removeIfFree(store, { kind: 'category', id: category.id })
+    if (deleted == null) setOpen('remove')
+    else onDeleted?.(deleted)
+  }
 
   function rename() {
     const n = name.trim()
@@ -47,7 +57,7 @@ export function CategoryMenu({ category, tables, household, onError, triggerClas
           <DropdownMenuItem disabled={at <= 0} onClick={act(() => moveCategory(store, category.id, 'up'))}>Move up</DropdownMenuItem>
           <DropdownMenuItem disabled={at === siblings.length - 1} onClick={act(() => moveCategory(store, category.id, 'down'))}>Move down</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setOpen('remove')}>Remove…</DropdownMenuItem>
+          <DropdownMenuItem onClick={cheap ? act(removeNow) : () => setOpen('remove')}>{cheap ? 'Delete' : 'Remove…'}</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 

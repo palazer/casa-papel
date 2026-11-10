@@ -304,7 +304,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   pointer is a finger), 20 px so the line keeps its height. On a row it is the Grid's own `RowMenu` (`Row menu for
   <row>`), unchanged. On a category it is `CategoryMenu` (`Category menu for <category>`): `Rename…` (a small dialog
   whose error stays beside the field), `Move up`, `Move down`, and removing; its rows are kept. On an account or a
-  pool account it is named `Edit <name>` and opens the account or pool account dialog, which removes at its foot;
+  pool account it is named `Edit <name>` and opens the account or pool account dialog, which removes at its foot
+  (how removing behaves, and when it is one click, is in §8);
   the calculated line for the current accounts opens the one account behind it, or lists them (`Edit a current
   account`) when there are several. So that a line can hold these beside its own action, every row line that opens
   something is built the way a line with a rule symbol is: its button is its name, stretched over the whole line,
@@ -446,6 +447,16 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   (`describeRemoval` and `planRemoval`/`planArchive` in `src/store/impact.ts`), so they cannot disagree, and every
   removal is one undoable commit ("You can undo this right after"). Archived things are listed with Restore under
   Household: Archived rows, and an Archived line in Accounts, Pool accounts and People & things.
+- **Cheap while setting up.** While a household is being set up (`Household.setupOpen`, the strip of §7), removing
+  is one click: the entry in the row menu, the category menu and the account and pool account dialogs opened from
+  the Statement reads `Delete` instead of `Archive or delete…` / `Remove…` and deletes at once, with no dialog
+  (`removeIfFree` in `src/store/remove.ts`). It does so only when nothing but the thing itself goes: when rows would
+  change, something stands in the way, a goal watches it, or a closed month holds its amounts, the remove dialog
+  opens as always and says what. After `Done`, and for every household set up before, removing is the dialog again.
+  A one-click delete is answered by the one floating message the app has: a small bordered card (`bg-card`,
+  `shadow-md`, `role="status"`) fixed at the foot of the window, above the bottom tabs on a phone, reading `Deleted
+  "<name>".` with an `xs outline` `Undo` and a ghost `×`. It floats because what was deleted can be anywhere on a
+  long page, and it goes away with the next change, so its `Undo` always takes back that delete.
 - Help is one mechanism: `InfoTip` (`src/components/InfoTip.tsx`), a 16 px (i) in `text-muted-foreground/70` (24 px
   where the pointer is a finger) that opens a `w-64 text-xs` popover on hover after 150 ms and on tap, and closes when
   the mouse leaves, on Escape or on a click outside. Its accessible name is `About <title>`. It is a sibling of the thing
@@ -470,7 +481,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 
 - Loading is nothing (the store is local; `useLiveQuery` resolves within a frame), never a spinner.
 - An action that failed shows a `role="alert"` line in `text-destructive` in the page header's toolbar or beside the
-  control; an engine warning is `text-amber-700`. Data-screen outcomes use the `Alert` block.
+  control; an engine warning is `text-amber-700`. Data-screen outcomes use the `Alert` block. Nothing floats, with
+  one exception: the Statement's `Deleted "<name>". Undo` after a one-click delete (§8).
 - Empty states are one muted sentence that says what to do (`Nothing to transfer.`, `Add a savings account first; pool
   accounts live inside one.`).
 - The welcome screen reports an import or the account dialog's outcome in a `role="status"` line under its header, and an

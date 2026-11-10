@@ -27,6 +27,8 @@ interface Props {
   /** A new account was saved. */
   onSaved?: (account: Account) => void
   onRemove?: () => void
+  /** What the remove button says: "Delete" where removing is one click, "Archive or delete…" where it opens the dialog. */
+  removeLabel?: string
 }
 
 type CardMode = 'itemized' | 'lump'
@@ -47,7 +49,7 @@ const balanceWord = (type: AccountType) => (type === 'credit-card' || type === '
  * what is owed on it, when it starts; a card also asks what is recorded for it. The rest (currency, owner, opening
  * month, tracking, how an investment grows) keeps its usual default behind "More options", which is open when editing.
  */
-export function HouseholdAccountDialog({ account, entities, baseCurrency, locale, startMonth, preset, onClose, onSaved, onRemove }: Props) {
+export function HouseholdAccountDialog({ account, entities, baseCurrency, locale, startMonth, preset, onClose, onSaved, onRemove, removeLabel = 'Archive or delete…' }: Props) {
   const store = useStore()
   const types = ACCOUNT_TYPE_INFO.filter((t) => account || !preset?.types || preset.types.includes(t.value))
   const [name, setName] = useState(account?.name ?? preset?.name ?? '')
@@ -200,7 +202,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
         </div>
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         <DialogFooter className="flex-row flex-wrap gap-2 sm:justify-between">
-          <div>{account && onRemove && <Button variant="ghost" size="sm" onClick={onRemove} disabled={busy}>Archive or delete…</Button>}</div>
+          <div>{account && onRemove && <Button variant="ghost" size="sm" onClick={onRemove} disabled={busy}>{removeLabel}</Button>}</div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
             <Button disabled={busy || !name.trim() || currency.length !== 3} onClick={() => void save()}>Save</Button>

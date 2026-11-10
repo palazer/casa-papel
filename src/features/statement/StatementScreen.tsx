@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
-import { Lock, MoreHorizontal, Plus } from 'lucide-react'
+import { Lock, MoreHorizontal, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -10,9 +10,10 @@ import { doneness, type DoneState } from '@/app/display'
 import { formatMonth } from '@/app/format'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
+import { useStoreVersion } from '@/app/useStoreVersion'
 import { buildStatement, cellKey, computeMainAccount, type GoalProgress, type StatementLine } from '@/engine'
 import { canCarryRule, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type MonthKey, type Row, type Section } from '@/model'
-import { accountSuggestions, addPlanYear, rowSuggestions, setCellDone, setDerivedDone, setItemStatus, setupSteps, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupStepKey } from '@/store'
+import { accountSuggestions, addPlanYear, removeIfFree, rowSuggestions, setCellDone, setDerivedDone, setItemStatus, setupSteps, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupStepKey } from '@/store'
 import { GoalDialog } from '@/features/goals/GoalDialog'
 import { goalStatusLine } from '@/features/goals/goalText'
 import { AddRowInline } from '@/features/grid/AddRowInline'
@@ -74,6 +75,9 @@ export function StatementScreen() {
   const [poolEdit, setPoolEdit] = useState<string | null>(null)
   /** What "Archive or delete…" in one of those dialogs was pressed for. */
   const [removing, setRemoving] = useState<RemovalTarget | null>(null)
+  /** What a one-click delete just removed, and the store's version right after it: the message goes with the next change. */
+  const [deleted, setDeleted] = useState<{ name: string; version: number } | null>(null)
+  const version = useStoreVersion(store)
   /** "Suggestions" in the toolbar, once it was pressed; until then they show while the household is being set up. */
   const [suggest, setSuggest] = useState<boolean | null>(null)
   /** The pool account being topped up. */
@@ -236,10 +240,24 @@ export function StatementScreen() {
     setGoalEdit({ goal: null, preset: { kind: 'net-worth' } })
   }
 
+  /** A one-click delete went through: say what is gone, with the way back, until something else changes. */
+  const onDeleted = (name: string) => setDeleted({ name, version: store.getVersion() })
+  /**
+   * Removing from an account's or a pool account's dialog. While the household is being set up it is one click, unless
+   * more than the thing itself would change; then, and always afterwards, the remove dialog asks.
+   */
+  function removeFrom(target: RemovalTarget) {
+    if (!settingUp) return setRemoving(target)
+    act(async () => {
+      const name = await removeIfFree(store, target)
+      if (name == null) setRemoving(target)
+      else onDeleted(name)
+    })
+  }
   /** The "…" after a row's name: the Grid's own row menu. */
   function rowMenu(rowId: string): ReactNode {
     const row = engine!.rows.find((r) => r.id === rowId)
-    return row ? <RowMenu row={row} tables={tables!} household={household!} onError={setError} triggerClassName={LINE_MENU} /> : null
+    return row ? <RowMenu row={row} tables={tables!} household={household!} onError={setError} onDeleted={onDeleted} triggerClassName={LINE_MENU} /> : null
   }
   const editButton = (label: string, onClick: () => void) => (
     <Button variant="ghost" size="icon" className={LINE_MENU} aria-label={`Edit ${label}`} title="Edit" onClick={onClick}><MoreHorizontal /></Button>
@@ -249,7 +267,7 @@ export function StatementScreen() {
     if (statement!.closed) return null
     if (line.kind === 'category' && line.id.startsWith('cat:')) {
       const category = tables!.categories.find((c) => c.id === line.id.split(':')[2] && !c.deletedAt)
-      return category ? <CategoryMenu category={category} tables={tables!} household={household!} onError={setError} triggerClassName={LINE_MENU} /> : null
+      return category ? <CategoryMenu category={category} tables={tables!} household={household!} onError={setError} onDeleted={onDeleted} triggerClassName={LINE_MENU} /> : null
     }
     if (line.kind === 'pool' && line.poolId) return editButton(line.label, () => setPoolEdit(line.poolId!))
     if (line.kind === 'account' && line.accountId) return editButton(line.label, () => setAccountEdit(line.accountId!))
@@ -328,6 +346,20 @@ export function StatementScreen() {
       />
       <StatementBand title="At the end of the month" help="statement.position" band={statement.position} ctx={positionCtx} totals={['Total', 'Total']} amountHead={day} feet={[assetsFoot, hasDebts ? null : debtsFoot]} />
 
+      {/* What a one-click delete took away, with the way back. It floats at the foot of the window, because the thing
+          that was deleted can be anywhere on a long page; it goes with the next change. */}
+      {deleted && deleted.version === version && (
+        <div role="status" className="fixed bottom-20 left-1/2 z-40 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-2 rounded-lg border bg-card py-1.5 pl-3 pr-1.5 text-xs shadow-md md:bottom-6">
+          <span className="min-w-0 truncate">Deleted "{deleted.name}".</span>
+          <Button size="xs" variant="outline" onClick={() => act(() => store.undo())}>Undo</Button>
+          <button
+            type="button" aria-label="Dismiss" onClick={() => setDeleted(null)}
+            className="inline-flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:size-8"
+          >
+            <X className="size-3.5" aria-hidden />
+          </button>
+        </div>
+      )}
       {editing && <CellEditor key={`${editing.id}:${m}`} tables={tables} engine={engine} household={household} row={editing} month={m} onClose={() => setEditorRow(null)} />}
       {goalEdit && (
         <GoalDialog
@@ -356,13 +388,15 @@ export function StatementScreen() {
       {accountEditing && (
         <HouseholdAccountDialog
           key={accountEditing.id} account={accountEditing} entities={tables.entities} baseCurrency={ccy} locale={locale} startMonth={household.startMonth}
-          onClose={() => setAccountEdit(null)} onRemove={() => { setRemoving({ kind: 'account', id: accountEditing.id }); setAccountEdit(null) }}
+          onClose={() => setAccountEdit(null)} removeLabel={settingUp ? 'Delete' : undefined}
+          onRemove={() => { setAccountEdit(null); removeFrom({ kind: 'account', id: accountEditing.id }) }}
         />
       )}
       {poolEditing && (
         <PoolDialog
           key={poolEditing.id} pool={poolEditing} savings={savingsAccounts} baseCurrency={ccy} locale={locale} onError={setError}
-          onClose={() => setPoolEdit(null)} onRemove={() => { setRemoving({ kind: 'pool', id: poolEditing.id }); setPoolEdit(null) }}
+          onClose={() => setPoolEdit(null)} removeLabel={settingUp ? 'Delete' : undefined}
+          onRemove={() => { setPoolEdit(null); removeFrom({ kind: 'pool', id: poolEditing.id }) }}
         />
       )}
       {removing && <RemoveDialog target={removing} tables={tables} household={household} onClose={() => setRemoving(null)} />}

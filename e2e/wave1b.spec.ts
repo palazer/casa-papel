@@ -133,12 +133,56 @@ test.describe('wave 1b', () => {
     await page.screenshot({ path: 'e2e/output/setup-statement-phone.png', fullPage: true })
     await page.setViewportSize({ width: 1400, height: 900 })
 
+    // while setting up, deleting is one click: the row goes, a line says so and offers the way back
+    const menu = page.getByRole('menu')
+    const gone = page.getByRole('status').filter({ hasText: 'Deleted' })
+    await moneyOut.getByRole('button', { name: 'Row menu for Ana – Pocket' }).click()
+    await expect(menu.getByRole('menuitem', { name: 'Archive or delete…' })).toHaveCount(0)
+    await menu.getByRole('menuitem', { name: 'Delete', exact: true }).click()
+    await expect(gone).toContainText('Deleted "Ana – Pocket".')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(moneyOut.getByRole('button', { name: /^Ana – Pocket: / })).toHaveCount(0)
+    await expect(moneyOut.getByRole('button', { name: 'To Savings: €3,900.00' })).toBeVisible()
+    // what a suggestion made is offered again once it is deleted
+    await expect(general.locator('[data-suggestion]').first()).toContainText('Ana – Pocket')
+    await page.screenshot({ path: 'e2e/output/setup-deleted.png' })
+    await gone.getByRole('button', { name: 'Undo' }).click()
+    await expect(moneyOut.getByRole('button', { name: /^Ana – Pocket: €300\.00/ })).toBeVisible()
+    await expect(gone).toHaveCount(0)
+    // a category with nothing in it goes the same way; one that has rows asks first and says they are kept
+    await moneyOut.getByRole('button', { name: 'Category menu for Transport' }).click()
+    await menu.getByRole('menuitem', { name: 'Delete', exact: true }).click()
+    await expect(gone).toContainText('Deleted "Transport".')
+    await expect(moneyOut.getByRole('button', { name: 'Transport', exact: true })).toHaveCount(0)
+    await moneyOut.getByRole('button', { name: 'Category menu for Housing' }).click()
+    await menu.getByRole('menuitem', { name: 'Delete', exact: true }).click()
+    await expect(dlg.getByRole('heading', { name: 'Category "Housing"' })).toBeVisible()
+    await expect(dlg).toContainText('keeps its place without a category')
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+    // an account nothing points at is deleted from its dialog in one click; one that is in use says what stands in the way
+    await claims.getByRole('button', { name: 'Edit Visa' }).click()
+    await expect(dlg.getByRole('button', { name: 'Archive or delete…' })).toHaveCount(0)
+    await dlg.getByRole('button', { name: 'Delete', exact: true }).click()
+    await expect(gone).toContainText('Deleted "Visa".')
+    await expect(claims.locator('[data-line^="acc:"]')).toHaveCount(0)
+    await assets.getByRole('button', { name: 'Edit Savings' }).click()
+    await dlg.getByRole('button', { name: 'Delete', exact: true }).click()
+    await expect(dlg.getByRole('heading', { name: 'Account "Savings"' })).toBeVisible()
+    await expect(dlg).toContainText('Resolve these first')
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+
     // "Done" puts the strip and the suggestions away; the month stays where it was
     await strip.getByRole('button', { name: 'Done', exact: true }).click()
     await expect(strip).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Suggestions', exact: true })).toHaveAttribute('aria-pressed', 'false')
     await expect(page.getByTestId('suggestions')).toHaveCount(0)
     await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
+    // from now on removing is the controlled way: archive from a month, or delete, in the dialog
+    await moneyOut.getByRole('button', { name: 'Row menu for Ana – Pocket' }).click()
+    await expect(menu.getByRole('menuitem', { name: 'Delete', exact: true })).toHaveCount(0)
+    await menu.getByRole('menuitem', { name: 'Archive or delete…' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Row "Ana – Pocket"' })).toBeVisible()
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
 
     // the Grid shows the same household: the amounts start in the first month and the rest has its row
     await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Grid' }).click()
