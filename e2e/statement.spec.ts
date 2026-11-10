@@ -456,6 +456,48 @@ test.describe('working the month in the Statement', () => {
     await expect(dlg.getByRole('heading', { name: 'How much goes to Index fund?' })).toBeVisible()
     await dlg.getByRole('button', { name: 'Cancel' }).click()
   })
+
+  test('the rest moves to a new savings account from its line in the lower half', async ({ page }) => {
+    await page.goto('?demo=1')
+    await page.getByRole('button', { name: 'Load the demo household' }).click()
+    await page.getByRole('link', { name: 'Household' }).click()
+    await page.getByRole('button', { name: 'Add account' }).click()
+    const dlg = page.getByRole('dialog')
+    await dlg.getByLabel('Name', { exact: true }).fill('Rainy day')
+    await dlg.getByLabel('Type').selectOption('savings')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
+    await goToMonth(page, 'November 2026')
+    const moneyOut = page.getByRole('region', { name: 'Money out' })
+    const assets = page.getByRole('region', { name: 'Assets' })
+
+    // an account no row feeds yet says so, and its symbol sets the rule up
+    await assets.getByRole('button', { name: 'Set a rule for Rainy day' }).click()
+    await expect(dlg.getByRole('heading', { name: 'How much goes to Rainy day?' })).toBeVisible()
+    await expect(dlg).toContainText('Saving adds the row "To Rainy day" under Transfers.')
+    await dlg.getByRole('radio', { name: 'The rest' }).click()
+    await expect(dlg).toContainText('"To savings" takes the rest now. From November 2026 on it comes here instead')
+    await expect(dlg.getByTestId('rule-amount')).toHaveText('€2,369.00')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+
+    // the rest is on the new account and its new row; the account that had it gets nothing more
+    await expect(assets.getByRole('button', { name: 'Rule for Rainy day: the rest' })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: 'To Rainy day: €2,369.00' })).toBeVisible()
+    await expect(assets.getByRole('button', { name: 'Rule for Savings: a fixed amount' })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: 'To savings: €0.00' })).toBeVisible()
+    expect((await total(page, 'in').innerText()).replace(/^Total in\s*/, '')).toBe((await total(page, 'out').innerText()).replace(/^Total out\s*/, ''))
+    // October went to Savings and still does
+    await goToMonth(page, 'October 2026')
+    await expect(moneyOut.getByRole('button', { name: /^To savings: €2,009\.00/ })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: /^To Rainy day: / })).toHaveAccessibleName('To Rainy day: €0.00')
+    // one undo takes the whole change back, the new row with it
+    await page.getByRole('button', { name: 'Undo' }).click()
+    await goToMonth(page, 'November 2026')
+    await expect(moneyOut.getByRole('button', { name: 'Rule for To savings: the rest' })).toBeVisible()
+    await expect(assets.getByRole('button', { name: 'Set a rule for Rainy day' })).toBeVisible()
+  })
 })
 
 test.describe('the Statement on a phone', () => {
