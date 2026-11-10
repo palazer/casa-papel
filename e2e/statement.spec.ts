@@ -335,16 +335,22 @@ test.describe('working the month in the Statement', () => {
     const assets = page.getByRole('region', { name: 'Assets' })
     const dlg = page.getByRole('dialog')
 
-    // a debt offers a goal to clear it
+    // a debt offers a goal to pay it down: nothing to choose, and zero unless another amount is typed
     await page.getByRole('region', { name: 'Debts and net worth' }).getByRole('button', { name: 'Set a goal for Credit card' }).click()
-    await expect(dlg.getByRole('heading', { name: 'New goal' })).toBeVisible()
-    await expect(dlg.getByLabel('Kind')).toHaveValue('pay-off')
+    await expect(dlg.getByRole('heading', { name: 'Goal for Credit card' })).toBeVisible()
+    await expect(dlg.getByRole('radiogroup', { name: 'Kind' })).toHaveCount(0)
+    await expect(dlg.getByLabel('Tracks')).toHaveCount(0)
+    await expect(dlg.getByLabel('Bring it down to (EUR)')).toHaveValue('0')
     await dlg.getByRole('button', { name: 'Cancel' }).click()
 
-    // a pool account: the dialog opens with the line already chosen
+    // a pool account: the line says what the goal watches, so only the name, the amount and the month are asked
     await assets.getByRole('button', { name: 'Set a goal for Travel' }).click()
-    await expect(dlg.getByLabel('Kind')).toHaveValue('pool-balance')
-    await expect(dlg.getByLabel('Tracks').locator('option:checked')).toHaveText('Travel')
+    await expect(dlg.getByRole('heading', { name: 'Goal for Travel' })).toBeVisible()
+    await expect(dlg.getByRole('radiogroup', { name: 'Kind' })).toHaveCount(0)
+    await expect(dlg.getByLabel('Tracks')).toHaveCount(0)
+    await expect(dlg.getByLabel('Name')).toHaveValue('Travel')
+    await expect(dlg).toHaveCSS('opacity', '1')
+    await page.screenshot({ path: 'e2e/output/statement-goal-dialog.png' })
     await dlg.getByLabel('Name').fill('Travel fund')
     await dlg.getByLabel(/^Target \(EUR\)/).fill('10000')
     await dlg.getByRole('button', { name: 'Save' }).click()
@@ -361,6 +367,7 @@ test.describe('working the month in the Statement', () => {
     await assets.getByRole('button', { name: 'Edit goal Travel fund' }).click()
     await expect(dlg.getByRole('heading', { name: 'Edit goal' })).toBeVisible()
     await expect(dlg.getByLabel('Name')).toHaveValue('Travel fund')
+    await expect(dlg.getByLabel('Tracks')).toHaveCount(0)
     await dlg.getByRole('button', { name: 'Cancel' }).click()
   })
 

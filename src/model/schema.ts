@@ -270,7 +270,7 @@ export const MonthStateSchema = z.object({
 // ---------- goals ----------
 export const GoalKindSchema = z.enum(['account-balance', 'pool-balance', 'pay-off', 'net-worth'])
 
-/** A finish line: grow an account or pool account to an amount, clear a debt, or reach a net worth. */
+/** A finish line: fill an account or pool account to an amount, pay a debt down to one, or reach a net worth. */
 export const GoalSchema = BaseRecord.extend({
   name: z.string().min(1),
   kind: GoalKindSchema,
@@ -278,7 +278,7 @@ export const GoalSchema = BaseRecord.extend({
   accountId: IdSchema.nullable().default(null),
   /** pool-balance: the pool account watched. */
   poolId: IdSchema.nullable().default(null),
-  /** Minor units in the account's currency (account kinds) or the base currency (pool, net worth). 0 for pay-off. */
+  /** Minor units in the account's currency (account kinds) or the base currency (pool, net worth). Pay-off: what the debt comes down to, 0 to clear it. */
   target: MoneySchema.default(0),
   /** Month the goal was set; pay-off progress counts down from what was owed then. */
   startMonth: MonthKeySchema,

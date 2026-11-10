@@ -111,11 +111,18 @@ export const SECTION_INFO: Record<Section, { label: string; blurb: string }> = {
   transfer: { label: 'Moving money', blurb: 'From one of your accounts to another, or to a person\'s pocket. Not spending, so it is never counted as an expense.' },
 }
 
-export const GOAL_KIND_INFO: Array<{ value: GoalKind; label: string; help: string }> = [
-  { value: 'account-balance', label: 'Grow an account to an amount', help: 'A savings, investment or other asset reaches a balance. Compared in the account\'s own currency.' },
-  { value: 'pool-balance', label: 'Fill a pool account', help: 'The pool account holds the amount: monthly set-asides minus what comes out of it.' },
-  { value: 'pay-off', label: 'Pay off a card or loan', help: 'Done when nothing is owed. Progress counts down from what was owed when you set the goal.' },
-  { value: 'net-worth', label: 'Reach a net worth', help: 'Tracked assets minus tracked debts, in your base currency; the number shown in Moves.' },
+/**
+ * What a goal is for, as the app asks it: fill an account or a pool account to an amount, or pay a debt down to one.
+ * Net worth is the third, set only from the Statement's Net worth line. The stored kinds stay as they were: "fill" is
+ * `account-balance` or `pool-balance` by what it watches, "pay-down" is `pay-off`.
+ */
+export type GoalFamily = 'fill' | 'pay-down' | 'net-worth'
+export const goalFamilyOf = (kind: GoalKind): GoalFamily => (kind === 'pay-off' ? 'pay-down' : kind === 'net-worth' ? 'net-worth' : 'fill')
+
+export const GOAL_KIND_INFO: Array<{ value: GoalFamily; label: string; help: string }> = [
+  { value: 'fill', label: 'Fill an account', help: 'A savings, investment or other asset account, or a pool account, reaches an amount. An account is compared in its own currency.' },
+  { value: 'pay-down', label: 'Pay down a debt', help: 'A card or loan comes down to an amount, zero unless you type another. Progress counts down from what was owed when you set the goal.' },
+  { value: 'net-worth', label: 'Reach a net worth', help: 'Tracked assets minus tracked debts, in your base currency. Set it from the "Net worth" line on the Statement.' },
 ]
 
 export const ACCOUNT_TYPE_INFO: Array<{ value: AccountType; label: string; help: string }> = [

@@ -241,12 +241,12 @@ export const GUIDE: GuideTopic[] = [
     title: 'Goals',
     summary: 'Pick a number to reach or a debt to clear; the bar shows how far the current plan gets.',
     what: [
-      'A goal is measured against the plan in the grid every month, so the bar moves when the plan changes. Four kinds: "Grow an account to an amount", "Fill a pool account", "Pay off a card or loan" and "Reach a net worth". With a target month the line says whether the plan gets there in time. Goals are the one thing on screen in gold.',
+      'A goal is measured against the plan in the grid every month, so the bar moves when the plan changes. Two kinds: "Fill an account" (an account or a pool account reaches an amount) and "Pay down a debt" (a card or loan comes down to an amount, usually zero); net worth can have a goal too. With a target month the line says whether the plan gets there in time. Goals are the one thing on screen in gold.',
     ],
     steps: [
-      'Moves → "Goals" → "Add goal".',
-      'Fill "Name", "Kind", "Tracks" (the account or pool account), "Target (EUR)" (not for a pay-off), "Target month (optional)" and "Notes", then "Save".',
-      'Read the line under the bar: it says how far the plan gets ("€… of €… · reached by <Month> (target <Month>)"), when it is late ("… after the target of <Month>"), or that the goal is done ("Reached in <Month>", or "Nothing owed" for a debt).',
+      'Statement → hover a line under "Assets" or "Debts and net worth" → "Set a goal for …". What the goal watches is then settled: fill "Name", "Target (EUR)", or "Bring it down to (EUR)" for a debt, "Target month (optional)" and "Notes", then "Save".',
+      'Or Moves → "Goals" → "Add goal": pick the "Kind" and what it "Tracks" first. A net worth goal is set from the "Net worth" line on the Statement.',
+      'Read the line under the bar: it says how far the plan gets ("€… of €… · reached by <Month> (target <Month>)"), when it is late ("… after the target of <Month>"), or that the goal is done ("Reached in <Month>", or "Nothing owed" for a debt brought to zero).',
       '"Edit" or "Delete…" from the goal\'s menu; the Month view shows the same bars under "Goals".',
     ],
     factsTitle: 'Goal kinds',

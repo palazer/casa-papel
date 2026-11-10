@@ -278,7 +278,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   opens its category and, in an open month, the cell editor for its first amount. In the lower half a line that can
   have a goal (an account, a pool account, a debt, Net worth) shows a 20 px ghost `Target` button after its name on
   hover or focus, always where the pointer is a finger, named `Set a goal for <line>`; it opens the goal dialog with
-  the kind and the thing it tracks already chosen. A goal's detail carries an `xs ghost` `Edit`. An account's balance
+  what the goal watches settled, so the dialog asks for the amount only. A goal's detail carries an `xs ghost` `Edit`. An account's balance
   is a button named `<account> balance: <amount>` (`, entered` once it is) that opens the Grid's `BalanceDialog`; the
   line for the current accounts is calculated and has none.
   **Category estimates.** An expense category can carry an estimate: what it should come to in a month, typed before
@@ -361,6 +361,16 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   amount, pre-filled with what is missing; and under `<month> will then show` the lines the save will leave (`Money
   in · From <account>`, `Money out · <pool account> pool, this month`, the pool account's balance), worked out on a
   copy. Footer: a ghost `Not now` on the left, `Top up` on the right. `Not now` changes nothing.
+- The goal dialog (`src/features/goals/GoalDialog.tsx`). A goal has two kinds: `Fill an account` (an account or a
+  pool account reaches an amount) and `Pay down a debt` (a card or loan comes down to an amount, zero unless another
+  is typed); net worth is a third, set only from its own line. Opened from a line of the Statement it is titled
+  `Goal for <line>`, says in one sentence what it does (`Fills Travel to an amount.`) and asks only for the name
+  (pre-filled with the line's name), the amount, the target month and notes. Editing (`Edit goal`) asks the same:
+  what a goal watches does not change, a different thing is a new goal. `Add goal` on Moves (`New goal`) asks first
+  for "Kind" as a `Segmented` of the two, with the chosen kind's sentence under it, and "Tracks" as one select
+  (accounts and pool accounts in two option groups for filling, cards and loans for paying down). The amount is
+  labelled `Target (<CCY>)`, and `Bring it down to (<CCY>)` for a debt, with the sentence that zero means nothing
+  is owed. Footer: a ghost `Delete…` on the left when editing, Cancel, Save.
 - Dialogs are shadcn `Dialog`; the confirm step lives inside the dialog, never behind it. Errors appear beside the field
   that caused them, `role="alert"`.
 - Removing anything goes through one `RemoveDialog` (`src/features/remove/RemoveDialog.tsx`), reached from a row's
