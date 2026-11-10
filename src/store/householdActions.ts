@@ -66,18 +66,22 @@ interface TemplateContext {
   adultCount: number
 }
 
-/** What the setup wizard adds to a template: the account it points at (instead of the first of its type) and a first amount. */
+/** What the caller adds to a template: the account it points at (instead of the first of its type) and a first amount. */
 export interface TemplateOptions {
   destination?: Account | null
-  /** Written into the household's start month; the engine carries it forward. */
+  /** Written into `month`; the engine carries it forward. */
   amount?: number | null
+  /** The month the first amount starts in; the household's first month when left out. */
+  month?: MonthKey
+  /** A pocket row with an amount of its own that is typed, instead of a share of the household's pocket total. */
+  typedPocket?: boolean
 }
 
-/** The first amount of a row from the wizard: one value cell in the start month, carried forward from there. */
+/** The first amount of a suggested row: one value cell in the month it starts, carried forward from there. */
 const startAmount = (rowId: string, month: MonthKey, value: number, ts: number): Mutation =>
   ({ op: 'put', table: 'cells', record: CellSchema.parse({ rowId, month, mode: 'value', value, items: [], updatedAt: ts }) })
 
-/** Build the rows (and pools) a template produces. Pure; used by the wizard and the household screen. */
+/** Build the rows (and pools) a template produces. Pure; used by setup, the Statement's suggestions and the household screen. */
 export function buildTemplateMutations(t: RowTemplate, ctx: TemplateContext, order: string, accounts: Account[], opts: TemplateOptions = {}): { mutations: Mutation[]; row: Row } {
   const ts = now()
   const name = templateTitle(t, ctx.entity?.name)
@@ -110,15 +114,16 @@ export function buildTemplateMutations(t: RowTemplate, ctx: TemplateContext, ord
     accountId: destination?.id ?? null,
     defaultFundedBy,
     categoryId: t.category ? ctx.tables.categories?.find((c) => !c.deletedAt && c.section === t.section && c.name === t.category)?.id ?? null : null,
-    pocketMode: t.pocket ? 'share-of-pocket-total' : null,
-    pocketShare: t.pocket ? 1 / Math.max(1, ctx.adultCount) : null,
+    pocketMode: t.pocket ? (opts.typedPocket ? 'fixed' : 'share-of-pocket-total') : null,
+    pocketShare: t.pocket && !opts.typedPocket ? 1 / Math.max(1, ctx.adultCount) : null,
+    templateKey: t.key,
     order,
   })
   mutations.push({ op: 'put', table: 'rows', record: row })
-  // automatic rows (the savings plug, pocket money) take no amount
-  const automatic = t.pocket || (t.kind === 'to-savings' && ctx.household.closingRule === 'savings-plug')
+  // automatic rows (the savings plug, a share of the pocket total) take no amount
+  const automatic = (t.pocket && !opts.typedPocket) || (t.kind === 'to-savings' && ctx.household.closingRule === 'savings-plug')
   // a pool template's amount is what is set aside each month, so it goes on the "<name> pool" transfer row
-  if (opts.amount != null && opts.amount > 0 && !automatic) mutations.push(startAmount(allocationRowId ?? row.id, ctx.household.startMonth, opts.amount, ts))
+  if (opts.amount != null && opts.amount > 0 && !automatic) mutations.push(startAmount(allocationRowId ?? row.id, opts.month ?? ctx.household.startMonth, opts.amount, ts))
   return { mutations, row }
 }
 

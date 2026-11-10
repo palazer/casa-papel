@@ -8,7 +8,7 @@ import { FUNDED_BY_PATTERN } from './fundedBy'
 z.config({ jitless: true })
 
 /** Bump when the shape of stored data changes; add a migration in migrations.ts. */
-export const SCHEMA_VERSION = 7
+export const SCHEMA_VERSION = 8
 
 // ---------- primitives ----------
 export const IdSchema = z.string().regex(ID_PATTERN, 'expected ULID')
@@ -61,6 +61,10 @@ export const HouseholdSchema = BaseRecord.extend({
   fxPairDrift: z.record(z.string(), z.number()).default({}),
   /** "Add <year>": the plan reaches at least this December. null = the calendar rule alone decides (see store/months.ts). */
   planUntil: MonthKeySchema.nullable().default(null),
+  /** The Statement shows its setup strip: true from the first screen until "Done". Households made before it have none. */
+  setupOpen: z.boolean().default(false),
+  /** Suggestions the household said no to (`<entity id or "household">:<template key>`); they sit behind "More suggestions". */
+  dismissedSuggestions: z.array(z.string()).default([]),
 })
 
 // ---------- entities ----------
@@ -177,6 +181,8 @@ export const RowSchema = BaseRecord.extend({
   rule: RowRuleSchema.nullable().default(null),
   /** With a share rule: the fraction of its base (0.1 = 10 %). */
   ruleShare: FractionSchema.nullable().default(null),
+  /** The suggestion that made this row (`RowTemplate.key`); with the row's person or thing it keeps the Statement from suggesting it again. */
+  templateKey: z.string().nullable().default(null),
   archivedMonth: MonthKeySchema.nullable().default(null),
   order: z.string().default('a0'),
 })

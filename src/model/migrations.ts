@@ -27,6 +27,10 @@ const STEPS: Record<number, Step> = {
   // 6 → 7: the row kind 'from-savings' (money taken out of a savings account into the month). Nothing to rewrite; the
   // version keeps an older app from reading such a row as an ordinary transfer out.
   6: (raw) => raw,
+  // 7 → 8: `Household.setupOpen` and `Household.dismissedSuggestions` (setting up on the Statement) and
+  // `Row.templateKey` (the suggestion a row came from). All fill in from their defaults; the version keeps an older
+  // app from dropping them when it writes a record back.
+  7: (raw) => raw,
 }
 
 export function migrateExport(raw: unknown): unknown {
