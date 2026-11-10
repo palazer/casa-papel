@@ -75,7 +75,8 @@ test.describe('wave 1b', () => {
     await page.getByRole('button', { name: 'Create household' }).click()
     await expect(page.getByText(/^Testers ·/)).toBeVisible()
     await expect(page.getByText('Ana – Pocket', { exact: true })).toBeVisible()
-    await expect(page.getByText('To savings', { exact: true })).toBeVisible()
+    // the row that takes the rest says so after its name
+    await expect(page.getByRole('rowheader', { name: /^To savings/ })).toContainText('= the rest')
     // the USD account carries its household-currency line
     await expect(page.getByRole('rowheader', { name: 'Broker · in EUR' })).toBeVisible()
     // the amounts typed in the wizard are the first month's values

@@ -80,17 +80,7 @@ export function resolveRules(rows: Row[], closingRule: Household['closingRule'])
   return { byRow, restRowId: rest?.id ?? null, warnings }
 }
 
-/** 0.1 → "10 %", 0.125 → "12.5 %": a share to a tenth of a percent. */
-export const sharePercent = (share: number): string => `${Math.round(share * 1000) / 10} %`
+const PERCENT = new Intl.NumberFormat('en', { style: 'percent', maximumFractionDigits: 1 })
 
-/**
- * What a row's rule reads as, in the words the rule dialog uses: `a fixed amount`, `10 % of income`,
- * `30 % of what is left`, `the rest`. A row that carries no rule of its own reads as a fixed amount.
- */
-export function ruleLabel(state: RuleState | undefined): string {
-  if (!state) return 'a fixed amount'
-  if (state.kind === 'share-of-income') return `${sharePercent(state.share)} of income`
-  if (state.kind === 'share-of-rest') return `${sharePercent(state.share)} of what is left`
-  if (state.kind === 'rest') return 'the rest'
-  return 'nothing: another account takes the rest'
-}
+/** 0.1 → "10%", 0.125 → "12.5%": a share to a tenth of a percent, for messages that have no locale at hand. */
+export const sharePercent = (share: number): string => PERCENT.format(share)

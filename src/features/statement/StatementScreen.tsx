@@ -9,14 +9,15 @@ import { doneness, type DoneState } from '@/app/display'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { buildStatement, cellKey, computeMainAccount, type GoalProgress, type StatementLine } from '@/engine'
-import { lastDayOfMonth, monthDiff, monthOfDate, type Goal, type GoalKind, type MonthKey, type Row, type Section } from '@/model'
-import { addPlanYear, setCellDone, setDerivedDone, setItemStatus } from '@/store'
+import { canCarryRule, lastDayOfMonth, monthDiff, monthOfDate, type Goal, type GoalKind, type MonthKey, type Row, type Section } from '@/model'
+import { addPlanYear, setCellDone, setDerivedDone, setItemStatus, type RuleTarget } from '@/store'
 import { GoalDialog } from '@/features/goals/GoalDialog'
 import { goalStatusLine } from '@/features/goals/goalText'
 import { AddRowInline } from '@/features/grid/AddRowInline'
 import { BalanceDialog } from '@/features/grid/BalanceDialog'
 import { CellEditor } from '@/features/grid/CellEditor'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
+import { RuleDialog } from '@/features/rules/RuleDialog'
 import { AddCategoryInline } from './AddCategoryInline'
 import { EstimateDialog } from './EstimateDialog'
 import { StatementBand } from './StatementBand'
@@ -47,6 +48,8 @@ export function StatementScreen() {
   const [balanceFor, setBalanceFor] = useState<string | null>(null)
   /** The expense category whose estimate is being typed. */
   const [estimateFor, setEstimateFor] = useState<string | null>(null)
+  /** The transfer, account or pool account whose rule is being set. */
+  const [ruleFor, setRuleFor] = useState<RuleTarget | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -89,10 +92,18 @@ export function StatementScreen() {
     run.catch((e) => setError(e instanceof Error ? e.message : 'Action failed')).finally(() => setBusy(null))
   }
 
-  /** A new row opens its category and, in an open month, the editor for its first amount. */
+  /** A new row opens its category and, in an open month, the editor for its first amount; a transfer to an account asks for its rule. */
   function onAdded(row: Row) {
     setOpenLines((s) => ({ ...s, [`cat:${row.section}:${row.categoryId ?? 'none'}`]: true }))
-    if (!statement!.closed) setEditorRow(row.id)
+    if (statement!.closed) return
+    if (canCarryRule(row)) setRuleFor({ rowId: row.id })
+    else setEditorRow(row.id)
+  }
+  /** The rule sits on a row; an account or a pool account that no row feeds yet gets one when the rule is saved. */
+  function onRule(line: StatementLine) {
+    if (line.rule?.rowId) setRuleFor({ rowId: line.rule.rowId })
+    else if (line.poolId) setRuleFor({ poolId: line.poolId })
+    else if (line.accountId) setRuleFor({ accountId: line.accountId })
   }
   const categoriesOf = (section: Section) => tables!.categories.filter((c) => !c.deletedAt && c.section === section)
   const addRow = (section: Section, over: { label?: string; defaultCategoryId?: string } = {}) => (
@@ -128,7 +139,8 @@ export function StatementScreen() {
     setGoalEdit({ goal: null, preset: { kind: 'net-worth' } })
   }
 
-  const base = { locale, ccy, isOpen, onToggle, goalText }
+  // a closed month shows its rules and changes none
+  const base = { locale, ccy, isOpen, onToggle, goalText, onRule: statement.closed ? undefined : onRule }
   const flowCtx: LineContext = { ...base, withChange: false, closed: statement.closed, doneOf, onTick, onEdit: setEditorRow, busy, footer, onEstimate: setEstimateFor }
   // the estimate dialog reads the category's line: what the month shows now, and what its rows explain
   const estimateCategory = estimateFor ? tables.categories.find((c) => c.id === estimateFor && !c.deletedAt) : undefined
@@ -173,6 +185,7 @@ export function StatementScreen() {
           current={estimateLine?.budget ?? 0} rows={(estimateLine?.amount ?? 0) - estimateRest} onClose={() => setEstimateFor(null)}
         />
       )}
+      {ruleFor && <RuleDialog key={JSON.stringify(ruleFor)} tables={tables} household={household} target={ruleFor} month={m} onClose={() => setRuleFor(null)} />}
       {removingGoal && <RemoveDialog target={{ kind: 'goal', id: removingGoal.id }} tables={tables} household={household} onClose={() => setRemovingGoal(null)} />}
     </div>
   )

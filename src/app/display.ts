@@ -1,6 +1,6 @@
-import type { CellResult, CellStatus } from '@/engine'
+import type { CellResult, CellStatus, StatementRule } from '@/engine'
 import type { Money, Row } from '@/model'
-import { formatAmount } from './format'
+import { formatAmount, formatShare } from './format'
 
 export type Flow = 'in' | 'out' | 'net'
 
@@ -50,4 +50,16 @@ export function doneLabel(d: { done: number; total: number; state: DoneState }):
   if (d.state === 'all') return 'Done'
   if (d.state === 'none') return 'Not done yet'
   return `${d.done} of ${d.total} done`
+}
+
+/** A rule in the rule dialog's words: `a fixed amount`, `10% of income`, `30% of what is left`, `the rest`. */
+export function ruleText(rule: Pick<StatementRule, 'kind' | 'share'>, locale: string): string {
+  switch (rule.kind) {
+    case 'share-of-income': return `${formatShare(rule.share ?? 0, locale)} of income`
+    case 'share-of-rest': return `${formatShare(rule.share ?? 0, locale)} of what is left`
+    case 'rest': return 'the rest'
+    case 'idle': return 'nothing, another account takes the rest'
+    case 'none': return 'no rule yet'
+    default: return 'a fixed amount'
+  }
 }

@@ -12,13 +12,13 @@ import { HUES, SECTION_HUE, type Hue } from '@/app/hues'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { cellKey, groupRowsByCategory, type EngineOutput } from '@/engine'
-import { monthOfDate, parseMonth, type Household, type Money, type MonthKey, type Row, type Section, type Tables } from '@/model'
+import { monthOfDate, parseMonth, resolveRules, type Household, type Money, type MonthKey, type Row, type RuleState, type Section, type Tables } from '@/model'
 import { addPlanYear, closeMonth, derivedRowReason, reopenMonth } from '@/store'
 import { AddRowInline } from './AddRowInline'
 import { BalanceDialog } from './BalanceDialog'
 import { CellEditor } from './CellEditor'
 import { RowMenu } from './RowMenu'
-import { amountDisplay, doneLabel, doneness, flowOf, statusClass, toneClass, type Flow } from '@/app/display'
+import { amountDisplay, doneLabel, doneness, flowOf, ruleText, statusClass, toneClass, type Flow } from '@/app/display'
 import { DoneDot } from '@/components/DoneDot'
 
 const SECTIONS: Array<{ key: Section; title: string }> = [
@@ -37,6 +37,8 @@ export function GridScreen() {
   const [selected, setSelected] = useState<{ rowId: string; month: MonthKey } | null>(null)
   const [balanceSel, setBalanceSel] = useState<{ accountId: string; month: MonthKey } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  /** Which rows a rule works out, read the way the engine reads them. */
+  const rules = useMemo(() => (engine && household ? resolveRules(engine.rows, household.closingRule) : null), [engine, household])
 
   if (!tables || !household || !engine) return null
   const { locale, baseCurrency: ccy, displayExpensesNegative: neg } = household
@@ -195,7 +197,7 @@ export function GridScreen() {
                       <td colSpan={months.length} />
                     </tr>
                   ),
-                  ...g.rows.map((row) => <GridRow key={row.id} row={row} band={bandOf(g.band)} rIndex={editableIndex++} months={months} engine={engine} tables={tables} household={household} ccy={ccy} locale={locale} neg={neg} onSelect={(m) => setSelected({ rowId: row.id, month: m })} onError={setError} />),
+                  ...g.rows.map((row) => <GridRow key={row.id} row={row} band={bandOf(g.band)} rIndex={editableIndex++} months={months} engine={engine} tables={tables} household={household} ccy={ccy} locale={locale} neg={neg} rule={rules?.byRow.get(row.id)} onSelect={(m) => setSelected({ rowId: row.id, month: m })} onError={setError} />),
                 ])),
                 !isCollapsed && (
                   <tr key={`${key}-add`}>
@@ -268,11 +270,13 @@ interface GridRowProps {
   ccy: string
   locale: string
   neg: boolean
+  /** The rule that works the row out, when it has one. */
+  rule?: RuleState
   onSelect: (m: MonthKey) => void
   onError: (msg: string) => void
 }
 
-function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, locale, neg, onSelect, onError }: GridRowProps) {
+function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, locale, neg, rule, onSelect, onError }: GridRowProps) {
   const totals = engine.rowTotals[row.id]
   const flow = flowOf(row)
   const followed = row.followsRowId ? tables.rows.find((r) => r.id === row.followsRowId) : undefined
@@ -281,6 +285,8 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
   const deductedFrom = row.deductedFromRowId ? tables.rows.find((r) => r.id === row.deductedFromRowId) : undefined
   const shareTag = row.followShare != null && row.followShare !== 1 ? `${formatPercent(row.followShare, locale)} of ` : ''
   const automatic = derivedRowReason(row, household.closingRule) !== null
+  /** A row a rule works out says which, the way a follower names its row. */
+  const ruleTag = rule && rule.kind !== 'idle' ? ruleText(rule, locale) : null
   return (
     <tr className={cn('group', band)}>
       <th scope="row" className={cn('sticky left-0 z-10 px-2 py-0.5 text-left font-normal', band ?? 'bg-card')}>
@@ -290,6 +296,7 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
               {row.name}{tagCcy && tagCcy !== ccy ? <span className="ml-1 text-[10px] font-normal text-muted-foreground">{tagCcy}</span> : null}
               {followed ? <span className="ml-1 text-[10px] font-normal text-muted-foreground" title={`${shareTag ? `${shareTag}the amount of` : 'Same amount as'} ${followed.name}`}>= {shareTag}{followed.name}</span> : null}
               {deductedFrom ? <span className="ml-1 text-[10px] font-normal text-muted-foreground" title={`Deducted from ${deductedFrom.name}`}>out of {deductedFrom.name}</span> : null}
+              {ruleTag ? <span className="ml-1 text-[10px] font-normal text-muted-foreground" title={`Rule: ${ruleTag}`}>= {ruleTag}</span> : null}
             </div>
             <div className="truncate text-[10px] leading-3 text-muted-foreground tabular-nums">
               Σ {formatAmount(totals?.total ?? 0, ccy, locale, { compact: true })}{row.section !== 'income' && totals?.shareOfIncome ? ` · ${formatPercent(totals.shareOfIncome, locale)} of income` : ''}
@@ -297,7 +304,7 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
           </div>
           {followed && <InfoTip help="row.follows" text={`${shareTag ? `${shareTag}the amount of` : 'Same amount as'} "${followed.name}" every month. Edit that row; this one has no amount of its own.`} />}
           {deductedFrom && <InfoTip help="row.deductedFrom" />}
-          {automatic && <InfoTip help={row.kind === 'to-savings' ? 'row.toSavingsPlug' : row.kind === 'category-estimate' ? 'row.categoryEstimate' : 'row.pocketShare'} />}
+          {automatic && <InfoTip help={rule?.kind === 'share-of-income' || rule?.kind === 'share-of-rest' ? 'row.rule' : row.kind === 'to-savings' ? 'row.toSavingsPlug' : row.kind === 'category-estimate' ? 'row.categoryEstimate' : 'row.pocketShare'} />}
           <RowMenu row={row} tables={tables} household={household} onError={onError} />
         </div>
       </th>

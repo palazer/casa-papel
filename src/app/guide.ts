@@ -188,11 +188,12 @@ export const GUIDE: GuideTopic[] = [
       'Set "Pocket money per month, all adults (EUR)" and "Cash kept in the account at month end (EUR)"; "Pocket money and cash buffer changes apply to" picks "This month and onwards (earlier months keep what they show)", "Only this month" or "Every open month".',
       'Grid → Transfers → "Add row" → say what the row does: "Moves money between your accounts", "Goes into a savings account", "Deposits into an investment account", "Fills a pool account", "Pocket money for an adult" or, for a card whose purchases are expense rows, "Pays off a credit card", then pick the "Account", "Pool account" or "Adult" and press "Add".',
       'Row menu → "Goes into…" changes a deposit row\'s account for every month.',
+      'Statement → "Set aside, pay off" → the symbol after a transfer\'s name, or Grid → row menu → "Rule…", says how the amount is worked out: "A fixed amount", "A percentage of income", "A percentage of what is left" or "The rest", with "Counts from" for the month it starts in.',
       'Moves → "Transfers to make" lists them for the month; automatic ones carry the "automatic" chip.',
     ],
     factsTitle: 'The two rules',
     facts: rules,
-    tips: ['section.transfer', 'household.closingRule', 'derived.keptInAccount', 'derived.leftover', 'row.toSavingsPlug', 'row.pocketShare', 'household.pocket', 'household.buffer', 'household.pocketScope', 'row.automatic', 'stat.toSavings'],
+    tips: ['section.transfer', 'household.closingRule', 'derived.keptInAccount', 'derived.leftover', 'row.toSavingsPlug', 'row.pocketShare', 'household.pocket', 'household.buffer', 'household.pocketScope', 'row.automatic', 'row.rule', 'row.ruleFrom', 'stat.toSavings'],
     open: 'household',
   },
   {

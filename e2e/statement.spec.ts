@@ -103,7 +103,7 @@ test.describe('working the month in the Statement', () => {
     await expect(utilities.locator('[data-estimate]')).toHaveText('€210.00')
     // a certain amount is plain
     await expect(moneyOut.getByRole('button', { name: /^The flat – Rent:/ })).toHaveAccessibleName('The flat – Rent: €1,650.00')
-    const rest = moneyOut.locator('[data-line]').filter({ hasText: 'the rest' })
+    const rest = moneyOut.locator('[data-line]').filter({ has: page.locator('[data-rule="rest"]') })
     const restBefore = euros(await rest.innerText())
 
     // overwrite it for this month and say it is certain
@@ -206,7 +206,7 @@ test.describe('working the month in the Statement', () => {
     const line = (name: string) => moneyOut.locator('[data-line^="cat:expense"]').filter({ hasText: name })
     const amountOf = async (name: string) => euros((await line(name).innerText()).split('\n').pop()!)
     const expenses = async () => euros((await moneyOut.locator('[data-line="expenses"]').innerText()).split('\n').pop()!)
-    const rest = async () => euros((await moneyOut.locator('[data-line]').filter({ hasText: 'the rest' }).innerText()).split('\n').pop()!)
+    const rest = async () => euros((await moneyOut.locator('[data-line]').filter({ has: page.locator('[data-rule="rest"]') }).innerText()).split('\n').pop()!)
     const sidesAgree = async () => expect((await total(page, 'in').innerText()).replace(/^Total in\s*/, '')).toBe((await total(page, 'out').innerText()).replace(/^Total out\s*/, ''))
     const expensesBefore = await expenses()
     const restBefore = await rest()
@@ -291,7 +291,7 @@ test.describe('working the month in the Statement', () => {
     const assets = page.getByRole('region', { name: 'Assets' })
     const dlg = page.getByRole('dialog')
     const expensesBefore = euros(await moneyOut.locator('[data-line="expenses"]').innerText())
-    const restBefore = euros(await moneyOut.locator('[data-line]').filter({ hasText: 'the rest' }).innerText())
+    const restBefore = euros(await moneyOut.locator('[data-line]').filter({ has: page.locator('[data-rule="rest"]') }).innerText())
     const amountOf = async (line: string) => euros((await claims.locator(`[data-line="${line}"]`).innerText()).split('\n').pop()!)
     const netWorthBefore = await amountOf('net-worth')
 
@@ -310,7 +310,7 @@ test.describe('working the month in the Statement', () => {
     await expect(claims.getByRole('button', { name: /^Credit card balance:/ })).toHaveAccessibleName('Credit card balance: €478.00, entered')
     await expect(claims.getByText(/against the plan/)).toHaveCount(0)
     expect(euros(await moneyOut.locator('[data-line="expenses"]').innerText())).toBe(expensesBefore + 400)
-    expect(euros(await moneyOut.locator('[data-line]').filter({ hasText: 'the rest' }).innerText())).toBe(restBefore - 400)
+    expect(euros(await moneyOut.locator('[data-line]').filter({ has: page.locator('[data-rule="rest"]') }).innerText())).toBe(restBefore - 400)
     await moneyOut.getByRole('button', { name: 'No category', exact: true }).click()
     await expect(moneyOut.getByRole('button', { name: /^Credit card – Not recorded:/ })).toHaveAccessibleName('Credit card – Not recorded: €400.00')
     await expect(page.getByRole('checkbox', { name: 'Credit card – Not recorded done' })).toBeChecked()
@@ -361,6 +361,99 @@ test.describe('working the month in the Statement', () => {
     await assets.getByRole('button', { name: 'Edit goal Travel fund' }).click()
     await expect(dlg.getByRole('heading', { name: 'Edit goal' })).toBeVisible()
     await expect(dlg.getByLabel('Name')).toHaveValue('Travel fund')
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+  })
+
+  test('a rule per account: a percentage from the transfer line, another from the account, and the rest follows', async ({ page }) => {
+    await openStatement(page)
+    await goToMonth(page, 'November 2026')
+    const moneyOut = page.getByRole('region', { name: 'Money out' })
+    const assets = page.getByRole('region', { name: 'Assets' })
+    const dlg = page.getByRole('dialog')
+    const rest = async () => euros(await moneyOut.locator('[data-line]').filter({ has: page.locator('[data-rule="rest"]') }).innerText())
+    const balanced = async () => expect((await total(page, 'in').innerText()).replace(/^Total in\s*/, '')).toBe((await total(page, 'out').innerText()).replace(/^Total out\s*/, ''))
+
+    // every transfer to an account, and the account it feeds, carries its rule as a symbol with a name
+    await expect(moneyOut.getByRole('button', { name: 'Rule for To savings: the rest' })).toBeVisible()
+    await expect(assets.getByRole('button', { name: 'Rule for Savings: the rest' })).toBeVisible()
+    await expect(assets.getByRole('button', { name: 'Rule for Index fund: a fixed amount' })).toBeVisible()
+    await expect(assets.getByRole('button', { name: 'Rule for Clothing: a fixed amount' })).toBeVisible()
+    await expect(moneyOut.getByText('the rest', { exact: true })).toHaveCount(0)
+    expect(await rest()).toBe(2369)
+
+    // 10 % of income for the investments, from this month on
+    await moneyOut.getByRole('button', { name: 'Rule for To investments: a fixed amount' }).click()
+    await expect(dlg.getByRole('heading', { name: 'How much goes to Index fund?' })).toBeVisible()
+    await expect(dlg.getByRole('radio', { name: 'A fixed amount' })).toBeChecked()
+    await expect(dlg.getByLabel('Amount per month in EUR')).toHaveValue('500')
+    // an investment account cannot take the rest
+    await expect(dlg.getByRole('radio', { name: 'The rest' })).toHaveCount(0)
+    await dlg.getByRole('radio', { name: 'A percentage of income' }).click()
+    await expect(dlg.getByRole('button', { name: 'Save' })).toBeDisabled()
+    await dlg.getByLabel('Percentage of income').fill('120')
+    await expect(dlg.getByRole('alert')).toContainText('above 0 and at most 100')
+    await dlg.getByLabel('Percentage of income').fill('10')
+    await expect(dlg.getByRole('alert')).toHaveCount(0)
+    await expect(dlg.getByLabel('Counts from: month')).toHaveValue('11')
+    await expect(dlg.getByTestId('rule-preview')).toContainText('10% of €7,405.00 take-home income')
+    await expect(dlg.getByTestId('rule-amount')).toHaveText('€740.50')
+    await expect(dlg.getByTestId('rule-rest')).toHaveText('€2,128.50')
+    await page.screenshot({ path: 'e2e/output/statement-rule-dialog.png' })
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(moneyOut.getByRole('button', { name: 'To investments: €740.50' })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: 'Rule for To investments: 10% of income' })).toBeVisible()
+    await expect(assets.getByRole('button', { name: 'Rule for Index fund: 10% of income' })).toBeVisible()
+    // what the investments get more, the rest gets less
+    expect(await rest()).toBe(2128.5)
+    await balanced()
+
+    // a worked-out line opens its rule, not the cell editor
+    await moneyOut.getByRole('button', { name: 'To investments: €740.50' }).click()
+    await expect(dlg.getByRole('heading', { name: 'How much goes to Index fund?' })).toBeVisible()
+    await expect(dlg.getByLabel('Percentage of income')).toHaveValue('10')
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+
+    // from the account: the Travel pool account takes a fifth of what is left
+    await assets.getByRole('button', { name: 'Rule for Travel: a fixed amount' }).click()
+    await expect(dlg.getByRole('heading', { name: 'How much goes to Travel?' })).toBeVisible()
+    await dlg.getByRole('radio', { name: 'A percentage of what is left' }).click()
+    await dlg.getByLabel('Percentage of what is left').fill('20')
+    // its own €200 goes back into what is left first: 2,128.50 + 200
+    await expect(dlg.getByTestId('rule-preview')).toContainText('20% of €2,328.50 left')
+    await expect(dlg.getByTestId('rule-amount')).toHaveText('€465.70')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(moneyOut.getByRole('button', { name: 'Travel pool: €465.70' })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: 'Rule for Travel pool: 20% of what is left' })).toBeVisible()
+    expect(await rest()).toBe(1862.8)
+    await balanced()
+    await page.screenshot({ path: 'e2e/output/statement-rules.png', fullPage: true })
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.screenshot({ path: 'e2e/output/statement-rules-phone.png', fullPage: true })
+    await page.setViewportSize({ width: 1440, height: 900 })
+
+    // the month before keeps what it showed, and December follows the rules
+    await goToMonth(page, 'October 2026')
+    await expect(moneyOut.getByRole('button', { name: /^To investments: €500\.00/ })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: /^Travel pool: €200\.00/ })).toBeVisible()
+    expect(await rest()).toBe(2009)
+    await goToMonth(page, 'December 2026')
+    await expect(moneyOut.getByRole('button', { name: 'To investments: €740.50' })).toBeVisible()
+    await balanced()
+
+    // a closed month shows its rules and changes none
+    await goToMonth(page, 'September 2026')
+    await expect(moneyOut.locator('[data-rule="rest"]')).toBeVisible()
+    await expect(page.getByRole('button', { name: /^Rule for / })).toHaveCount(0)
+
+    // the Grid says the same and offers the same dialog
+    await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Grid' }).click()
+    await expect(page.getByText('= 10% of income')).toBeVisible()
+    await expect(page.getByText('= 20% of what is left')).toBeVisible()
+    await page.getByRole('button', { name: 'Row menu for To investments' }).click()
+    await page.getByRole('menuitem', { name: 'Rule…' }).click()
+    await expect(dlg.getByRole('heading', { name: 'How much goes to Index fund?' })).toBeVisible()
     await dlg.getByRole('button', { name: 'Cancel' }).click()
   })
 })

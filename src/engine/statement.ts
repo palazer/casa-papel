@@ -13,7 +13,7 @@
  *   out = spending + set aside and paid off + max(0, toSavings) + max(0, leftover)
  * Rows are sorted into the same buckets the engine's totals use (compute.ts, pass 2), which is what keeps the cents.
  */
-import { addMonths, canCarryRule, cardIsItemized, resolveRules, rowsFeeding, ruleLabel, type Account, type Money, type MonthKey, type Row, type Section, type Tables } from '@/model'
+import { addMonths, canCarryRule, cardIsItemized, resolveRules, rowsFeeding, type Account, type Money, type MonthKey, type Row, type Section, type Tables } from '@/model'
 import { computeGoals, type GoalProgress } from './goals'
 import { computeMainAccount, type MainAccountSeries } from './mainAccount'
 import { cellKey, type AccountSeries, type CellResult, type CellStatus, type EngineOutput } from './types'
@@ -27,8 +27,6 @@ export interface StatementRule {
   kind: 'fixed' | 'share-of-income' | 'share-of-rest' | 'rest' | 'idle' | 'none'
   /** The fraction of a share rule. */
   share?: number
-  /** In the rule dialog's words: `a fixed amount`, `10 % of income`, `30 % of what is left`, `the rest`. */
-  label: string
   /** The row the rule sits on; absent for `none`. */
   rowId?: string
 }
@@ -70,7 +68,7 @@ export interface StatementLine {
   memo?: boolean
   /** A short lowercase tag beside the name: `automatic`, `the rest`, `calculated`. */
   chip?: string
-  /** The rule that works this line out, or that feeds this account. */
+  /** The rule that works this line out, or that feeds this account: shown as the rule symbol, which opens the rule dialog. */
   rule?: StatementRule
   skipped?: boolean
   scheduled?: boolean
@@ -152,11 +150,11 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   const rules = resolveRules(engine.rows, household.closingRule)
   const ruleOf = (row: Row): StatementRule => {
     const state = rules.byRow.get(row.id)
-    return { kind: state?.kind ?? 'fixed', share: state && state.share > 0 ? state.share : undefined, label: ruleLabel(state), rowId: row.id }
+    return { kind: state?.kind ?? 'fixed', share: state && state.share > 0 ? state.share : undefined, rowId: row.id }
   }
   /** An account or pool account shows the rule of the one row that feeds it; fed by several, it shows none of its own. */
   const ruleOfRows = (feeding: Row[]): StatementRule | undefined =>
-    feeding.length === 0 ? { kind: 'none', label: 'no rule yet' } : feeding.length === 1 ? ruleOf(feeding[0]) : undefined
+    feeding.length === 0 ? { kind: 'none' } : feeding.length === 1 ? ruleOf(feeding[0]) : undefined
   const accounts = tables.accounts.filter((a) => !a.deletedAt).sort(byOrder)
   const accountsById = new Map(accounts.map((a) => [a.id, a]))
   const poolsById = new Map(tables.pools.filter((p) => !p.deletedAt).map((p) => [p.id, p]))
@@ -177,9 +175,11 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
           rowId: row.id, itemId: it.id,
         }))
       : []
+    // a transfer that feeds an account says how through its rule symbol, not through a tag
+    const rule = canCarryRule(row) ? ruleOf(row) : undefined
     return {
       id: row.id, kind: 'row', label: row.name, amount, children, status: c.status, estimate: !empty && c.status === 'projected', empty,
-      automatic: c.source === 'derived', chip: c.source === 'derived' ? 'automatic' : undefined, rule: canCarryRule(row) ? ruleOf(row) : undefined, missingRate: c.missingRate || undefined,
+      automatic: c.source === 'derived', chip: c.source === 'derived' && !rule ? 'automatic' : undefined, rule, missingRate: c.missingRate || undefined,
       native: c.currency !== base ? { amount: c.value, currency: c.currency } : undefined,
       net: row.section === 'income' && c.deductionsBase > 0 ? c.netBase : undefined,
       rowId: row.id, ...over,
@@ -278,10 +278,9 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
         // a row that gets nothing because another takes the rest has nothing to show
         if (state?.kind === 'idle') break
         // the rest closes the month; in a month with a typed amount the same row is a plain line
-        const rest = state?.kind === 'rest' && c.source === 'derived'
-        const over: Partial<StatementLine> = rest ? { balancing: true } : {}
+        const over: Partial<StatementLine> = state?.kind === 'rest' && c.source === 'derived' ? { balancing: true } : {}
         if (v < 0) cover.push(rowLine(row, c, -v, { ...over, label: 'From savings' }))
-        else setAside.push(rowLine(row, c, v, rest ? { ...over, chip: 'the rest' } : over))
+        else setAside.push(rowLine(row, c, v, over))
         break
       }
     }

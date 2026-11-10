@@ -233,7 +233,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   `Repeat` icon when scheduled); a category's amount is the sum of its rows. Tags follow the name and wrap under it
   when there is no room: a zinc chip with the currency code and the original amount in muted `text-[11px]` for a
   line in another currency (the amount column is always the household currency), a rose `no rate` chip, `net €…`
-  on an income with deductions, and a zinc chip for what the line is (`automatic`, `the rest`, `calculated`,
+  on an income with deductions, and a zinc chip for what the line is (`automatic`, `calculated`,
   `counted when bought` on a card payment that is shown muted and left out of the sum). Pool accounts sit by name
   under the savings account that holds them, with `Not set aside` for the rest of it; the right side sums them in
   one `Set aside` line. A line a goal watches carries the goal mark: a 12 px `Target` icon in the goal hue and the
@@ -245,6 +245,18 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   An itemized row's chevron is a button of its own, `Items of <row>`. An automatic row has the tick (it marks the
   money as moved) but no button; a closed month has neither. The island's head carries the legend, a shaded `an
   estimate` with an (i).
+  **The rule symbol.** A transfer that feeds a savings account, an investment account or a pool account, and that
+  account in the lower half, say how the amount is worked out with one small symbol after the name, never a word
+  tag: `ArrowDownToLine` (14 px) for the rest, the percentage in `text-[11px] tabular-nums` for a share of income
+  (`10%`), the percentage followed by a 12 px `ArrowDownToLine` for a share of what is left (`20% ↓`), `Equal` for
+  a fixed amount, the same sign at half strength for an account no row feeds yet. Muted, 20 px high, 32 px where
+  the pointer is a finger; a button named `Rule for <line>: <rule>` (`Set a rule for <account>` when there is none)
+  that opens the rule dialog, and the bare symbol with the same name in a closed month. A line a rule works out
+  opens the rule dialog when pressed, a fixed one the cell editor; where a line holds both controls, the line's
+  button is its name stretched over the line and the symbol sits above it. An account fed by several rows shows no
+  symbol of its own. A new transfer to an account opens the rule dialog instead of the cell editor. The Grid names
+  the same rule after the row's name the way a follower names its row (`= 10% of income`, `= the rest`) and offers
+  `Rule…` in the row menu.
   Things are added where they will appear: the foot of Income and Expenses holds the Grid's `AddRowInline` (`Add row`)
   and `AddCategoryInline` (`Add category`, a name and Enter), the foot of Set aside, pay off holds `Add row`, and an
   opened category ends with `Add row to <category>` with that category already chosen. A category is a line from
@@ -319,6 +331,15 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   is typed (`Rows this month`, `Not broken down yet`; a muted sentence when the rows already add up to more), then
   "Applies to" as the cell editor's `Segmented` (`This month and onwards` / `Only this month`). Footer: a ghost
   `Remove estimate` when there is one, Cancel, Save. A closed month disables it.
+- The rule dialog (`src/features/rules/RuleDialog.tsx`), titled `How much goes to <account>?`: "Rule" as a
+  `Segmented` (`A fixed amount`, `A percentage of income`, `A percentage of what is left`, and `The rest` for a
+  savings account) with the chosen option's sentence under it, then that option's one field (`Amount per month in
+  <CCY>` or the percentage), then "Counts from" as a `MonthField` with an (i) and the sentence that earlier months
+  keep their amounts. It opens on the month it was called from, or on the first month after the last closed one.
+  Two read-only lines follow what is typed: what the account gets in that month, with the sum the percentage is
+  taken of, and what is then left for the rest (or as leftover). A muted sentence says so when the rest would
+  move from another account or stop being taken. The figures and every refusal come from running the save on a
+  copy, so the dialog never shows a number or allows a Save the store would not. Footer: Cancel, Save.
 - Dialogs are shadcn `Dialog`; the confirm step lives inside the dialog, never behind it. Errors appear beside the field
   that caused them, `role="alert"`.
 - Removing anything goes through one `RemoveDialog` (`src/features/remove/RemoveDialog.tsx`), reached from a row's

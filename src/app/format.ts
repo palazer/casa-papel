@@ -12,6 +12,11 @@ export function formatPercent(fraction: number, locale: string): string {
   return new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 0 }).format(fraction)
 }
 
+/** A share to a tenth of a percent, for a rule: 0.1 → "10%", 0.125 → "12.5%". */
+export function formatShare(fraction: number, locale: string): string {
+  return new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 }).format(fraction)
+}
+
 export function formatMonth(m: MonthKey, locale: string, style: 'short' | 'long' = 'short'): string {
   const { year, month } = parseMonth(m)
   return new Intl.DateTimeFormat(locale, { month: style, year: 'numeric' }).format(new Date(year, month - 1, 1))

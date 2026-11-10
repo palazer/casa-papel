@@ -388,7 +388,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
       shareOfRest += e.rule.share
       fill(e, scaleMoney(t.leftForShares, e.rule.share))
     }
-    if (shareOfRest > 1.000001) warnOnce('share-of-rest', 'The percentages of what is left add up to more than 100 %.')
+    if (shareOfRest > 1.000001) warnOnce('share-of-rest', 'The percentages of what is left add up to more than 100%.')
     if (plugged) {
       t.rest = t.income - outflows() - userToSavings - t.buffer
       t.toSavings = userToSavings + t.rest

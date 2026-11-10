@@ -7,14 +7,15 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { useStore } from '@/app/store'
-import type { Household, Row, Tables } from '@/model'
+import { canCarryRule, monthOfDate, type Household, type Row, type Tables } from '@/model'
 import { derivedRowReason, moveRow, renameRow, restoreRow, updateRow } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
+import { RuleDialog } from '@/features/rules/RuleDialog'
 import { RowAccountDialog, RowCurrencyDialog, RowDeductionDialog, RowFollowDialog, RowScopeDialog, RowSourceDialog } from './RowDialogs'
 import { RowCategoryDialog } from './RowCategoryDialog'
 import { accountVerb } from './rowAccount'
 
-type Open = 'rename' | 'category' | 'scope' | 'currency' | 'source' | 'deduction' | 'account' | 'follow' | 'remove' | null
+type Open = 'rename' | 'category' | 'scope' | 'currency' | 'source' | 'deduction' | 'account' | 'follow' | 'rule' | 'remove' | null
 
 export function RowMenu({ row, tables, household, onError }: { row: Row; tables: Tables; household: Household; onError: (msg: string) => void }) {
   const store = useStore()
@@ -50,6 +51,7 @@ export function RowMenu({ row, tables, household, onError }: { row: Row; tables:
           {row.section === 'expense' && <DropdownMenuItem onClick={() => setOpen('source')}>Comes out of…</DropdownMenuItem>}
           {row.section === 'expense' && <DropdownMenuItem onClick={() => setOpen('deduction')}>{deductedFrom ? `Deducted from ${deductedFrom.name}…` : 'Deducted from an income…'}</DropdownMenuItem>}
           {row.kind !== 'pool-allocation' && <DropdownMenuItem onClick={() => setOpen('account')}>{accountVerb(row)}…</DropdownMenuItem>}
+          {canCarryRule(row) && !row.archivedMonth && <DropdownMenuItem onClick={() => setOpen('rule')}>Rule…</DropdownMenuItem>}
           {canFollow && <DropdownMenuItem onClick={() => setOpen('follow')}>{followed ? `Follows ${followed.name}…` : 'Follow another row…'}</DropdownMenuItem>}
           <DropdownMenuSeparator />
           {row.archivedMonth ? (
@@ -77,6 +79,7 @@ export function RowMenu({ row, tables, household, onError }: { row: Row; tables:
       {open === 'source' && <RowSourceDialog row={row} tables={tables} household={household} onClose={close} />}
       {open === 'account' && <RowAccountDialog row={row} tables={tables} household={household} onClose={close} />}
       {open === 'follow' && <RowFollowDialog row={row} tables={tables} household={household} onClose={close} />}
+      {open === 'rule' && <RuleDialog tables={tables} household={household} target={{ rowId: row.id }} month={monthOfDate()} onClose={close} />}
       {open === 'remove' && <RemoveDialog target={{ kind: 'row', id: row.id }} tables={tables} household={household} onClose={close} />}
     </>
   )

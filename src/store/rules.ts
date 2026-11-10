@@ -97,7 +97,7 @@ export function ruleMutations(tables: Tables, target: RuleTarget, choice: RuleCh
     const others = liveRows.filter((r) => r.id !== row.id && before.byRow.get(r.id)?.kind === 'share-of-rest')
     const total = others.reduce((sum, r) => sum + (before.byRow.get(r.id)?.share ?? 0), 0) + choice.share
     if (total > 1.000001) {
-      throw new Error(`With ${others.map((r) => `"${r.name}"`).join(' and ')} the percentages of what is left would add up to ${sharePercent(total)}. Together they can take 100 % at most.`)
+      throw new Error(`With ${others.map((r) => `"${r.name}"`).join(' and ')} the percentages of what is left would add up to ${sharePercent(total)}. Together they can take 100% at most.`)
     }
   }
 

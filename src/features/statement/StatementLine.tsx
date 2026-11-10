@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react'
-import { ChevronRight, Repeat, Target } from 'lucide-react'
+import { ArrowDownToLine, ChevronRight, Equal, Repeat, Target } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { InfoTip } from '@/components/InfoTip'
 import { Tick } from '@/components/Tick'
 import { cn } from '@/lib/utils'
-import type { DoneState } from '@/app/display'
-import { formatAmount, formatPercent } from '@/app/format'
+import { ruleText, type DoneState } from '@/app/display'
+import { formatAmount, formatPercent, formatShare } from '@/app/format'
 import type { HelpKey } from '@/app/help'
 import { HUES, type Hue } from '@/app/hues'
 import type { GoalProgress, StatementHue, StatementLine as Line } from '@/engine'
@@ -38,6 +38,8 @@ export interface LineContext {
   onBalance?: (accountId: string) => void
   /** Set or change a category's estimate; "Not broken down yet" opens it too. */
   onEstimate?: (categoryId: string) => void
+  /** Open the rule dialog for a transfer line, or for the account or pool account it feeds. Leave out to show the rule without the button. */
+  onRule?: (line: Line) => void
 }
 
 const HUE: Record<StatementHue, Hue> = { income: HUES.income, expense: HUES.expense, transfer: HUES.transfer, worth: HUES.worth, pool: HUES.pool }
@@ -78,7 +80,8 @@ export function StatementLines({ lines, level, ctx, parent }: { lines: Line[]; l
 /**
  * One line of the Statement (DESIGN.md §7). A group is a heading on its hue's tint with its lines always under it; a
  * category, an account or an itemized row opens as an accordion; a row and its items carry a tick and open the cell
- * editor; everything else is a name, its tags and its amount.
+ * editor; everything else is a name, its tags and its amount. A transfer that feeds an account, and that account,
+ * carry the rule symbol.
  */
 function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: number; ctx: LineContext; parent?: Line }) {
   const { locale, ccy } = ctx
@@ -150,7 +153,10 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
   if (rowLike) {
     const working = !ctx.closed && !!ctx.doneOf
     const d = working ? ctx.doneOf!(line) : null
-    const editable = !ctx.closed && !!ctx.onEdit && !!line.rowId && !line.automatic
+    // a line a rule works out has no amount to type: it opens its rule instead of the cell editor
+    const byRule = !!line.rule && (line.automatic || line.rule.kind === 'share-of-income' || line.rule.kind === 'share-of-rest')
+    const ruleOpens = !ctx.closed && !!ctx.onRule && byRule
+    const editable = !ctx.closed && !!ctx.onEdit && !!line.rowId && !line.automatic && !byRule
     // what is left of a category's estimate is worked out, so the line opens the estimate it comes from
     const estimateOf = !ctx.closed && ctx.onEstimate ? line.estimateFor : undefined
     const busy = ctx.busy != null && (ctx.busy === line.id || ctx.busy === line.rowId || ctx.busy.startsWith(`${line.rowId}:`))
@@ -160,10 +166,28 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
         <span className={LABEL}>
           {name}
           {tags}
+          {line.rule && <RuleMark line={line} ctx={{ ...ctx, onRule: undefined }} />}
         </span>
         {amount}
       </>
     )
+    // A line with a rule holds two controls: the line itself and the rule symbol. The line's button is its name, stretched
+    // over the whole line; the symbol sits above it.
+    const ruled = line.rule && (editable || ruleOpens) ? (
+      <div className="relative -mr-2 flex min-w-0 flex-1 items-center gap-1.5 self-stretch rounded pr-2 hover:bg-muted">
+        <span className={LABEL}>
+          <button
+            type="button" aria-label={said} onClick={() => (ruleOpens ? ctx.onRule!(line) : ctx.onEdit!(line.rowId!))}
+            className="min-w-0 truncate rounded text-left outline-none after:absolute after:inset-0 after:rounded focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring"
+          >
+            {line.label}
+          </button>
+          {tags}
+          <RuleMark line={line} ctx={ctx} className="relative z-10" />
+        </span>
+        {amount}
+      </div>
+    ) : null
     return (
       <li>
         <div className={cn(ROW, pad, item && 'bg-muted/20')} data-line={line.id}>
@@ -178,14 +202,14 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
           {working && (d ? (
             <Tick done={d.done} total={d.total} state={d.state} label={`${fullLabel} done`} disabled={busy} onToggle={() => ctx.onTick?.(line, d.state !== 'all')} className={cn(TICK_SLOT, 'md:rounded')} dotClassName="md:size-3" />
           ) : <span className={TICK_SLOT} aria-hidden />)}
-          {editable || estimateOf ? (
+          {ruled ?? (editable || estimateOf ? (
             <button
               type="button" aria-label={said} onClick={() => (estimateOf ? ctx.onEstimate!(estimateOf) : ctx.onEdit!(line.rowId!))}
               className="-mr-2 flex min-w-0 flex-1 items-center gap-1.5 self-stretch rounded pr-2 text-left outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
             >
               {body}
             </button>
-          ) : body}
+          ) : body)}
         </div>
         {below}
       </li>
@@ -213,6 +237,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
         <div className={LABEL}>
           {head}
           {tags}
+          {line.rule && <RuleMark line={line} ctx={ctx} />}
           {tip && <InfoTip help={tip} />}
           {canGoal && !line.goals?.length && (
             <button
@@ -235,6 +260,37 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
       </div>
       {below}
     </li>
+  )
+}
+
+/**
+ * The rule symbol (DESIGN.md §7): how the amount for an account is worked out, on the transfer line and on the account
+ * it feeds. An arrow to a line for the rest, the percentage for a share of income, the percentage and the arrow for a
+ * share of what is left, an equals sign for a fixed amount (faint where there is no rule yet). A button when the
+ * rule can be changed from here, the bare symbol otherwise; its name says the rule in full.
+ */
+function RuleMark({ line, ctx, className }: { line: Line; ctx: LineContext; className?: string }) {
+  const rule = line.rule
+  if (!rule) return null
+  const said = rule.kind === 'none' ? `Set a rule for ${line.label}` : `Rule for ${line.label}: ${ruleText(rule, ctx.locale)}`
+  const pct = rule.share != null ? <span className="tabular-nums">{formatShare(rule.share, ctx.locale)}</span> : null
+  const glyph = rule.kind === 'rest' ? <ArrowDownToLine className="size-3.5" aria-hidden />
+    : rule.kind === 'share-of-income' ? pct
+    : rule.kind === 'share-of-rest' ? <>{pct}<ArrowDownToLine className="size-3" aria-hidden /></>
+    : <Equal className="size-3.5" aria-hidden />
+  const look = cn(
+    'inline-flex h-5 min-w-5 shrink-0 items-center justify-center gap-0.5 rounded px-0.5 text-[11px] text-muted-foreground',
+    (rule.kind === 'none' || rule.kind === 'idle') && 'text-muted-foreground/50',
+    className,
+  )
+  if (!ctx.onRule) return <span className={look} title={said} data-rule={rule.kind}>{glyph}<span className="sr-only">{said}</span></span>
+  return (
+    <button
+      type="button" aria-label={said} title={said} data-rule={rule.kind} onClick={() => ctx.onRule!(line)}
+      className={cn(look, 'outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:h-8 pointer-coarse:min-w-8')}
+    >
+      {glyph}
+    </button>
   )
 }
 

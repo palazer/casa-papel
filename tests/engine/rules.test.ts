@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildStatement, cellKey, computeEngine, type EngineOutput, type Statement, type StatementLine } from '@/engine'
-import { FxRateSchema, monthRange, resolveRules, ruleLabel, type Row, type Tables } from '@/model'
+import { FxRateSchema, monthRange, resolveRules, sharePercent, type Row, type Tables } from '@/model'
 import { T0, account, cellValue, household, pool, row, tables } from './helpers'
 
 const months = monthRange('2026-01', '2026-04')
@@ -184,7 +184,7 @@ describe('rules: how a transfer is worked out', () => {
     // 400.00 EUR at 0.8 EUR per USD is 500.00 USD a month
     expect(out.accounts[base.broker.id].months['2026-02'].capital).toBe(100000)
     const s = buildStatement(t, out, '2026-02')!
-    expect(all(s).find((l) => l.id === `pool:${travel.id}`)?.rule).toMatchObject({ kind: 'share-of-income', share: 0.05, label: '5 % of income', rowId: alloc.id })
+    expect(all(s).find((l) => l.id === `pool:${travel.id}`)?.rule).toEqual({ kind: 'share-of-income', share: 0.05, rowId: alloc.id })
     expectIdentity(out)
     expectBalanced(t, out)
   })
@@ -199,7 +199,7 @@ describe('rules: how a transfer is worked out', () => {
 
     const over = world({ rows: () => ({ toBroker: { rule: 'share-of-rest', ruleShare: 0.9 } }) })
     out = run(over.t)
-    expect(out.warnings).toContain('The percentages of what is left add up to more than 100 %.')
+    expect(out.warnings).toContain('The percentages of what is left add up to more than 100%.')
     expectIdentity(out)
   })
 
@@ -228,13 +228,16 @@ describe('rules on the Statement', () => {
     const s = buildStatement(withSpare, run(withSpare), '2026-02')!
     const lines = all(s)
     const line = (id: string) => lines.find((l) => l.id === id)!
-    expect(line(r.toBroker.id).rule).toEqual({ kind: 'share-of-income', share: 0.1, label: '10 % of income', rowId: r.toBroker.id })
+    expect(line(r.toBroker.id).rule).toEqual({ kind: 'share-of-income', share: 0.1, rowId: r.toBroker.id })
     expect(line(`acc:${broker.id}`).rule).toEqual(line(r.toBroker.id).rule)
-    expect(line(r.toRainy.id).rule).toMatchObject({ kind: 'share-of-rest', label: '25 % of what is left' })
+    expect(line(r.toRainy.id).rule).toMatchObject({ kind: 'share-of-rest', share: 0.25 })
     expect(line(`acc:${rainy.id}`).rule?.rowId).toBe(r.toRainy.id)
-    expect(line(r.toSavings.id)).toMatchObject({ balancing: true, automatic: true, rule: { kind: 'rest', label: 'the rest', rowId: r.toSavings.id } })
+    expect(line(r.toSavings.id)).toMatchObject({ balancing: true, automatic: true, rule: { kind: 'rest', rowId: r.toSavings.id } })
+    // the rule symbol says it: no word tag on these lines
+    expect(line(r.toSavings.id).chip).toBeUndefined()
+    expect(line(r.toBroker.id).chip).toBeUndefined()
     expect(line(`acc:${savings.id}`).rule?.kind).toBe('rest')
-    expect(line(`acc:${spare.id}`).rule).toEqual({ kind: 'none', label: 'no rule yet' })
+    expect(line(`acc:${spare.id}`).rule).toEqual({ kind: 'none' })
     expect(line(`acc:${loan.id}`).rule).toBeUndefined()
     expect(line(r.rent.id).rule).toBeUndefined()
   })
@@ -243,17 +246,16 @@ describe('rules on the Statement', () => {
     const { t, r, broker } = world({ rows: () => ({ toBroker: { rule: null, ruleShare: null } }) })
     const second = row({ name: 'Bonus to Broker', section: 'transfer', kind: 'to-investment', accountId: broker.id, order: 'a4' })
     let s = buildStatement(t, run(t), '2026-02')!
-    expect(all(s).find((l) => l.id === `acc:${broker.id}`)?.rule).toEqual({ kind: 'fixed', share: undefined, label: 'a fixed amount', rowId: r.toBroker.id })
+    expect(all(s).find((l) => l.id === `acc:${broker.id}`)?.rule).toEqual({ kind: 'fixed', share: undefined, rowId: r.toBroker.id })
     const two = { ...t, rows: [...t.rows, second] }
     s = buildStatement(two, run(two), '2026-02')!
     expect(all(s).find((l) => l.id === `acc:${broker.id}`)?.rule).toBeUndefined()
     expect(all(s).find((l) => l.id === second.id)?.rule?.kind).toBe('fixed')
   })
 
-  it('names every state in the rule dialog\'s words', () => {
-    expect(ruleLabel(undefined)).toBe('a fixed amount')
-    expect(ruleLabel({ kind: 'share-of-income', share: 0.125, typedCounts: true })).toBe('12.5 % of income')
-    expect(ruleLabel({ kind: 'share-of-rest', share: 1, typedCounts: true })).toBe('100 % of what is left')
-    expect(ruleLabel({ kind: 'rest', share: 0, typedCounts: false })).toBe('the rest')
+  it('writes a share to a tenth of a percent', () => {
+    expect(sharePercent(0.1)).toBe('10%')
+    expect(sharePercent(0.125)).toBe('12.5%')
+    expect(sharePercent(1)).toBe('100%')
   })
 })

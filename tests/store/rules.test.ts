@@ -183,7 +183,7 @@ describe('setRule', () => {
     await expect(rule({ rowId: toBroker.id }, { kind: 'share-of-income', share: 0.1 }, '2025-12')).rejects.toThrow(/starts in 2026-01/)
     // the percentages of what is left cannot pass 100 % together
     await rule({ accountId: rainy.id }, { kind: 'share-of-rest', share: 0.7 })
-    await expect(rule({ rowId: toBroker.id }, { kind: 'share-of-rest', share: 0.4 })).rejects.toThrow(/"To Rainy day".*110 %.*100 % at most/)
+    await expect(rule({ rowId: toBroker.id }, { kind: 'share-of-rest', share: 0.4 })).rejects.toThrow(/"To Rainy day".*110%.*100% at most/)
     await rule({ rowId: toBroker.id }, { kind: 'share-of-rest', share: 0.3 })
     // two rows into one account: the account cannot say which
     await addRowOfKind(store, { section: 'transfer', name: 'Bonus to Broker', categoryId: null, kind: 'to-investment', accountId: broker.id })
@@ -199,7 +199,7 @@ describe('setRule', () => {
     await setRule(store, { rowId: toBroker.id }, { kind: 'share-of-income', share: 0.1 }, '2026-01')
     const t = await loadTables(store)
     const ruled = t.rows.find((r) => r.id === toBroker.id)!
-    expect(derivedRowReason(ruled, 'savings-plug')).toBe('"To Broker" is worked out by its rule: 10 % of income.')
+    expect(derivedRowReason(ruled, 'savings-plug')).toBe('"To Broker" is worked out by its rule: 10% of income.')
     expect(derivedRowReason(t.rows.find((r) => r.id === toSavings.id)!, 'savings-plug')).toMatch(/rest of the month/)
     const plain = await addRow(store, { name: 'Gift', section: 'transfer' })
     await expect(followRow(store, plain.id, toBroker.id)).rejects.toThrow(/worked out by its rule/)
