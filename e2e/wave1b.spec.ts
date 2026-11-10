@@ -146,6 +146,11 @@ test.describe('wave 1b', () => {
     // what a suggestion made is offered again once it is deleted
     await expect(general.locator('[data-suggestion]').first()).toContainText('Ana – Pocket')
     await page.screenshot({ path: 'e2e/output/setup-deleted.png' })
+    // on a phone the message sits above the bottom tabs
+    await page.setViewportSize({ width: 390, height: 844 })
+    await expect(gone).toBeInViewport({ ratio: 1 })
+    await page.screenshot({ path: 'e2e/output/setup-deleted-phone.png' })
+    await page.setViewportSize({ width: 1400, height: 900 })
     await gone.getByRole('button', { name: 'Undo' }).click()
     await expect(moneyOut.getByRole('button', { name: /^Ana – Pocket: €300\.00/ })).toBeVisible()
     await expect(gone).toHaveCount(0)
