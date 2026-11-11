@@ -33,6 +33,18 @@ export interface StatementRule {
   rowId?: string
 }
 
+/**
+ * Money that moves between a row of the month and an account of the lower half. On a row: the account or virtual
+ * account it fills, takes from or pays off. On an account: the rows that do. `to` holds the other end's lines on this
+ * Statement and `text` says it in words ("Pays off Car loan"). `open` is a loan or a card that no row pays off at all:
+ * there is no other end yet.
+ */
+export interface StatementLink {
+  to: string[]
+  text: string
+  open?: boolean
+}
+
 export interface StatementLine {
   id: string
   kind: StatementLineKind
@@ -88,6 +100,8 @@ export interface StatementLine {
   note?: string
   /** The rule that works this line out, or that feeds this account: shown as the rule symbol, which opens the rule dialog. */
   rule?: StatementRule
+  /** A linked money flow: the other end of this line, shown as the link symbol. */
+  link?: StatementLink
   skipped?: boolean
   scheduled?: boolean
   missingRate?: boolean
@@ -484,6 +498,50 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   claims.push(netWorthLine)
   const claimsSide = side('claims', 'Debts and net worth', claims)
   claimsSide.change = claims.reduce((s, l) => s + (l.change ?? 0), 0)
+
+  // a row that fills, takes from or pays off an account is linked to that account's line, and the line to its rows
+  const fills: Row['kind'][] = ['to-savings', 'to-investment', 'pool-allocation']
+  const takes: Row['kind'][] = ['from-savings', 'from-investment']
+  const pays: Row['kind'][] = ['debt-payment', 'card-payment']
+  const rowsById = new Map(engine.rows.map((r) => [r.id, r]))
+  const poolOfRow = new Map(tables.pools.filter((p) => !p.deletedAt && p.allocationRowId).map((p) => [p.allocationRowId!, p]))
+  const ends = new Map<StatementLine, Array<{ line: StatementLine; way: 'fills' | 'takes' | 'pays' }>>()
+  const linkRows = (lines: StatementLine[], incoming: boolean) => {
+    for (const line of lines) {
+      linkRows(line.children, incoming)
+      const row = line.kind === 'row' && line.rowId ? rowsById.get(line.rowId) : undefined
+      if (!row) continue
+      const pool = poolOfRow.get(row.id)
+      const target = row.kind === 'pool-allocation' ? (pool ? poolLines.get(pool.id) : undefined)
+        : fills.includes(row.kind) || takes.includes(row.kind) || pays.includes(row.kind) ? (row.accountId ? accountLines.get(row.accountId) : undefined)
+        : undefined
+      if (!target) continue
+      // a month that overruns takes money back out of the account the row usually fills
+      const way = pays.includes(row.kind) ? 'pays' : incoming || takes.includes(row.kind) ? 'takes' : 'fills'
+      line.link = { to: [target.id], text: `${way === 'pays' ? 'Pays off' : way === 'takes' ? 'Comes from' : row.kind === 'pool-allocation' ? 'Fills' : 'Goes into'} ${target.label}` }
+      ends.set(target, [...(ends.get(target) ?? []), { line, way }])
+    }
+  }
+  linkRows(moneyIn.lines, true)
+  linkRows(moneyOut.lines, false)
+  // by the row's own name: under "From accounts" a line is labelled after its account
+  const named = (list: StatementLine[]) => list.map((l) => rowsById.get(l.rowId ?? '')?.name ?? l.label).join(', ')
+  for (const [target, list] of ends) {
+    const by = (way: 'fills' | 'takes' | 'pays') => list.filter((e) => e.way === way).map((e) => e.line)
+    const parts = [
+      by('pays').length ? `Paid off by ${named(by('pays'))}` : '',
+      by('fills').length ? `Filled by ${named(by('fills'))}` : '',
+      by('takes').length ? `Money taken by ${named(by('takes'))}` : '',
+    ].filter(Boolean)
+    target.link = { to: list.map((e) => e.line.id), text: parts.join('; ') }
+  }
+  // a loan or a card that never had a payment row: the link is open, and pressing it adds the row
+  for (const line of debts) {
+    const acc = line.accountId ? accountsById.get(line.accountId) : undefined
+    if (!acc || line.link || acc.archivedMonth || (acc.type !== 'loan' && acc.type !== 'credit-card')) continue
+    if (engine.rows.some((r) => r.accountId === acc.id && pays.includes(r.kind))) continue
+    line.link = { to: [], text: `No row pays off ${acc.name} yet`, open: true }
+  }
 
   // a goal sits on the line it measures
   for (const g of computeGoals(tables, engine, month)) {

@@ -15,7 +15,7 @@ import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useE
 import { useStoreVersion } from '@/app/useStoreVersion'
 import { buildStatement, cellKey, currentAccountsIn, type GoalProgress, type StatementLine } from '@/engine'
 import { isPocketRow, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type MonthKey, type Row, type Section } from '@/model'
-import { accountSuggestions, addPlanYear, closeMonth, removeIfFree, reopenMonth, rowSuggestions, ruleRowOf, setCellDone, setDerivedDone, setItemStatus, setupSteps, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupStepKey } from '@/store'
+import { accountSuggestions, addPayOffRow, addPlanYear, closeMonth, removeIfFree, reopenMonth, rowSuggestions, ruleRowOf, setCellDone, setDerivedDone, setItemStatus, setupSteps, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupStepKey } from '@/store'
 import { GoalDialog } from '@/features/goals/GoalDialog'
 import { goalStatusLine } from '@/features/goals/goalText'
 import { AddRowInline } from '@/features/grid/AddRowInline'
@@ -39,6 +39,15 @@ import { TopUpDialog } from './TopUpDialog'
 import { LINE_MENU, type LineContext } from './StatementLine'
 
 const walk = (lines: StatementLine[]): StatementLine[] => lines.flatMap((l) => [l, ...walk(l.children)])
+/** The ids of the lines a line sits under, outermost first; null when the line is not there. */
+function pathTo(lines: StatementLine[], id: string, above: string[] = []): string[] | null {
+  for (const l of lines) {
+    if (l.id === id) return above
+    const found = pathTo(l.children, id, [...above, l.id])
+    if (found) return found
+  }
+  return null
+}
 /** What "Add account" offers under Assets, and "Add a card or loan" under Debts. */
 const ASSET_TYPES: AccountType[] = ['checking', 'joint', 'savings', 'investment', 'other-asset', 'cash']
 const DEBT_TYPES: AccountType[] = ['credit-card', 'loan']
@@ -87,6 +96,10 @@ export function StatementScreen() {
   const [removing, setRemoving] = useState<RemovalTarget | null>(null)
   /** What a one-click delete just removed, and the store's version right after it: the message goes with the next change. */
   const [deleted, setDeleted] = useState<{ name: string; version: number } | null>(null)
+  /** The lines a link symbol has just moved the page to, for the two seconds they stay marked. */
+  const [marked, setMarked] = useState<ReadonlySet<string> | null>(null)
+  const markTimer = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(markTimer.current), [])
   const version = useStoreVersion(store)
   /** "Suggestions" in the toolbar, once it was pressed; until then they show while the household is being set up. */
   const [suggest, setSuggest] = useState<boolean | null>(null)
@@ -228,6 +241,30 @@ export function StatementScreen() {
     const restTaken = resolveRules(engine!.rows, household!.closingRule).restRowId !== null
     askRule({ accountId: account.id }, account.type === 'savings' && !restTaken ? 'rest' : undefined)
   }
+  /**
+   * The link symbol: the other end of a linked money flow. What hides it is opened, the page moves there, and the
+   * line is marked for two seconds; the keyboard lands on it too.
+   */
+  function goToLink(line: StatementLine) {
+    const ids = line.link?.to ?? []
+    if (ids.length === 0) return
+    const all = [...statement!.flow.left.lines, ...statement!.flow.right.lines, ...statement!.position.left.lines, ...statement!.position.right.lines]
+    const parents = ids.flatMap((id) => pathTo(all, id) ?? [])
+    if (parents.length) setOpenLines((s) => ({ ...s, ...Object.fromEntries(parents.map((id) => [id, true])) }))
+    setMarked(new Set(ids))
+    window.clearTimeout(markTimer.current)
+    markTimer.current = window.setTimeout(() => setMarked(null), 2000)
+    // once the parents have opened
+    requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLElement>(`[data-line="${CSS.escape(ids[0])}"]`)
+      el?.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+      el?.querySelector<HTMLElement>('button')?.focus({ preventScroll: true })
+    })
+  }
+  /** The open link on a loan or card: the row that pays it off is made, linked, and asks for its amount. */
+  function addPayOff(line: StatementLine) {
+    if (line.accountId) act(async () => onAdded(await addPayOffRow(store, line.accountId!)))
+  }
   /** The rule sits on a row, so its symbol opens that row's dialog; an account or a virtual account that no row feeds yet gets one when the rule is saved. */
   function onRule(line: StatementLine) {
     if (line.rule?.rowId) setEditor({ rowId: line.rule.rowId })
@@ -326,7 +363,7 @@ export function StatementScreen() {
   const poolEditing = poolEdit ? tables.pools.find((p) => p.id === poolEdit && !p.deletedAt) : undefined
 
   // a closed month shows its rules and changes none
-  const base = { locale, ccy, isOpen, onToggle, goalText, onRule: statement.closed ? undefined : onRule, onTopUp: statement.closed ? undefined : setTopUpFor }
+  const base = { locale, ccy, isOpen, onToggle, goalText, onRule: statement.closed ? undefined : onRule, onTopUp: statement.closed ? undefined : setTopUpFor, onLink: goToLink, onLinkOpen: statement.closed ? undefined : addPayOff, marked }
   const flowCtx: LineContext = { ...base, withChange: false, closed: statement.closed, doneOf, onTick, onEdit: (rowId) => setEditor({ rowId }), busy, footer, onEstimate: setEstimateFor, rowMenu, menu: lineMenu }
   // the estimate dialog reads the category's line: what the month shows now, and what its rows explain
   const estimateCategory = estimateFor ? tables.categories.find((c) => c.id === estimateFor && !c.deletedAt) : undefined

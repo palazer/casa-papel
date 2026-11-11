@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { ArrowDownToLine, Banknote, ChevronRight, Equal, Repeat, Target, UserRound } from 'lucide-react'
+import { ArrowDownToLine, Banknote, ChevronRight, Equal, Link2, Link2Off, Repeat, Target, UserRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { InfoTip } from '@/components/InfoTip'
@@ -42,6 +42,12 @@ export interface LineContext {
   onEstimate?: (categoryId: string) => void
   /** The rule symbol on an account or a virtual account: open the dialog of the row that fills it. Leave out to show the rule without the button. */
   onRule?: (line: Line) => void
+  /** The link symbol: go to the other end of a linked money flow. Leave out to show the symbol without the button. */
+  onLink?: (line: Line) => void
+  /** The open link on a loan or card that no row pays off: add that row. Leave out where nothing can be added. */
+  onLinkOpen?: (line: Line) => void
+  /** The lines the page has just moved to from a link symbol: marked for a moment. */
+  marked?: ReadonlySet<string> | null
   /** Top up a virtual account that is short this month. */
   onTopUp?: (poolId: string) => void
   /** The "…" after a row's name: the Grid's row menu (rename, category, archive or delete, …). */
@@ -79,6 +85,8 @@ const TICK_SLOT = 'size-11 shrink-0 md:size-6'
 const TICK_GAP = 'w-11 shrink-0 md:w-6'
 /** A control on a line whose own button covers the whole line: it stays above that button. */
 const ABOVE = 'relative z-10'
+/** The line the page has just moved to from a link symbol (DESIGN.md §7): the focus ring's colour, never the lime. */
+const MARKED = 'bg-muted ring-2 ring-inset ring-ring'
 
 export function changeText(change: number, ccy: string, locale: string): string {
   return change === 0 ? '·' : formatAmount(change, ccy, locale, { sign: 'exceptZero' })
@@ -113,6 +121,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
   const hue = line.hue ? HUE[line.hue] : undefined
   const quiet = line.kind === 'note' || line.memo || line.skipped
   const tip = TIP[line.id]
+  const marked = !!ctx.marked?.has(line.id)
   const inner = group ? level : level + 1
   const pad = INDENT[Math.min(level, INDENT.length - 1)]
   /** A row shown under its account's name keeps its own name in what its controls are called. */
@@ -202,6 +211,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
             {line.label}
           </button>
           {tags}
+          <LinkMark line={line} ctx={ctx} className={ABOVE} />
           {line.rule && <RuleMark line={line} ctx={{ ...ctx, onRule: press }} className={ABOVE} />}
           {menu && <span className={cn(ABOVE, 'inline-flex')}>{menu}</span>}
         </span>
@@ -212,6 +222,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
         <span className={LABEL}>
           {name}
           {tags}
+          <LinkMark line={line} ctx={ctx} />
           {line.rule && <RuleMark line={line} ctx={{ ...ctx, onRule: undefined }} />}
           {menu}
         </span>
@@ -220,7 +231,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
     )
     return (
       <li>
-        <div className={cn(ROW, pad, 'group/line', item && 'bg-muted/20')} data-line={line.id}>
+        <div className={cn(ROW, pad, 'group/line', item && 'bg-muted/20', marked && MARKED)} data-line={line.id} data-marked={marked || undefined}>
           {expandable ? (
             <button
               type="button" aria-label={`Items of ${nameOf(line)}`} aria-expanded={open} aria-controls={listId} onClick={() => ctx.onToggle(line)}
@@ -264,10 +275,11 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
 
   return (
     <li>
-      <div className={cn(ROW, pad, 'group/line', group && hue?.tint, expandable && 'relative hover:bg-muted/50')} data-line={line.id}>
+      <div className={cn(ROW, pad, 'group/line', group && hue?.tint, expandable && 'relative hover:bg-muted/50', marked && MARKED)} data-line={line.id} data-marked={marked || undefined}>
         <div className={LABEL}>
           {head}
           {tags}
+          <LinkMark line={line} ctx={ctx} className={ABOVE} />
           {line.rule && <RuleMark line={line} ctx={ctx} className={ABOVE} />}
           {line.short != null && line.poolId && ctx.onTopUp && (
             <Button size="xs" variant="outline" className={ABOVE} aria-label={`Top up ${line.label}`} onClick={() => ctx.onTopUp!(line.poolId!)}>Top up…</Button>
@@ -326,6 +338,31 @@ function RuleMark({ line, ctx, className }: { line: Line; ctx: LineContext; clas
   return (
     <button
       type="button" aria-label={said} title={said} data-rule={rule.kind} onClick={() => ctx.onRule!(line)}
+      className={cn(look, 'outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:h-8 pointer-coarse:min-w-8')}
+    >
+      {glyph}
+    </button>
+  )
+}
+
+/**
+ * The link symbol (DESIGN.md §7): two chain rings on a row whose money moves an account of the lower half, and on
+ * that account. Pressing it goes to the other end, which is marked for a moment; its name says the other end. A loan
+ * or card that no row pays off shows the rings apart and faint, and pressing that adds the row.
+ */
+function LinkMark({ line, ctx, className }: { line: Line; ctx: LineContext; className?: string }) {
+  const link = line.link
+  if (!link) return null
+  const act = link.open ? ctx.onLinkOpen : link.to.length ? ctx.onLink : undefined
+  // an open link that cannot be closed from here (a closed month) has nothing to say
+  if (link.open && !act) return null
+  const said = link.open ? `${link.text}: add the row that pays it off` : `${link.text}: go there`
+  const look = cn('inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded text-muted-foreground', link.open && 'text-muted-foreground/50', className)
+  const glyph = link.open ? <Link2Off className="size-3.5" aria-hidden /> : <Link2 className="size-3.5" aria-hidden />
+  if (!act) return <span className={look} title={link.text} data-link="linked">{glyph}<span className="sr-only">{link.text}</span></span>
+  return (
+    <button
+      type="button" aria-label={said} title={said} data-link={link.open ? 'open' : 'linked'} onClick={() => act(line)}
       className={cn(look, 'outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:h-8 pointer-coarse:min-w-8')}
     >
       {glyph}

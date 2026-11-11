@@ -332,6 +332,18 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   12 px `UserRound` (`10% 👤`). The Grid names
   the same rule after the row's name the way a follower names its row (`= 10% of income`, `= the rest`) and offers
   `Rule…` in the row menu, which opens the same dialog in the current month (a worked-out cell is not a button there).
+  **The link symbol.** Money that moves between a row of the month and an account of the lower half is one flow
+  with two ends, and both ends say so: two chain rings (`Link2`, 14 px, muted, in a 20 px slot like the rule symbol,
+  before it) on a row that fills, takes from or pays off an account, and on that account's or virtual account's
+  line. It is a button named after the other end (`Pays off Car loan: go there`, `Paid off by Car loan – Payment: go
+  there`, `Filled by To savings; Money taken by Car repair: go there`). Pressing it opens whatever hides the other
+  end, scrolls it to the middle of the window, moves the keyboard to it and marks the line for two seconds with
+  `bg-muted ring-2 ring-inset ring-ring` (`data-marked`), never with the lime. A loan or a card that never had a
+  payment row shows `Link2Off` at half strength (`No row pays off <name> yet: add the row that pays it off`):
+  pressing it adds the row and opens its dialog; a closed month shows no open link. Savings, investment and virtual
+  accounts without a row keep the faint `=` of the rule symbol, which adds theirs, so a line never carries two faint
+  marks. A plain row has no link symbol, which is how an unconnected "Car loan" row is told from a payment row. The
+  Grid does not draw the symbol.
   Things are added where they will appear: the foot of Income and Expenses holds the Grid's `AddRowInline` (`Add row`)
   and `AddCategoryInline` (`Add category`, a name and Enter), the foot of Set aside, pay off holds `Add row`, and an
   opened category ends with `Add row to <category>` with that category already chosen. A category is a line from

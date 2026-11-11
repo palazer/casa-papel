@@ -1134,6 +1134,67 @@ test.describe('working the month in the Statement', () => {
     await expect(moneyIn.getByLabel('Account for the new transfer row').locator('option')).toHaveText(['Savings', 'New savings account…'])
   })
 
+  test('the link symbol joins a row and its account: pressing it goes to the other end, and an open one adds the missing row', async ({ page }) => {
+    await openStatement(page)
+    const moneyIn = page.getByRole('region', { name: 'Money in' })
+    const moneyOut = page.getByRole('region', { name: 'Money out' })
+    const assets = page.getByRole('region', { name: 'Assets' })
+    const claims = page.getByRole('region', { name: 'Debts and net worth' })
+    const dlg = page.getByRole('dialog')
+    const line = (side: typeof assets, name: string) => side.locator('[data-line]').filter({ hasText: name }).first()
+
+    // a closed month still shows what is linked, and offers nothing to add
+    await goToMonth(page, 'September 2026')
+    await expect(moneyOut.getByRole('button', { name: 'Goes into Index fund: go there' })).toBeVisible()
+    await expect(page.locator('[data-link="open"]')).toHaveCount(0)
+
+    await goToMonth(page, 'November 2026')
+    // income and plain expenses move no account of the lower half: no symbol
+    await expect(moneyIn.locator('[data-link]')).toHaveCount(0)
+    await expect(moneyOut.locator('[data-link]')).toHaveCount(4)
+
+    // from the row to its account: the line is marked for a moment
+    await moneyOut.getByRole('button', { name: 'Goes into Index fund: go there' }).click()
+    const fund = assets.locator('[data-line^="acc:"]').filter({ hasText: 'Index fund' })
+    await expect(fund).toHaveAttribute('data-marked', 'true')
+    await expect(fund).toBeInViewport()
+    await page.screenshot({ path: 'e2e/output/statement-links.png', fullPage: true })
+    await expect(fund).not.toHaveAttribute('data-marked', 'true', { timeout: 4000 })
+
+    // and back, from the account to the row that fills it
+    await assets.getByRole('button', { name: 'Filled by To investments: go there' }).click()
+    await expect(line(moneyOut, 'To investments')).toHaveAttribute('data-marked', 'true')
+
+    // the other end is opened when something hides it: a virtual account inside a folded savings account
+    await assets.getByRole('button', { name: 'Savings', exact: true }).click()
+    await expect(assets.locator('[data-line^="pool:"]')).toHaveCount(0)
+    await moneyOut.getByRole('button', { name: 'Fills Travel: go there' }).click()
+    const travel = assets.locator('[data-line^="pool:"]').filter({ hasText: 'Travel' })
+    await expect(travel).toHaveAttribute('data-marked', 'true')
+    await expect(assets.getByRole('button', { name: 'Filled by To Travel: go there' })).toBeVisible()
+    // the savings account names the row that fills it
+    await expect(assets.getByRole('button', { name: 'Filled by To savings: go there' })).toBeVisible()
+
+    // the card has no row that pays it off: its link is open, and pressing it adds the row
+    const card = claims.locator('[data-line^="acc:"]').filter({ hasText: 'Credit card' })
+    await expect(card.locator('[data-link="open"]')).toHaveCount(1)
+    await claims.getByRole('button', { name: 'No row pays off Credit card yet: add the row that pays it off' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Credit card – Payment · November 2026' })).toBeVisible()
+    await dlg.getByLabel('Amount in EUR').fill('60')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    // now both ends carry the closed link, and they find each other
+    await expect(card.locator('[data-link="open"]')).toHaveCount(0)
+    await claims.getByRole('button', { name: 'Paid off by Credit card – Payment: go there' }).click()
+    await expect(line(moneyOut, 'Credit card – Payment')).toHaveAttribute('data-marked', 'true')
+    await moneyOut.getByRole('button', { name: 'Pays off Credit card: go there' }).click()
+    await expect(card).toHaveAttribute('data-marked', 'true')
+
+    // the legend says what the symbol means
+    await page.getByRole('button', { name: 'What the colours and marks mean' }).click()
+    await expect(page.getByText('Linked, on the Statement: a row and the account it fills, takes from or pays off.')).toBeVisible()
+  })
+
   test('a top-up on a virtual account whose amount a rule works out says that the month then keeps a typed amount', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'November 2026')
@@ -1351,6 +1412,17 @@ test.describe('the Statement on a phone', () => {
     await dlg.getByRole('button', { name: 'Save' }).tap()
     await expect(dlg.getByRole('heading', { name: 'Car loan – Payment · November 2026' })).toBeVisible()
     await dlg.getByRole('button', { name: 'Cancel' }).tap()
-    await expect(moneyOut.locator('[data-line]').filter({ hasText: 'Car loan – Payment' })).toBeVisible()
+    const payment = moneyOut.locator('[data-line]').filter({ hasText: 'Car loan – Payment' })
+    await expect(payment).toBeVisible()
+
+    // the link symbol is finger-sized, and a tap takes the page to the loan
+    const link = moneyOut.getByRole('button', { name: 'Pays off Car loan: go there' })
+    const box = await link.boundingBox()
+    expect(box && box.width >= 32 && box.height >= 32).toBeTruthy()
+    await link.tap()
+    const loan = page.getByRole('region', { name: 'Debts and net worth' }).locator('[data-line^="acc:"]').filter({ hasText: 'Car loan' })
+    await expect(loan).toHaveAttribute('data-marked', 'true')
+    await expect(loan).toBeInViewport()
+    await page.screenshot({ path: 'e2e/output/statement-links-phone.png' })
   })
 })

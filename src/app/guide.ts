@@ -351,7 +351,7 @@ export const GUIDE: GuideTopic[] = [
     summary: 'Every kind of money has one colour and every mark one meaning; the keyboard moves you around the grid.',
     what: [
       '"What the colours and marks mean" in the Statement and Grid toolbars is the legend. Kinds of money: "Income", "Expenses", "Transfers", "Balances and net worth", "Virtual accounts", "Goals". Marks: an estimate sits on a light yellow shade, certain is plain, done has a green dot; in the current month a red ring means nothing done yet and an amber half-dot partly done.',
-      'Spending shows as a red negative number when "Show expenses as negative red numbers" is on; an amber "+€…" is money drawn from savings this month; a dotted underline is a balance you entered yourself; a lock is a closed month; a faint band is one category\'s rows.',
+      'Spending shows as a red negative number when "Show expenses as negative red numbers" is on; an amber "+€…" is money drawn from savings this month; a dotted underline is a balance you entered yourself; a lock is a closed month; a faint band is one category\'s rows. On the Statement two chain rings mark a row and the account it fills, takes from or pays off: press them to go to the other end, which is marked for a moment. Faint, open rings on a loan or card mean no row pays it off yet; pressing them adds the row.',
       'In the grid the arrow keys move between cells, Enter or Space opens one, Escape closes the editor. Cmd/Ctrl+Z undoes and Shift redoes, like the two arrows at the left of every toolbar.',
     ],
     steps: [

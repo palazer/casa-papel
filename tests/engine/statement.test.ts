@@ -393,6 +393,60 @@ describe('the Statement, the position', () => {
     expectSound(t, months)
   })
 
+  it('links a row to the account it fills or pays off, and the account back to its rows', () => {
+    const { t, savings, fund, visa, loan, travel } = world()
+    const { s } = statementFor(t, '2026-01')
+    const rowNamed = (name: string) => t.rows.find((r) => r.name === name)!
+    const payLoan = rowNamed('Car loan payment')
+    expect(find(s, payLoan.id)!.link).toEqual({ to: [`acc:${loan.id}`], text: 'Pays off Car loan' })
+    expect(find(s, `acc:${loan.id}`)!.link).toEqual({ to: [payLoan.id], text: 'Paid off by Car loan payment' })
+    expect(find(s, rowNamed('Pay Visa').id)!.link).toEqual({ to: [`acc:${visa.id}`], text: 'Pays off Visa' })
+    expect(find(s, rowNamed('To fund').id)!.link).toEqual({ to: [`acc:${fund.id}`], text: 'Goes into Fund' })
+    expect(find(s, `acc:${fund.id}`)!.link).toEqual({ to: [rowNamed('To fund').id], text: 'Filled by To fund' })
+    // a virtual account is the other end of the row that fills it, not the savings account that holds it
+    expect(find(s, rowNamed('To Travel').id)!.link).toEqual({ to: [`pool:${travel.id}`], text: 'Fills Travel' })
+    expect(find(s, `pool:${travel.id}`)!.link).toEqual({ to: [rowNamed('To Travel').id], text: 'Filled by To Travel' })
+    expect(find(s, rowNamed('To savings').id)!.link).toEqual({ to: [`acc:${savings.id}`], text: 'Goes into Savings' })
+    expect(find(s, `acc:${savings.id}`)!.link).toEqual({ to: [rowNamed('To savings').id], text: 'Filled by To savings' })
+    // a row that names no account of the lower half has no other end
+    for (const name of ['Salary', 'Rent', 'Trip']) expect(find(s, rowNamed(name).id)!.link, name).toBeUndefined()
+    expect(find(s, 'main')!.link).toBeUndefined()
+  })
+
+  it('says which way the money goes: a month that overruns and a row taken by hand both come from the account', () => {
+    const savings = account({ name: 'Savings', type: 'savings', openingBalance: 8000_00 })
+    const salary = row({ name: 'Salary', section: 'income' })
+    const rent = row({ name: 'Rent', section: 'expense', order: 'b0' })
+    const toSavings = row({ name: 'To savings', section: 'transfer', kind: 'to-savings', accountId: savings.id, order: 'c0' })
+    const repair = row({ name: 'Car repair', section: 'transfer', kind: 'from-savings', accountId: savings.id, order: 'c1' })
+    const t = tables({
+      household: [household()], accounts: [savings], rows: [salary, rent, toSavings, repair],
+      cells: [cellValue(salary.id, '2026-01', 1000_00), cellValue(rent.id, '2026-01', 1900_00), cellValue(repair.id, '2026-01', 400_00)],
+    })
+    const { s } = statementFor(t, '2026-01')
+    // 1,000 in and 400 taken, 1,900 out: the rest row covers 500 out of savings this month
+    expect(find(s, toSavings.id)).toMatchObject({ label: 'From Savings', amount: 500_00, link: { to: [`acc:${savings.id}`], text: 'Comes from Savings' } })
+    expect(find(s, repair.id)!.link).toEqual({ to: [`acc:${savings.id}`], text: 'Comes from Savings' })
+    expect(find(s, `acc:${savings.id}`)!.link).toEqual({ to: [repair.id, toSavings.id], text: 'Money taken by Car repair, To savings' })
+    expectSound(t, months)
+  })
+
+  it('leaves the link open on a loan or card that never had a payment row, and only there', () => {
+    const loan = account({ name: 'Car loan', type: 'loan', openingBalance: 8400_00 })
+    const visa = account({ name: 'Visa', type: 'credit-card', openingBalance: 100_00, card: { cardMode: 'itemized' }, order: 'a1' })
+    const old = account({ name: 'Old loan', type: 'loan', openingBalance: 50_00, order: 'a2' })
+    const gone = account({ name: 'Closed card', type: 'credit-card', openingBalance: 0, archivedMonth: '2026-02', order: 'a3' })
+    const salary = row({ name: 'Salary', section: 'income' })
+    // its payments stopped: the row is archived, and the loan is not asked for another
+    const paid = row({ name: 'Old loan payment', section: 'expense', kind: 'debt-payment', accountId: old.id, archivedMonth: '2026-01', order: 'b0' })
+    const t = tables({ household: [household()], accounts: [loan, visa, old, gone], rows: [salary, paid], cells: [cellValue(salary.id, '2026-01', 1000_00)] })
+    const { s } = statementFor(t, '2026-01')
+    expect(find(s, `acc:${loan.id}`)!.link).toEqual({ to: [], text: 'No row pays off Car loan yet', open: true })
+    expect(find(s, `acc:${visa.id}`)!.link).toEqual({ to: [], text: 'No row pays off Visa yet', open: true })
+    expect(find(s, `acc:${old.id}`)!.link).toBeUndefined()
+    expect(find(s, `acc:${gone.id}`)!.link).toBeUndefined()
+  })
+
   it('puts a goal on the line it measures', () => {
     const w = world()
     const goals = [
