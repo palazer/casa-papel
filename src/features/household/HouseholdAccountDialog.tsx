@@ -9,6 +9,7 @@ import { InfoTip, TipLabel } from '@/components/InfoTip'
 import { MonthField } from '@/components/MonthField'
 import { NativeSelect } from '@/components/NativeSelect'
 import { Segmented } from '@/components/Segmented'
+import { currencyChoices, currencyLabel } from '@/app/currencies'
 import { amountToInput, formatMonth, parseAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import { ACCOUNT_TYPE_INFO, type Account, type AccountType, type Entity } from '@/model'
@@ -115,7 +116,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5"><Label htmlFor="acc-name">Name</Label><Input id="acc-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} /></div>
           <div className="space-y-1.5"><Label htmlFor="acc-type">Type</Label><NativeSelect id="acc-type" className="w-full" value={type} onChange={(e) => setType(e.target.value as AccountType)}>{types.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</NativeSelect></div>
-          <p className="-mt-1 text-xs text-muted-foreground sm:col-span-2">{info?.help}{foreign ? ` Amounts are shown in ${ccy}; the Currency rates card converts them.` : ''}</p>
+          <p className="-mt-1 text-xs text-muted-foreground sm:col-span-2">{info?.help}{foreign ? ` Amounts are typed in ${ccy} and shown in ${baseCurrency} beneath. The rates come from the European Central Bank by themselves (only currency codes and dates are sent); change them under Household, "Currency rates".` : ''}</p>
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="acc-open">{balanceWord(type)} at the start of {formatMonth(openingMonth, locale, 'long')} ({ccy})</Label>
             <Input id="acc-open" className="sm:w-1/2" inputMode="decimal" value={opening} onChange={(e) => setOpening(e.target.value)} placeholder="0" />
@@ -145,7 +146,12 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
           </div>
           {more && (
             <div id="acc-more" className="grid gap-3 sm:col-span-2 sm:grid-cols-2">
-              <div className="space-y-1.5"><Label htmlFor="acc-ccy">Currency</Label><Input id="acc-ccy" value={currency} maxLength={3} onChange={(e) => setCurrency(e.target.value.toUpperCase())} /></div>
+              <div className="space-y-1.5">
+                <Label htmlFor="acc-ccy">Currency</Label>
+                <NativeSelect id="acc-ccy" className="w-full" value={currency} onChange={(e) => setCurrency(e.target.value)}>
+                  {currencyChoices(baseCurrency, account?.currency).map((c) => <option key={c} value={c}>{currencyLabel(c, baseCurrency)}</option>)}
+                </NativeSelect>
+              </div>
               <div className="space-y-1.5"><Label htmlFor="acc-month">Opening month</Label><MonthField id="acc-month" label="Opening month" value={openingMonth} onChange={setOpeningMonth} locale={locale} /></div>
               <div className="space-y-1.5 sm:col-span-2">
                 <TipLabel htmlFor="acc-owner" help="setup.owner">Owner</TipLabel>

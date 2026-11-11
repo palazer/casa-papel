@@ -12,7 +12,7 @@ import { ENTITY_KIND_LABEL, monthOfDate, type FundedBy, type Household, type Row
 import { accountTypeForRow, derivedRowReason, followRow, setRowAccount, setRowDeductedFrom, setRowFundedBy, setRowScope, updateRow } from '@/store'
 import { NativeSelect } from '@/components/NativeSelect'
 import { fundingOptions } from './funding'
-import { CURRENCIES } from '@/app/currencies'
+import { currencyChoices, currencyLabel } from '@/app/currencies'
 import { HELP } from '@/app/help'
 import { InfoTip, TipLabel } from '@/components/InfoTip'
 import { accountHelp, accountVerb } from './rowAccount'
@@ -206,7 +206,7 @@ export function RowFollowDialog({ row, tables, household, onClose }: Base) {
 export function RowCurrencyDialog({ row, household, onClose }: Base) {
   const store = useStore()
   const base = household.baseCurrency
-  const codes = [base, ...CURRENCIES.filter((c) => c !== base), ...(row.currency && row.currency !== base && !CURRENCIES.includes(row.currency) ? [row.currency] : [])]
+  const codes = currencyChoices(base, row.currency)
   const [ccy, setCcy] = useState(row.currency ?? base)
   const { error, busy, save } = useSave(onClose)
 
@@ -221,7 +221,7 @@ export function RowCurrencyDialog({ row, household, onClose }: Base) {
           <div className="space-y-1.5">
             <TipLabel htmlFor="row-currency" help="row.currency">Amounts in this row are in</TipLabel>
             <NativeSelect id="row-currency" className="w-full" value={ccy} onChange={(e) => setCcy(e.target.value)}>
-              {codes.map((c) => <option key={c} value={c}>{c === base ? `${c} (household currency)` : c}</option>)}
+              {codes.map((c) => <option key={c} value={c}>{currencyLabel(c, base)}</option>)}
             </NativeSelect>
             <p className="text-xs text-muted-foreground">{HELP['row.currency'].text}</p>
           </div>

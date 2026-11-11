@@ -4,7 +4,7 @@
  * and the drift settings used to project future months.
  */
 import { withDeadline } from '@/lib/deadline'
-import { FxRateSchema, type FxMonthRate, type Household, type MonthKey, type Tables } from '@/model'
+import { FxRateSchema, addMonths, compareMonths, monthOfDate, type FxMonthRate, type Household, type MonthKey, type Tables } from '@/model'
 import type { Mutation, Store } from './store'
 import { loadTables, updateHousehold } from './actions'
 
@@ -120,6 +120,26 @@ export async function fetchEcbRates(
   }
   if (mutations.length) await store.commitSystem(mutations)
   return { written: mutations.length, months: [...months].sort(), unsupported }
+}
+
+/** The pairs the household needs and has no rate at all for, fetched or typed: amounts in them cannot be converted yet. */
+export function pairsWithoutRates(tables: Tables): string[] {
+  const known = new Set(tables.fxRates.map((r) => r.pair))
+  return neededPairs(tables).filter((p) => !known.has(p))
+}
+
+/**
+ * Fetch the ECB's month rates for some of the household's currencies, from the household's first month up to today,
+ * and a year back at least so the average change per month has something to work with. Used by the "Fetch ECB rates"
+ * button and, for a currency that has no rate yet, by the app itself.
+ */
+export async function fetchRatesFor(store: Store, symbols: string[], fetchFn: typeof fetch = fetch): Promise<FetchResult> {
+  const household = (await loadTables(store)).household.find((h) => !h.deletedAt)
+  if (!household || symbols.length === 0) return { written: 0, months: [], unsupported: [] }
+  const to = monthOfDate()
+  const yearAgo = addMonths(to, -13)
+  const from = compareMonths(yearAgo, household.startMonth) < 0 ? yearAgo : household.startMonth
+  return fetchEcbRates(store, { base: household.baseCurrency, symbols, from, to, policy: household.fxMonthRate }, fetchFn)
 }
 
 /** Set a rate by hand (wins over fetched rates); null removes whatever is stored for that month, a manual or a fetched rate alike. */

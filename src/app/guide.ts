@@ -278,13 +278,13 @@ export const GUIDE: GuideTopic[] = [
     summary: 'Rows and accounts can be in another currency; the grid shows what they are worth in EUR at each month\'s rate.',
     what: [
       '"Currency…" in the row menu sets a row\'s currency. The cell keeps the typed amount and shows "≈ €…" beneath; the row\'s name carries the code. The cell editor adds a rate line, "≈ €… · 1 EUR = 1.08 USD · ECB · 2 Nov 2026", with a chip that says where the rate came from: "ECB", "manual", "projected", "carried" or "missing".',
-      'Rates live under Household → "Currency rates": "Fetch ECB rates" asks the European Central Bank (only currency codes and dates leave the device), "Month rate" picks the day of the month, "Future months" how the rate drifts. Rates are always spelled with both codes in the direction whose number is at least 1.',
+      'A currency gets its rates from the European Central Bank by itself the first time it is used (only currency codes and dates leave the device). They live under Household → "Currency rates": "Fetch ECB rates" asks again, "Month rate" picks the day of the month, "Future months" how the rate drifts. Rates are always spelled with both codes in the direction whose number is at least 1.',
     ],
     steps: [
       'Row menu → "Currency…" → "Amounts in this row are in" (the first entry, "EUR (household currency)", is the default) → "Save".',
       'Open a cell of that row; under the amount, "Change this month\'s rate…" → type after "1 USD =" → "Save rate". One rate per currency per month, for every row in it.',
       '"Use the ECB rate again" drops a manual rate for the published one.',
-      'Household → "Currency rates" → "Fetch ECB rates" fills the past months.',
+      'An account\'s currency is under "More options" in its dialog. Household → "Currency rates" → "Fetch ECB rates" fills the months since the last fetch, and is the way back after being offline.',
       '"Month rate": "First business day of the month", "Last business day of the month" or "Average over the month".',
       '"Future months": "Change by a fixed % each month" with "Change per month (%)", or "Repeat the average change of the last year"; "Use for EUR/USD" keeps a rule for one pair, "Back to the default" clears it.',
       'Type over a month in the "1 EUR in USD" column to set it by hand; empty it to go back.',

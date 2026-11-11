@@ -7,9 +7,12 @@ async function loadDemo(page: Page) {
 }
 
 test.describe('wave 1c', () => {
-  test.use({ viewport: { width: 1400, height: 900 } })
+  // service workers are blocked so page.route can stand in for the rate service
+  test.use({ viewport: { width: 1400, height: 900 }, serviceWorkers: 'block' })
 
   test('a USD investment account, a manual rate, a pool, and a real value pinned from the grid', async ({ page }) => {
+    // the rate service cannot be reached: a new currency then has no rate until one is typed
+    await page.route('https://api.frankfurter.dev/**', (r) => r.abort())
     await loadDemo(page)
     await page.getByRole('link', { name: 'Household' }).click()
 
@@ -21,7 +24,9 @@ test.describe('wave 1c', () => {
     // the short form asks the name, the type and what it holds; the rest waits behind "More options"
     await expect(dlg.getByLabel('Growth per year (%)')).toHaveCount(0)
     await dlg.getByRole('button', { name: /^More options/ }).click()
-    await dlg.getByLabel('Currency').fill('USD')
+    await expect(dlg.getByLabel('Currency').locator('option').first()).toHaveText('EUR (household currency)')
+    await dlg.getByLabel('Currency').selectOption('USD')
+    await expect(dlg).toContainText('The rates come from the European Central Bank by themselves')
     await dlg.getByLabel('Holds at the start of September 2026 (USD)').fill('10000')
     await expect(dlg.getByLabel('Growth per year (%)')).toBeVisible()
     await dlg.getByLabel('Growth per year (%)').fill('6')

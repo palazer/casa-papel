@@ -4,6 +4,7 @@ import { ScreenContext, isUtility, readScreen, rememberScreen, type Screen } fro
 import { createAppStore, isDemoMode, useStore } from '@/app/store'
 import { StoreProvider } from '@/app/StoreProvider'
 import { takeInviteFromUrl } from '@/app/url'
+import { useAutoRates } from '@/app/useAutoRates'
 import { activeHousehold, defaultMonths, useTables } from '@/app/useEngine'
 import { AppRail } from '@/components/AppRail'
 import { BottomTabs } from '@/components/BottomTabs'
@@ -73,6 +74,8 @@ function Shell() {
     const mutations = planRecurringPosts(tables, months)
     if (mutations.length) void store.commitSystem(mutations)
   }, [tables, household, months, store])
+  // a currency that has no rate yet gets the ECB's by itself
+  useAutoRates(store, tables)
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {

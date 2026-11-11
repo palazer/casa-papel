@@ -60,6 +60,8 @@ test('a pool account that was asked for more than it held stops at zero, in the 
 })
 
 test('a row in another currency: the typed amount, the household value beneath, one rate per month', async ({ page }) => {
+  // the rate service cannot be reached at first: the new currency has no rate until one is typed
+  await page.route('https://api.frankfurter.dev/**', (r) => r.abort())
   await loadDemo(page)
   await page.getByRole('button', { name: 'Row menu for Other income' }).click()
   await page.getByRole('menuitem', { name: 'Currency…' }).click()
@@ -112,7 +114,12 @@ test('a row in another currency: the typed amount, the household value beneath, 
   await expect(novRow.getByText('manual', { exact: true })).toHaveCount(0)
 })
 
-test('a foreign-currency account shows its household-currency value beneath', async ({ page }) => {
+test('a currency that comes into use gets its rates by itself', async ({ page }) => {
+  const asked: string[] = []
+  await page.route('https://api.frankfurter.dev/**', (r) => {
+    asked.push(r.request().url())
+    return r.fulfill({ json: { rates: { '2026-10-01': { USD: 1.1 }, '2026-11-02': { USD: 1.25 } } } })
+  })
   await loadDemo(page)
   await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Household' }).click()
   await page.getByRole('button', { name: 'Add account' }).click()
@@ -120,7 +127,32 @@ test('a foreign-currency account shows its household-currency value beneath', as
   await dlg.getByLabel('Name', { exact: true }).fill('Broker')
   await dlg.getByLabel('Type').selectOption('investment')
   await dlg.getByRole('button', { name: /^More options/ }).click()
-  await dlg.getByLabel('Currency').fill('USD')
+  await dlg.getByLabel('Currency').selectOption('USD')
+  await dlg.getByLabel(/^Holds at the start of/).fill('10000')
+  await dlg.getByLabel('Growth per year (%)').fill('0')
+  await dlg.getByRole('button', { name: 'Save' }).click()
+  await expect(dlg).toBeHidden()
+  // nobody pressed "Fetch ECB rates": the rates are there, and the account is worth its amount in euros
+  await expect(page.getByLabel('1 EUR in USD for Nov 2026')).toHaveValue('1.25')
+  await expect(page.getByRole('row', { name: /^Nov 2026/ }).getByText('ECB', { exact: true })).toBeVisible()
+  expect(asked).toHaveLength(1)
+  expect(asked[0]).toContain('base=EUR&symbols=USD')
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
+  await expect(page.getByText(/No USD→EUR rate/)).toHaveCount(0)
+  await expect(page.getByRole('region', { name: 'Assets' }).locator('[data-line^="acc:"]').filter({ hasText: 'Broker' })).toContainText('€8,000.00')
+})
+
+test('a foreign-currency account shows its household-currency value beneath', async ({ page }) => {
+  // the rate service cannot be reached: the rate is typed by hand
+  await page.route('https://api.frankfurter.dev/**', (r) => r.abort())
+  await loadDemo(page)
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Household' }).click()
+  await page.getByRole('button', { name: 'Add account' }).click()
+  const dlg = page.getByRole('dialog')
+  await dlg.getByLabel('Name', { exact: true }).fill('Broker')
+  await dlg.getByLabel('Type').selectOption('investment')
+  await dlg.getByRole('button', { name: /^More options/ }).click()
+  await dlg.getByLabel('Currency').selectOption('USD')
   await dlg.getByLabel(/^Holds at the start of/).fill('10000')
   await dlg.getByLabel('Growth per year (%)').fill('0')
   await dlg.getByRole('button', { name: 'Save' }).click()

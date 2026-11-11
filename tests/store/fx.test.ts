@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { newId } from '@/model'
-import { CasaDb, Store, addAccount, fetchEcbRates, loadTables, monthRates, monthRatesWithDates, neededPairs, quickCreateHousehold, restoreEcbRate, setManualRate } from '@/store'
+import { CasaDb, Store, addAccount, fetchEcbRates, fetchRatesFor, loadTables, monthRates, monthRatesWithDates, neededPairs, pairsWithoutRates, quickCreateHousehold, restoreEcbRate, setManualRate } from '@/store'
 
 async function fresh() {
   const store = new Store(new CasaDb(`test-${newId()}`))
@@ -20,6 +20,25 @@ describe('currency rates', () => {
     expect(neededPairs(await loadTables(store))).toEqual([])
     await addAccount(store, { name: 'Broker', type: 'investment', currency: 'USD', openingMonth: '2026-01' })
     expect(neededPairs(await loadTables(store))).toEqual(['EUR/USD'])
+  })
+  it('a currency without any rate is fetched from the household\'s first month on, a year back at least; one with a rate is left alone', async () => {
+    const store = await fresh()
+    await addAccount(store, { name: 'Broker', type: 'investment', currency: 'USD', openingMonth: '2026-01' })
+    await addAccount(store, { name: 'Lira', type: 'savings', currency: 'TRY', openingMonth: '2026-01' })
+    await setManualRate(store, 'EUR/TRY', '2026-01', 50)
+    expect(pairsWithoutRates(await loadTables(store))).toEqual(['EUR/USD'])
+    const calls: string[] = []
+    const fetchFn = vi.fn(async (url: string) => {
+      calls.push(url)
+      return new Response(JSON.stringify({ rates: { '2026-01-02': { USD: 1.1 } } }), { status: 200 })
+    }) as unknown as typeof fetch
+    const res = await fetchRatesFor(store, ['USD'], fetchFn)
+    expect(res.written).toBe(1)
+    // the household starts in January 2026; thirteen months before today reaches further back
+    expect(calls[0]).toMatch(/\/v1\/2025-\d\d-01\.\.\d{4}-\d\d-\d\d\?base=EUR&symbols=USD$/)
+    expect(pairsWithoutRates(await loadTables(store))).toEqual([])
+    expect((await fetchRatesFor(store, [], fetchFn)).written).toBe(0)
+    expect(calls).toHaveLength(1)
   })
   it('fetches, stores api rates, keeps manual ones, and reports unsupported symbols', async () => {
     const store = await fresh()

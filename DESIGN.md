@@ -366,6 +366,12 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   `≈ €3,120.00 · 1 EUR = 1.084 USD · [ECB] 2 Nov 2026` with the table's chip tones, a ghost `xs` "Change this month's
   rate…" that reveals an inline input (one rate per currency per month), and "Use the ECB rate again" while the rate is
   manual. The ECB day is the Month rate setting's, the first business day by default.
+- A currency is always chosen from a list, never typed: `currencyChoices` in `src/app/currencies.ts` (the household's
+  own first, labelled `EUR (household currency)`, then the currencies the ECB publishes; a code in use that is not on
+  the list stays selectable). A currency that comes into use and has no rate at all yet gets the ECB's by itself
+  (`useAutoRates` in the app shell, once per session per currency; only currency codes and dates are sent). The field
+  that brings it in says so in its inline text. Offline, or for a currency the ECB does not publish, the amounts stay
+  unconverted and the rates card under Household is where a rate is typed or fetched again.
 - A row's menu (`src/features/grid/RowMenu.tsx`) runs Rename…, Move up, Move down, Category…, Belongs to…, Currency…,
   then Treat new values as…, Comes out of…, Deducted from an income… (spending rows, followers included; it names the
   income once set), the account verb, Follow another row…, then Archive or delete… or Restore. Belongs to offers the
@@ -419,7 +425,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   …` for a card or loan, `Worth at the start of …` for another asset. A card adds "What do you record for this
   card?" as a `Segmented` (`Everything I buy with it` / `Only what I pay to it`) with the chosen answer's sentence.
   Everything that has a usual default sits behind a `More options` disclosure (a chevron button that names what it
-  holds while closed): currency, opening month, owner, tracking, and for investments growth, projection and when
+  holds while closed): currency (a `NativeSelect`), opening month, owner, tracking, and for investments growth, projection and when
   deposits count. It is closed for a new account and open when editing. Opened from a place that says what the
   account is (Assets, Debts, a suggestion), the type list holds only the types that belong there. Errors show in the
   dialog. Footer: a ghost `Archive or delete…` on the left when editing, Cancel, Save.
