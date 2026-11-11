@@ -78,7 +78,7 @@ export function StatementScreen() {
   /** For an account added a moment ago: the choice its rule dialog opens on. */
   const [ruleStart, setRuleStart] = useState<RuleChoice['kind'] | undefined>(undefined)
   /** An account being added from the lower half: where it was asked from says which types are on offer. */
-  const [accountNew, setAccountNew] = useState<{ name?: string; type?: AccountType; types: AccountType[] } | null>(null)
+  const [accountNew, setAccountNew] = useState<{ name?: string; type?: AccountType; types: AccountType[]; payOff?: boolean } | null>(null)
   const [poolNew, setPoolNew] = useState(false)
   /** An account or a virtual account opened from the "…" on its line. */
   const [accountEdit, setAccountEdit] = useState<string | null>(null)
@@ -209,7 +209,13 @@ export function StatementScreen() {
     if (isPocketRow(row) && !(amount != null && amount > 0) && !statement!.closed) setEditor({ rowId: row.id })
   }
   const suggested = (line: StatementLine) => (showing && m
-    ? <SuggestionLines suggestions={suggestions.get(line.id) ?? []} label={line.label} month={m} currency={household!.baseCurrency} locale={household!.locale} onAdded={onSuggested} onError={setError} />
+    ? (
+      <SuggestionLines
+        suggestions={suggestions.get(line.id) ?? []} label={line.label} month={m} currency={household!.baseCurrency} locale={household!.locale} onAdded={onSuggested} onError={setError}
+        // the account a suggested row needs is made first; the suggestion is the row, so the account brings none
+        onNeed={(type) => setAccountNew({ type, types: [type], payOff: false })}
+      />
+    )
     : null)
   /**
    * A new account that came with its row (a loan or card with its payment) opens that row for the amount. A new
@@ -229,15 +235,19 @@ export function StatementScreen() {
     else if (line.accountId) askRule({ accountId: line.accountId })
   }
   const categoriesOf = (section: Section) => tables!.categories.filter((c) => !c.deletedAt && c.section === section)
-  const addRow = (section: Section, over: Pick<ComponentProps<typeof AddRowInline>, 'label' | 'defaultCategoryId' | 'only' | 'without'> = {}) => (
-    <AddRowInline section={section} categories={categoriesOf(section)} tables={tables!} household={household!} onError={setError} onAdded={onAdded} {...over} />
+  // a payment row shows under "Set aside, pay off" whichever section it lives in, so that is where one is added
+  const addRow = (section: Section, over: Pick<ComponentProps<typeof AddRowInline>, 'label' | 'defaultCategoryId' | 'only' | 'place'> = {}) => (
+    <AddRowInline
+      section={section} categories={categoriesOf(section)} tables={tables!} household={household!} onError={setError} onAdded={onAdded}
+      without={section === 'expense' ? ['pay-off'] : undefined} month={statement!.closed ? undefined : m} {...over}
+    />
   )
   /** Things are added where they will appear: at the foot of a group, and inside a category for a row of that category. */
   function footer(line: StatementLine): ReactNode {
     if (line.id === 'income') return <>{suggested(line)}{addRow('income')}<AddCategoryInline section="income" onError={setError} /></>
     if (line.id === 'expenses') return <>{suggested(line)}{addRow('expense')}<AddCategoryInline section="expense" onError={setError} estimate={statement!.closed ? undefined : { month: m, currency: ccy, locale }} /></>
-    // money taken out of an account has a section of its own on the left, so the right side does not offer it
-    if (line.id === 'set-aside') return <>{suggested(line)}{addRow('transfer', { without: ['from-savings', 'from-investment'] })}</>
+    // what the row is for is asked first; money taken out of an account has a section of its own on the left
+    if (line.id === 'set-aside') return <>{suggested(line)}{addRow('transfer', { place: 'set-aside' })}</>
     if (line.id === 'from-accounts') return addRow('transfer', { only: ['from-savings', 'from-investment'] })
     if (line.kind === 'category' && line.id.startsWith('cat:')) {
       const [, section, categoryId] = line.id.split(':')

@@ -202,13 +202,27 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   a category. Under Transfers it also asks what the row does (moves money between your accounts, goes into a savings
   account, deposits into an investment account, fills a virtual account that lost its row, pocket money for an adult, pays
   off a card whose purchases are expense rows), with a second select for the target and one muted sentence under the controls for the chosen kind. A choice without a
-  possible target is left out (a second "to savings" under the savings plug, a row that fills a virtual account when each already has one)
-  or the sentence says what to add first and Add is disabled. Under Expenses the same select offers "A normal expense" or
+  possible target is left out (a second "to savings" under the savings plug, a row that fills a virtual account when each already has one).
+  A row that names an account never dead-ends on a missing one: the target select ends with the way to make it
+  (`New savings account…`, `New investment account…`, `New loan…`, `New credit card…`, `New virtual account…`), which
+  is the only entry while nothing fits. With it chosen the sentence says what Add does (`Add opens the form of the
+  new loan. Saving it makes the loan and this row together.`), Add opens the account dialog with the type fixed, and
+  saving makes the account and the row in one step (one Undo). A row that names an account or a virtual account may
+  be left without a name: the field's placeholder shows what it will be called (`To Savings`, `Car loan – Payment`,
+  `Named after the loan`). Only pocket money without an adult still says what to add first, with Add disabled.
+  Under Expenses the same select offers "A normal expense" or
   "Pays off a loan or card" with the loans and the cards whose payment is the recorded spending as targets (the
   account's type picks the row kind). A card whose purchases are expense rows gets "Pays off a credit card" under
   Transfers instead, because its payment only moves money (`cardIsItemized` in `src/model/cards.ts` is the one reading
   of that setting for the engine, the split, the store and the grid). The store checks the same rules (`addRowOfKind`,
   `rowTargets`); a choice the lists no longer offer falls back to the first one, and Cancel forgets the choice.
+  On the Statement the foot of Set aside, pay off uses the same form with `place="set-aside"`: the question comes
+  first as a visible label, `What is it for?`, then `Which one`, then the name. Its choices are the places money is
+  put, in this order: goes into a savings account, deposits into an investment account, fills a virtual account
+  (offered once a savings account can hold one; `New virtual account…` opens the virtual account's own form, which
+  names its row), pays off a loan or card (every loan and card, whichever section the row then lives in), pocket
+  money, and last the plain move between accounts. The Statement's Expenses do not offer the payment row, because it
+  shows under Set aside, pay off.
 - Section header rows: the chevron and the title in `text-xs font-semibold` in the section's hue; no bar, no fill.
 - Categories (`groupRowsByCategory`): inside a section rows sort by category, then by their own order; rows without
   one come last. When the section has categories, each group opens with a label row (`text-[10px] font-semibold
@@ -360,8 +374,10 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   `text-[11px]`, then a 28 px amount field (`per month`, named `Amount per month for <row>`), an `xs outline` `Add`
   and a ghost `×` named `Dismiss <row>`. Enter in the field adds the row with that amount from the month on screen
   on; `Add` with the field empty adds it without one; no dialog opens. An amount that cannot be read shows its error
-  under the line and disables `Add`. A suggestion that needs an account the household does not have shows a zinc
-  chip (`needs a loan account`) in place of the field and the button. Under the usual ones a dotted-underlined link
+  under the line and disables `Add`. A suggestion that needs an account the household does not have shows an `xs
+  outline` button that makes it (`Add a loan…`, `Add a savings account…`, `Add an investment account…`) in place of
+  the field and the button; once the account is saved the suggestion takes its amount like the others and its row
+  links to the account by itself. Under the usual ones a dotted-underlined link
   `More suggestions (n)` opens the rarer and the dismissed ones, which have no `×`. Each block is a group named
   `Suggestions for <part>`. Under Assets the same line offers an account most households have (`Main account`,
   `Savings`); its `Add` opens the account dialog with the name and type filled in.
