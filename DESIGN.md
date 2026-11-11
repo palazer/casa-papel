@@ -217,6 +217,10 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   The closed-month grey stays a translucent overlay on the cells, so it reads over a band.
 - Total rows (`derivedRow` with `band`): the label in the hue on the hue's `tint`, `font-medium`; detail lines under an
   investment account (`Deposited`, `Return`) indented and `text-[11px]` muted.
+- Balances open with what stays in the current accounts: one row named like the Statement's line (the one account's
+  name, else `Current accounts`), shown once such an account exists or money stays in it, so the rows under Balances
+  add up to `Net worth`. It is worked out; a click on a month opens `CurrentBalanceDialog` (§8), and a month whose
+  real balances were typed is underlined like the other entered balances.
 - Keyboard: arrows move between cells (`data-cell="row,col"`), Enter or Space opens the editor.
 
 ## 7. Rows, lists, tables and tiles

@@ -201,11 +201,12 @@ export const GUIDE: GuideTopic[] = [
       'Household → "Household settings" → "Cash kept in the account at month end (EUR)"; "Cash buffer changes apply to" picks "This month and onwards (earlier months keep what they show)", "Only this month" or "Every open month".',
       'Statement → "Set aside, pay off" → "Add row" (or Grid → Transfers → "Add row") → say what the row does: "Moves money between your accounts", "Goes into a savings account", "Deposits into an investment account", "Fills a pool account", "Pocket money for an adult" or, for a card whose purchases are expense rows, "Pays off a credit card", then pick the "Account", "Pool account" or "Adult" and press "Add".',
       'Row menu → "Goes into…" changes a deposit row\'s account for every month.',
+      'What is not passed on stays in the current accounts: Statement → "Assets" → press the amount of "Current accounts" (or its row under "Balances" in the Grid) to type what the bank says for each account. The line then shows how far the plan was off, and later months continue from the real numbers; "Use the calculated amount" takes it back.',
       'Statement → "Set aside, pay off" and "Pocket money" list them for the month, each with a tick for when the money has moved.',
     ],
     factsTitle: 'The rules',
     facts: rules,
-    tips: ['section.transfer', 'derived.keptInAccount', 'derived.leftover', 'row.toSavingsPlug', 'household.buffer', 'household.bufferScope', 'row.automatic', 'row.rule', 'row.ruleFrom'],
+    tips: ['section.transfer', 'derived.keptInAccount', 'derived.leftover', 'row.toSavingsPlug', 'household.buffer', 'household.bufferScope', 'row.automatic', 'row.rule', 'row.ruleFrom', 'statement.mainAccount'],
     open: 'household',
   },
   {

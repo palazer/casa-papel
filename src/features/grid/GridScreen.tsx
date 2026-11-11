@@ -13,11 +13,12 @@ import { readPref, writePref } from '@/app/prefs'
 import { handMonth, useScreen } from '@/app/screens'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
-import { cellKey, groupRowsByCategory, type EngineOutput } from '@/engine'
+import { cellKey, currentAccountsIn, groupRowsByCategory, mainAccountLabel, type EngineOutput } from '@/engine'
 import { isOldPocketShare, isShareRule, monthOfDate, parseMonth, resolveRules, type Household, type Money, type MonthKey, type Row, type RuleState, type Section, type Tables } from '@/model'
 import { addPlanYear, closeMonth, derivedRowReason, reopenMonth } from '@/store'
 import { AddRowInline } from './AddRowInline'
 import { BalanceDialog } from './BalanceDialog'
+import { CurrentBalanceDialog } from './CurrentBalanceDialog'
 import { CellEditor } from './CellEditor'
 import { RowMenu } from './RowMenu'
 import { amountDisplay, doneLabel, doneness, flowOf, ruleText, statusClass, toneClass, type Flow } from '@/app/display'
@@ -42,6 +43,8 @@ export function GridScreen() {
   const [collapsed, setCollapsed] = useState<Set<Section>>(() => new Set())
   const [selected, setSelected] = useState<{ rowId: string; month: MonthKey } | null>(null)
   const [balanceSel, setBalanceSel] = useState<{ accountId: string; month: MonthKey } | null>(null)
+  /** The month whose real balances of the current accounts are being typed. */
+  const [currentSel, setCurrentSel] = useState<MonthKey | null>(null)
   const [error, setError] = useState<string | null>(null)
   /** Which rows a rule works out, read the way the engine reads them. */
   const rules = useMemo(() => (engine && household ? resolveRules(engine.rows, household.closingRule) : null), [engine, household])
@@ -97,6 +100,9 @@ export function GridScreen() {
   /** Balance series that still reach into the shown months; an account archived before them has nothing to show. */
   const accountSeries = Object.values(engine.accounts).filter((s) => Object.keys(s.months).length > 0)
   const poolSeries = Object.values(engine.pools).filter((p) => Object.keys(p.months).length > 0)
+  /** What stays in the current accounts counts in net worth, so it has a row: once there is such an account, or money in it. */
+  const main = engine.main
+  const mainShown = !!main && (main.accountIds.length > 0 || months.some((m) => (main.months[m]?.balance ?? 0) !== 0))
 
   const derivedRow = (
     /** `pick` returns null for a month the series does not reach (an archived account or pool account): the cell stays blank. */
@@ -234,12 +240,17 @@ export function GridScreen() {
               ]
             })}
 
-            {(accountSeries.length > 0 || poolSeries.length > 0) && (
+            {(mainShown || accountSeries.length > 0 || poolSeries.length > 0) && (
               <tr>
                 <th scope="row" className={cn('sticky left-0 z-10 border-t bg-card px-2 py-1.5 text-left text-xs font-semibold', HUES.worth.text)}>Balances</th>
                 <td colSpan={months.length} className="border-t" />
               </tr>
             )}
+            {main && mainShown && derivedRow(mainAccountLabel(main, tables.accounts), 'in', (m) => main.months[m]?.balance ?? null, {
+              strong: true, hue: HUES.worth, help: 'statement.mainAccount', mark: (m) => main.months[m]?.entered ?? false,
+              // a month takes real balances once a current account exists in it
+              onClick: (m) => { if (currentAccountsIn(tables.accounts, m).length > 0) setCurrentSel(m) },
+            })}
             {accountSeries.flatMap((s) => {
               const acc = tables.accounts.find((a) => a.id === s.accountId)
               if (!acc) return []
@@ -266,7 +277,7 @@ export function GridScreen() {
                 warn: (m) => (p.months[m]?.short ? `Short by ${formatAmount(p.months[m].short, ccy, locale)}: more came out of it than it held. Top it up on the Statement.` : null),
               })
             })}
-            {(accountSeries.length > 0 || (engine.main?.accountIds.length ?? 0) > 0) && derivedRow('Net worth', 'in', (m) => (engine.netWorth[m] != null && (engine.main?.months[m] || accountSeries.some((s) => s.months[m])) ? engine.netWorth[m] : null), { strong: true, hue: HUES.worth, band: true, help: 'derived.netWorth' })}
+            {(accountSeries.length > 0 || mainShown) && derivedRow('Net worth', 'in', (m) => (engine.netWorth[m] != null && (engine.main?.months[m] || accountSeries.some((s) => s.months[m])) ? engine.netWorth[m] : null), { strong: true, hue: HUES.worth, band: true, help: 'derived.netWorth' })}
           </tbody>
         </table>
       </div>
@@ -276,6 +287,12 @@ export function GridScreen() {
         const res = engine.accounts[balanceSel.accountId]?.months[balanceSel.month]
         return acc && res ? <BalanceDialog key={`${acc.id}:${balanceSel.month}`} account={acc} month={balanceSel.month} result={res} locale={locale} closed={engine.totals[balanceSel.month]?.closed ?? false} onClose={() => setBalanceSel(null)} /> : null
       })()}
+      {currentSel && main?.months[currentSel] && (
+        <CurrentBalanceDialog
+          key={currentSel} title={mainAccountLabel(main, tables.accounts)} accounts={currentAccountsIn(tables.accounts, currentSel)} month={currentSel} result={main.months[currentSel]}
+          actuals={tables.accountMonths} baseCurrency={ccy} locale={locale} closed={engine.totals[currentSel]?.closed ?? false} onClose={() => setCurrentSel(null)}
+        />
+      )}
       {selected && selectedRow && (
         <CellEditor key={`${selectedRow.id}:${selected.month}`} tables={tables} engine={engine} household={household} row={selectedRow} month={selected.month} onClose={() => setSelected(null)} />
       )}

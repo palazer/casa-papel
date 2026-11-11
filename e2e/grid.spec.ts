@@ -149,3 +149,40 @@ test.describe('grid: a row that pays off a loan', () => {
     await page.keyboard.press('Escape')
   })
 })
+
+test.describe('grid: the current accounts', () => {
+  test.use({ viewport: { width: 1400, height: 900 } })
+
+  test('have a row under Balances that counts in Net worth and takes their real balances', async ({ page }) => {
+    await loadDemo(page)
+    // the row is named like the Statement's line and sits first under Balances
+    await expect(page.getByRole('rowheader', { name: /^Current accounts/ })).toBeVisible()
+    const nov = page.getByRole('button', { name: /^Current accounts Nov 2026:/ })
+    await expect(nov).toHaveText('€78.00')
+    // with it the rows add up: 78 + 14,236 savings + 13,729.16 investments − 78 on the card
+    const netWorth = page.getByRole('row', { name: /^Net worth/ }).getByRole('cell').first()
+    await expect(netWorth).toHaveText('€27,965.16')
+
+    // a click on a month opens the same dialog as on the Statement
+    await nov.click()
+    const dlg = page.getByRole('dialog')
+    await expect(dlg.getByRole('heading', { name: 'Current accounts · November 2026' })).toBeVisible()
+    await dlg.getByLabel('Main account (EUR)').fill('1150')
+    await dlg.getByLabel('Joint account (EUR)').fill('300')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    // the entered month is underlined, net worth follows, and December continues from the real number:
+    // 1,450 plus the 18 bought on the card that month and not yet paid
+    await expect(nov).toHaveText('€1,450.00')
+    await expect(nov).toHaveClass(/underline/)
+    await expect(netWorth).toHaveText('€29,337.16')
+    const dec = page.getByRole('button', { name: /^Current accounts Dec 2026:/ })
+    await expect(dec).toHaveText('€1,468.00')
+    await expect(dec).not.toHaveClass(/underline/)
+    await page.screenshot({ path: 'e2e/output/grid-current-accounts.png' })
+
+    // the Statement shows the same month as entered
+    await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
+    await expect(page.getByRole('region', { name: 'Assets' }).getByRole('button', { name: 'Current accounts balance: €1,450.00, entered' })).toBeVisible()
+  })
+})

@@ -29,6 +29,12 @@ export function currentAccountsIn(accounts: Account[], month: MonthKey): Account
     .sort(byOrder)
 }
 
+/** What the line is called on every screen: the one current account's name, "Current accounts" for several, "Main account" for none. */
+export function mainAccountLabel(series: MainAccountSeries, accounts: Account[]): string {
+  if (series.accountIds.length === 1) return accounts.find((a) => a.id === series.accountIds[0])?.name ?? 'Main account'
+  return series.accountIds.length > 1 ? 'Current accounts' : 'Main account'
+}
+
 /**
  * The running balance over `months`, which must begin at the household's first month (or before it) for the balance
  * to be a balance. `accounts` are the live ones; `cells` and `totals` cover every one of `months`.
