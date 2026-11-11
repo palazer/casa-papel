@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { HUES } from '@/app/hues'
 import { useScreen } from '@/app/screens'
 import { DoneDot } from './DoneDot'
-import { statusClass } from '@/app/display'
+import { ESTIMATE_SHADE } from '@/app/display'
 import { cn } from '@/lib/utils'
 
 const KINDS = [
@@ -54,7 +54,7 @@ export function MarksLegend({ neg }: { neg: boolean }) {
         <section>
           <h4 className={H4}>Marks</h4>
           <ul className="space-y-1">
-            <Mark sample={<span className={statusClass.projected}>€210.00</span>}>An estimate: italic, dashed underline</Mark>
+            <Mark sample={<span className={ESTIMATE_SHADE}>€210.00</span>}>An estimate: on the yellow shade</Mark>
             <Mark sample={<span>€210.00</span>}>Certain: you know the amount</Mark>
             <Mark sample={<DoneDot done={1} total={1} state="all" />}>Done: the money has moved</Mark>
             <Mark sample={<span className="flex gap-1"><DoneDot done={0} total={1} state="none" /><DoneDot done={1} total={2} state="partial" /></span>}>This month only: nothing done yet, partly done</Mark>

@@ -31,7 +31,8 @@ import { SetupStrip } from './SetupStrip'
 import { StatementBand } from './StatementBand'
 import { AccountSuggestionLines, SuggestionLines } from './SuggestionLines'
 import { TopUpDialog } from './TopUpDialog'
-import { ESTIMATE_SHADE, LINE_MENU, type LineContext } from './StatementLine'
+import { ESTIMATE_SHADE } from '@/app/display'
+import { LINE_MENU, type LineContext } from './StatementLine'
 
 const walk = (lines: StatementLine[]): StatementLine[] => lines.flatMap((l) => [l, ...walk(l.children)])
 /** What "Add account" offers under Assets, and "Add a card or loan" under Debts. */

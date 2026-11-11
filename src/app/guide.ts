@@ -112,7 +112,7 @@ export const GUIDE: GuideTopic[] = [
     title: 'Spending & categories',
     summary: 'Spending rows hold what leaves; categories group them, and every amount says how sure you are and what it comes out of.',
     what: [
-      'Every amount is an "Estimate" (italic, dashed), "Certain" or "Done" (green dot). That changes how it looks and what the month\'s progress counts, never how it adds up. "Treat new values as…" in the row menu sets the default for new amounts in that row.',
+      'Every amount is an "Estimate" (on a light yellow shade), "Certain" or "Done" (green dot). That changes how it looks and what the month\'s progress counts, never how it adds up. "Treat new values as…" in the row menu sets the default for new amounts in that row.',
       'A cell is a "Single amount" or "Itemized": a list of items with a "What", an amount, a status and a source each, and "Mark all done" for the whole list.',
       '"Comes out of" says where the money is taken from: "This month\'s income", the "Savings balance" or a "Pool account: Travel". Savings and pool accounts never touch the month\'s leftover. Categories ("Housing", "Living", "Transport", "Family & pets", "Fun", "Personal") group rows under a label line on a faint band.',
     ],
@@ -344,7 +344,7 @@ export const GUIDE: GuideTopic[] = [
     title: 'Marks & keyboard',
     summary: 'Every kind of money has one colour and every mark one meaning; the keyboard moves you around the grid.',
     what: [
-      '"What the colours and marks mean" in the Grid and Month toolbars is the legend. Kinds of money: "Income", "Expenses", "Transfers", "Balances and net worth", "Pool accounts", "Goals". Marks: an estimate is italic with a dashed underline, certain is plain, done has a green dot; in the current month a red ring means nothing done yet and an amber half-dot partly done.',
+      '"What the colours and marks mean" in the Grid and Month toolbars is the legend. Kinds of money: "Income", "Expenses", "Transfers", "Balances and net worth", "Pool accounts", "Goals". Marks: an estimate sits on a light yellow shade, certain is plain, done has a green dot; in the current month a red ring means nothing done yet and an amber half-dot partly done.',
       'Spending shows as a red negative number when "Show expenses as negative red numbers" is on; an amber "+€…" is money drawn from savings this month; a dotted underline is a balance you entered yourself; a lock is a closed month; a faint band is one category\'s rows.',
       'In the grid the arrow keys move between cells, Enter or Space opens one, Escape closes the editor. Cmd/Ctrl+Z undoes and Shift redoes, like the two arrows at the left of every toolbar.',
     ],

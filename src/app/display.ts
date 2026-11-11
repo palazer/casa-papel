@@ -30,8 +30,12 @@ export const toneClass: Record<Tone, string> = {
   neutral: '',
 }
 
+/** The light yellow an estimate sits on, on every screen (DESIGN.md §5): the amount in a rounded pill of the shade. */
+export const ESTIMATE_SHADE = 'rounded bg-estimate px-1 py-0.5'
+
 export const statusClass: Record<CellStatus, string> = {
-  projected: 'italic text-muted-foreground underline decoration-dashed decoration-partial underline-offset-4',
+  // pulled back by its own padding, so an estimate's digits line up with the plain amounts above and below it
+  projected: `-mr-1 ${ESTIMATE_SHADE}`,
   committed: '',
   done: '',
   derived: 'font-medium',

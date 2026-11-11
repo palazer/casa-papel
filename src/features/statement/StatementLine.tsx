@@ -6,7 +6,7 @@ import { InfoTip } from '@/components/InfoTip'
 import { Tick } from '@/components/Tick'
 import { cn } from '@/lib/utils'
 import { isShareRule } from '@/model'
-import { ruleText, type DoneState } from '@/app/display'
+import { ESTIMATE_SHADE, ruleText, type DoneState } from '@/app/display'
 import { formatAmount, formatPercent, formatShare } from '@/app/format'
 import type { HelpKey } from '@/app/help'
 import { HUES, type Hue } from '@/app/hues'
@@ -65,8 +65,6 @@ const TIP: Record<string, HelpKey> = {
 const INDENT = ['pl-2', 'pl-7', 'pl-12', 'pl-16']
 export const CHANGE_COL = 'w-20 shrink-0 text-right tabular-nums md:w-24'
 export const AMOUNT_COL = 'w-24 shrink-0 text-right tabular-nums md:w-28'
-/** The light yellow an estimate sits on (DESIGN.md §5). */
-export const ESTIMATE_SHADE = 'rounded bg-estimate px-1 py-0.5'
 /**
  * A line's "…": 20 px so the line keeps its height, shown while the line is hovered or the control has the focus, and
  * always (and finger-sized) where the pointer is a finger.

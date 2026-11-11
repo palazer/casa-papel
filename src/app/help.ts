@@ -51,7 +51,7 @@ export const HELP = {
   'stat.movesLeft': { title: 'Moves left', text: 'Transfers and payments of this month that are not ticked as done yet. Tick them here or on the Month screen.' },
 
   // The cell editor
-  'cell.howSure': { title: 'How sure', text: 'An estimate is a guess (italic, dashed underline). Certain means you know the amount. Done means the money has moved; done cells get a green dot and count towards the month\'s progress.' },
+  'cell.howSure': { title: 'How sure', text: 'An estimate is a guess; it sits on a light yellow shade. Certain means you know the amount. Done means the money has moved; done amounts get a green dot and count towards the month\'s progress.' },
   'cell.appliesTo': { title: 'Applies to', text: '"This month and onwards" changes this month and every later month that still follows this row. "Only this month" changes one month; the next month keeps the old amount. Done in a December, it pins January, so the grid shows the next year.' },
   'cell.comesOutOf': { title: 'Comes out of', text: 'The budget side of an expense: this month\'s income (the normal case), the savings balance, or a pool account. Savings and pool accounts do not reduce this month\'s leftover.' },
   'cell.deductions': { title: 'Deducted from this income', text: 'Rows marked as deducted from this income, taken off this month\'s amount. The net is what actually arrives; the deductions stay as expenses in their own rows.' },
@@ -79,7 +79,7 @@ export const HELP = {
   'statement.mainAccount': { title: 'Main account', text: 'Worked out, not a bank balance: what your current accounts started with, plus what each month kept or fell short, plus money waiting for a card bill. In a household that passes everything on it never moves.' },
   'statement.netWorth': { title: 'Net worth', text: 'Assets minus debts. Unlike the Grid\'s figure it counts the main account, so its change is the month\'s result: income minus spending, plus what investments earned.' },
   'statement.fromAccounts': { title: 'Taken from accounts', text: 'Money you move out of a savings or an investment account into the month yourself, to fill a gap or to top up a pool account. The account falls by the amount and the month has that much more. Add a row here and type the month\'s amount.' },
-  'statement.estimate': { title: 'Estimates', text: 'A number on a light yellow shade is an estimate. Click the line to overwrite it or to say how sure you are, and tick it once the money has moved. A category is shaded while one of its lines still is.' },
+  'statement.estimate': { title: 'Estimates', text: 'A number on a light yellow shade is an estimate, on every screen. Click it to overwrite it or to say how sure you are, and tick it once the money has moved. On the Statement a category is shaded while one of its lines still is.' },
   'statement.free': { title: 'Free', text: 'The part of your net worth that no pool account has set aside. It closes the right side, which is why both sides agree.' },
 
   // Goals and schedules

@@ -152,12 +152,11 @@ Truncation idiom: a `min-w-0` parent, `truncate` on the name, `shrink-0` on sibl
   amounts in the expense hue when "show expenses as negative" is on; money taken back out of savings in `--draw`. Numbers
   otherwise stay ink, so the grid never becomes a heat map. A balance below zero (an overdrawn pool account, savings in the
   red, negative net worth) is in the expense hue whatever the negatives setting: it is a warning, not spending.
-- **Certainty**: an estimate is italic with a dashed `decoration-partial` underline; certain and done are plain.
-  **On the Statement, as a trial, an estimate sits on a light yellow shade instead** (`--estimate`, yellow-200,
-  `bg-estimate`; `ESTIMATE_SHADE` in `src/features/statement/StatementLine.tsx`): the amount in a rounded pill of the
-  shade, upright and without the underline, and a category's subtotal shaded while a line under it still is. The
-  shade means an estimate and nothing else; done stays the dot. The Grid and the Month view keep the italic until the
-  trial is judged, then one of the two marks goes everywhere.
+- **Certainty**: an estimate sits on a light yellow shade (`--estimate`, yellow-200, `bg-estimate`; `ESTIMATE_SHADE`
+  and `statusClass.projected` in `src/app/display.ts`), on every screen: the amount in a rounded pill of the shade,
+  upright, in ink. On the Statement a category's subtotal is shaded while a line under it still is. The shade means an
+  estimate and nothing else; certain and done are plain, and done has the dot. (Until November 2026 an estimate was
+  italic with a dashed underline in the Grid; the Statement's trial settled it.)
 - **Done**: one mark only, the `DoneDot` (8 px): a green disc for done in any month; in the current open month also a
   red ring for nothing done and an amber half disc for partly done.
 - **Chips** (`src/components/ui/chip.tsx`, `rounded px-1.5 leading-4 text-[10px] font-medium`): zinc a neutral fact or
