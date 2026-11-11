@@ -510,14 +510,12 @@ export async function setMonthlyDefault(store: Store, value: Money, scope: Month
   const tables = await loadTables(store)
   const household = tables.household.find((h) => !h.deletedAt)
   if (!household) throw new Error('No household yet')
-  const key = 'cashBuffer' as const
-  const overrideKey = 'cashBufferOverride' as const
   const states = new Map(tables.monthStates.map((s) => [s.month, s]))
   const ts = now()
   const mutations: Mutation[] = []
   const putState = (m: MonthKey, override: Money | null) => {
     const prev = states.get(m)
-    mutations.push({ op: 'put', table: 'monthStates', record: MonthStateSchema.parse({ month: m, closed: false, closedAt: null, ...prev, [overrideKey]: override, updatedAt: ts }) })
+    mutations.push({ op: 'put', table: 'monthStates', record: MonthStateSchema.parse({ month: m, closed: false, closedAt: null, ...prev, cashBufferOverride: override, updatedAt: ts }) })
   }
   if (scope === 'this-month') {
     if (states.get(month)?.closed) throw new Error('Month is closed')
@@ -526,15 +524,15 @@ export async function setMonthlyDefault(store: Store, value: Money, scope: Month
     if (scope === 'from-now-on' && compareMonths(month, household.startMonth) > 0) {
       for (const m of monthRange(household.startMonth, addMonths(month, -1))) {
         const s = states.get(m)
-        if (s?.closed || s?.[overrideKey] != null) continue
-        putState(m, household[key])
+        if (s?.closed || s?.cashBufferOverride != null) continue
+        putState(m, household.cashBuffer)
       }
     }
     for (const s of tables.monthStates) {
-      if (s.closed || s[overrideKey] == null) continue
+      if (s.closed || s.cashBufferOverride == null) continue
       if (scope === 'all-open' || compareMonths(s.month, month) >= 0) putState(s.month, null)
     }
-    mutations.push({ op: 'put', table: 'household', record: HouseholdSchema.parse({ ...household, [key]: value, updatedAt: ts }) })
+    mutations.push({ op: 'put', table: 'household', record: HouseholdSchema.parse({ ...household, cashBuffer: value, updatedAt: ts }) })
   }
   await store.commit(mutations)
 }
