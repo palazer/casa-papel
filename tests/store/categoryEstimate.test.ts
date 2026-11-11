@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { cellKey, computeEngine } from '@/engine'
 import { monthRange, newId } from '@/model'
 import {
-  CasaDb, Store, addCategory, deleteCategory, derivedRowReason, describeRemoval, estimateRowOf, loadTables, markPaid, removeThing, renameCategory, setCategoryEstimate, setRowCategory,
+  CasaDb, Store, addCategory, deleteCategory, derivedRowReason, describeRemoval, estimateRowOf, loadTables, removeThing, renameCategory, setCategoryEstimate, setRowCategory,
 } from '@/store'
 import { DEMO_IDS } from '@/demo/demoHousehold'
 import { loadDemo } from '@/demo/loadDemo'
@@ -31,7 +31,6 @@ describe('a category\'s estimate in the store', () => {
     // it sorts at the end of its category
     expect(out.rows.filter((r) => r.categoryId === DEMO_IDS.catHousing).at(-1)?.id).toBe(row.id)
     expect(derivedRowReason(row, 'savings-plug')).toMatch(/what is left of its category's estimate/)
-    await expect(markPaid(store, row.id, '2026-11', null, { amount: 100, status: 'done', date: null, note: null })).rejects.toThrow(/Tick it instead/)
   })
 
   it('changes it for one month or from a month on, on the same row, and 0 takes it away', async () => {

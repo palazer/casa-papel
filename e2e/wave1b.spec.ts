@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
 async function loadDemo(page: Page) {
-  await page.goto('?demo=1')
+  await page.goto('?demo=1&screen=grid')
   await page.getByRole('button', { name: 'Load the demo household' }).click()
   await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
 }
@@ -261,11 +261,14 @@ test.describe('wave 1b', () => {
     await expect(page.getByRole('button', { name: /^Water Dec 2026: empty/ })).toBeVisible()
     await expect(page.getByRole('button', { name: /^Water Feb 2027/ })).toContainText('90')
 
-    await page.getByRole('link', { name: 'Moves' }).click()
-    await expect(page.getByText('Payments due')).toBeVisible()
-    await page.getByLabel('Rent paid').click()
-    await expect(page.getByLabel('Rent paid')).toBeChecked()
-    await page.screenshot({ path: 'e2e/output/moves.png', fullPage: true })
+    // a schedule's posting is ticked on the Statement like any other line; the schedule then shows the month as paid
+    await page.getByRole('link', { name: 'Statement' }).click()
+    await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
+    await page.getByRole('region', { name: 'Money out' }).getByRole('button', { name: 'Housing', exact: true }).click()
+    const rentDone = page.getByRole('checkbox', { name: 'The flat – Rent done' })
+    await expect(rentDone).not.toBeChecked()
+    await rentDone.click()
+    await expect(rentDone).toBeChecked()
     await page.getByRole('link', { name: 'Household' }).click()
     await expect(page.getByLabel('Rent paid in Nov 2026')).toBeChecked()
     await page.getByRole('link', { name: 'Grid' }).click()

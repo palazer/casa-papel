@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
 async function loadDemo(page: Page) {
-  await page.goto('?demo=1')
+  await page.goto('?demo=1&screen=grid')
   await page.getByRole('button', { name: 'Load the demo household' }).click()
   await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
 }
@@ -12,15 +12,17 @@ test.describe('wave 1d', () => {
   test('per-person view, pocket money on its own line, a loan and a card in Balances, net worth', async ({ page }) => {
     await loadDemo(page)
 
-    // what each adult brings, spends on themselves and takes; there is one way of sharing, so nothing to choose
-    await page.getByRole('link', { name: 'Moves' }).click()
-    await expect(page.getByText('Per person', { exact: true })).toBeVisible()
-    await expect(page.getByRole('columnheader', { name: 'Sam' })).toBeVisible()
-    await expect(page.getByRole('columnheader', { name: 'Alex' })).toBeVisible()
-    await expect(page.getByRole('cell', { name: 'Leaves for the household' })).toBeVisible()
+    // what each adult brings, spends on themselves and takes closes the Statement; there is one way of sharing, so nothing to choose
+    await page.getByRole('link', { name: 'Statement' }).click()
+    const perPerson = page.getByTestId('per-person')
+    await expect(perPerson.getByRole('heading', { name: 'Per person' })).toBeVisible()
+    await expect(perPerson.getByRole('columnheader')).toHaveText(['Sam', 'Alex'])
+    await expect(perPerson.getByRole('rowheader')).toHaveText(['Income', 'Own spending', 'Pocket money', 'Leaves for the household'])
+    // Sam brings 4,200, spends 110 on Sam and takes 500: 3,590 is left for the household
+    await expect(perPerson.getByRole('row', { name: /^Leaves for the household/ })).toContainText('+€3,590.00')
     await expect(page.getByText('Who pays what')).toHaveCount(0)
-    await expect(page.getByText('Net worth', { exact: true })).toBeVisible()
-    await page.screenshot({ path: 'e2e/output/moves-per-person.png', fullPage: true })
+    await perPerson.scrollIntoViewIfNeeded()
+    await page.screenshot({ path: 'e2e/output/statement-per-person.png' })
 
     // pocket money is set on each adult's own line, not under Household: 750 for Sam from this month on
     await page.getByRole('link', { name: 'Household' }).click()

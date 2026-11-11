@@ -27,13 +27,13 @@ export const HELP = {
   'row.follows': { title: 'Follows another row', text: 'This row copies another row\'s amount every month, or a share of it, like a child\'s savings following the child benefit or a tax taking a quarter of a salary. Edit the row it follows; this one has no amount of its own.' },
   'row.followShare': { title: 'Share of the followed row', text: 'The row shows this percentage of the row it follows, month by month. 100 mirrors it exactly; 25 puts a quarter of it here, like a tax that takes a fixed slice of a salary.' },
   'row.deductedFrom': { title: 'Deducted from an income', text: 'A tax or contribution taken off an income before it reaches you. It stays an expense in its own row, the income shows what is left as a net line, and percentages of income count the net amount.' },
-  'row.belongsTo': { title: 'Belongs to', text: 'Who the row is for: the household, an adult, or a child, pet or thing. An adult\'s own rows count for them in "Per person" on Moves, and their income lines are what a pocket money rule takes a percentage of.' },
+  'row.belongsTo': { title: 'Belongs to', text: 'Who the row is for: the household, an adult, or a child, pet or thing. An adult\'s own rows count for them in "Per person" under the Statement, and their income lines are what a pocket money rule takes a percentage of.' },
   'row.category': { title: 'Category', text: 'A named group inside the section, like Housing or Transport. Rows sort by category in the grid and share a faint band, so related lines sit together. Categories are managed under Household.' },
   'row.rule': { title: 'Rule', text: 'How the amount for an account, or an adult\'s pocket money, is worked out each month: an amount, a percentage of take-home income, a percentage of what is left, or the rest. Pocket money never takes the rest; it can be a percentage of its adult\'s own income. Percentages of income come first, then the cash kept, then what is left; one account takes the rest.' },
   'row.ruleFrom': { title: 'Counts from', text: 'A rule counts from this month on. The months before it keep the amounts they showed, so changing a percentage never rewrites the past. Amounts typed for this account from this month on are replaced by the rule.' },
   'row.automatic': { title: 'Automatic', text: 'The app works this amount out from the rest of the month or from a rule, so there is nothing to type. Tick it once the money has actually moved; the amount keeps following the plan.' },
   'row.currency': { title: 'Currency of this row', text: 'Amounts in this row are typed in this currency and shown in the household currency beneath, converted at each month\'s rate. Numbers already typed keep their digits and are read in the new currency; the rates live under Household.' },
-  'month.progress': { title: 'Progress', text: 'Every line with an amount counts once; an itemized line counts each item. Still to pay adds up the open spending and transfers, to come in the open income, both in your base currency.' },
+  'statement.progress': { title: 'Progress', text: 'Every line with an amount counts once; an itemized line counts each item. Still to pay adds up the open spending and transfers, to come in the open income, both in your base currency. "Close month" locks the month and counts all of it as done.' },
 
   // Balances
   'balance.savings': { title: 'Savings balance', text: 'Last month\'s balance plus what went in minus what came out, month by month from the opening balance. Click a month to enter what the account really held; later months start from your number.' },
@@ -45,10 +45,6 @@ export const HELP = {
   'balance.otherAsset': { title: 'Other asset', text: 'Something you own with a value, like a rental deposit. The balance only changes when you enter a new value; it counts towards net worth.' },
   'balance.pool': { title: 'Pool account', text: 'Money set aside inside a savings account for one purpose: what goes in every month minus the spending that comes out of it. The savings balance already includes it. It never goes below zero: when more comes out than it holds, the rest comes out of the unassigned savings and the pool account shows as short until you top it up on the Statement.' },
   'balance.inBase': { title: 'In the household currency', text: 'The balance converted at the month\'s rate, so it can be compared with the other balances and counted in net worth. The line above is in the account\'s own currency.' },
-
-  // Stats on Month and Moves
-  'stat.toSavings': { title: 'To savings', text: 'How much the month moves into savings, pool accounts included. Negative means the month draws on savings instead.' },
-  'stat.movesLeft': { title: 'Moves left', text: 'Transfers and payments of this month that are not ticked as done yet. Tick them here or on the Month screen.' },
 
   // The cell editor
   'cell.howSure': { title: 'How sure', text: 'An estimate is a guess; it sits on a light yellow shade. Certain means you know the amount. Done means the money has moved; done amounts get a green dot and count towards the month\'s progress.' },
@@ -77,10 +73,10 @@ export const HELP = {
   'statement.position': { title: 'At the end of the month', text: 'What you have on the left. On the right, whose it is: debts first, then your net worth, split into what is set aside in pool accounts and what is free. The change column shows how the month moved each figure.' },
   'statement.setAside': { title: 'Set aside, pay off', text: 'Money that leaves the main account but stays yours: into savings, investments and pool accounts, or off a loan or a card. Loan payments sit here; the Grid counts them under Expenses. The small symbol on a line is its rule: press it to change how the amount is worked out.' },
   'statement.mainAccount': { title: 'Main account', text: 'Worked out, not a bank balance: what your current accounts started with, plus what each month kept or fell short, plus money waiting for a card bill. In a household that passes everything on it never moves.' },
-  'statement.netWorth': { title: 'Net worth', text: 'Assets minus debts. Unlike the Grid\'s figure it counts the main account, so its change is the month\'s result: income minus spending, plus what investments earned.' },
+  'statement.netWorth': { title: 'Net worth', text: 'Assets minus debts, the same figure on every screen. It counts what stays in the main account, so its change is the month\'s result: income minus spending, plus what investments earned.' },
   'statement.fromAccounts': { title: 'Taken from accounts', text: 'Money you move out of a savings or an investment account into the month yourself, to fill a gap or to top up a pool account. The account falls by the amount and the month has that much more. Add a row here and type the month\'s amount.' },
-  'statement.estimate': { title: 'Estimates', text: 'A number on a light yellow shade is an estimate, on every screen. Click it to overwrite it or to say how sure you are, and tick it once the money has moved. On the Statement a category is shaded while one of its lines still is.' },
   'statement.free': { title: 'Free', text: 'The part of your net worth that no pool account has set aside. It closes the right side, which is why both sides agree.' },
+  'statement.perPerson': { title: 'Per person', text: 'Income minus own spending minus pocket money: what each adult leaves for the household this month. A row counts for an adult when it belongs to them (row menu, "Belongs to…"); rows for children, pets and things are the household\'s.' },
 
   // Goals and schedules
   'goal.status': { title: 'Goal status', text: 'Measured against the plan in the grid, so the bar moves when the plan changes. On track: reached by the target month. Late: reached after it, or not within the months shown. Reached: already there.' },

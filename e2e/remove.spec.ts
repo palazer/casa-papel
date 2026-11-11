@@ -5,7 +5,7 @@ test.describe('archive or delete', () => {
   test.use({ viewport: { width: 1440, height: 900 } })
 
   test('a row: delete with its impact and undo, archive one with closed history and restore it', async ({ page }) => {
-    await page.goto('?demo=1')
+    await page.goto('?demo=1&screen=grid')
     await page.getByRole('button', { name: 'Load the demo household' }).click()
     await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
     await page.getByRole('button', { name: 'Earlier months (2)' }).click()
@@ -54,7 +54,7 @@ test.describe('archive or delete', () => {
   })
 
   test('an account: a pool account inside it blocks the delete; a schedule goes from the list', async ({ page }) => {
-    await page.goto('?demo=1')
+    await page.goto('?demo=1&screen=grid')
     await page.getByRole('button', { name: 'Load the demo household' }).click()
     await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
     await page.getByRole('link', { name: 'Household' }).click()

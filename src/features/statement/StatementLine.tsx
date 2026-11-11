@@ -330,7 +330,7 @@ function GoalMark({ goal, locale }: { goal: GoalProgress; locale: string }) {
   )
 }
 
-/** Under an opened line: each goal's name, its bar and the sentence the Goals card uses. */
+/** Under an opened line: each goal's name, its bar and the sentence that says how far the plan gets. */
 function GoalDetail({ goals, line: owner, level, ctx }: { goals: GoalProgress[]; line: Line; level: number; ctx: LineContext }) {
   return (
     <div className={cn('space-y-2 bg-muted/20 py-2 pr-2 text-xs', INDENT[Math.min(level, INDENT.length - 1)])}>

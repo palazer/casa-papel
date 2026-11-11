@@ -9,7 +9,7 @@ test.describe('categories', () => {
   const background = (page: Page, name: string) => rowOf(page, name).evaluate((el) => getComputedStyle(el).backgroundColor)
 
   test('bands and labels on the grid, assign from the row menu, manage under Household', async ({ page }) => {
-    await page.goto('?demo=1')
+    await page.goto('?demo=1&screen=grid')
     await page.getByRole('button', { name: 'Load the demo household' }).click()
     await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
 

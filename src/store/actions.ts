@@ -242,7 +242,7 @@ export async function addRowOfKind(store: Store, input: RowOfKindInput): Promise
 
 // ---------- category estimates ----------
 
-/** The row that carries a category's estimate; the Grid and the Month view show it by this name. */
+/** The row that carries a category's estimate; the Grid shows it by this name. */
 export const estimateRowName = (category: Pick<Category, 'name'>): string => `${category.name} – Not broken down yet`
 
 /** A category's estimate row, archived or not; there is one per category at most. */
@@ -490,60 +490,6 @@ export async function setDerivedDone(store: Store, rowId: string, month: MonthKe
     rowId, month, mode: existing?.mode ?? 'inherit', value: existing?.value ?? null, items: existing?.items ?? [],
     note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, markedDone: done, updatedAt: now(),
   })])
-}
-
-export interface PaidInput {
-  amount: Money
-  status: ItemStatus
-  date: string | null
-  note: string | null
-}
-
-const itemSig = (items: CellItem[]) =>
-  JSON.stringify(items.map((i) => [i.id, i.label, i.amount, i.status, i.fundedBy, i.date, i.note, i.recurringItemId, i.kind, i.skipped, i.pinned ?? false]))
-
-/**
- * The Month view's "Paid…" sheet: record what actually moved for one line this month. The target is the given item,
- * the cell's single live item, or a plain amount turned into one unlabelled item. Only this month changes: when the
- * amount differs from what the month showed, the next month is frozen at the old amount (never for scheduled rows,
- * which do not carry forward), and a scheduled item with a new amount is pinned so the schedule leaves it alone.
- */
-export async function markPaid(store: Store, rowId: string, month: MonthKey, itemId: string | null, input: PaidInput): Promise<void> {
-  const { tables, engine, household } = await engineUpTo(store, month)
-  assertOpen(tables, month)
-  const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
-  if (!row) throw new Error('Row not found')
-  const why = derivedRowReason(row, household.closingRule)
-  if (why) throw new Error(`${why} Tick it instead.`)
-  if (row.followsRowId) throw new Error(`"${row.name}" follows another row. Tick it instead.`)
-  const current = engine.cells[cellKey(rowId, month)]
-  if (!current || current.source === 'archived') throw new Error(`"${row.name}" is archived in ${month}.`)
-  const existing = cellOf(tables, rowId, month)
-  let items: CellItem[] = existing?.mode === 'items' ? [...existing.items] : []
-  let target: CellItem | undefined
-  if (itemId) {
-    target = items.find((i) => i.id === itemId)
-    if (!target) throw new Error('That item is gone.')
-  } else {
-    const live = items.filter((i) => !i.skipped)
-    if (live.length > 1) throw new Error('This cell has several items. Pick one.')
-    target = live[0]
-    if (!target) {
-      target = { id: newId(), label: '', amount: current.value, status: row.defaultStatus, fundedBy: row.defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }
-      items.push(target)
-    }
-  }
-  const shown = target.kind === 'carry' ? (current.items.find((i) => i.id === target!.id)?.effectiveAmount ?? 0) : target.amount
-  const changed = shown !== input.amount
-  const paid: CellItem = {
-    ...target, kind: 'normal', amount: input.amount, status: input.status, date: input.date, note: input.note, skipped: false,
-    pinned: target.recurringItemId ? target.pinned || changed : target.pinned,
-  }
-  items = items.map((i) => (i.id === paid.id ? paid : i))
-  if (existing?.mode === 'items' && itemSig(items) === itemSig(existing.items)) return
-  const mutations: Mutation[] = changed && current.source !== 'empty' ? freezeNext(tables, engine, rowId, month) : []
-  mutations.push(putCell({ rowId, month, mode: 'items', value: null, items, note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, markedDone: existing?.markedDone ?? false, updatedAt: now() }))
-  await store.commit(mutations)
 }
 
 // ---------- monthly defaults with a scope ----------

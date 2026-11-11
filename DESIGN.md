@@ -37,11 +37,11 @@ Page header      header flex flex-col gap-y-2 > h1 text-2xl font-semibold leadin
                           Undo Redo (icon-xs ghost) · the screen's controls · the sync cloud at ml-auto
                           a basis-full child (an alert, a notice) wraps onto its own line under the controls
 Grid frame       the table in its own scroll box: relative isolate max-h-[calc(100dvh-var(--page-chrome))] overflow-auto rounded-lg border bg-card
-Reading page     mx-auto max-w-3xl space-y-4 text-xs of air islands (Household, Data, Moves, Guide)
-Phone list       mx-auto max-w-xl space-y-4 of dense islands, rows text-sm and min-h-11 (the Month view)
-Statement frame  full width, space-y-4 of dense islands, one per half; an island's body is grid grid-cols-1 lg:grid-cols-2
-                 lg:divide-x (max-lg:divide-y): two sides, each a flex column whose total sits at mt-auto, so from
-                 1024 px both totals share a line; below it the sides stack and each keeps its own total
+Reading page     mx-auto max-w-3xl space-y-4 text-xs of air islands (Household, Data, Guide)
+Statement frame  full width, space-y-4: the progress line, then dense islands, one per half and "Per person" last; a
+                 half's body is grid grid-cols-1 lg:grid-cols-2 lg:divide-x (max-lg:divide-y): two sides, each a flex
+                 column whose total sits at mt-auto, so from 1024 px both totals share a line; below it the sides stack
+                 and each keeps its own total. Rows are text-sm and min-h-11 on phones, md:text-xs and md:min-h-7
 ```
 
 - **Rail** (`src/components/AppRail.tsx`, after FantasyPros' and nfl's): a `<nav aria-label="Screens">`, 72 px, one
@@ -50,18 +50,20 @@ Statement frame  full width, space-y-4 of dense islands, one per half; an island
   it and `getByRole('link', { name: 'Household' })` stays unambiguous), then one tile per screen: a 40 × 30 `rounded-lg` tile holding a 20 px lucide icon over a `text-[10px] font-semibold`
   label. The open screen's tile is `bg-primary text-primary-foreground` with `aria-current="page"`; the others are
   `text-white/70`, hover `bg-white/10`. Items are real links (`?screen=…`, every other parameter kept, so `?demo=1`
-  survives); a plain click opens in place, Cmd-click opens a tab. The rail's order is `RAIL`: Statement, Grid, Month, Moves, then
+  survives); a plain click opens in place, Cmd-click opens a tab. The rail's order is `RAIL`: Statement, Grid, then
   **Settings**, a group after nfl-fantasy's Research: a `<button aria-expanded aria-controls="rail-settings">` tile with a
   caret in its label, and when unfolded a `role="group"` block on `bg-white/5` holding its pages Household, Data and Guide
   as ordinary links with smaller 32 × 26 tiles. A click on it folded unfolds it and opens the group's page open last
   (`casa.settings.page`, Household at first); a click on it unfolded only folds it (`casa.settings.open`, unfolded until
   someone folds it). Folded while one of its pages is open, the Settings tile wears the lime and `aria-current`.
-- **Bottom tabs** (`src/components/BottomTabs.tsx`): the rail's five tiles (Statement, Grid, Month, Moves, Settings) as a bar along
+- **Bottom tabs** (`src/components/BottomTabs.tsx`): the rail's three tiles (Statement, Grid, Settings) as a bar along
   the bottom edge, 56 px tall plus the safe-area inset, `md:hidden`. The Settings tab opens the group's page open last;
   on phones the group's pages switch through `GroupTabs` (`src/components/GroupTabs.tsx`), a `TabBar` named
   `Settings pages` on a hairline right under the page header of Household, Data and Guide, `md:hidden`.
-- **Screen state** (`src/app/screens.ts`): `?screen=` wins, then the screen open last (`casa.screen`), then the device's
-  natural first screen (Month on a phone, Grid otherwise). `rememberScreen` writes both; the address bar follows through
+- **Screen state** (`src/app/screens.ts`): `?screen=` wins, then the screen open last (`casa.screen`), then the
+  Statement, the first screen on every device (a remembered or bookmarked screen that no longer exists, the Month view
+  or Moves, opens it too). The Statement is where a month is read and worked and a household is set up; the Grid is the
+  planning view for the months ahead. `rememberScreen` writes both; the address bar follows through
   `history.replaceState`, so Back never walks through screen changes. Data and the Guide are never remembered as the
   screen to land on: they are utilities, so a fresh visit opens the household (or the welcome screen when there is
   none); the Guide also opens without a household.
@@ -128,7 +130,7 @@ air      h3  flex items-end gap-4 border-b px-4 pt-2 text-sm font-medium leading
 - `description` is the one sentence that explains the panel (Casa Papel explains every option inline). `right` holds a
   count or a small control, `toolbar` a non-scrolling filter row, `tabs` a `TabBar` in place of the title, `onFold` a
   caret that minimizes the island.
-- Dense islands for the phone's Month view and small stat panels; air islands for reading pages (Household, Data, Moves,
+- Dense islands for the Statement and small stat panels; air islands for reading pages (Household, Data, the Guide,
   the first setup screen). Titles are sentence case with facts after a middle dot.
 
 ## 4. Typography
@@ -137,7 +139,7 @@ air      h3  flex items-end gap-4 border-b px-4 pt-2 text-sm font-medium leading
 |---|---|
 | `text-2xl font-semibold leading-8 tracking-tight` | the page header's H1 only |
 | `text-sm font-medium leading-5` | air island titles, the month in the toolbar, one emphasised value |
-| `text-sm` | the phone's Month view rows and its stats (14 px, the one place desktop density does not apply) |
+| `text-sm` | the Statement's rows on a phone (14 px, the one place desktop density does not apply) |
 | `text-xs` | body text inside every panel, table and toolbar on desktop; the grid |
 | `text-[11px] leading-[15px]` | the muted meta line under a title or row |
 | `text-[10px]` | chips, small-caps island titles, the Σ line under a row name, rail labels |
@@ -191,7 +193,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 - A cell in another currency is two lines: the typed amount over a `text-[10px] leading-3` muted `≈ €3,120` in the household
   currency at that month's rate (the cell button becomes `flex-col items-end`; the certainty styling stays on the amount
   line; the `aria-label` says `, about €3,120`). The label keeps the currency code, a follower's too. A foreign account's
-  balance row has a muted `in EUR` sub-row like `Deposited`; the Month view's stat shows `≈ €…` after the balance.
+  balance row has a muted `in EUR` sub-row like `Deposited`; the Statement counts the account in the household currency.
 - An income cell with deductions shows `net €2,775` as its second line in place of the `≈` line (`aria-label` `, net
   €2,775`). A deduction row's label carries the muted tag `out of <income>` with an (i); a follower that takes a share
   reads `= 25% of <row>`. The cell editor of such an income lists the deductions in a `rounded-md border` block
@@ -212,8 +214,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   one come last. When the section has categories, each group opens with a label row (`text-[10px] font-semibold
   uppercase tracking-wider text-muted-foreground`, `No category` for the rest) and every other named group sits on the
   section hue's `band` (a 5 % mix, opaque, so sticky label cells can carry it too); the uncategorised group never does.
-  The closed-month grey stays a translucent overlay on the cells, so it reads over a band. The Month view shows the same
-  label lines, without bands.
+  The closed-month grey stays a translucent overlay on the cells, so it reads over a band.
 - Total rows (`derivedRow` with `band`): the label in the hue on the hue's `tint`, `font-medium`; detail lines under an
   investment account (`Deposited`, `Return`) indented and `text-[11px]` muted.
 - Keyboard: arrows move between cells (`data-cell="row,col"`), Enter or Space opens the editor.
@@ -228,14 +229,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   `rounded-md border`. No zebra striping.
 - **Stat tiles** (`src/components/ui/stat-tile.tsx`): a small-caps label (in a kind-of-money hue when the number is one)
   over `text-sm font-semibold tabular-nums`, in `rounded-md border` boxes laid out `grid grid-cols-2 gap-2 sm:grid-cols-5`.
-- **Month lines** (`src/features/month/MonthLine.tsx`): `grid grid-cols-[minmax(0,1fr)_2.75rem]`, a `min-h-11 px-3
-  py-2 text-sm` body (the name, a muted subline for `= Followed`, `= 25% of Followed`, `automatic`, `2 of 3 done`, `≈ €3,120` or
-  `net €2,775`, the amount at the end)
-  and the `Tick` in the right column. The body of an itemized line opens its items as an accordion (`aria-expanded`,
-  items on `bg-muted/20` indented `pl-9`, a `Repeat` icon for scheduled ones, each with its own tick); any other body
-  opens the Paid sheet; an automatic line's body is plain text with an (i). Above the islands, `ProgressLine`: an
-  `aria-live` text (`7 of 21 done · €… still to pay · €… to come in`, `All 21 done`, `Closed · all done`) and a small
-  `Hide done` switch; a section whose lines are all hidden says `All done`.
+  No screen uses them at the moment; like the other unused primitives under `src/components/ui/` the component stays.
 - **Progress bars** (goals): `h-2 rounded-full bg-goal-tint` with a `bg-goal` fill, `bg-income` once reached.
 - **Statement lines** (`src/features/statement/`, figures from `buildStatement` in `src/engine/statement.ts`): the
   Statement is one month in accounting form, two halves that each balance. "The month": Money in beside Money out,
@@ -256,13 +250,24 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   under the savings account that holds them, with `Not set aside` for the rest of it; the right side sums them in
   one `Set aside` line. A line a goal watches carries the goal mark: a 12 px `Target` icon in the goal hue and the
   percentage in muted `text-[11px]`, the income hue once reached, a rose `late` chip when late; opening the line
-  shows the goal's name, its bar and the Goals card's sentence (`goalStatusLine`). The toolbar holds the
-  `MonthPicker` and `Open all` / `Close all`. The month is worked in its upper half: a row and each of its items
+  shows the goal's name, its bar and the sentence that says how far the plan gets (`goalStatusLine`), with `Edit`
+  beside the name; there is no list of all goals. The toolbar holds the `MonthPicker`, `Expand all` / `Collapse all`
+  (every category at once; not "Open" and "Close", which would read as the month's), the `Suggestions` toggle, the
+  `MarksLegend` and, last, the month's one primary action: `Close month` (`sm`, lime) while it is open, `Reopen month`
+  (`sm outline`) once closed; `Close month` is left out while the "Setting up" strip shows. Under the header sits the
+  **progress line** (`monthProgress` and `progressText` in `src/features/statement/progress.ts`): a muted `text-xs`
+  `role="status"` line with an (i), `7 of 21 done · €… still to pay · €… to come in`, then `All 21 done`, and `Closed ·
+  all done` for a closed month; a month with nothing in it shows no line. The month is worked in its upper half: a row and each of its items
   carry the `Tick` before the name (44 px on phones, 24 px with a 12 px dot from 768 px), and the rest of the line is
   a button named `<line>: <amount>` (`, an estimate` when shaded) that opens the cell editor for that row and month.
   An itemized row's chevron is a button of its own, `Items of <row>`. An automatic row has the tick (it marks the
-  money as moved) but no button; a closed month has neither. The island's head carries the legend, a shaded `an
-  estimate` with an (i).
+  money as moved) but no button; a closed month has neither. A different amount than planned is typed in the cell
+  editor ("Only this month", "Done"); there is no quick sheet for it.
+  **Per person** (`src/features/statement/PerPerson.tsx`) closes the page when the household has two or more adults:
+  a dense island with an (i), a column per adult (the names as small-caps column heads in the amount column's width)
+  and the rows Income, Own spending, Pocket money and, in `font-semibold` over a full hairline, Leaves for the
+  household (signed, the expense hue below zero). Rows keep the Statement's heights; more adults than fit scroll
+  sideways inside the island.
   **Money in from your own accounts** has two sections that must not be mixed up. `Taken from accounts` is typed:
   rows that move money out of a savings or an investment account into the month, always shown (a faint `·` while
   empty) with `Add row` at its foot offering only those two kinds. `From savings and pool accounts` is worked out
@@ -274,8 +279,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   up…` (named `Top up <pool account>`), and its line under "From savings and pool accounts" says `€2,730.00 more
   than it held, taken from <savings account>` in muted `text-[11px]` with the same button. When a pool account
   becomes short while its month is on screen, the top-up dialog opens by itself; one that was short already only
-  shows the chip. The Grid and the Month view show the balance at zero in the expense hue with the reason in the
-  title or sub-line. A row whose month is a single labelled item that no schedule posted (a top-up, a one-off purchase)
+  shows the chip. The Grid shows the balance at zero in the expense hue with the reason in the
+  title. A row whose month is a single labelled item that no schedule posted (a top-up, a one-off purchase)
   shows the label after its name in muted `text-[11px]`.
   **The rule symbol.** A transfer that feeds a savings account, an investment account or a pool account, and that
   account in the lower half, say how the amount is worked out with one small symbol after the name, never a word
@@ -353,7 +358,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   `Change estimate` beside `Add row to <category>`. `Add category` under Expenses takes an optional estimate
   (`Estimate`, `EUR per month, optional`), so a category can be a name and a number and count at once. The engine
   keeps the estimate on a row of kind `category-estimate` in that category, so every screen counts the same rest:
-  the Grid and the Month view show it as an automatic row named `<category> – Not broken down yet`. "No category"
+  the Grid shows it as an automatic row named `<category> – Not broken down yet`. "No category"
   and income categories have none.
 
 ## 8. Controls
@@ -364,7 +369,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   toggles, `ghost` for quiet actions (Edit, Cancel), `destructive` for the irreversible. Toggle idiom:
   `variant={active ? 'default' : 'outline'}` (the entity-kind picker under People & things).
 - `MonthPicker`: two `icon-xs outline` buttons around the month as an `h2 text-sm font-medium`; lives in the page
-  header's toolbar (Month, Moves) or an island's first line (Schedules). At the last planned month the Next button gives
+  header's toolbar (the Statement) or an island's first line (Schedules). At the last planned month the Next button gives
   way to an `xs outline` `Add <year>`, the Grid toolbar's action: the plan always ends in a December and grows a calendar
   year at a time (`planEnd` in `src/store/months.ts`; this year's December, next year's from October on).
 - One name per idea, the same in every control: a repeating amount is a **schedule** (dialog "New schedule" / "Edit
@@ -389,7 +394,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   then Treat new values as…, Comes out of…, Deducted from an income… (spending rows, followers included; it names the
   income once set), the account verb, Follow another row…, then Archive or delete… or Restore. Belongs to offers the
   household, an Adults group and an Other people & things group (`name · kind`), and nothing else: who a row is for
-  is what "Per person" on Moves counts and what a pocket money rule's "percentage of <Adult>'s income" is taken of.
+  is what "Per person" under the Statement counts and what a pocket money rule's "percentage of <Adult>'s income" is taken of.
   There is one way of sharing money (each adult's income lines are what they put in), so no screen asks for a mode,
   a split or who pays for a child, pet or thing; Deducted from lists the live income rows after "Nothing: a normal expense" (an archived income the row still points at stays listed as "<name> (archived)");
   Follow another row shows "Share (%)" once a row is chosen (100 mirrors it). Each dialog's help sentence is the
@@ -397,15 +402,11 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 - `TabBar` switches an island's view (`src/components/ui/tab-bar.tsx`); `ViewToggle` filters a list
   (`src/components/ui/view-toggle.tsx`); `Segmented` stays for a form field with a few options (certainty, applies to).
 - Native `<select>` through `NativeSelect` for form fields; `MonthField` for months (Safari has no month input).
-- Checkboxes are the native `Check` (16 px) in lists that tick things off (Moves). The Month view's `Tick`
-  (`src/components/Tick.tsx`) is a `role="checkbox"` button of 44 × 44 px whose face is the `DoneDot` at 20 px
-  (`aria-checked` true, `mixed` or false), named `<line> done`; one tap marks done, a second tap goes back to the row's
-  default. The Statement uses the same `Tick`, smaller on desktop through `className` and `dotClassName`. Automatic rows (the rest, a row a rule works out, followers) tick through `Cell.markedDone`; Moves shows the
-  same tick before their `automatic` chip.
-- The Paid sheet (`src/features/month/PaidSheet.tsx`) is the shadcn `Dialog` docked to the bottom edge under 640 px
-  (`SHEET_CLASS`: `max-sm:bottom-0 … rounded-t-2xl` with safe-area padding): amount, date (today in the current month),
-  certainty as a `Segmented` with Done preselected, note, then `Open full editor`, Cancel and Save. Saving changes this
-  month only.
+- Checkboxes are the native `Check` (16 px) in forms and in lists that tick things off (a schedule's months). The
+  Statement's `Tick` (`src/components/Tick.tsx`) is a `role="checkbox"` button of 44 × 44 px whose face is the `DoneDot`
+  at 20 px (`aria-checked` true, `mixed` or false), named `<line> done`; one tap marks done, a second tap goes back to
+  the row's default. From 768 px it is smaller through `className` and `dotClassName`. Automatic rows (the rest, a row
+  a rule works out, followers) tick through `Cell.markedDone`.
 - The balance dialog (`src/features/grid/BalanceDialog.tsx`) of a card whose purchases are expense rows offers, when the
   typed balance is above the expected one, a `rounded-md border` block (`data-testid="book-difference"`) with a
   `Check` "Count the €400.00 difference as spending this month" and one muted sentence saying where it goes (a done
@@ -454,8 +455,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   is typed); net worth is a third, set only from its own line. Opened from a line of the Statement it is titled
   `Goal for <line>`, says in one sentence what it does (`Fills Travel to an amount.`) and asks only for the name
   (pre-filled with the line's name), the amount, the target month and notes. Editing (`Edit goal`) asks the same:
-  what a goal watches does not change, a different thing is a new goal. `Add goal` on Moves (`New goal`) asks first
-  for "Kind" as a `Segmented` of the two, with the chosen kind's sentence under it, and "Tracks" as one select
+  what a goal watches does not change, a different thing is a new goal. Every goal starts on a line today; opened
+  without one (`New goal`, no screen does) the dialog asks first for "Kind" as a `Segmented` of the two, with the chosen kind's sentence under it, and "Tracks" as one select
   (accounts and pool accounts in two option groups for filling, cards and loans for paying down). The amount is
   labelled `Target (<CCY>)`, and `Bring it down to (<CCY>)` for a debt, with the sentence that zero means nothing
   is owed. Footer: a ghost `Delete…` on the left when editing, Cancel, Save.
@@ -488,16 +489,15 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   the mouse leaves, on Escape or on a click outside. Its accessible name is `About <title>`. It is a sibling of the thing
   it explains, never inside a `<label>`, `<button>`, `<legend>` text or menu item (in Playwright, a field with a tip is
   found with `getByLabel(name, { exact: true })`, since the (i)'s name contains the field's): `TipLabel` pairs a form label with one,
-  `Island`, `StatTile`, the Month view's `Stat` and the grid's `derivedRow` take a `help` key, the grid's row label puts
+  `Island`, `StatTile` and the grid's `derivedRow` take a `help` key, the grid's row label puts
   it between the name and the row menu. Where it goes: section titles, every total and balance the app works out,
-  automatic and following rows, stat labels, the cell editor's "Applies to", "How sure", "Comes out of", its rate line and its deductions block, a row's currency, who a row belongs to, what it is deducted from and its share of a followed row, the `in EUR` balance line, the Statement's two halves, its Set aside group, its main account line, Net worth and Free, the
+  automatic and following rows, stat labels, the cell editor's "Applies to", "How sure", "Comes out of", its rate line and its deductions block, a row's currency, who a row belongs to, what it is deducted from and its share of a followed row, the `in EUR` balance line, the Statement's progress line, its two halves, its Set aside group, its main account line, Net worth, Free and "Per person", the
   household settings, "Track the balance", the Archived list, Goals and the schedules' status column.
 - Every text lives in `src/app/help.ts`: `HELP[key] = { title, text }`, keys `area.name`, titles up to 40 characters,
   texts two or three plain sentences up to 360 characters in the app's own words (pool accounts, people & things,
   schedules, automatic). `balanceHelp(type)` picks the balance text for an account. Texts that belong to a model enum
-  (section blurbs, account types, entity kinds, goal kinds, the four rules) stay in `src/model/templates.ts`; the
-  sharing lines (`MODE_HELP`, `BASIS_HELP`) stay inline because their words depend on the choice.
-- `MarksLegend` ("What the colours and marks mean", an `xs outline` button in the Grid and Month toolbars) is the legend:
+  (section blurbs, account types, entity kinds, goal kinds, the rules) stay in `src/model/templates.ts`.
+- `MarksLegend` ("What the colours and marks mean", an `xs outline` button in the Statement and Grid toolbars) is the legend:
   the six hue dots with their kinds of money, then the marks with a sample each: estimate, certain, done, this month's
   red and amber dots, the negative spending number when that setting is on, the amber draw, the dotted entered balance,
   the locked closed month, the category band. It ends with a ghost `xs` "More in the Guide" that opens the Guide's
@@ -523,4 +523,4 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 3. Colours only from §5: money through `HUES`, states through the dots and chips, lime for the pressed control alone.
 4. Explanations inline, errors in place, a `help.ts` key for each (i).
 5. `npm run typecheck && npm run lint && npx vitest run && npm run build && npm run e2e`, then screenshots at 1440 × 900
-   and 390 × 844 compared against the Grid and the Month view; extend this file in the same commit.
+   and 390 × 844 compared against the Statement and the Grid; extend this file in the same commit.

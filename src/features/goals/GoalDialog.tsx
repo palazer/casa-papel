@@ -18,14 +18,14 @@ interface Props {
   /** A new goal opened from the thing it will watch (the Statement's lines): the dialog then asks only for the amount. */
   preset?: { kind: GoalKind; accountId?: string | null; poolId?: string | null }
   onClose: () => void
-  /** "Delete…" hands the goal to the remove dialog; the card opens it after this one closes. */
+  /** "Delete…" hands the goal to the remove dialog; the Statement opens it after this one closes. */
   onRemove?: () => void
 }
 
 const ASSET_TYPES = ['savings', 'investment', 'other-asset']
 const DEBT_TYPES = ['credit-card', 'loan']
 
-/** The two kinds "New goal" offers. A net worth goal is only reached from the Net worth line, where nothing needs choosing. */
+/** The two kinds a goal without a line to start from is offered. A net worth goal is only reached from the Net worth line, where nothing needs choosing. */
 const FAMILIES = GOAL_KIND_INFO.filter((k) => k.value !== 'net-worth').map((k) => ({ value: k.value, label: k.label }))
 /** What a goal watches, as one value for the "Tracks" list: `acc:<id>` or `pool:<id>`. */
 const thingOf = (g: { kind: GoalKind; accountId?: string | null; poolId?: string | null } | null | undefined): string =>
@@ -33,7 +33,8 @@ const thingOf = (g: { kind: GoalKind; accountId?: string | null; poolId?: string
 
 /**
  * A goal (DESIGN.md §8). From a line of the Statement, and when editing, what it watches is settled, so the dialog
- * asks only for the name, the amount and the month. "New goal" on Moves asks which of the two kinds and what it tracks.
+ * asks only for the name, the amount and the month. Every goal starts on a line today; opened without one, the dialog
+ * asks which of the two kinds and what it tracks.
  */
 export function GoalDialog({ household, tables, goal, preset, onClose, onRemove }: Props) {
   const store = useStore()

@@ -4,7 +4,7 @@ test.describe('archiving people and things', () => {
   test.use({ viewport: { width: 1400, height: 900 } })
 
   test('the dialog explains, archives from a month, and archived entries can be restored', async ({ page }) => {
-    await page.goto('?demo=1')
+    await page.goto('?demo=1&screen=grid')
     await page.getByRole('button', { name: 'Load the demo household' }).click()
     await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
     await page.getByRole('link', { name: 'Household' }).click()

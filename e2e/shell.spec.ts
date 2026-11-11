@@ -9,8 +9,17 @@ test.describe('shell', () => {
     await page.getByRole('button', { name: 'Load the demo household' }).click()
     const rail = page.getByRole('navigation', { name: 'Screens' })
     await expect(rail).toBeVisible()
+    // the Statement is the first screen; the rail holds it, the Grid and the Settings group
+    await expect(rail.getByRole('link', { name: 'Statement' })).toHaveAttribute('aria-current', 'page')
+    await expect(page.getByRole('heading', { level: 1, name: 'Statement' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
+    await expect(rail.getByRole('link', { name: 'Month' })).toHaveCount(0)
+    await expect(rail.getByRole('link', { name: 'Moves' })).toHaveCount(0)
+    await page.screenshot({ path: 'e2e/output/shell-statement.png' })
+    await rail.getByRole('link', { name: 'Grid' }).click()
     await expect(rail.getByRole('link', { name: 'Grid' })).toHaveAttribute('aria-current', 'page')
     await expect(page.getByRole('heading', { level: 1, name: 'Grid' })).toBeVisible()
+    expect(new URL(page.url()).searchParams.get('screen')).toBe('grid')
     // Settings groups Household, Data and the Guide; it starts unfolded
     const settings = rail.getByRole('button', { name: 'Settings' })
     await expect(settings).toHaveAttribute('aria-expanded', 'true')
@@ -40,13 +49,15 @@ test.describe('shell', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Guide' })).toBeVisible()
     await expect(page.getByText('What Casa Papel is')).toBeVisible()
 
-    await rail.getByRole('link', { name: 'Moves' }).click()
-    await expect(page.getByRole('heading', { level: 1, name: 'Moves' })).toBeVisible()
-    await page.screenshot({ path: 'e2e/output/shell-moves.png', fullPage: true })
+    // a device that had the Month view or Moves open last, or a bookmark of one, opens the Statement
+    await page.evaluate(() => window.localStorage.setItem('casa.screen', JSON.stringify('month')))
+    await page.goto('?demo=1&screen=moves')
+    await expect(page.getByRole('heading', { level: 1, name: 'Statement' })).toBeVisible()
+    await expect(rail.getByRole('link', { name: 'Statement' })).toHaveAttribute('aria-current', 'page')
   })
 
   test('undo and redo live in the page header toolbar', async ({ page }) => {
-    await page.goto('?demo=1')
+    await page.goto('?demo=1&screen=grid')
     await page.getByRole('button', { name: 'Load the demo household' }).click()
     await page.getByRole('button', { name: /^Groceries Nov 2026/ }).click()
     const dlg = page.getByRole('dialog')
@@ -63,17 +74,19 @@ test.describe('shell', () => {
 test.describe('shell on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
 
-  test('bottom tabs replace the rail, the month opens first, Settings opens its pages through a tab row', async ({ page }) => {
+  test('bottom tabs replace the rail, the Statement opens first, Settings opens its pages through a tab row', async ({ page }) => {
     await page.goto('?demo=1')
     await page.getByRole('button', { name: 'Load the demo household' }).click()
-    await expect(page.getByRole('heading', { level: 1, name: 'Month' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Statement' })).toBeVisible()
     const tabs = page.getByRole('navigation', { name: 'Screens' })
     await expect(tabs).toHaveCount(1)
-    await expect(tabs.getByRole('link')).toHaveText(['Statement', 'Grid', 'Month', 'Moves', 'Settings'])
-    await expect(tabs.getByRole('link', { name: 'Month' })).toHaveAttribute('aria-current', 'page')
+    await expect(tabs.getByRole('link')).toHaveText(['Statement', 'Grid', 'Settings'])
+    await expect(tabs.getByRole('link', { name: 'Statement' })).toHaveAttribute('aria-current', 'page')
     const box = await tabs.boundingBox()
     expect(box && box.y + box.height).toBeGreaterThan(800)
-    await page.screenshot({ path: 'e2e/output/shell-month-phone.png', fullPage: true })
+    // the toolbar wraps and nothing runs off the side
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    await page.screenshot({ path: 'e2e/output/shell-statement-phone.png' })
 
     await tabs.getByRole('link', { name: 'Settings' }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Household' })).toBeVisible()
@@ -84,7 +97,7 @@ test.describe('shell on a phone', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Data' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Where your data lives' })).toBeVisible()
     // the group remembers the page open last
-    await tabs.getByRole('link', { name: 'Month' }).click()
+    await tabs.getByRole('link', { name: 'Statement' }).click()
     await tabs.getByRole('link', { name: 'Settings' }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Data' })).toBeVisible()
     await page.screenshot({ path: 'e2e/output/shell-settings-phone.png', fullPage: true })

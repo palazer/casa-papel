@@ -16,7 +16,7 @@ interface Props {
 }
 
 /**
- * The Month view's tick (DESIGN.md §8): a 44 px checkbox whose face is the done dot, so done keeps its one mark.
+ * The Statement's tick (DESIGN.md §8): a 44 px checkbox whose face is the done dot, so done keeps its one mark.
  * One tap marks the line done, a second tap goes back to the row's default; a partly done itemized line is `mixed`.
  */
 export function Tick({ done, total, state, label, disabled, onToggle, className, dotClassName }: Props) {

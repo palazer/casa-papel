@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { InfoTip } from '@/components/InfoTip'
+import { MarksLegend } from '@/components/MarksLegend'
 import { MonthPicker } from '@/components/MonthPicker'
 import { PageHeader } from '@/components/PageHeader'
 import { doneness, type DoneState } from '@/app/display'
@@ -14,7 +15,7 @@ import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useE
 import { useStoreVersion } from '@/app/useStoreVersion'
 import { buildStatement, cellKey, type GoalProgress, type StatementLine } from '@/engine'
 import { canCarryRule, isPocketRow, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type MonthKey, type Row, type Section } from '@/model'
-import { accountSuggestions, addPlanYear, removeIfFree, rowSuggestions, setCellDone, setDerivedDone, setItemStatus, setupSteps, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupStepKey } from '@/store'
+import { accountSuggestions, addPlanYear, closeMonth, removeIfFree, reopenMonth, rowSuggestions, setCellDone, setDerivedDone, setItemStatus, setupSteps, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupStepKey } from '@/store'
 import { GoalDialog } from '@/features/goals/GoalDialog'
 import { goalStatusLine } from '@/features/goals/goalText'
 import { AddRowInline } from '@/features/grid/AddRowInline'
@@ -28,11 +29,12 @@ import { RuleDialog } from '@/features/rules/RuleDialog'
 import { AddCategoryInline } from './AddCategoryInline'
 import { CategoryMenu } from './CategoryMenu'
 import { EstimateDialog } from './EstimateDialog'
+import { PerPerson } from './PerPerson'
+import { monthProgress, progressText } from './progress'
 import { SetupStrip } from './SetupStrip'
 import { StatementBand } from './StatementBand'
 import { AccountSuggestionLines, SuggestionLines } from './SuggestionLines'
 import { TopUpDialog } from './TopUpDialog'
-import { ESTIMATE_SHADE } from '@/app/display'
 import { LINE_MENU, type LineContext } from './StatementLine'
 
 const walk = (lines: StatementLine[]): StatementLine[] => lines.flatMap((l) => [l, ...walk(l.children)])
@@ -42,10 +44,11 @@ const DEBT_TYPES: AccountType[] = ['credit-card', 'loan']
 const ADD = 'text-muted-foreground'
 
 /**
- * One month in accounting form (DESIGN.md §2 and §7): the month on top, money in beside money out, and under it where
- * things stand at the end of it, assets beside debts and net worth. Each half balances; the figures come from
- * `buildStatement`, which reads them off the engine. The month is worked here too: a tick marks a row or an item done,
- * a click on a line opens the cell editor to overwrite the amount or say how sure it is.
+ * The first screen: one month in accounting form (DESIGN.md §2 and §7). The month on top, money in beside money out,
+ * and under it where things stand at the end of it, assets beside debts and net worth. Each half balances; the figures
+ * come from `buildStatement`, which reads them off the engine. The month is worked here too: a tick marks a row or an
+ * item done, a click on a line opens the cell editor to overwrite the amount or say how sure it is, the progress line
+ * counts what is still open, and "Close month" locks it. With two or more adults, "Per person" closes the page.
  */
 export function StatementScreen() {
   const store = useStore()
@@ -123,7 +126,8 @@ export function StatementScreen() {
   const onToggle = useCallback((line: StatementLine) => setOpenLines((s) => ({ ...s, [line.id]: !(s[line.id] ?? ((line.open ?? false) || autoOpen.has(line.id))) })), [autoOpen])
 
   if (!tables || !household || !engine || !statement) return null
-  const { locale, baseCurrency: ccy } = household
+  const { locale, baseCurrency: ccy, displayExpensesNegative: neg } = household
+  const progress = monthProgress(engine.rows, engine.cells, m)
   const horizon = engine.months.length ? monthDiff(m, engine.months[engine.months.length - 1]) : 0
   const goalText = (g: GoalProgress) => goalStatusLine(g, locale, horizon)
   const editing = editorRow ? engine.rows.find((r) => r.id === editorRow) : undefined
@@ -329,15 +333,30 @@ export function StatementScreen() {
     <div className="space-y-4">
       <PageHeader title="Statement" subline={<>{household.name}{statement.closed && <> · <Chip tone="zinc"><Lock aria-hidden /> closed</Chip></>}</>}>
         <MonthPicker months={months} month={m} onChange={setMonth} locale={locale} onAddYear={() => act(() => addPlanYear(store))} />
-        <Button size="xs" variant="outline" onClick={() => setAll(true)}>Open all</Button>
-        <Button size="xs" variant="outline" onClick={() => setAll(false)}>Close all</Button>
+        <Button size="xs" variant="outline" onClick={() => setAll(true)}>Expand all</Button>
+        <Button size="xs" variant="outline" onClick={() => setAll(false)}>Collapse all</Button>
         <span className="flex items-center gap-1">
           <Button size="xs" variant={showing ? 'default' : 'outline'} aria-pressed={showing} disabled={statement.closed} title={statement.closed ? 'A closed month takes no new rows.' : undefined} onClick={() => setSuggest(!showing)}>Suggestions</Button>
           <InfoTip help="statement.suggestions" />
         </span>
+        <MarksLegend neg={neg} />
+        {/* a household that is still being set up has nothing to close yet; a closed month can always be reopened */}
+        {statement.closed ? (
+          <Button size="sm" variant="outline" onClick={() => act(() => reopenMonth(store, m))}>Reopen month</Button>
+        ) : !settingUp && (
+          <Button size="sm" onClick={() => act(() => closeMonth(store, m))}>Close month</Button>
+        )}
         {error && <p role="alert" className="basis-full text-destructive">{error}</p>}
         {statement.warnings.map((w) => <p key={w} className="basis-full text-amber-700">{w}</p>)}
       </PageHeader>
+
+      {/* How much of the month is ticked and what is still open; a month with nothing in it has nothing to count */}
+      {(statement.closed || progress.total > 0) && (
+        <p role="status" className="flex items-center gap-1 text-xs text-muted-foreground" data-testid="progress">
+          <span>{progressText(progress, statement.closed, ccy, locale)}</span>
+          <InfoTip help="statement.progress" />
+        </p>
+      )}
 
       {settingUp && (
         <SetupStrip
@@ -347,11 +366,9 @@ export function StatementScreen() {
           onDone={() => { setMonth(m); act(() => updateHousehold(store, { setupOpen: false })) }}
         />
       )}
-      <StatementBand
-        title="The month" help="statement.month" band={statement.flow} ctx={flowCtx} totals={['Total in', 'Total out']}
-        right={<span className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><span className={ESTIMATE_SHADE}>an estimate</span><InfoTip help="statement.estimate" /></span>}
-      />
+      <StatementBand title="The month" help="statement.month" band={statement.flow} ctx={flowCtx} totals={['Total in', 'Total out']} />
       <StatementBand title="At the end of the month" help="statement.position" band={statement.position} ctx={positionCtx} totals={['Total', 'Total']} amountHead={day} feet={[assetsFoot, hasDebts ? null : debtsFoot]} />
+      <PerPerson household={household} tables={tables} engine={engine} month={m} />
 
       {/* What a one-click delete took away, with the way back. It floats at the foot of the window, because the thing
           that was deleted can be anywhere on a long page; it goes with the next change. */}

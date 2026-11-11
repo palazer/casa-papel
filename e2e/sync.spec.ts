@@ -51,7 +51,7 @@ test.describe('cloud sync', () => {
 
     // ----- device B: same household, second device -----
     const b = await device(browser, server)
-    await b.goto('./')
+    await b.goto('./?screen=grid')
     await b.getByRole('button', { name: 'Sign in' }).click()
     const dlgB = b.getByRole('dialog')
     await dlgB.getByLabel('Email').fill('erkin@example.test')
@@ -73,7 +73,7 @@ test.describe('cloud sync', () => {
 
     // ----- device C: forgot the password, recovers with the code -----
     const c = await device(browser, server)
-    await c.goto('./')
+    await c.goto('./?screen=grid')
     await c.getByRole('button', { name: 'Sign in' }).click()
     const dlgC = c.getByRole('dialog')
     await dlgC.getByRole('button', { name: 'Forgot the password?' }).click()
@@ -89,7 +89,7 @@ test.describe('cloud sync', () => {
 
     // the old password is gone; the new one works on a fresh device, and A keeps working unchanged
     const d = await device(browser, server)
-    await d.goto('./')
+    await d.goto('./?screen=grid')
     await d.getByRole('button', { name: 'Sign in' }).click()
     const dlgD = d.getByRole('dialog')
     await dlgD.getByLabel('Email').fill('erkin@example.test')
@@ -134,7 +134,7 @@ test.describe('cloud sync', () => {
     await a.getByRole('button', { name: 'Sign out', exact: true }).click()
     await expect(a.getByText('Signed out. Your data stays on this device.')).toBeVisible()
     await expect(a.getByRole('button', { name: /^Sync:/ })).toHaveCount(0)
-    await a.goto('?demo=1')
+    await a.goto('?demo=1&screen=grid')
     await a.getByRole('button', { name: 'Load the demo household' }).click()
     await a.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Data' }).click()
     await expect(a.getByText('Sync is off in the demo sandbox.')).toBeVisible()

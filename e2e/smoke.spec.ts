@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 
 async function loadDemo(page: Page) {
-  await page.goto('?demo=1')
+  await page.goto('?demo=1&screen=grid')
   await expect(page.getByText('Welcome to Casa Papel')).toBeVisible()
   await page.getByRole('button', { name: 'Load the demo household' }).click()
   await expect(page.getByText(/^Demo household ·/)).toBeVisible()
@@ -55,7 +55,7 @@ test('the built page carries its content security policy and no screen trips it'
   expect(policy).toContain("script-src 'self'")
   expect(policy).toContain('https://api.frankfurter.dev')
 
-  for (const screen of ['Month', 'Moves', 'Household', 'Data', 'Guide', 'Grid']) {
+  for (const screen of ['Statement', 'Household', 'Data', 'Guide', 'Grid']) {
     await page.getByRole('link', { name: screen, exact: true }).click()
     await expect(page.getByRole('heading', { level: 1, name: screen })).toBeVisible()
   }

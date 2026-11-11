@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
 async function loadDemo(page: Page) {
-  await page.goto('?demo=1')
+  await page.goto('?demo=1&screen=grid')
   await page.getByRole('button', { name: 'Load the demo household' }).click()
   await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
 }
@@ -87,7 +87,7 @@ test.describe('guide on a phone', () => {
   test('Settings opens Household, the tab row opens the Guide, the search field runs full width', async ({ page }) => {
     await page.goto('?demo=1')
     await page.getByRole('button', { name: 'Load the demo household' }).click()
-    await expect(page.getByRole('heading', { level: 1, name: 'Month' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Statement' })).toBeVisible()
     const tabs = page.getByRole('navigation', { name: 'Screens' })
     await tabs.getByRole('link', { name: 'Settings' }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Household' })).toBeVisible()

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
 async function loadDemo(page: Page) {
-  await page.goto('?demo=1')
+  await page.goto('?demo=1&screen=grid')
   await page.getByRole('button', { name: 'Load the demo household' }).click()
   await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
 }
@@ -88,21 +88,6 @@ test.describe('grid', () => {
     await expect(page.getByRole('button', { name: /^Haircuts Nov 2026/ })).toBeVisible()
   })
 
-})
-
-test.describe('phone', () => {
-  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
-
-  test('month view shows totals and rows, editor opens', async ({ page }) => {
-    await page.goto('?demo=1')
-    await page.getByRole('button', { name: 'Load the demo household' }).click()
-    await expect(page.getByRole('heading', { name: 'November 2026' })).toBeVisible()
-    await expect(page.getByText('Kept in account')).toBeVisible()
-    await page.screenshot({ path: 'e2e/output/month-phone.png', fullPage: true })
-    await page.getByRole('button', { name: /^The flat – Rent:/ }).click()
-    await expect(page.getByRole('dialog')).toBeVisible()
-    await page.getByRole('button', { name: 'Cancel' }).click()
-  })
 })
 
 test.describe('grid: add a transfer row', () => {

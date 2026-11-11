@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test'
 test.use({ viewport: { width: 1400, height: 900 }, serviceWorkers: 'block' })
 
 async function loadDemo(page: import('@playwright/test').Page) {
-  await page.goto('?demo=1')
+  await page.goto('?demo=1&screen=grid')
   await page.getByRole('button', { name: 'Load the demo household' }).click()
   await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
 }
@@ -63,8 +63,8 @@ test('the plan ends in a December and "Add <year>" appends a calendar year on ev
   await expect(page.getByRole('button', { name: 'Dec 2028', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Add 2029' })).toBeVisible()
 
-  // the Month view shares the range: at its last month Next gives way to the same action
-  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Month' }).click()
+  // the Statement shares the range: at its last month Next gives way to the same action
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
   const next = page.getByRole('button', { name: 'Next month' })
   const add = page.getByRole('button', { name: 'Add 2029' })
   for (let i = 0; i < 40 && !(await add.isVisible()); i++) await next.click()
@@ -189,8 +189,9 @@ test('a foreign-currency account shows its household-currency value beneath', as
   await expect(page.getByRole('rowheader', { name: 'Broker · in EUR' })).toBeVisible()
   await expect(page.getByRole('row', { name: /^Broker · in EUR/ })).toContainText('€8,000.00')
 
-  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Month' }).click()
-  await expect(page.getByText(/≈ €8,000\.00/)).toBeVisible()
+  // the Statement counts it in the household currency
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
+  await expect(page.getByRole('region', { name: 'Assets' }).locator('[data-line^="acc:"]').filter({ hasText: 'Broker' })).toContainText('€8,000.00')
 })
 
 test('an expense deducted from an income: the tag, the net line and the editor block', async ({ page }) => {
@@ -215,12 +216,12 @@ test('an expense deducted from an income: the tag, the net line and the editor b
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog')).toBeHidden()
 
-  // the menu now names the income; the Month view carries the net line
+  // the menu now names the income; the Statement carries the net beside the salary
   await page.getByRole('button', { name: 'Row menu for Health' }).click()
   await expect(page.getByRole('menuitem', { name: 'Deducted from Sam – Salary…' })).toBeVisible()
   await page.keyboard.press('Escape')
-  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Month' }).click()
-  await expect(page.getByText(/net €4/).first()).toBeVisible()
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
+  await expect(page.getByRole('region', { name: 'Money in' }).getByText('net €4,170.00')).toBeVisible()
 })
 
 test('a row can follow a share of another row', async ({ page }) => {
@@ -238,13 +239,15 @@ test('a row can follow a share of another row', async ({ page }) => {
   await expect(row).toContainText('€127.50')
 })
 
-test('"Belongs to" gives a row to one adult, and Per person on Moves counts it as theirs', async ({ page }) => {
+test('"Belongs to" gives a row to one adult, and Per person under the Statement counts it as theirs', async ({ page }) => {
   await loadDemo(page)
-  const moves = async () => page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Moves' }).click()
-  const ownSpending = page.getByRole('row', { name: /^Own spending/ })
-  await moves()
-  await expect(page.getByText('Per person', { exact: true })).toBeVisible()
-  await expect(page.getByRole('row', { name: /^Income/ })).toContainText('€4,200.00')
+  const statement = async () => page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
+  const perPerson = page.getByTestId('per-person')
+  const ownSpending = perPerson.getByRole('row', { name: /^Own spending/ })
+  await statement()
+  await expect(perPerson.getByRole('heading', { name: 'Per person' })).toBeVisible()
+  await expect(perPerson.getByRole('columnheader')).toHaveText(['Sam', 'Alex'])
+  await expect(perPerson.getByRole('row', { name: /^Income/ })).toContainText('€4,200.00')
   await expect(ownSpending).toContainText('€110.00')
   await expect(ownSpending).not.toContainText('€810.00')
 
@@ -265,7 +268,7 @@ test('"Belongs to" gives a row to one adult, and Per person on Moves counts it a
   await expect(dlg).toBeHidden()
 
   // the groceries are Sam's own spending now; nothing splits them between the adults
-  await moves()
+  await statement()
   await expect(ownSpending).toContainText('€810.00')
   await expect(page.getByText('Who pays what')).toHaveCount(0)
 })

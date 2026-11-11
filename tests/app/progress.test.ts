@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { computeEngine } from '@/engine'
 import { CellSchema } from '@/model'
-import { monthProgress, progressText } from '@/features/month/progress'
+import { monthProgress, progressText } from '@/features/statement/progress'
 import { T0, cellItems, cellValue, closedMonth, household, row, tables } from '../engine/helpers'
 
 const month = '2026-01'

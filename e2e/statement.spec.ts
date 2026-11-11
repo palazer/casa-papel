@@ -62,12 +62,20 @@ test.describe('the Statement', () => {
     await expect(moneyOut.getByRole('button', { name: /^Alex – Personal:/ })).toHaveCount(0)
     await page.screenshot({ path: 'e2e/output/statement-closed.png', fullPage: true })
 
-    // "Open all" and "Close all"
-    await page.getByRole('button', { name: 'Open all' }).click()
+    // "Expand all" and "Collapse all"
+    await page.getByRole('button', { name: 'Expand all' }).click()
     await expect(moneyOut.getByText('The flat – Rent')).toBeVisible()
-    await page.getByRole('button', { name: 'Close all' }).click()
+    await page.getByRole('button', { name: 'Collapse all' }).click()
     await expect(moneyOut.getByText('The flat – Rent')).toHaveCount(0)
     await expect(assetsSide.getByText('Not set aside')).toHaveCount(0)
+
+    // a closed month counts as done and can be reopened from here; the legend sits in the toolbar
+    await expect(page.getByTestId('progress')).toHaveText('Closed · all done')
+    await expect(page.getByRole('button', { name: 'Close month' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Reopen month' })).toBeVisible()
+    await page.getByRole('button', { name: 'What the colours and marks mean' }).click()
+    await expect(page.getByRole('dialog').getByText('An estimate: on the yellow shade', { exact: false })).toBeVisible()
+    await page.keyboard.press('Escape')
   })
 
   test('spending from a pool account shows on both sides', async ({ page }) => {
@@ -124,12 +132,15 @@ test.describe('working the month in the Statement', () => {
     expect(euros(await rest.innerText())).toBe(restBefore + 11)
     expect((await total(page, 'in').innerText()).replace(/^Total in\s*/, '')).toBe((await total(page, 'out').innerText()).replace(/^Total out\s*/, ''))
 
-    // one click on a tick marks a row done; the Month screen sees the same
+    // one click on a tick marks a row done, and the progress line counts it
+    const progress = page.getByTestId('progress')
+    await expect(progress).toHaveText(/^0 of 21 done · €[\d,.]+ still to pay · €7,405\.00 to come in$/)
     await moneyOut.getByRole('button', { name: 'Family & pets', exact: true }).click()
     const childcare = page.getByRole('checkbox', { name: 'Robin – Childcare done' })
     await expect(childcare).not.toBeChecked()
     await childcare.click()
     await expect(childcare).toBeChecked()
+    await expect(progress).toHaveText(/^1 of 21 done/)
 
     // an automatic row can be ticked as moved but not typed over: pressing it opens its rule, not the cell editor
     await expect(page.getByRole('checkbox', { name: 'To savings done' })).toBeVisible()
@@ -159,10 +170,10 @@ test.describe('working the month in the Statement', () => {
     await expect(page.getByRole('checkbox', { name: 'Health done' })).toHaveAttribute('aria-checked', 'mixed')
     await page.screenshot({ path: 'e2e/output/statement-working.png', fullPage: true })
 
-    await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Month' }).click()
-    await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
-    await expect(page.getByRole('checkbox', { name: 'Robin – Childcare done' })).toBeChecked()
-    await expect(page.getByRole('checkbox', { name: 'Health done' })).toHaveAttribute('aria-checked', 'mixed')
+    // the Grid shows the same: a done dot on the row, a half dot on the partly done one
+    await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Grid' }).click()
+    await expect(page.getByRole('button', { name: /^Robin – Childcare Nov 2026/ }).getByRole('img', { name: 'Done', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^Health Nov 2026/ }).getByRole('img', { name: /^1 of 2 done/ })).toBeVisible()
   })
 
   test('rows and categories are added where they will appear', async ({ page }) => {
@@ -786,7 +797,7 @@ test.describe('working the month in the Statement', () => {
     await expect(poolLine).toContainText('€270.00')
 
     // €3,000 of clothing out of a pool account that holds €450 this month
-    await page.getByRole('button', { name: 'Open all' }).click()
+    await page.getByRole('button', { name: 'Expand all' }).click()
     await moneyOut.getByRole('button', { name: /^Clothing: €180\.00/ }).click()
     // the row holds one item this month, the winter coat
     await dlg.getByLabel('Item amount').fill('3000')

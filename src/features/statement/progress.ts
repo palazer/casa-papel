@@ -15,7 +15,7 @@ export interface MonthProgress {
   lines: number
 }
 
-/** What the Month view's header says: how much of the month has been ticked and what is still open. Pure. */
+/** What the Statement's progress line says: how much of the month has been ticked and what is still open. Pure. */
 export function monthProgress(rows: Row[], cells: Record<string, CellResult>, month: MonthKey): MonthProgress {
   const p: MonthProgress = { done: 0, total: 0, toPay: 0, toComeIn: 0, lines: 0 }
   for (const row of rows) {

@@ -1,8 +1,8 @@
 import { createContext, useContext } from 'react'
-import { ArrowLeftRight, BookOpen, CalendarDays, Database, Scale, Settings, Table2, Users, type LucideIcon } from 'lucide-react'
+import { BookOpen, Database, Scale, Settings, Table2, Users, type LucideIcon } from 'lucide-react'
 import { readPref, writePref } from './prefs'
 
-export type Screen = 'statement' | 'grid' | 'month' | 'moves' | 'household' | 'data' | 'guide'
+export type Screen = 'statement' | 'grid' | 'household' | 'data' | 'guide'
 
 export interface ScreenDef {
   key: Screen
@@ -16,8 +16,6 @@ export interface ScreenDef {
 export const SCREENS: ScreenDef[] = [
   { key: 'statement', label: 'Statement', icon: Scale },
   { key: 'grid', label: 'Grid', icon: Table2 },
-  { key: 'month', label: 'Month', icon: CalendarDays },
-  { key: 'moves', label: 'Moves', icon: ArrowLeftRight },
   { key: 'household', label: 'Household', icon: Users },
   { key: 'data', label: 'Data', icon: Database, utility: true },
   { key: 'guide', label: 'Guide', icon: BookOpen, utility: true },
@@ -33,12 +31,10 @@ export const SETTINGS_PAGES: Screen[] = ['household', 'data', 'guide']
 
 export type RailItem = { kind: 'page'; key: Screen } | { kind: 'group'; key: 'settings'; label: string; icon: LucideIcon; pages: Screen[] }
 
-/** The rail and the phone bar (DESIGN.md §2): four pages, then Settings, which groups Household, Data and the Guide. */
+/** The rail and the phone bar (DESIGN.md §2): the Statement and the Grid, then Settings, which groups Household, Data and the Guide. */
 export const RAIL: RailItem[] = [
   { kind: 'page', key: 'statement' },
   { kind: 'page', key: 'grid' },
-  { kind: 'page', key: 'month' },
-  { kind: 'page', key: 'moves' },
   { kind: 'group', key: 'settings', label: 'Settings', icon: Settings, pages: SETTINGS_PAGES },
 ]
 
@@ -46,16 +42,16 @@ export const groupOf = (s: Screen): 'settings' | null => (SETTINGS_PAGES.include
 
 export const isScreen = (s: unknown): s is Screen => SCREENS.some((d) => d.key === s)
 
-/** Under 768 px the app is the phone app: the Month view opens first and the bottom tabs replace the rail. */
-export const isPhone = (): boolean => typeof window !== 'undefined' && window.innerWidth < 768
-
-/** `?screen=` wins, then the screen open last on this device, then the device's natural first screen. */
+/**
+ * `?screen=` wins, then the screen open last on this device, then the Statement: the first screen on every device. A
+ * remembered screen that no longer exists (the Month view, Moves) falls back to it too.
+ */
 export function readScreen(): Screen {
   const fromUrl = new URLSearchParams(window.location.search).get('screen')
   if (isScreen(fromUrl)) return fromUrl
   const stored = readPref<string | null>('screen', null)
   if (isScreen(stored)) return stored
-  return isPhone() ? 'month' : 'grid'
+  return 'statement'
 }
 
 /**
@@ -101,5 +97,5 @@ export const handMonth = (month: string): void => { handedMonth = month }
 export const handedOverMonth = (): string | null => handedMonth
 export const clearHandedMonth = (): void => { handedMonth = null }
 
-export const ScreenContext = createContext<{ screen: Screen; go: (s: Screen, hash?: string) => void }>({ screen: 'grid', go: () => undefined })
+export const ScreenContext = createContext<{ screen: Screen; go: (s: Screen, hash?: string) => void }>({ screen: 'statement', go: () => undefined })
 export const useScreen = () => useContext(ScreenContext)

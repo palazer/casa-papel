@@ -2,7 +2,7 @@ import { memo } from 'react'
 import { RAIL, groupOf, screenDef, screenHref, settingsPage, useScreen, type Screen } from '@/app/screens'
 import { follow, labelClass, tileClass } from './railStyles'
 
-/** The phone's navigation (DESIGN.md §2): the rail's five tiles as a dark bar along the bottom edge, above the home
+/** The phone's navigation (DESIGN.md §2): the rail's three tiles as a dark bar along the bottom edge, above the home
  *  indicator. The Settings tab opens the group's page open last; its pages switch through the tab row under the page
  *  header. Hidden from 768 px, where the rail takes over. */
 export const BottomTabs = memo(function BottomTabs() {

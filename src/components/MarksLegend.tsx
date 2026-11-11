@@ -29,7 +29,7 @@ function Mark({ sample, children }: { sample: ReactNode; children: ReactNode }) 
 }
 
 /**
- * "What the colours and marks mean" (DESIGN.md §5): the legend behind one button in the Grid and Month toolbars.
+ * "What the colours and marks mean" (DESIGN.md §5): the legend behind one button in the Statement and Grid toolbars.
  * Every kind of money has one hue, every mark one meaning; the samples use the same classes as the real cells.
  */
 export function MarksLegend({ neg }: { neg: boolean }) {
@@ -54,7 +54,7 @@ export function MarksLegend({ neg }: { neg: boolean }) {
         <section>
           <h4 className={H4}>Marks</h4>
           <ul className="space-y-1">
-            <Mark sample={<span className={ESTIMATE_SHADE}>€210.00</span>}>An estimate: on the yellow shade</Mark>
+            <Mark sample={<span className={ESTIMATE_SHADE}>€210.00</span>}>An estimate: on the yellow shade; a category too, while one of its lines is one</Mark>
             <Mark sample={<span>€210.00</span>}>Certain: you know the amount</Mark>
             <Mark sample={<DoneDot done={1} total={1} state="all" />}>Done: the money has moved</Mark>
             <Mark sample={<span className="flex gap-1"><DoneDot done={0} total={1} state="none" /><DoneDot done={1} total={2} state="partial" /></span>}>This month only: nothing done yet, partly done</Mark>
