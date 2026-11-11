@@ -409,6 +409,16 @@ describe('the Statement, the position', () => {
     expect(find(s, `acc:${w.fund.id}`)!.goals).toBeUndefined()
   })
 
+  it('marks an account and a virtual account that are archived, so nothing new is started on their lines', () => {
+    const w = world()
+    const t = { ...w.t, accounts: w.t.accounts.map((a) => (a.id === w.fund.id ? { ...a, archivedMonth: '2026-03' } : a)), pools: w.t.pools.map((p) => (p.id === w.travel.id ? { ...p, archivedMonth: '2026-03' } : p)) }
+    // January is before both were archived: their lines still show, marked
+    const { s } = statementFor(t, '2026-01')
+    expect(find(s, `acc:${w.fund.id}`)).toMatchObject({ archived: true })
+    expect(find(s, `pool:${w.travel.id}`)).toMatchObject({ archived: true })
+    expect(find(s, `acc:${w.savings.id}`)!.archived).toBeUndefined()
+  })
+
   it('shows a foreign account in the household currency with its own balance beside it', () => {
     const usd = account({ name: 'Dollar savings', type: 'savings', currency: 'USD', openingBalance: 1000_00 })
     const t = tables({ household: [household()], accounts: [usd], fxRates: [fx('USD/EUR', '2026-01', 0.9), fx('USD/EUR', '2026-02', 0.8)] })

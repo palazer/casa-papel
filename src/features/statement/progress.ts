@@ -45,3 +45,13 @@ export function progressText(p: MonthProgress, closed: boolean, currency: string
   if (p.toComeIn > 0) parts.push(`${formatAmount(p.toComeIn, currency, locale)} to come in`)
   return parts.join(' · ')
 }
+
+/**
+ * The month a screen shows when it is asked for `month`: that month when the plan has it, else the nearest one the
+ * plan has (the first when the month lies before the plan, the last when it lies after). A plan without months has
+ * none to give: like `months[0]`, the result is then not a month, and the caller shows nothing.
+ */
+export function nearestMonth(months: MonthKey[], month: MonthKey): MonthKey {
+  if (months.includes(month)) return month
+  return month < months[0] ? months[0] : months[months.length - 1]
+}

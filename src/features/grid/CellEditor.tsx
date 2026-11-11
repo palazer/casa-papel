@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Repeat, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -98,7 +98,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   // the rule fills the months after this one: nothing carries on from a typed amount, and nothing is held for it
   const saveScope: EditScope = ruleRuns ? 'from-now-on' : scope
 
-  const itemsTotal = items.filter((i) => !i.skipped).reduce((s, i) => s + (i.kind === 'carry' ? (cell?.items.find((x) => x.id === i.id)?.effectiveAmount ?? prevValue()) : i.amount), 0)
+  const itemsTotal = items.filter((i) => !i.skipped).reduce((s, i) => s + (i.kind === 'carry' ? (cell?.items.find((x) => x.id === i.id)?.effectiveAmount ?? prevValue()) : Number.isFinite(i.amount) ? i.amount : 0), 0)
 
   function prevValue(): number {
     const idx = engine.months.indexOf(month)
@@ -106,7 +106,11 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
     return engine.cells[cellKey(row.id, engine.months[idx - 1])]?.value ?? 0
   }
 
+  // one save at a time: Enter in the amount field is not a button, so `busy` alone does not stop a second press
+  const running = useRef(false)
   async function run(fn: () => Promise<void>, close = true) {
+    if (running.current) return
+    running.current = true
     setBusy(true)
     setError(null)
     try {
@@ -115,6 +119,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save.')
     } finally {
+      running.current = false
       setBusy(false)
     }
   }
@@ -138,7 +143,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   }
 
   function saveItems() {
-    for (const it of items) if (it.kind === 'normal' && !Number.isFinite(it.amount)) return setError('Every item needs an amount.')
+    for (const it of items) if (it.kind === 'normal' && !Number.isFinite(it.amount)) return setError(`${it.label.trim() ? `"${it.label.trim()}"` : 'An item'} has an amount that is not a number I can read.`)
     void run(async () => {
       let next = items
       for (const it of items) {
@@ -315,7 +320,8 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                         <Input
                           aria-label="Item amount" inputMode="decimal" placeholder="0"
                           defaultValue={amountToInput(it.amount, currency, locale)}
-                          onChange={(e) => { const v = parseAmount(e.target.value, currency, locale); updateItem(it.id, { amount: v ?? 0 }) }}
+                          // an empty field is zero; anything else that cannot be read is kept as such, so saving says so instead of storing zero
+                          onChange={(e) => { setError(null); updateItem(it.id, { amount: e.target.value.trim() === '' ? 0 : parseAmount(e.target.value, currency, locale) ?? Number.NaN }) }}
                         />
                         <NativeSelect aria-label="Item status" value={it.status} onChange={(e) => updateItem(it.id, { status: e.target.value as ItemStatus })}>
                           {(['projected', 'committed', 'done'] as ItemStatus[]).map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}

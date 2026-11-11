@@ -324,7 +324,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   opens its category and, in an open month, the cell editor for its first amount. In the lower half a line that can
   have a goal (an account, a virtual account, a debt, Net worth) shows a 20 px ghost `Target` button after its name on
   hover or focus, always where the pointer is a finger, named `Set a goal for <line>`; it opens the goal dialog with
-  what the goal watches settled, so the dialog asks for the amount only. A goal's detail carries an `xs ghost` `Edit`. An account's balance
+  what the goal watches settled, so the dialog asks for the amount only. A line of something that is archived (shown
+  in the months before it was) has no such button: nothing new is started on it. A goal's detail carries an `xs ghost` `Edit`. An account's balance
   is a button named `<account> balance: <amount>` (`, entered` once it is) that opens the Grid's `BalanceDialog`.
   The line for what stays in the current accounts (the one account's name, else `Current accounts`) is worked out
   and says so with the `calculated` chip; its amount is the same kind of button and opens `CurrentBalanceDialog` (§8).
@@ -452,6 +453,10 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   is typed (`Rows this month`, `Not broken down yet`; a muted sentence when the rows already add up to more), then
   "Applies to" as the cell editor's `Segmented` (`This month and onwards` / `Only this month`). Footer: a ghost
   `Remove estimate` when there is one, Cancel, Save. A closed month disables it.
+- **A dialog saves once.** Its buttons are disabled while a save runs, and the save itself refuses a second start
+  (`useSave` in `src/features/grid/RowDialogs.tsx`, the cell editor's `run`), because Enter in a field is not a
+  button: pressed twice, it must not add a top-up or a virtual account twice. A field that cannot be read says so
+  when Save is pressed and nothing is stored: never a silent zero (an item's amount in the cell editor included).
 - **One dialog per row: the amount and the rule together.** The cell editor (`src/features/grid/CellEditor.tsx`),
   titled `<row> · <month>`, is the only dialog a row has, on the Statement and in the Grid. For a row that can carry
   a rule (the transfer that fills a savings account, an investment account or a virtual account; an adult's pocket

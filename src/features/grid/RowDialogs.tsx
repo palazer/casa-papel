@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -33,7 +33,12 @@ const SECTIONS: Array<{ key: Section; title: string }> = [
 export function useSave(onClose: () => void) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // Buttons are disabled while a save runs, but Enter in a field is not a button: a second press before the first
+  // has finished must not save twice (a top-up would be added twice).
+  const running = useRef(false)
   const save = async (fn: () => Promise<void>) => {
+    if (running.current) return
+    running.current = true
     setBusy(true)
     setError(null)
     try {
@@ -42,6 +47,7 @@ export function useSave(onClose: () => void) {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save.')
     } finally {
+      running.current = false
       setBusy(false)
     }
   }

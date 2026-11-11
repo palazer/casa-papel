@@ -183,7 +183,12 @@ test.describe('working the month in the Statement', () => {
     await dlg.getByRole('tab', { name: 'Itemized' }).click()
     await dlg.getByRole('button', { name: 'Add item' }).click()
     await dlg.getByLabel('Item label').last().fill('Physio')
+    // an item amount that cannot be read is said on saving, not stored as zero
+    await dlg.getByLabel('Item amount').last().fill('abc')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg.getByRole('alert')).toHaveText('"Physio" has an amount that is not a number I can read.')
     await dlg.getByLabel('Item amount').last().fill('45')
+    await expect(dlg.getByRole('alert')).toHaveCount(0)
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
     await expect(moneyOut.getByRole('button', { name: /^Health:/ })).toHaveAccessibleName(/^Health: €75\.00/)
@@ -997,7 +1002,12 @@ test.describe('working the month in the Statement', () => {
     await expect(dlg.getByTestId('top-up-rule')).toHaveCount(0)
     await expect(dlg).toHaveCSS('opacity', '1')
     await page.screenshot({ path: 'e2e/output/statement-top-up-dialog.png' })
-    await dlg.getByRole('button', { name: 'Top up' }).click()
+    // Enter twice in a row tops up once: the second press finds a save already on its way
+    await dlg.getByLabel('Amount in EUR').focus()
+    await page.evaluate(() => {
+      const field = document.activeElement as HTMLElement
+      for (let i = 0; i < 2; i++) field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    })
     await expect(dlg).toBeHidden()
 
     // both lines are there, the tag is gone, and the rest of the month did not move

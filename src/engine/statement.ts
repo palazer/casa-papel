@@ -76,6 +76,8 @@ export interface StatementLine {
   accountKind?: string
   /** A row shown under the name of the account it takes from: the row's own name, when that says something else. */
   ownName?: string
+  /** An account or a virtual account that is archived from some month on: shown while it existed, with nothing new started on it. */
+  archived?: boolean
   /** A virtual account that was asked for more than it held this month: by how much, on its own line and on the line of what it paid. */
   short?: Money
   /** With `short`: the savings account whose unassigned part covered it. */
@@ -423,6 +425,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
     const change = changeOf(s, acc)
     const line: StatementLine = { id: `acc:${acc.id}`, kind: 'account', label: acc.name, amount: r.balanceBase, change, children: [], accountId: acc.id, missingRate: r.missingRate || undefined, native: s.currency !== base ? { amount: r.balance, currency: s.currency } : undefined }
     if ((acc.type === 'savings' || acc.type === 'investment') && !acc.archivedMonth) line.rule = ruleOfRows(rowsFeeding(engine.rows, acc))
+    if (acc.archivedMonth) line.archived = true
     if (r.adjustment !== 0 || r.projected === false) line.entered = true
     if (r.adjustment !== 0) line.adjustment = s.currency !== base && r.balance !== 0 ? Math.round(r.adjustment * (r.balanceBase / r.balance)) : r.adjustment
     accountLines.set(acc.id, line)
@@ -438,6 +441,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
         const pm = engine.pools[p.id].months[month]
         const poolLine: StatementLine = { id: `pool:${p.id}`, kind: 'pool', label: p.name, amount: pm.balance, change: pm.allocation - pm.spend, children: [], poolId: p.id }
         if (!p.archivedMonth) poolLine.rule = ruleOfRows(engine.rows.filter((row) => row.id === p.allocationRowId && !row.archivedMonth))
+        else poolLine.archived = true
         if (pm.short > 0) Object.assign(poolLine, { short: pm.short, shortFrom: acc.name })
         poolLines.set(p.id, poolLine)
         line.children.push(poolLine)

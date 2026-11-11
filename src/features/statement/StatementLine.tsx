@@ -106,7 +106,8 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
   const foot = (group || line.kind === 'category') ? ctx.footer?.(line) : null
   // a category opens even while it is empty: its first row is added inside it
   const expandable = !group && (line.children.length > 0 || !!line.goals?.length || (line.kind === 'category' && !!foot))
-  const canGoal = !!ctx.onGoal && (line.kind === 'pool' || (line.kind === 'account' && !!line.accountId) || line.id === 'net-worth')
+  // a goal is not started on something that is archived: the goal dialog would have nothing to attach it to
+  const canGoal = !!ctx.onGoal && !line.archived && (line.kind === 'pool' || (line.kind === 'account' && !!line.accountId) || line.id === 'net-worth')
   const open = group || (expandable && ctx.isOpen(line))
   const listId = `st-${line.id}`
   const hue = line.hue ? HUE[line.hue] : undefined

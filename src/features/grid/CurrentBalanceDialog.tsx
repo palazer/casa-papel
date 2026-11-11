@@ -41,7 +41,9 @@ export function CurrentBalanceDialog({ title, accounts, month, result, actuals, 
   const several = accounts.length > 1
   const hasActual = accounts.some((acc) => stored(acc) != null)
   // the sum as it is typed, while every account is in the household currency; another currency is converted on saving
-  const typed = accounts.map((acc) => (texts[acc.id].trim() === '' ? null : parseAmount(texts[acc.id], acc.currency, locale)))
+  // an account that turns up while the dialog is open (another device, an undo) starts with an empty field
+  const textOf = (acc: Account): string => texts[acc.id] ?? ''
+  const typed = accounts.map((acc) => (textOf(acc).trim() === '' ? null : parseAmount(textOf(acc), acc.currency, locale)))
   const together = accounts.every((acc) => acc.currency === base) && typed.every((v) => v != null) ? typed.reduce<number>((sum, v) => sum + (v ?? 0), 0) : null
 
   async function save(balances: Record<string, number> | null) {
@@ -57,12 +59,12 @@ export function CurrentBalanceDialog({ title, accounts, month, result, actuals, 
     }
   }
   function submit() {
-    const filled = accounts.filter((acc) => texts[acc.id].trim() !== '')
+    const filled = accounts.filter((acc) => textOf(acc).trim() !== '')
     if (filled.length === 0) return void save(null)
     if (filled.length < accounts.length) return setError('Fill in every account, or leave them all empty to use the calculated amount.')
     const balances: Record<string, number> = {}
     for (const acc of accounts) {
-      const v = parseAmount(texts[acc.id], acc.currency, locale)
+      const v = parseAmount(textOf(acc), acc.currency, locale)
       if (v == null) return setError(several ? `${acc.name}: that is not a number I can read.` : 'That is not a number I can read.')
       balances[acc.id] = v
     }
@@ -89,7 +91,7 @@ export function CurrentBalanceDialog({ title, accounts, month, result, actuals, 
             <div key={acc.id} className="space-y-1.5">
               <Label htmlFor={`real-${acc.id}`}>{several ? `${acc.name} (${acc.currency})` : `Real balance in ${acc.currency}`}</Label>
               <Input
-                id={`real-${acc.id}`} autoFocus={i === 0} inputMode="decimal" value={texts[acc.id]} disabled={closed}
+                id={`real-${acc.id}`} autoFocus={i === 0} inputMode="decimal" value={textOf(acc)} disabled={closed}
                 onChange={(e) => { setError(null); setTexts((t) => ({ ...t, [acc.id]: e.target.value })) }} onKeyDown={(e) => { if (e.key === 'Enter') submit() }}
                 placeholder={several ? undefined : 'leave empty to use the calculated amount'}
               />

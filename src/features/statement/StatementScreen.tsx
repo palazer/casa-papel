@@ -31,7 +31,7 @@ import { AddCategoryInline } from './AddCategoryInline'
 import { CategoryMenu } from './CategoryMenu'
 import { EstimateDialog } from './EstimateDialog'
 import { PerPerson } from './PerPerson'
-import { monthProgress, progressText } from './progress'
+import { monthProgress, nearestMonth, progressText } from './progress'
 import { SetupStrip } from './SetupStrip'
 import { StatementBand } from './StatementBand'
 import { AccountSuggestionLines, SuggestionLines } from './SuggestionLines'
@@ -97,8 +97,7 @@ export function StatementScreen() {
 
   const settingUp = household?.setupOpen ?? false
   const month = picked ?? (settingUp && household ? household.startMonth : monthOfDate())
-  const idx = Math.max(0, months.indexOf(month) === -1 ? months.length - 1 : months.indexOf(month))
-  const m = months[idx]
+  const m = nearestMonth(months, month)
   const statement = useMemo(() => (tables && engine && m ? buildStatement(tables, engine, m) : null), [tables, engine, m])
   /** What each virtual account is short by in the month shown. */
   const shortNow = useMemo(() => {

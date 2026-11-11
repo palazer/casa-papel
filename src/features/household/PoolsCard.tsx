@@ -100,15 +100,19 @@ export function PoolDialog({ pool, savings, baseCurrency, locale, fromMonth, onC
   const [monthly, setMonthly] = useState('')
   const [spendRow, setSpendRow] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  /** A save is on its way: a second press must not add the virtual account twice. */
+  const [busy, setBusy] = useState(false)
   function save() {
+    if (busy) return
     const openingBalance = opening.trim() ? parseAmount(opening, baseCurrency, locale) : 0
     if (openingBalance == null) return setError('Opening balance is not a number I can read.')
     const monthlyAllocation = monthly.trim() ? parseAmount(monthly, baseCurrency, locale) : null
     if (monthly.trim() && monthlyAllocation == null) return setError('The monthly amount is not a number I can read.')
+    setBusy(true)
     const p: Promise<unknown> = pool
       ? updatePool(store, pool.id, { name: name.trim(), accountId, openingBalance })
       : addPool(store, { name: name.trim(), accountId, openingBalance, monthlyAllocation, fromMonth, createSpendRow: spendRow }).then((made) => onSaved?.(made))
-    p.then(onClose).catch((e) => onError(e instanceof Error ? e.message : 'Failed'))
+    p.then(onClose).catch((e) => { setBusy(false); onError(e instanceof Error ? e.message : 'Failed') })
   }
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
@@ -132,8 +136,8 @@ export function PoolDialog({ pool, savings, baseCurrency, locale, fromMonth, onC
         <DialogFooter className="flex-row flex-wrap gap-2 sm:justify-between">
           <div>{pool && onRemove && <Button variant="ghost" size="sm" onClick={onRemove}>{removeLabel}</Button>}</div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button disabled={!name.trim() || !accountId} onClick={save}>Save</Button>
+            <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+            <Button disabled={busy || !name.trim() || !accountId} onClick={save}>Save</Button>
           </div>
         </DialogFooter>
       </DialogContent>
