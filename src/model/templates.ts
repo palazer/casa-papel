@@ -121,7 +121,7 @@ export const goalFamilyOf = (kind: GoalKind): GoalFamily => (kind === 'pay-off' 
 export const GOAL_KIND_INFO: Array<{ value: GoalFamily; label: string; help: string }> = [
   { value: 'fill', label: 'Fill an account', help: 'A savings, investment or other asset account, or a pool account, reaches an amount. An account is compared in its own currency.' },
   { value: 'pay-down', label: 'Pay down a debt', help: 'A card or loan comes down to an amount, zero unless you type another. Progress counts down from what was owed when you set the goal.' },
-  { value: 'net-worth', label: 'Reach a net worth', help: 'Tracked assets minus tracked debts, in your base currency. Set it from the "Net worth" line on the Statement.' },
+  { value: 'net-worth', label: 'Reach a net worth', help: 'Everything you have, what stays in the main account included, minus what you owe, in your base currency. Set it from the "Net worth" line on the Statement.' },
 ]
 
 /**

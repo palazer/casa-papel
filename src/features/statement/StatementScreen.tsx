@@ -11,7 +11,7 @@ import { formatMonth } from '@/app/format'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { useStoreVersion } from '@/app/useStoreVersion'
-import { buildStatement, cellKey, computeMainAccount, type GoalProgress, type StatementLine } from '@/engine'
+import { buildStatement, cellKey, type GoalProgress, type StatementLine } from '@/engine'
 import { canCarryRule, isPocketRow, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type MonthKey, type Row, type Section } from '@/model'
 import { accountSuggestions, addPlanYear, removeIfFree, rowSuggestions, setCellDone, setDerivedDone, setItemStatus, setupSteps, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupStepKey } from '@/store'
 import { GoalDialog } from '@/features/goals/GoalDialog'
@@ -51,7 +51,6 @@ export function StatementScreen() {
   const household = activeHousehold(tables)
   const months = useMemo(() => (household && tables ? defaultMonths(household, tables) : []), [household, tables])
   const engine = useEngine(tables, months)
-  const main = useMemo(() => (tables && engine ? computeMainAccount(tables, engine) : null), [tables, engine])
   /** The month someone picked. Until then: today's month, or the first month while the household is being set up. */
   const [picked, setMonth] = useState<MonthKey | null>(null)
   /** Lines someone opened or closed; the rest follow their own default. */
@@ -89,7 +88,7 @@ export function StatementScreen() {
   const month = picked ?? (settingUp && household ? household.startMonth : monthOfDate())
   const idx = Math.max(0, months.indexOf(month) === -1 ? months.length - 1 : months.indexOf(month))
   const m = months[idx]
-  const statement = useMemo(() => (tables && engine && m ? buildStatement(tables, engine, m, main) : null), [tables, engine, m, main])
+  const statement = useMemo(() => (tables && engine && m ? buildStatement(tables, engine, m) : null), [tables, engine, m])
   /** What each pool account is short by in the month shown. */
   const shortNow = useMemo(() => {
     const out: Record<string, number> = {}
@@ -277,7 +276,7 @@ export function StatementScreen() {
     if (line.kind === 'account' && line.accountId) return editButton(line.label, () => setAccountEdit(line.accountId!))
     // the calculated line stands for the current accounts: one opens straight away, several are listed
     if (line.id === 'main') {
-      const current = (main?.accountIds ?? []).map((id) => tables!.accounts.find((a) => a.id === id && !a.deletedAt)).filter((a): a is Account => !!a)
+      const current = (engine!.main?.accountIds ?? []).map((id) => tables!.accounts.find((a) => a.id === id && !a.deletedAt)).filter((a): a is Account => !!a)
       if (current.length === 0) return null
       if (current.length === 1) return editButton(current[0].name, () => setAccountEdit(current[0].id))
       return (

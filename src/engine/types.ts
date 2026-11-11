@@ -129,6 +129,27 @@ export interface RowTotals {
   shareOfIncome: number
 }
 
+export interface MainAccountMonth {
+  /** Balance when the month began, in the base currency. */
+  start: Money
+  /** What the month left in the account: the cash buffer or the leftover. Negative when the month overran. */
+  kept: Money
+  /** Bought on an itemized card this month: spent on paper, the cash is still here. */
+  cardBought: Money
+  /** Paid to an itemized card this month. */
+  cardPaid: Money
+  balance: Money
+}
+
+/** The current, joint and cash accounts together, as one calculated balance (see `mainAccount.ts`). */
+export interface MainAccountSeries {
+  /** The current, joint and cash accounts counted, in their own order. */
+  accountIds: string[]
+  /** An opening balance in another currency had no rate and was taken 1:1. */
+  missingRate: boolean
+  months: Record<MonthKey, MainAccountMonth>
+}
+
 export interface EngineOutput {
   months: MonthKey[]
   /** Visible rows in display order. */
@@ -139,7 +160,12 @@ export interface EngineOutput {
   pools: Record<string, PoolSeries>
   rowTotals: Record<string, RowTotals>
   incomeTotal: Money
-  /** Tracked assets minus tracked debts, in the base currency. */
+  /**
+   * What stays in the main account (the current, joint and cash accounts together), worked out from the household's
+   * first month on. Null only when there is no household or no month.
+   */
+  main: MainAccountSeries | null
+  /** Tracked assets and the main account's calculated balance, minus tracked debts, in the base currency. */
   netWorth: Record<MonthKey, Money>
   /** Rows whose months are filled by recurring items instead of carry-forward. */
   recurringRowIds: string[]

@@ -234,7 +234,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 - **Statement lines** (`src/features/statement/`, figures from `buildStatement` in `src/engine/statement.ts`): the
   Statement is one month in accounting form, two halves that each balance. "The month": Money in beside Money out,
   closed by the rest (to savings) or the leftover; a month that overruns shows "To cover the month" on the left.
-  "At the end of the month": Assets beside Debts and net worth, closed by Free, with a muted `change` column before
+  "At the end of the month": Assets beside Debts and net worth, closed by Free (net worth is one figure in the whole
+  app: tracked accounts and the main account's calculated line, minus debts; `engine.netWorth`), with a muted `change` column before
   the balance on both sides (`+€460.00`, a `·` for none) and the day as the balance column's head. A side opens with
   its name in small caps and closes with its total in `font-semibold` over a hairline. Lines are `min-h-11 text-sm`
   on phones and `md:min-h-7 md:text-xs`, separated by `divide-border/60`, amounts in a fixed right-aligned column:

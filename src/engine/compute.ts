@@ -3,6 +3,7 @@ import {
   type Account, type Category, type Cell, type Money, type MonthKey, type Row, type RuleState, type Section,
 } from '@/model'
 import { buildFxIndex, convertMoney } from './fx'
+import { mainAccountSeries } from './mainAccount'
 import {
   cellKey,
   type AccountSeries, type CellResult, type CellStatus, type EngineInput, type EngineOutput,
@@ -73,7 +74,7 @@ function addFunding(f: Funding, fundedBy: string, amount: Money): void {
 }
 
 function emptyOutput(months: MonthKey[]): EngineOutput {
-  return { months, rows: [], cells: {}, totals: {}, accounts: {}, pools: {}, rowTotals: {}, incomeTotal: 0, netWorth: {}, recurringRowIds: [], warnings: [] }
+  return { months, rows: [], cells: {}, totals: {}, accounts: {}, pools: {}, rowTotals: {}, incomeTotal: 0, main: null, netWorth: {}, recurringRowIds: [], warnings: [] }
 }
 
 /**
@@ -581,10 +582,13 @@ export function computeEngine(input: EngineInput): EngineOutput {
     accountSeries[acc.id] = series
   }
 
-  // ---------- net worth ----------
+  // ---------- the main account, and net worth ----------
+  // What stays in the current accounts is money the household has, so it counts: the Statement's lower half would
+  // not balance without it, and every other screen shows the same figure.
+  const main = mainAccountSeries({ months, rows, cells, totals, accounts, fx, base })
   const netWorth: Record<MonthKey, Money> = {}
   for (const m of months) {
-    let nw = 0
+    let nw = main.months[m]?.balance ?? 0
     for (const s of Object.values(accountSeries)) {
       const r = s.months[m]
       if (!r) continue
@@ -612,8 +616,9 @@ export function computeEngine(input: EngineInput): EngineOutput {
   for (const s of Object.values(accountSeries)) for (const m of Object.keys(s.months)) if (!requestedSet.has(m)) delete s.months[m]
   const outNetWorth: Record<MonthKey, Money> = {}
   for (const m of requested) if (netWorth[m] != null) outNetWorth[m] = netWorth[m]
+  for (const m of Object.keys(main.months)) if (!requestedSet.has(m)) delete main.months[m]
 
-  return { months: requested, rows, cells: outCells, totals: outTotals, accounts: accountSeries, pools: poolSeries, rowTotals, incomeTotal, netWorth: outNetWorth, recurringRowIds: [...recurringRowIds], warnings: dedupe(warnings) }
+  return { months: requested, rows, cells: outCells, totals: outTotals, accounts: accountSeries, pools: poolSeries, rowTotals, incomeTotal, main, netWorth: outNetWorth, recurringRowIds: [...recurringRowIds], warnings: dedupe(warnings) }
 }
 
 function savingsInflow(acc: Account, m: MonthKey, rows: Row[], cells: Record<string, CellResult>, pools: EngineInput['tables']['pools'], t: MonthTotals): Money {

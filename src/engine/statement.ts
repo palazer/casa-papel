@@ -15,7 +15,6 @@
  */
 import { addMonths, canCarryRule, cardIsItemized, isTakenFromAccount, resolveRules, rowsFeeding, type Account, type Money, type MonthKey, type Row, type Section, type Tables } from '@/model'
 import { computeGoals, type GoalProgress } from './goals'
-import { computeMainAccount, type MainAccountSeries } from './mainAccount'
 import { cellKey, type AccountSeries, type CellResult, type CellStatus, type EngineOutput } from './types'
 
 export type StatementHue = 'income' | 'expense' | 'transfer' | 'worth' | 'pool'
@@ -150,8 +149,9 @@ function side(key: StatementSide['key'], label: string, lines: StatementLine[]):
   return { key, label, total: sum(lines), lines }
 }
 
-/** Null when the engine has no figures for the month. `main` saves recomputing the main account for every month shown. */
-export function buildStatement(tables: Tables, engine: EngineOutput, month: MonthKey, main: MainAccountSeries | null = computeMainAccount(tables, engine)): Statement | null {
+/** Null when the engine has no figures for the month. */
+export function buildStatement(tables: Tables, engine: EngineOutput, month: MonthKey): Statement | null {
+  const main = engine.main
   const household = tables.household.find((h) => !h.deletedAt)
   const t = engine.totals[month]
   if (!household || !t) return null

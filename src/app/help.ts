@@ -20,7 +20,7 @@ export const HELP = {
   'derived.fromSavings': { title: 'From savings and pool accounts', text: 'Worked out from your expenses, never typed: every expense that comes out of the savings balance or a pool account shows here instead of being taken from the month\'s income. To change it, change the expense or what it comes out of.' },
   'derived.keptInAccount': { title: 'Kept in account', text: 'With the savings-plug rule the month\'s leftover goes to savings and this is what stays behind: the cash buffer you set under Household.' },
   'derived.leftover': { title: 'Leftover', text: 'Income minus spending from income minus the transfers you typed. What is neither spent nor moved; positive means money stays in the account, negative means the month overran.' },
-  'derived.netWorth': { title: 'Net worth', text: 'Every tracked balance added up: savings, investments and other assets minus cards and loans, in your base currency. Only accounts with a tracked balance count.' },
+  'derived.netWorth': { title: 'Net worth', text: 'Everything you have minus everything you owe, in your base currency: savings, investments, other assets and what stays in the main account, minus cards and loans. The main account\'s part is calculated, as the Statement shows it; the other accounts count when their balance is tracked.' },
 
   // Rows
   'row.toSavingsPlug': { title: 'To savings', text: 'Worked out for you: income minus spending from income minus pocket money and the cash buffer. Whatever is left moves to savings, so you never type it.' },

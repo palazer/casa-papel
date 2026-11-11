@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { buildStatement, computeEngine, computeMainAccount, type EngineOutput, type Statement, type StatementLine } from '@/engine'
+import { buildStatement, computeEngine, type EngineOutput, type Statement, type StatementLine } from '@/engine'
 import { CategorySchema, FxRateSchema, GoalSchema, monthRange, newId, poolRef, type Goal, type MonthKey, type Tables } from '@/model'
 import { applyMutations, planRecurringPosts, ruleMutations, type RuleChoice, type RuleTarget } from '@/store'
 import { buildDemoTables } from '@/demo/demoHousehold'
@@ -27,9 +27,8 @@ function statementFor(t: Tables, m: MonthKey, range: MonthKey[] = months): { s: 
 /** Both halves agree, every heading is the sum of what sits under it, and the figures match the engine's own totals. */
 function expectSound(t: Tables, range: MonthKey[]) {
   const out = computeEngine({ tables: t, months: range })
-  const main = computeMainAccount(t, out)
   for (const m of range) {
-    const s = buildStatement(t, out, m, main)!
+    const s = buildStatement(t, out, m)!
     const tot = out.totals[m]
     expect(s.flow.difference, `${m} month`).toBe(0)
     expect(s.position.difference, `${m} position`).toBe(0)
@@ -49,8 +48,9 @@ function expectSound(t: Tables, range: MonthKey[]) {
     expect(amountOf('in', 'sources'), `${m} from savings`).toBe(tot.fromSavingsDerived)
     // what covers a short month sits on the left; taken back out, the right side is the engine's outflows and closing figures
     expect(s.flow.right.total - amountOf('in', 'cover'), `${m} outflows`).toBe(tot.expensesTotal + tot.allocations + tot.toInvestment + tot.toSavings + tot.leftover)
-    const mainBalance = find(s, 'main')?.amount ?? 0
-    expect(topLine(s, 'claims', 'net-worth')!.amount - mainBalance, `${m} net worth`).toBe(out.netWorth[m] ?? 0)
+    // one net worth: the Statement's is the engine's, and both count what stays in the main account
+    expect(find(s, 'main')?.amount ?? 0, `${m} main account`).toBe(out.main?.months[m]?.balance ?? 0)
+    expect(topLine(s, 'claims', 'net-worth')!.amount, `${m} net worth`).toBe(out.netWorth[m] ?? 0)
   }
 }
 
@@ -97,9 +97,8 @@ describe('the Statement balances', () => {
   it.each(['savings-plug', 'leftover-plug'] as const)('and the change in net worth is the month: income minus spending plus what investments earned (%s)', (rule) => {
     const t = withRule(posted, rule)
     const out = computeEngine({ tables: t, months: demoMonths })
-    const main = computeMainAccount(t, out)
     for (const m of demoMonths) {
-      const s = buildStatement(t, out, m, main)!
+      const s = buildStatement(t, out, m)!
       const tot = out.totals[m]
       const growth = t.accounts.filter((a) => a.type === 'investment').reduce((g, a) => {
         const line = find(s, `acc:${a.id}`)!
