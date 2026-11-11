@@ -65,7 +65,7 @@ describe('the cheap delete of a household that is being set up', () => {
     const pool = (await loadTables(store)).pools[0]
     expect(await removeIfFree(store, { kind: 'pool', id: pool.id })).toBeNull()
     expect(await live(store)).toMatchObject({ accounts: ['Savings'], pools: ['Travel'] })
-    expect((await live(store)).rows).toEqual(expect.arrayContaining(['To Savings', 'Travel', 'Travel pool']))
+    expect((await live(store)).rows).toEqual(expect.arrayContaining(['To Savings', 'Travel', 'To Travel']))
   })
 
   it('never deletes what has amounts in a closed month', async () => {

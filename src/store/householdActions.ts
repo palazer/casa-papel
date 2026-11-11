@@ -2,7 +2,7 @@ import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing'
 import { buildDefaultCategoryMutations } from './categoryActions'
 import {
   AccountMonthSchema, AccountSchema, CellSchema, EntitySchema, HouseholdSchema, PoolSchema, RowSchema,
-  ENTITY_TEMPLATES, HOUSEHOLD_TEMPLATES, monthOfDate, newId, poolRef, templateTitle,
+  ENTITY_TEMPLATES, HOUSEHOLD_TEMPLATES, monthOfDate, newId, poolRef, poolRowName, templateTitle,
   type Account, type Entity, type EntityKind, type Household, type MonthKey, type Pool, type Row, type RowTemplate, type Tables,
 } from '@/model'
 import { currentAccountsIn } from '@/engine'
@@ -115,7 +115,7 @@ export function buildTemplateMutations(t: RowTemplate, ctx: TemplateContext, ord
     if (savings) {
       const pool: Pool = PoolSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, name, accountId: savings.id, openingBalance: 0, order })
       const alloc = RowSchema.parse({
-        id: newId(), createdAt: ts, updatedAt: ts, name: `${name} pool`, section: 'transfer', kind: 'pool-allocation',
+        id: newId(), createdAt: ts, updatedAt: ts, name: poolRowName(name), section: 'transfer', kind: 'pool-allocation',
         accountId: savings.id, defaultStatus: 'committed', order: `${order}p`,
       })
       pool.allocationRowId = alloc.id
@@ -140,7 +140,7 @@ export function buildTemplateMutations(t: RowTemplate, ctx: TemplateContext, ord
   mutations.push({ op: 'put', table: 'rows', record: row })
   // the row that takes the rest of the month takes no amount
   const automatic = t.kind === 'to-savings' && ctx.household.closingRule === 'savings-plug'
-  // a pool template's amount is what is set aside each month, so it goes on the "<name> pool" transfer row
+  // a pool template's amount is what is set aside each month, so it goes on the "To <name>" transfer row
   if (opts.amount != null && opts.amount > 0 && !automatic) mutations.push(startAmount(allocationRowId ?? row.id, opts.month ?? ctx.household.startMonth, opts.amount, ts))
   return { mutations, row }
 }
@@ -297,7 +297,7 @@ export async function addPool(store: Store, input: PoolInput): Promise<Pool> {
   const [allocOrder, spendOrder] = generateNKeysBetween(lastRow, null, 2)
   const pool: Pool = PoolSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, name: input.name.trim(), accountId: input.accountId, openingBalance: input.openingBalance ?? 0, order: generateKeyBetween(lastPool, null) })
   const alloc = RowSchema.parse({
-    id: newId(), createdAt: ts, updatedAt: ts, name: `${pool.name} pool`, section: 'transfer', kind: 'pool-allocation',
+    id: newId(), createdAt: ts, updatedAt: ts, name: poolRowName(pool.name), section: 'transfer', kind: 'pool-allocation',
     accountId: input.accountId, defaultStatus: 'committed', order: allocOrder,
   })
   pool.allocationRowId = alloc.id

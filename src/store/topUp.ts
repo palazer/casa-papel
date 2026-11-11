@@ -1,6 +1,6 @@
 import { cellKey, computeEngine } from '@/engine'
 import {
-  CellSchema, PoolSchema, addMonths, compareMonths, monthRange, newId, resolveRules,
+  CellSchema, PoolSchema, addMonths, compareMonths, monthRange, newId, poolRowName, resolveRules,
   type Cell, type CellItem, type Money, type MonthKey, type Row, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
@@ -15,7 +15,7 @@ export type TopUpSource = { kind: 'account'; accountId: string } | { kind: 'inco
 
 /**
  * Top a virtual account up for one month, with a record of where the money came from. Two one-off items, this month only:
- * "Top-up for <pool>" on the row that takes money out of the source account (made on first use), and "Top-up from
+ * "Top-up for <virtual account>" on the row that takes money out of the source account (made on first use), and "Top-up from
  * <account>" on the virtual account's own set-aside row. The month takes the money in and sets it aside again, so the
  * rest is untouched; from the month's income only the second is written, and the rest shrinks. Pure; the caller
  * commits, and the dialog runs it on a copy to show what the month will hold.
@@ -41,7 +41,7 @@ export function topUpMutations(tables: Tables, poolId: string, month: MonthKey, 
   // the virtual account's own set-aside row; one that lost its row gets a new one
   let setAside = working.rows.find((r) => r.id === pool.allocationRowId && !r.deletedAt)
   if (!setAside) {
-    const made = newRowMutation(working, { name: `${pool.name} pool`, section: 'transfer', kind: 'pool-allocation', accountId: pool.accountId, defaultStatus: 'committed', rule: 'fixed' })
+    const made = newRowMutation(working, { name: poolRowName(pool.name), section: 'transfer', kind: 'pool-allocation', accountId: pool.accountId, defaultStatus: 'committed', rule: 'fixed' })
     setAside = made.row
     add([made.mutation, { op: 'put', table: 'pools', record: PoolSchema.parse({ ...pool, allocationRowId: made.row.id, updatedAt: ts }) }])
   } else if (setAside.archivedMonth && compareMonths(setAside.archivedMonth, month) <= 0) {

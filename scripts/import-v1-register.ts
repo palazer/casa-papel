@@ -64,7 +64,7 @@ async function main() {
   })
   writeFileSync(out, JSON.stringify(file, null, 1) + '\n')
   const t = file.tables
-  console.log(`${out}: ${t.entities.length} entities, ${t.accounts.length} accounts, ${t.rows.length} rows, ${t.recurringItems.length} recurring items, ${t.pools.length} pools`)
+  console.log(`${out}: ${t.entities.length} entities, ${t.accounts.length} accounts, ${t.rows.length} rows, ${t.recurringItems.length} schedules, ${t.pools.length} virtual accounts`)
   console.log('entities:', t.entities.map((e) => `${e.kind}:${e.name}`).join(', '))
   console.log('accounts:', t.accounts.map((a) => `${a.name} [${a.type}]`).join(', '))
   console.log('rows:', t.rows.map((r) => r.name).join(' | '))

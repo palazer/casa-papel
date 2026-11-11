@@ -180,7 +180,7 @@ describe('setRule', () => {
     const pool = await addPool(store, { name: 'Travel', accountId: savings.id, openingBalance: 0 })
     await store.commit(planRemoval(await loadTables(store), { kind: 'row', id: pool.allocationRowId! }, Date.now()))
     const alloc = await setRule(store, { poolId: pool.id }, { kind: 'share-of-income', share: 0.05 }, '2026-02')
-    expect(alloc).toMatchObject({ name: 'Travel pool', kind: 'pool-allocation', accountId: savings.id, rule: 'share-of-income', ruleShare: 0.05 })
+    expect(alloc).toMatchObject({ name: 'To Travel', kind: 'pool-allocation', accountId: savings.id, rule: 'share-of-income', ruleShare: 0.05 })
     let t = await loadTables(store)
     expect(t.pools.find((p) => p.id === pool.id)?.allocationRowId).toBe(alloc.id)
     const out = await engineOf(store)

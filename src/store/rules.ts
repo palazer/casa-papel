@@ -1,6 +1,6 @@
 import { cellKey, computeEngine, sortRows, type EngineOutput } from '@/engine'
 import {
-  CellSchema, HouseholdSchema, PoolSchema, RowSchema, addMonths, canCarryRule, canTakeRest, compareMonths, isOldPocketShare, isPocketRow, monthRange, newId,
+  CellSchema, HouseholdSchema, PoolSchema, RowSchema, addMonths, canCarryRule, canTakeRest, compareMonths, isOldPocketShare, isPocketRow, monthRange, newId, poolRowName,
   resolveRules, rowsFeeding, sharePercent,
   type Cell, type CellItem, type Money, type MonthKey, type Pool, type Row, type RuleState, type Tables,
 } from '@/model'
@@ -48,7 +48,7 @@ export function ruleRowOf(tables: Tables, target: RuleTarget): Row | null {
 function makeRuleRow(tables: Tables, target: { accountId: string } | { poolId: string }, ts: number): { row: Row; mutations: Mutation[] } {
   if ('poolId' in target) {
     const pool = tables.pools.find((p) => p.id === target.poolId) as Pool
-    const made = newRowMutation(tables, { name: `${pool.name} pool`, section: 'transfer', kind: 'pool-allocation', accountId: pool.accountId, defaultStatus: 'committed' })
+    const made = newRowMutation(tables, { name: poolRowName(pool.name), section: 'transfer', kind: 'pool-allocation', accountId: pool.accountId, defaultStatus: 'committed' })
     return { row: made.row, mutations: [made.mutation, { op: 'put', table: 'pools', record: PoolSchema.parse({ ...pool, allocationRowId: made.row.id, updatedAt: ts }) }] }
   }
   const acc = tables.accounts.find((a) => a.id === target.accountId)!

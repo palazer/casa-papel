@@ -78,8 +78,8 @@ describe('the Statement balances', () => {
     let t = start
     const set = (target: RuleTarget, choice: RuleChoice) => { t = applyMutations(t, ruleMutations(t, target, choice, from).mutations) }
     set({ rowId: named('To investments').id }, { kind: 'share-of-income', share: 0.1 })
-    set({ rowId: named('Travel pool').id }, { kind: 'share-of-rest', share: 0.25 })
-    set({ rowId: named('Clothing pool').id }, { kind: 'fixed', amount: 9000 })
+    set({ rowId: named('To Travel').id }, { kind: 'share-of-rest', share: 0.25 })
+    set({ rowId: named('To Clothing').id }, { kind: 'fixed', amount: 9000 })
     // the rest moves to a second savings account (or is taken for the first time), and the first one gets half of what is left
     set({ accountId: rainy.id }, { kind: 'rest' })
     set({ rowId: named('To savings').id }, { kind: 'share-of-rest', share: 0.5 })
@@ -128,7 +128,7 @@ describe('the Statement, the month', () => {
     // an itemized row opens to its items
     expect(find(s, expenses.children.find((c) => c.label === 'Personal')!.children[0].id)!.children.map((c) => [c.label, c.amount, c.status])).toEqual([['Concert tickets', 9000, 'done'], ['Books', 3200, 'done']])
     const setAside = topLine(s, 'out', 'set-aside')!
-    expect(setAside.children.map((c) => c.label)).toEqual(['To savings', 'To investments', 'Travel pool', 'Clothing pool'])
+    expect(setAside.children.map((c) => c.label)).toEqual(['To savings', 'To investments', 'To Travel', 'To Clothing'])
     // the rest: income − expenses − pocket money − the three typed transfers
     expect(setAside.children[0]).toMatchObject({ balancing: true, automatic: true, amount: 725500 - 335700 - 100000 - 80000 })
     expect(expenses.amount).toBe(335700 + 100000)
@@ -350,7 +350,7 @@ describe('the Statement, the position', () => {
     const payVisa = row({ name: 'Pay Visa', section: 'expense', kind: 'card-payment', accountId: visa.id, order: 'b3' })
     const toSavings = row({ name: 'To savings', section: 'transfer', kind: 'to-savings', accountId: savings.id, order: 'c0' })
     const toFund = row({ name: 'To fund', section: 'transfer', kind: 'to-investment', accountId: fund.id, order: 'c1' })
-    const fill = row({ name: 'Travel pool', section: 'transfer', kind: 'pool-allocation', accountId: savings.id, order: 'c2' })
+    const fill = row({ name: 'To Travel', section: 'transfer', kind: 'pool-allocation', accountId: savings.id, order: 'c2' })
     const t = tables({
       household: [household()], accounts: [main, savings, fund, visa, loan], pools: [{ ...travel, allocationRowId: fill.id }], goals,
       rows: [salary, rent, trip, payLoan, payVisa, toSavings, toFund, fill],

@@ -115,7 +115,7 @@ describe('remove', () => {
     t = await tables()
     expect(t.accounts.find((a) => a.id === savings)?.archivedMonth).toBe(TODAY)
     expect(t.pools.filter((p) => p.accountId === savings).map((p) => p.archivedMonth)).toEqual([TODAY, TODAY])
-    expect(t.rows.find((r) => r.name === 'Travel pool')?.archivedMonth).toBe(TODAY)
+    expect(t.rows.find((r) => r.name === 'To Travel')?.archivedMonth).toBe(TODAY)
     expect(t.rows.find((r) => r.name === 'Travel')?.defaultFundedBy).toBe('savings')
     // October's pool spending keeps its source, November's moves to savings
     const travelId = idOf(t, 'pools', 'Travel')

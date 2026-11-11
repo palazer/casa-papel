@@ -23,7 +23,7 @@ async function engine(store: Store) {
 }
 
 describe('setRowFundedBy', () => {
-  it('from a month on: earlier months are pinned to the old source, later ones draw the pool', async () => {
+  it('from a month on: earlier months are pinned to the old source, later ones draw the virtual account', async () => {
     const { store, savings } = await fresh()
     const pool = await addPool(store, { name: 'Travel', accountId: savings.id, openingBalance: 100000 })
     const trips = await addRow(store, { name: 'Trips', section: 'expense' })

@@ -22,7 +22,7 @@ describe('setup and household actions', () => {
     expect(t.entities.map((e) => e.name)).toEqual(['A', 'B', 'Kid', 'Dog'])
     expect(t.accounts.find((a) => a.type === 'savings')).toMatchObject({ tracked: true, openingBalance: 500000 })
     const names = t.rows.map((r) => r.name)
-    expect(names).toEqual(expect.arrayContaining(['A – Salary', 'A – Pocket', 'B – Personal', 'Kid – Child benefit', 'Kid – Long-term savings', 'Dog – Food & supplies', 'Groceries', 'To savings', 'To investments', 'Travel', 'Travel pool']))
+    expect(names).toEqual(expect.arrayContaining(['A – Salary', 'A – Pocket', 'B – Personal', 'Kid – Child benefit', 'Kid – Long-term savings', 'Dog – Food & supplies', 'Groceries', 'To savings', 'To investments', 'Travel', 'To Travel']))
     expect(t.pools).toHaveLength(1)
     const travel = t.rows.find((r) => r.name === 'Travel')!
     expect(travel.defaultFundedBy).toBe(`pool:${t.pools[0].id}`)

@@ -40,7 +40,7 @@ describe('describeRemoval', () => {
     expect(d.archiveChanges).toContain('Its schedule "Rent" stops after Oct 2026')
     expect(d.archiveChanges).toContain('"Rent mirror" stops following it and keeps the last amount as its own from Nov 2026')
 
-    const alloc = describeRemoval(t, { kind: 'row', id: idOf(t, 'rows', 'Travel pool') }, OPTS)
+    const alloc = describeRemoval(t, { kind: 'row', id: idOf(t, 'rows', 'To Travel') }, OPTS)
     expect(alloc.changes).toEqual(['The virtual account "Travel" is no longer filled each month'])
     const plug = describeRemoval(t, { kind: 'row', id: idOf(t, 'rows', 'To savings') }, OPTS)
     expect(plug.changes).toEqual(['"Savings" no longer receives the month\'s leftover'])
@@ -88,11 +88,11 @@ describe('describeRemoval', () => {
     const travel = describeRemoval(t, { kind: 'pool', id: idOf(t, 'pools', 'Travel') }, OPTS)
     expect(travel).toMatchObject({ kindLabel: 'Virtual account', closedHistory: 'Sept 2026', canDelete: false, canArchive: true })
     expect(travel.loses[0]).toMatch(/^Its balance \(Sept 2026 – /)
-    expect(travel.loses[1]).toMatch(/^The row "Travel pool" that fills it, with its amounts in \d+ months$/)
+    expect(travel.loses[1]).toMatch(/^The row "To Travel" that fills it, with its amounts in \d+ months$/)
     expect(travel.changes).toEqual(['"Travel" comes out of the savings balance instead', 'Spending that came out of it in 1 month counts as spent from the savings balance'])
     expect(travel.archiveChanges).toEqual([
       'Its balance stops at Oct 2026',
-      '"Travel pool" is archived from Nov 2026; nothing more is set aside',
+      '"To Travel" is archived from Nov 2026; nothing more is set aside',
       'From Nov 2026, "Travel" comes out of the savings balance; earlier months keep the virtual account as their source',
     ])
   })

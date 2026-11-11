@@ -185,7 +185,7 @@ describe('rules: how a transfer is worked out', () => {
   it('gives the rest to a virtual account, which pays back in a month that overruns', () => {
     const base = world({ rows: () => ({ toSavings: { rule: 'fixed' }, toRainy: { rule: 'fixed', ruleShare: null }, toBroker: { rule: 'fixed', ruleShare: null } }) })
     const travel = pool({ name: 'Travel', accountId: base.savings.id, order: 'a0' })
-    const alloc = row({ name: 'Travel pool', section: 'transfer', kind: 'pool-allocation', accountId: base.savings.id, order: 'a3', rule: 'rest' })
+    const alloc = row({ name: 'To Travel', section: 'transfer', kind: 'pool-allocation', accountId: base.savings.id, order: 'a3', rule: 'rest' })
     travel.allocationRowId = alloc.id
     const t: Tables = { ...base.t, pools: [travel], rows: [...base.t.rows, alloc], cells: [...base.t.cells, cellValue(base.r.rent.id, '2026-02', 480000), cellValue(base.r.rent.id, '2026-03', 150000)] }
     const out = run(t)
@@ -238,7 +238,7 @@ describe('rules: how a transfer is worked out', () => {
   it('feeds a virtual account from a share and an investment account in another currency at the month\'s rate', () => {
     const base = world()
     const travel = pool({ name: 'Travel', accountId: base.savings.id, order: 'a0' })
-    const alloc = row({ name: 'Travel pool', section: 'transfer', kind: 'pool-allocation', accountId: base.savings.id, order: 'a3', rule: 'share-of-income', ruleShare: 0.05 })
+    const alloc = row({ name: 'To Travel', section: 'transfer', kind: 'pool-allocation', accountId: base.savings.id, order: 'a3', rule: 'share-of-income', ruleShare: 0.05 })
     travel.allocationRowId = alloc.id
     const t: Tables = {
       ...base.t,

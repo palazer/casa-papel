@@ -92,7 +92,7 @@ test.describe('archive or delete', () => {
     await gifts.getByRole('button', { name: 'Edit' }).click()
     await dlg.getByRole('button', { name: 'Archive or delete…' }).click()
     await expect(dlg.getByRole('heading', { name: 'Virtual account "Gifts"' })).toBeVisible()
-    await expect(dlg.getByText('The row "Gifts pool" that fills it')).toBeVisible()
+    await expect(dlg.getByText('The row "To Gifts" that fills it')).toBeVisible()
     await dlg.getByRole('button', { name: 'Delete', exact: true }).click()
     await expect(dlg).toBeHidden()
     await expect(gifts).toHaveCount(0)

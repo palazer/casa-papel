@@ -19,7 +19,7 @@ describe('searching the guide', () => {
     expect(keys('LISBON')).toEqual(['virtual-accounts'])
     expect(keys('lisbon travel')).toEqual(['virtual-accounts'])
     expect(keys('lisbon xyzzy')).toEqual([])
-    expect(queryWords('  Pool   Account ')).toEqual(['pool', 'account'])
+    expect(queryWords('  Virtual   Account ')).toEqual(['virtual', 'account'])
   })
 
   it('highlights every occurrence, longest word first, without overlaps', () => {

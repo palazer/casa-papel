@@ -66,8 +66,8 @@ describe('setup: owners, destinations, first amounts, deposits and own rows', ()
     expect(amount('Netflix')?.value).toBe(1500)
     expect(amount('To savings')).toBeUndefined()
     expect(amount('Kid – Piano')).toBeUndefined()
-    // a pool template's amount is the monthly set-aside: on the "Travel pool" row, not on the spending row
-    expect(amount('Travel pool')?.value).toBe(20000)
+    // a pool template's amount is the monthly set-aside: on the "To Travel" row, not on the spending row
+    expect(amount('To Travel')?.value).toBe(20000)
     expect(amount('Travel')).toBeUndefined()
     expect(cells).toHaveLength(7)
   })

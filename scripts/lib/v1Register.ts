@@ -6,7 +6,7 @@
 import { generateNKeysBetween } from 'fractional-indexing'
 import {
   AccountSchema, EntitySchema, ExportFileSchema, HouseholdSchema, PoolSchema, RecurringItemSchema, RowSchema, SCHEMA_VERSION,
-  EMPTY_TABLES, newId, poolRef, toMinor,
+  EMPTY_TABLES, newId, poolRef, poolRowName, toMinor,
   type Account, type AccountType, type Entity, type ExportFile, type MonthKey, type RecurringItem, type Row, type Section,
 } from '../../src/model'
 
@@ -172,11 +172,11 @@ export function mapV1(input: V1Input): ExportFile {
     if (cat === 'saving') {
       if (/travel|holiday|urlaub|tatil/i.test(l.purpose)) {
         const pool = PoolSchema.parse({ ...base(), name: 'Travel', accountId: savings.id, openingBalance: 0, order: 'a0' })
-        const alloc = ensureRow('pool-travel-alloc', { name: 'Travel pool', section: 'transfer', kind: 'pool-allocation', accountId: savings.id })
+        const alloc = ensureRow('pool-travel-alloc', { name: poolRowName('Travel'), section: 'transfer', kind: 'pool-allocation', accountId: savings.id })
         pool.allocationRowId = alloc.id
         pools.push(pool)
         ensureRow('pool-travel', { name: 'Travel', section: 'expense', defaultFundedBy: poolRef(pool.id), defaultStatus: 'projected' })
-        if (l.amount) addItem(alloc, 'Travel pool', l.amount, 'EUR', { cadence: { intervalMonths: 1, anchorMonth: 1 }, accountId: savings.id })
+        if (l.amount) addItem(alloc, poolRowName('Travel'), l.amount, 'EUR', { cadence: { intervalMonths: 1, anchorMonth: 1 }, accountId: savings.id })
       }
       continue
     }

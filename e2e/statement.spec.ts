@@ -527,8 +527,8 @@ test.describe('working the month in the Statement', () => {
     await expect(dlg.getByTestId('rule-amount')).toHaveText('€465.70')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-    await expect(moneyOut.getByRole('button', { name: 'Travel pool: €465.70' })).toBeVisible()
-    await expect(moneyOut.getByRole('button', { name: 'Rule for Travel pool: 20% of what is left' })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: 'To Travel: €465.70' })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: 'Rule for To Travel: 20% of what is left' })).toBeVisible()
     expect(await rest()).toBe(1862.8)
     await balanced()
     await page.screenshot({ path: 'e2e/output/statement-rules.png', fullPage: true })
@@ -539,7 +539,7 @@ test.describe('working the month in the Statement', () => {
     // the month before keeps what it showed, and December follows the rules
     await goToMonth(page, 'October 2026')
     await expect(moneyOut.getByRole('button', { name: /^To investments: €500\.00/ })).toBeVisible()
-    await expect(moneyOut.getByRole('button', { name: /^Travel pool: €200\.00/ })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: /^To Travel: €200\.00/ })).toBeVisible()
     expect(await rest()).toBe(2009)
     await goToMonth(page, 'December 2026')
     await expect(moneyOut.getByRole('button', { name: 'To investments: €740.50' })).toBeVisible()
@@ -649,7 +649,7 @@ test.describe('working the month in the Statement', () => {
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
     await expect(assets.locator('[data-line^="pool:"]').filter({ hasText: 'Gifts' })).toContainText('€20.00')
-    await expect(moneyOut.getByRole('button', { name: 'Gifts pool: €20.00' })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: 'To Gifts: €20.00' })).toBeVisible()
 
     // under Debts: a card or a loan, and nothing else
     await claims.getByRole('button', { name: 'Add a card or loan' }).click()
@@ -895,7 +895,7 @@ test.describe('working the month in the Statement', () => {
     await expect(dlg.getByLabel('Amount in EUR')).toHaveValue('2550')
     const preview = dlg.getByTestId('top-up-preview')
     await expect(preview).toContainText('Money in · From Savings€2,550.00')
-    await expect(preview).toContainText('Money out · Clothing pool, this month€2,650.00')
+    await expect(preview).toContainText('Money out · To Clothing, this month€2,650.00')
     await expect(dlg.getByTestId('top-up-balance')).toHaveText('€0.00')
     await expect(dlg).toHaveCSS('opacity', '1')
     await page.screenshot({ path: 'e2e/output/statement-top-up-dialog.png' })
@@ -906,7 +906,7 @@ test.describe('working the month in the Statement', () => {
     const fromSavings = moneyIn.getByRole('button', { name: 'From Savings: €2,550.00' })
     await expect(fromSavings).toBeVisible()
     await expect(moneyIn.locator('[data-line]').filter({ has: page.getByRole('button', { name: 'From Savings: €2,550.00' }) })).toContainText('Top-up for Clothing')
-    await expect(moneyOut.getByRole('button', { name: /^Clothing pool: €2,650\.00/ })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: /^To Clothing: €2,650\.00/ })).toBeVisible()
     await expect(poolLine).not.toContainText('short')
     await expect(assets.getByRole('button', { name: 'Top up Clothing' })).toHaveCount(0)
     expect(await rest()).toBe(2369)
@@ -914,7 +914,7 @@ test.describe('working the month in the Statement', () => {
     await page.screenshot({ path: 'e2e/output/statement-topped-up.png', fullPage: true })
     // December is back to the usual €100, with nothing taken from savings
     await goToMonth(page, 'December 2026')
-    await expect(moneyOut.getByRole('button', { name: /^Clothing pool: €100\.00/ })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: /^To Clothing: €100\.00/ })).toBeVisible()
     await expect(moneyIn.getByRole('button', { name: /^From Savings:/ })).toHaveAccessibleName('From Savings: €0.00')
   })
 

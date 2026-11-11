@@ -458,7 +458,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   account's own savings account first, as `<account>, not set aside · <free amount>`, then the other savings and
   investment accounts with their balance, then `This month's income`) with a sentence for the chosen source; the
   amount, pre-filled with what is missing; and under `<month> will then show` the lines the save will leave (`Money
-  in · From <account>`, `Money out · <virtual account> pool, this month`, the virtual account's balance), worked out on a
+  in · From <account>`, `Money out · To <virtual account>, this month`, the virtual account's balance), worked out on a
   copy. Footer: a ghost `Not now` on the left, `Top up` on the right. `Not now` changes nothing.
 - The account dialog (`src/features/household/HouseholdAccountDialog.tsx`), one for the Household screen and the
   Statement. The short form asks what every account needs: `Name`, `Type` with the type's sentence under it, and

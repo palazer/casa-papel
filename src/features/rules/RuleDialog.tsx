@@ -9,7 +9,7 @@ import { Segmented } from '@/components/Segmented'
 import { amountToInput, formatAmount, formatMonth, formatShare, parseAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import { cellKey, computeEngine, sortRows } from '@/engine'
-import { RULE_KIND_INFO, addMonths, compareMonths, isOldPocketShare, isPocketRow, isShareRule, parseMonth, resolveRules, type Household, type MonthKey, type Row, type Tables } from '@/model'
+import { RULE_KIND_INFO, addMonths, compareMonths, isOldPocketShare, isPocketRow, isShareRule, parseMonth, poolRowName, resolveRules, type Household, type MonthKey, type Row, type Tables } from '@/model'
 import { previewRule, ruleRowOf, setRule, type RuleChoice, type RuleTarget } from '@/store'
 import { useSave } from '@/features/grid/RowDialogs'
 
@@ -145,7 +145,7 @@ export function RuleDialog({ tables, household, target: given, month, start, onC
         <DialogHeader>
           <DialogTitle>{pocket ? (adult ? `How much pocket money does ${adult.name} get?` : `How much is ${name}?`) : `How much goes to ${name}?`}</DialogTitle>
           <DialogDescription>
-            {found.error ?? (row ? <>Row &quot;{row.name}&quot;. Each month the app works the amount out from the rule you pick.{wasShareOfTotal ? ' Until now it was a share of the household\'s pocket money total; from the month below on it has an amount of its own.' : ''}</> : <>Nothing moves money to {name} yet. Saving adds the row &quot;{pool ? `${pool.name} pool` : `To ${name}`}&quot; under Transfers.</>)}
+            {found.error ?? (row ? <>Row &quot;{row.name}&quot;. Each month the app works the amount out from the rule you pick.{wasShareOfTotal ? ' Until now it was a share of the household\'s pocket money total; from the month below on it has an amount of its own.' : ''}</> : <>Nothing moves money to {name} yet. Saving adds the row &quot;{pool ? poolRowName(pool.name) : `To ${name}`}&quot; under Transfers.</>)}
           </DialogDescription>
         </DialogHeader>
         {!found.error && (

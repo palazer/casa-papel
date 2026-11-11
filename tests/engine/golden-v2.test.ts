@@ -92,7 +92,7 @@ describe('golden: v2 template workbook', () => {
     })
   })
 
-  it('matches the share-of-income column for rent and the travel pool', () => {
+  it('matches the share-of-income column for rent and the travel set-aside', () => {
     for (const r of [28, 43]) {
       const rowId = rowIdBySheetRow.get(r)!
       expect(out.rowTotals[rowId].shareOfIncome).toBeCloseTo(Math.abs(num(rows.get(r)?.a)), 6)

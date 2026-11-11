@@ -77,8 +77,8 @@ export function buildDemoTables(): Tables {
     // transfers
     { ...base(ID.rowToSavings, 'c0'), name: 'To savings', section: 'transfer', kind: 'to-savings', categoryId: ID.catTransfers, accountId: ID.savings, defaultStatus: 'committed' },
     { ...base(ID.rowToInvestment, 'c1'), name: 'To investments', section: 'transfer', kind: 'to-investment', categoryId: ID.catTransfers, accountId: ID.invest, defaultStatus: 'committed' },
-    { ...base(ID.rowTravelAlloc, 'c2'), name: 'Travel pool', section: 'transfer', kind: 'pool-allocation', categoryId: ID.catTransfers, accountId: ID.savings, defaultStatus: 'committed' },
-    { ...base(ID.rowClothingAlloc, 'c3'), name: 'Clothing pool', section: 'transfer', kind: 'pool-allocation', categoryId: ID.catTransfers, accountId: ID.savings, defaultStatus: 'committed' },
+    { ...base(ID.rowTravelAlloc, 'c2'), name: 'To Travel', section: 'transfer', kind: 'pool-allocation', categoryId: ID.catTransfers, accountId: ID.savings, defaultStatus: 'committed' },
+    { ...base(ID.rowClothingAlloc, 'c3'), name: 'To Clothing', section: 'transfer', kind: 'pool-allocation', categoryId: ID.catTransfers, accountId: ID.savings, defaultStatus: 'committed' },
     { ...base(ID.rowPocketSam, 'c4'), name: 'Sam – Pocket', section: 'transfer', kind: 'pocket-money', categoryId: ID.catTransfers, scope: ID.sam, pocketMode: 'fixed', defaultStatus: 'committed' },
     { ...base(ID.rowPocketAlex, 'c5'), name: 'Alex – Pocket', section: 'transfer', kind: 'pocket-money', categoryId: ID.catTransfers, scope: ID.alex, pocketMode: 'fixed', defaultStatus: 'committed' },
   ]

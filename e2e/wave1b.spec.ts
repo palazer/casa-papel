@@ -209,7 +209,7 @@ test.describe('wave 1b', () => {
     await expect(page.getByRole('rowheader', { name: /^To Savings/ })).toContainText('= the rest')
     await expect(page.getByRole('button', { name: /^Ana – Salary Nov 2026: €3,000\.00/ })).toBeVisible()
     await expect(page.getByRole('button', { name: /^The flat – Rent or mortgage Nov 2026: -?€1,400\.00/ })).toBeVisible()
-    await expect(page.getByRole('button', { name: /^Travel pool Nov 2026: -?€200\.00/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^To Travel Nov 2026: -?€200\.00/ })).toBeVisible()
     // neither the month-end rule nor how money is shared is a setting any more; the rule on a line is the one place
     await page.getByRole('link', { name: 'Household' }).click()
     await expect(page.getByLabel(/^Cash kept in the account at month end/)).toBeVisible()

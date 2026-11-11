@@ -173,13 +173,13 @@ export const GUIDE: GuideTopic[] = [
     title: 'Virtual accounts',
     summary: 'Set money aside inside a savings account for one purpose and spend from it without touching the month\'s leftover.',
     what: [
-      'A virtual account lives inside a savings account. A transfer row fills it every month, and spending that "comes out of" it draws it down; the savings balance already includes it. In the demo, "Travel pool" moves €200 a month into "Travel", held in "Savings", and "Weekend in Lisbon" takes €480 out of it in October.',
+      'A virtual account lives inside a savings account. A transfer row fills it every month, and spending that "comes out of" it draws it down; the savings balance already includes it. In the demo, "To Travel" moves €200 a month into "Travel", held in "Savings", and "Weekend in Lisbon" takes €480 out of it in October.',
       'It shows as "Virtual account · Travel" under Balances in the Grid, on a line of its own under its savings account on the Statement, and as "€… now" under Household. It never goes below zero: when an expense takes more than it holds, its line on the Statement says "short" and offers "Top up…". A virtual account that lost its row can be filled again from "Add row" under Transfers with "Fills a virtual account".',
     ],
     steps: [
       'Statement → "Assets" → "Add virtual account", or Household → "Virtual accounts" → "Add virtual account" (it needs a savings account: "Add a savings account first; virtual accounts live inside one.").',
       'Fill "Name", "Held in", "Already in it (EUR)", "Set aside each month (EUR)"; keep "Also add a spending row "Gifts" that comes out of it" ticked, then "Save".',
-      'The row "Gifts pool" appears under Transfers; type what goes in each month.',
+      'The row "To Gifts" appears under Transfers; type what goes in each month.',
       'In any spending cell, "Comes out of" → "Virtual account: Gifts" draws from it.',
       'Read it under its savings account on the Statement, or as "Virtual account · Gifts" under Balances in the Grid; a "short" chip means an expense took more than it held, and "Top up…" fills the gap.',
     ],

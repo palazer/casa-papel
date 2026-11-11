@@ -47,12 +47,12 @@ test.describe('wave 1c', () => {
     await page.getByRole('dialog').getByLabel(/^Set aside each month/).fill('50')
     await page.getByRole('dialog').getByRole('button', { name: 'Save' }).click()
     await expect(page.getByRole('dialog')).toBeHidden()
-    await expect(page.getByText(/filled by the row "Gifts pool"/)).toBeVisible()
+    await expect(page.getByText(/filled by the row "To Gifts"/)).toBeVisible()
 
     // grid: balances show the broker and the pool; pin a real value and watch December project from it
     await page.getByRole('link', { name: 'Grid' }).click()
     await expect(page.getByText('Virtual account · Gifts')).toBeVisible()
-    await expect(page.getByRole('button', { name: /^Gifts pool Nov 2026/ })).toContainText('50')
+    await expect(page.getByRole('button', { name: /^To Gifts Nov 2026/ })).toContainText('50')
     const brokerNov = page.getByRole('button', { name: /^Broker · value Nov 2026/ })
     await expect(brokerNov).toBeVisible()
     await brokerNov.click()

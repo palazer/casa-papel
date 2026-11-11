@@ -14,6 +14,9 @@ export function poolRef(poolId: Id): FundedBy {
   return `pool:${poolId}`
 }
 
+/** What the row that fills a virtual account is called when the app makes it: "To Travel", beside "To savings". */
+export const poolRowName = (poolName: string): string => `To ${poolName}`
+
 export function poolIdOf(f: FundedBy): Id | null {
   return f.startsWith('pool:') ? f.slice(5) : null
 }
