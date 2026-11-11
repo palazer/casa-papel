@@ -425,7 +425,7 @@ export function StatementScreen() {
           onClose={() => setAccountNew(null)} onSaved={onAccountSaved}
         />
       )}
-      {poolNew && <PoolDialog pool={null} savings={savingsAccounts} baseCurrency={ccy} locale={locale} fromMonth={statement.closed ? undefined : m} onClose={() => setPoolNew(false)} onError={setError} />}
+      {poolNew && <PoolDialog pool={null} savings={savingsAccounts} baseCurrency={ccy} locale={locale} fromMonth={statement.closed ? undefined : m} onClose={() => setPoolNew(false)} />}
       {topUpFor && <TopUpDialog key={`${topUpFor}:${m}`} tables={tables} engine={engine} household={household} poolId={topUpFor} month={m} onClose={() => setTopUpFor(null)} />}
       {accountEditing && (
         <HouseholdAccountDialog
@@ -436,7 +436,7 @@ export function StatementScreen() {
       )}
       {poolEditing && (
         <PoolDialog
-          key={poolEditing.id} pool={poolEditing} savings={savingsAccounts} baseCurrency={ccy} locale={locale} onError={setError}
+          key={poolEditing.id} pool={poolEditing} savings={savingsAccounts} baseCurrency={ccy} locale={locale}
           onClose={() => setPoolEdit(null)} removeLabel={settingUp ? 'Delete' : undefined}
           onRemove={() => { setPoolEdit(null); removeFrom({ kind: 'pool', id: poolEditing.id }) }}
         />

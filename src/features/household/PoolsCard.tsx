@@ -69,7 +69,7 @@ export function PoolsCard({ household, tables, engine, onError }: { household: H
         )}
         {editing && (
           <PoolDialog
-            pool={editing === 'new' ? null : editing} savings={savings} baseCurrency={baseCurrency} locale={locale} onClose={() => setEditing(null)} onError={onError}
+            pool={editing === 'new' ? null : editing} savings={savings} baseCurrency={baseCurrency} locale={locale} onClose={() => setEditing(null)}
             onRemove={editing !== 'new' ? () => { setRemoving(editing); setEditing(null) } : undefined}
           />
         )}
@@ -83,11 +83,11 @@ export function PoolsCard({ household, tables, engine, onError }: { household: H
  * A virtual account: its name, the savings account that holds it, what is already in it, and for a new one what is set
  * aside each month. The Statement opens it too, with the month on screen as the month the set-aside starts in.
  */
-export function PoolDialog({ pool, savings, baseCurrency, locale, fromMonth, onClose, onError, onRemove, onSaved, removeLabel = 'Archive or delete…' }: {
+export function PoolDialog({ pool, savings, baseCurrency, locale, fromMonth, onClose, onRemove, onSaved, removeLabel = 'Archive or delete…' }: {
   pool: Pool | null; savings: Account[]; baseCurrency: string; locale: string
   /** A new virtual account: the month its monthly amount starts in; this month when left out. */
   fromMonth?: MonthKey
-  onClose: () => void; onError: (m: string) => void; onRemove?: () => void
+  onClose: () => void; onRemove?: () => void
   /** A new virtual account was saved. */
   onSaved?: (pool: Pool) => void
   /** What the remove button says: "Delete" where removing is one click. */
@@ -112,7 +112,8 @@ export function PoolDialog({ pool, savings, baseCurrency, locale, fromMonth, onC
     const p: Promise<unknown> = pool
       ? updatePool(store, pool.id, { name: name.trim(), accountId, openingBalance })
       : addPool(store, { name: name.trim(), accountId, openingBalance, monthlyAllocation, fromMonth, createSpendRow: spendRow }).then((made) => onSaved?.(made))
-    p.then(onClose).catch((e) => { setBusy(false); onError(e instanceof Error ? e.message : 'Failed') })
+    // a refusal is said in the dialog, where it is seen: the screen's own alert sits behind it
+    p.then(onClose).catch((e) => { setBusy(false); setError(e instanceof Error ? e.message : 'Could not save.') })
   }
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
