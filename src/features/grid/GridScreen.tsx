@@ -327,6 +327,10 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
   const deductedFrom = row.deductedFromRowId ? tables.rows.find((r) => r.id === row.deductedFromRowId) : undefined
   const shareTag = row.followShare != null && row.followShare !== 1 ? `${formatPercent(row.followShare, locale)} of ` : ''
   const automatic = derivedRowReason(row, household.closingRule) !== null
+  // "Rule…" opens the row's dialog in a month that can still change: this month when it is shown and open, else the first open one
+  const thisMonth = monthOfDate()
+  const openMonth = (m: MonthKey) => !engine.totals[m]?.closed
+  const ruleMonth = months.find((m) => m === thisMonth && openMonth(m)) ?? months.find((m) => m > thisMonth && openMonth(m)) ?? months.find(openMonth) ?? months[0]
   /** A row a rule works out says which, the way a follower names its row. */
   const ruleTag = rule && rule.kind !== 'idle' ? ruleText(rule, locale) : null
   return (
@@ -349,7 +353,7 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
           {automatic && (isOldPocketShare(row)
             ? <InfoTip help="row.rule" text={'A share of the pocket money total the household had before. Give it an amount or a rule of its own: row menu, "Rule…".'} />
             : <InfoTip help={row.kind === 'category-estimate' ? 'row.categoryEstimate' : row.kind === 'to-savings' && !isShareRule(rule?.kind) ? 'row.toSavingsPlug' : 'row.rule'} />)}
-          <RowMenu row={row} tables={tables} household={household} onError={onError} />
+          <RowMenu row={row} tables={tables} household={household} onError={onError} onRule={() => onSelect(ruleMonth)} />
         </div>
       </th>
       {months.map((m, c) => {

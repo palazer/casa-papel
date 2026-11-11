@@ -11,12 +11,14 @@ import { readPref, writePref } from '@/app/prefs'
 import { useStore } from '@/app/store'
 import { cellKey, type EngineOutput } from '@/engine'
 import { RecurringDialog } from '@/features/recurring/RecurringDialog'
-import { compareMonths, describeCadence, isTakenFromAccount, newId, type CellItem, type Household, type ItemStatus, type MonthKey, type Row, type Tables } from '@/model'
+import { canCarryRule, compareMonths, describeCadence, isTakenFromAccount, newId, type CellItem, type Household, type ItemStatus, type MonthKey, type Row, type Tables } from '@/model'
 import {
   changeRecurringFrom, clearCell, endRecurringFrom, itemsFromCurrent, reopenMonth, setCellItems, setCellValue, skipRecurringMonth,
-  type EditScope,
+  type EditScope, type RuleTarget,
 } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
+import { RuleFields, RulePicker } from '@/features/rules/RuleDialog'
+import { ruleFacts, type RuleKind } from '@/features/rules/ruleFacts'
 import { DoneDot } from '@/components/DoneDot'
 import { NativeSelect } from '@/components/NativeSelect'
 import { RateLine } from './RateLine'
@@ -30,6 +32,8 @@ interface Props {
   household: Household
   row: Row
   month: MonthKey
+  /** For a row that can carry a rule: the choice the dialog opens on, instead of how this month's amount is set now. */
+  startRule?: RuleKind
   onClose: () => void
 }
 
@@ -37,10 +41,24 @@ type Mode = 'value' | 'items'
 type StatusChoice = 'default' | ItemStatus
 const STATUS_LABEL: Record<ItemStatus, string> = { projected: 'Estimate', committed: 'Certain', done: 'Done' }
 
-export function CellEditor({ tables, engine, household, row, month, onClose }: Props) {
+/**
+ * The one dialog of a row in a month (DESIGN.md §8): its amount, as a single amount or as items, how sure it is and
+ * which months it applies to. A row that can carry a rule (pocket money, the transfer that fills an account) starts
+ * with "How the amount is set": a fixed amount shows these fields, a percentage or the rest shows the rule's.
+ */
+export function CellEditor({ tables, engine, household, row, month, startRule, onClose }: Props) {
   const store = useStore()
   const cell = engine.cells[cellKey(row.id, month)]
   const closed = engine.totals[month]?.closed ?? false
+  // ----- the rule, for a row that can carry one -----
+  const ruleTarget = useMemo<RuleTarget>(() => ({ rowId: row.id }), [row.id])
+  const facts = useMemo(() => (canCarryRule(row) ? ruleFacts(tables, household, ruleTarget) : null), [tables, household, row, ruleTarget])
+  /** The app works this month's amount out: the dialog opens on the rule that does, and has no amount to type. */
+  const worked = cell?.source === 'derived'
+  const [ruleKind, setRuleKind] = useState<RuleKind>(startRule ?? (worked && facts ? facts.current : 'fixed'))
+  const showRuleFields = !!facts && !facts.error && (ruleKind !== 'fixed' || worked)
+  /** A rule fills this row's other months, so an amount typed here is for this month alone. */
+  const ruleRuns = !!facts && (facts.current !== 'fixed' || facts.wasShareOfTotal)
   // the engine's currency: a follower takes its target's
   const currency = cell?.currency ?? row.currency ?? household.baseCurrency
   const locale = household.locale
@@ -77,6 +95,8 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
   useEffect(() => {
     if (!oneOff) writePref('editScope', scope)
   }, [scope, oneOff])
+  // the rule fills the months after this one: nothing carries on from a typed amount, and nothing is held for it
+  const saveScope: EditScope = ruleRuns ? 'from-now-on' : scope
 
   const itemsTotal = items.filter((i) => !i.skipped).reduce((s, i) => s + (i.kind === 'carry' ? (cell?.items.find((x) => x.id === i.id)?.effectiveAmount ?? prevValue()) : i.amount), 0)
 
@@ -106,9 +126,9 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
       return
     }
     // A plain value takes the row's defaults; any other certainty or source is stored as one unlabelled item.
-    if (status === 'default' && fundedBy === row.defaultFundedBy) return void run(() => setCellValue(store, row.id, month, minor, scope))
+    if (status === 'default' && fundedBy === row.defaultFundedBy) return void run(() => setCellValue(store, row.id, month, minor, saveScope))
     const single: CellItem = { id: newId(), label: '', amount: minor, status: status === 'default' ? row.defaultStatus : status, fundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }
-    void run(() => setCellItems(store, row.id, month, [single], scope))
+    void run(() => setCellItems(store, row.id, month, [single], saveScope))
   }
 
   /** A scheduled item whose amount or funding was edited here. */
@@ -130,7 +150,7 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
           next = next.map((x) => (x.id === it.id ? { ...x, pinned: true } : x))
         }
       }
-      await setCellItems(store, row.id, month, next, isRecurringRow ? 'this-month' : scope)
+      await setCellItems(store, row.id, month, next, isRecurringRow ? 'this-month' : saveScope)
     })
   }
 
@@ -180,6 +200,7 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
 
   const title = `${row.name} · ${formatMonth(month, locale, 'long')}`
   const sourceText =
+    cell?.source === 'derived' ? 'Worked out by the app' :
     cell?.source === 'inherit' ? 'Carried from the previous month' :
     cell?.source === 'value' ? 'Set in this month' :
     cell?.source === 'items' ? (soloItem ? 'Set in this month' : isRecurringRow ? 'Posted from a schedule' : `${cell.items.length} item${cell.items.length === 1 ? '' : 's'}`) :
@@ -200,8 +221,14 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
             <p className="text-sm">This month is closed. Reopen it to make changes.</p>
             <Button variant="outline" onClick={() => void run(() => reopenMonth(store, month))} disabled={busy}>Reopen {formatMonth(month, locale)}</Button>
           </div>
+        ) : showRuleFields && facts ? (
+          <>
+            <RulePicker facts={facts} kind={ruleKind} onKind={setRuleKind} />
+            <RuleFields tables={tables} household={household} target={ruleTarget} facts={facts} month={month} kind={ruleKind} onClose={onClose} />
+          </>
         ) : (
           <div className="space-y-4">
+            {facts && !facts.error && <RulePicker facts={facts} kind={ruleKind} onKind={setRuleKind} />}
             {!isRecurringRow && (
               <div className="inline-flex rounded-md border p-0.5 text-sm" role="tablist">
                 <button role="tab" aria-selected={mode === 'value'} className={cn('rounded px-3 py-1', mode === 'value' && 'bg-muted font-medium')} onClick={() => setMode('value')}>Single amount</button>
@@ -216,13 +243,17 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
                   <Input id="cell-amount" autoFocus inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') saveValue() }} placeholder="0" />
                   {currency !== household.baseCurrency && <RateLine tables={tables} household={household} month={month} currency={currency} amount={parseAmount(text, currency, locale) ?? 0} />}
                 </div>
-                <fieldset className="space-y-1.5">
-                  <legend className="text-sm font-medium"><span className="inline-flex items-center gap-1">Applies to <InfoTip help="cell.appliesTo" /></span></legend>
-                  <Segmented value={scope} onChange={(v) => setScope(v as EditScope)} options={[{ value: 'from-now-on', label: 'This month and onwards' }, { value: 'this-month', label: 'Only this month' }]} />
-                  <p className="text-xs text-muted-foreground">
-                    {scope === 'from-now-on' ? 'Later months that follow this row will pick up the new amount.' : 'The next month keeps the old amount.'}
-                  </p>
-                </fieldset>
+                {ruleRuns ? (
+                  <p className="text-xs text-muted-foreground" data-testid="rule-runs">This amount is for {formatMonth(month, locale, 'long')} alone. A rule works this row out in every month without a typed amount; to change the rule, open a month it works out.</p>
+                ) : (
+                  <fieldset className="space-y-1.5">
+                    <legend className="text-sm font-medium"><span className="inline-flex items-center gap-1">Applies to <InfoTip help="cell.appliesTo" /></span></legend>
+                    <Segmented value={scope} onChange={(v) => setScope(v as EditScope)} options={[{ value: 'from-now-on', label: 'This month and onwards' }, { value: 'this-month', label: 'Only this month' }]} />
+                    <p className="text-xs text-muted-foreground">
+                      {scope === 'from-now-on' ? 'Later months that follow this row will pick up the new amount.' : 'The next month keeps the old amount.'}
+                    </p>
+                  </fieldset>
+                )}
                 <fieldset className="space-y-1.5">
                   <legend className="text-sm font-medium"><span className="inline-flex items-center gap-1">How sure <InfoTip help="cell.howSure" /></span></legend>
                   <Segmented
@@ -332,7 +363,7 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
                 {row.section === 'expense' && (
                   <p className="text-xs text-muted-foreground">{HELP['cell.comesOutOf'].text}</p>
                 )}
-                {!isRecurringRow && (
+                {!isRecurringRow && !ruleRuns && (
                   <Segmented value={scope} onChange={(v) => setScope(v as EditScope)} options={[{ value: 'from-now-on', label: 'This month and onwards' }, { value: 'this-month', label: 'Only this month' }]} />
                 )}
               </div>
@@ -350,10 +381,10 @@ export function CellEditor({ tables, engine, household, row, month, onClose }: P
           </div>
         )}
 
-        {!closed && (
+        {!closed && !showRuleFields && (
           <DialogFooter className="flex-row flex-wrap gap-2 sm:justify-between">
             <div className="flex gap-2">
-              {!isRecurringRow && <Button variant="ghost" onClick={() => void run(() => clearCell(store, row.id, month))} disabled={busy || !cell?.cell}>Clear (inherit)</Button>}
+              {!isRecurringRow && <Button variant="ghost" onClick={() => void run(() => clearCell(store, row.id, month))} disabled={busy || !cell?.cell}>{ruleRuns ? 'Clear (back to the rule)' : 'Clear (inherit)'}</Button>}
               <Button variant="ghost" onClick={() => setRecurring(true)} disabled={busy}>Make recurring…</Button>
             </div>
             <div className="flex gap-2">

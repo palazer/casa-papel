@@ -5,7 +5,6 @@ import { Chip } from '@/components/ui/chip'
 import { InfoTip } from '@/components/InfoTip'
 import { Tick } from '@/components/Tick'
 import { cn } from '@/lib/utils'
-import { isShareRule } from '@/model'
 import { ESTIMATE_SHADE, ruleText, type DoneState } from '@/app/display'
 import { formatAmount, formatPercent, formatShare } from '@/app/format'
 import type { HelpKey } from '@/app/help'
@@ -27,7 +26,7 @@ export interface LineContext {
   /** How much of a row or an item is done; null when there is nothing to tick. Leave out for a side without ticks. */
   doneOf?: (line: Line) => { done: number; total: number; state: DoneState } | null
   onTick?: (line: Line, done: boolean) => void
-  /** Open the cell editor for a row. */
+  /** Open a row's dialog: its amount and, where it can carry one, its rule. */
   onEdit?: (rowId: string) => void
   /** The line (or row) a tick is being saved for. */
   busy?: string | null
@@ -41,7 +40,7 @@ export interface LineContext {
   onCurrentBalance?: () => void
   /** Set or change a category's estimate; "Not broken down yet" opens it too. */
   onEstimate?: (categoryId: string) => void
-  /** Open the rule dialog for a transfer line, or for the account or virtual account it feeds. Leave out to show the rule without the button. */
+  /** The rule symbol on an account or a virtual account: open the dialog of the row that fills it. Leave out to show the rule without the button. */
   onRule?: (line: Line) => void
   /** Top up a virtual account that is short this month. */
   onTopUp?: (poolId: string) => void
@@ -94,8 +93,8 @@ export function StatementLines({ lines, level, ctx, parent }: { lines: Line[]; l
 
 /**
  * One line of the Statement (DESIGN.md §7). A group is a heading on its hue's tint with its lines always under it; a
- * category, an account or an itemized row opens as an accordion; a row and its items carry a tick and open the cell
- * editor; everything else is a name, its tags and its amount. A transfer that feeds an account, and that account,
+ * category, an account or an itemized row opens as an accordion; a row and its items carry a tick and open the row's
+ * one dialog; everything else is a name, its tags and its amount. A transfer that feeds an account, and that account,
  * carry the rule symbol.
  */
 function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: number; ctx: LineContext; parent?: Line }) {
@@ -174,19 +173,19 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
   if (rowLike) {
     const working = !ctx.closed && !!ctx.doneOf
     const d = working ? ctx.doneOf!(line) : null
-    // a line a rule works out has no amount to type: it opens its rule instead of the cell editor
-    const byRule = !!line.rule && (line.automatic || isShareRule(line.rule.kind))
-    const ruleOpens = !ctx.closed && !!ctx.onRule && byRule
-    const editable = !ctx.closed && !!ctx.onEdit && !!line.rowId && !line.automatic && !byRule
+    // one dialog per row: a line the app works out opens it too when a rule does the working out (the dialog then
+    // shows the rule); any other automatic line has nothing to change
+    const editable = !ctx.closed && !!ctx.onEdit && !!line.rowId && (!line.automatic || !!line.rule)
     // what is left of a category's estimate is worked out, so the line opens the estimate it comes from
     const estimateOf = !ctx.closed && ctx.onEstimate ? line.estimateFor : undefined
     const busy = ctx.busy != null && (ctx.busy === line.id || ctx.busy === line.rowId || ctx.busy.startsWith(`${line.rowId}:`))
     const said = `${fullLabel}: ${line.empty ? 'empty' : amountText}${shaded ? ', an estimate' : ''}`
     // a row carries its menu; what is left of an estimate is not a row of its own, and a closed month changes nothing
     const menu = !ctx.closed && line.kind === 'row' && line.rowId && line.estimateFor == null ? ctx.rowMenu?.(line.rowId) : null
-    const press = ruleOpens ? () => ctx.onRule!(line) : estimateOf ? () => ctx.onEstimate!(estimateOf) : editable ? () => ctx.onEdit!(line.rowId!) : null
+    const press = estimateOf ? () => ctx.onEstimate!(estimateOf) : editable ? () => ctx.onEdit!(line.rowId!) : null
     // A line that opens something can hold more controls: the rule symbol, the menu. So the line's button is its name,
-    // stretched over the whole line, and the other controls sit above it.
+    // stretched over the whole line, and the other controls sit above it. The rule symbol opens the same dialog: it
+    // stays a button so that it says the rule when it is pointed at or read out.
     const main = press ? (
       <div className="relative -mr-2 flex min-w-0 flex-1 items-center gap-1.5 self-stretch rounded pr-2 hover:bg-muted">
         <span className={LABEL}>
@@ -197,7 +196,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
             {line.label}
           </button>
           {tags}
-          {line.rule && <RuleMark line={line} ctx={ctx} className={ABOVE} />}
+          {line.rule && <RuleMark line={line} ctx={{ ...ctx, onRule: press }} className={ABOVE} />}
           {menu && <span className={cn(ABOVE, 'inline-flex')}>{menu}</span>}
         </span>
         {amount}
@@ -292,7 +291,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
  * it feeds, and how an adult's pocket money is. An arrow to a line for the rest, the percentage for a share of income,
  * the percentage and a person for a share of the adult's own income, the percentage and the arrow for a share of what
  * is left, an equals sign for a fixed amount (faint where there is no rule yet). A button when the
- * rule can be changed from here, the bare symbol otherwise; its name says the rule in full.
+ * rule can be changed from here (it opens the row's dialog), the bare symbol otherwise; its name says the rule in full.
  */
 function RuleMark({ line, ctx, className }: { line: Line; ctx: LineContext; className?: string }) {
   const rule = line.rule

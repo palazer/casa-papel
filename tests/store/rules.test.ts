@@ -243,4 +243,27 @@ describe('setRule', () => {
     expect((await loadTables(store)).rows.find((r) => r.id === toBroker.id)?.rule).toBeNull()
     expect(() => previewRule(t, { rowId: toBroker.id }, { kind: 'share-of-income', share: 0 }, '2026-03', months)).toThrow(/above 0 and at most 100/)
   })
+
+  it('an amount typed for one month only leaves the next month to the rule', async () => {
+    const { store, toBroker, rainy } = await fresh()
+    await setRule(store, { rowId: toBroker.id }, { kind: 'share-of-income', share: 0.1 }, '2026-02')
+    await setCellValue(store, toBroker.id, '2026-03', 55000, 'this-month')
+    let out = await engineOf(store)
+    expect(out.cells[cellKey(toBroker.id, '2026-03')]).toMatchObject({ value: 55000, source: 'value' })
+    // April is still the rule's: nothing was written down to hold it
+    expect(out.cells[cellKey(toBroker.id, '2026-04')]).toMatchObject({ value: 40000, source: 'derived' })
+    expect((await loadTables(store)).cells.some((c) => c.rowId === toBroker.id && c.month === '2026-04')).toBe(false)
+    // the same for a row chosen to take the rest: a typed month, then the rest again
+    const toRainy = await setRule(store, { accountId: rainy.id }, { kind: 'rest' }, '2026-02')
+    await setCellValue(store, toRainy.id, '2026-03', 100000, 'this-month')
+    out = await engineOf(store)
+    expect(out.cells[cellKey(toRainy.id, '2026-03')]).toMatchObject({ value: 100000, source: 'value' })
+    expect(out.cells[cellKey(toRainy.id, '2026-04')].source).toBe('derived')
+    // a typed row still holds its next month, as before
+    await setCellValue(store, (await loadTables(store)).rows.find((r) => r.name === 'Rent')!.id, '2026-03', 160000, 'this-month')
+    out = await engineOf(store)
+    const rent = out.rows.find((r) => r.name === 'Rent')!
+    expect(value(out, rent, '2026-03')).toBe(160000)
+    expect(value(out, rent, '2026-04')).toBe(150000)
+  })
 })

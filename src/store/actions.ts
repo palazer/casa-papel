@@ -47,6 +47,10 @@ const putCell = (cell: CellInput): Mutation => ({ op: 'put', table: 'cells', rec
 function freezeNext(tables: Tables, engine: EngineOutput, rowId: string, month: MonthKey): Mutation[] {
   // a scheduled row never carries forward, so there is nothing to freeze (and a value cell there would post a phantom amount)
   if (engine.recurringRowIds.includes(rowId)) return []
+  // a row a rule works out fills its own months: holding the next one would take that month away from the rule
+  const row = tables.rows.find((r) => r.id === rowId)
+  const household = tables.household.find((h) => !h.deletedAt)
+  if (row && household && (resolveRules(engine.rows, household.closingRule).byRow.has(rowId) || isOldPocketShare(row))) return []
   const next = addMonths(month, 1)
   const nextCell = cellOf(tables, rowId, next)
   const current = engine.cells[cellKey(rowId, month)]

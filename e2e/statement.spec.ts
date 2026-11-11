@@ -159,10 +159,12 @@ test.describe('working the month in the Statement', () => {
     await expect(childcare).toBeChecked()
     await expect(progress).toHaveText(/^1 of 21 done/)
 
-    // an automatic row can be ticked as moved but not typed over: pressing it opens its rule, not the cell editor
+    // an automatic row can be ticked as moved but not typed over: its dialog opens on the rule that works it out
     await expect(page.getByRole('checkbox', { name: 'To savings done' })).toBeVisible()
     await moneyOut.getByRole('button', { name: /^To savings:/ }).click()
-    await expect(dlg.getByRole('heading', { name: 'How much goes to Savings?' })).toBeVisible()
+    await expect(dlg.getByRole('heading', { name: 'To savings · November 2026' })).toBeVisible()
+    await expect(dlg.getByRole('radio', { name: 'The rest' })).toBeChecked()
+    await expect(dlg.getByLabel('Amount in EUR')).toHaveCount(0)
     await dlg.getByRole('button', { name: 'Cancel' }).click()
     await expect(dlg).toBeHidden()
     // pocket money is a line per adult with an amount of its own
@@ -490,14 +492,31 @@ test.describe('working the month in the Statement', () => {
     await expect(moneyOut.getByText('the rest', { exact: true })).toHaveCount(0)
     expect(await rest()).toBe(2369)
 
+    // one dialog per row: the name, the amount and the rule symbol all open it, with how the amount is set on top
+    await moneyOut.getByRole('button', { name: /^To investments: €500\.00/ }).click()
+    await expect(dlg.getByRole('heading', { name: 'To investments · November 2026' })).toBeVisible()
+    await expect(dlg.getByRole('radiogroup', { name: 'How the amount is set' }).getByRole('radio')).toHaveText(['A fixed amount', 'A percentage of income', 'A percentage of what is left', 'The rest'])
+    await expect(dlg.getByText('Applies to')).toBeVisible()
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+    await expect(dlg).toBeHidden()
+    const investments = moneyOut.locator('[data-line]').filter({ has: page.getByRole('button', { name: /^To investments:/ }) })
+    const box = (await investments.boundingBox())!
+    await investments.click({ position: { x: box.width - 20, y: box.height / 2 } })
+    await expect(dlg.getByRole('heading', { name: 'To investments · November 2026' })).toBeVisible()
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+    await expect(dlg).toBeHidden()
+
     // 10 % of income for the investments, from this month on
     await moneyOut.getByRole('button', { name: 'Rule for To investments: a fixed amount' }).click()
-    await expect(dlg.getByRole('heading', { name: 'How much goes to Index fund?' })).toBeVisible()
+    await expect(dlg.getByRole('heading', { name: 'To investments · November 2026' })).toBeVisible()
     await expect(dlg.getByRole('radio', { name: 'A fixed amount' })).toBeChecked()
-    await expect(dlg.getByLabel('Amount per month in EUR')).toHaveValue('500')
+    await expect(dlg.getByLabel('Amount in EUR')).toHaveValue('500')
     // every account a rule can feed may take the rest
     await expect(dlg.getByRole('radio', { name: 'The rest' })).toBeVisible()
     await dlg.getByRole('radio', { name: 'A percentage of income' }).click()
+    // the fields of the amount make way for the rule's
+    await expect(dlg.getByLabel('Amount in EUR')).toHaveCount(0)
+    await expect(dlg.getByText('Applies to')).toHaveCount(0)
     await expect(dlg.getByRole('button', { name: 'Save' })).toBeDisabled()
     await dlg.getByLabel('Percentage of income').fill('120')
     await expect(dlg.getByRole('alert')).toContainText('above 0 and at most 100')
@@ -518,15 +537,17 @@ test.describe('working the month in the Statement', () => {
     expect(await rest()).toBe(2128.5)
     await balanced()
 
-    // a worked-out line opens its rule, not the cell editor
+    // a worked-out line opens the same dialog on its rule
     await moneyOut.getByRole('button', { name: 'To investments: €740.50' }).click()
-    await expect(dlg.getByRole('heading', { name: 'How much goes to Index fund?' })).toBeVisible()
+    await expect(dlg.getByRole('heading', { name: 'To investments · November 2026' })).toBeVisible()
+    await expect(dlg).toContainText('Worked out by the app · currently €740.50')
+    await expect(dlg.getByRole('radio', { name: 'A percentage of income' })).toBeChecked()
     await expect(dlg.getByLabel('Percentage of income')).toHaveValue('10')
     await dlg.getByRole('button', { name: 'Cancel' }).click()
 
-    // from the account: the Travel virtual account takes a fifth of what is left
+    // from the account: its symbol opens the dialog of the row that fills it; the Travel virtual account takes a fifth of what is left
     await assets.getByRole('button', { name: 'Rule for Travel: a fixed amount' }).click()
-    await expect(dlg.getByRole('heading', { name: 'How much goes to Travel?' })).toBeVisible()
+    await expect(dlg.getByRole('heading', { name: 'To Travel · November 2026' })).toBeVisible()
     await dlg.getByRole('radio', { name: 'A percentage of what is left' }).click()
     await dlg.getByLabel('Percentage of what is left').fill('20')
     // its own €200 goes back into what is left first: 2,128.50 + 200
@@ -548,6 +569,12 @@ test.describe('working the month in the Statement', () => {
     await expect(moneyOut.getByRole('button', { name: /^To investments: €500\.00/ })).toBeVisible()
     await expect(moneyOut.getByRole('button', { name: /^To Travel: €200\.00/ })).toBeVisible()
     expect(await rest()).toBe(2009)
+    // its typed amount is for that month alone, so the dialog does not ask which months it applies to
+    await moneyOut.getByRole('button', { name: /^To investments: €500\.00/ }).click()
+    await expect(dlg.getByLabel('Amount in EUR')).toHaveValue('500')
+    await expect(dlg.getByTestId('rule-runs')).toContainText('for October 2026 alone')
+    await expect(dlg.getByText('Applies to')).toHaveCount(0)
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
     await goToMonth(page, 'December 2026')
     await expect(moneyOut.getByRole('button', { name: 'To investments: €740.50' })).toBeVisible()
     await balanced()
@@ -563,7 +590,8 @@ test.describe('working the month in the Statement', () => {
     await expect(page.getByText('= 20% of what is left')).toBeVisible()
     await page.getByRole('button', { name: 'Row menu for To investments' }).click()
     await page.getByRole('menuitem', { name: 'Rule…' }).click()
-    await expect(dlg.getByRole('heading', { name: 'How much goes to Index fund?' })).toBeVisible()
+    await expect(dlg.getByRole('heading', { name: 'To investments · November 2026' })).toBeVisible()
+    await expect(dlg.getByLabel('Percentage of income')).toHaveValue('10')
     await dlg.getByRole('button', { name: 'Cancel' }).click()
   })
 
@@ -577,10 +605,12 @@ test.describe('working the month in the Statement', () => {
 
     // a pocket line carries the rule symbol, like a transfer to an account
     await moneyOut.getByRole('button', { name: 'Rule for Sam – Pocket: a fixed amount' }).click()
-    await expect(dlg.getByRole('heading', { name: 'How much pocket money does Sam get?' })).toBeVisible()
-    await expect(dlg.getByRole('radiogroup', { name: 'Rule' }).getByRole('radio')).toHaveText(['A fixed amount', 'A percentage of income', 'A percentage of Sam\'s income', 'A percentage of what is left'])
+    await expect(dlg.getByRole('heading', { name: 'Sam – Pocket · November 2026' })).toBeVisible()
+    await expect(dlg.getByRole('radiogroup', { name: 'How the amount is set' }).getByRole('radio')).toHaveText(['A fixed amount', 'A percentage of income', 'A percentage of Sam\'s income', 'A percentage of what is left'])
     await expect(dlg.getByRole('radio', { name: 'A fixed amount' })).toBeChecked()
-    await expect(dlg.getByLabel('Amount per month in EUR')).toHaveValue('500')
+    await expect(dlg.getByLabel('Amount in EUR')).toHaveValue('500')
+    await expect(dlg).toHaveCSS('opacity', '1')
+    await page.screenshot({ path: 'e2e/output/statement-row-dialog.png' })
     await dlg.getByRole('radio', { name: 'A percentage of Sam\'s income' }).click()
     await expect(dlg).toContainText('the income lines that belong to them')
     await dlg.getByLabel('Percentage of Sam\'s income').fill('10')
@@ -598,13 +628,22 @@ test.describe('working the month in the Statement', () => {
     await expect(moneyOut.getByRole('button', { name: 'Alex – Pocket: €500.00' })).toBeVisible()
     await expect(moneyOut.getByRole('button', { name: 'To savings: €2,449.00' })).toBeVisible()
     await page.screenshot({ path: 'e2e/output/statement-pocket-rule.png' })
-    // a line a rule works out opens its rule when pressed, not the cell editor
+    // a line a rule works out opens the same dialog on its rule
     await moneyOut.getByRole('button', { name: 'Sam – Pocket: €420.00' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Sam – Pocket · November 2026' })).toBeVisible()
     await expect(dlg.getByRole('radio', { name: 'A percentage of Sam\'s income' })).toBeChecked()
     await expect(dlg.getByLabel('Percentage of Sam\'s income')).toHaveValue('10')
     await dlg.getByRole('button', { name: 'Cancel' }).click()
     await page.setViewportSize({ width: 390, height: 844 })
     await page.screenshot({ path: 'e2e/output/statement-pocket-rule-phone.png', fullPage: true })
+    // the one dialog on a phone, with the amount's fields
+    await moneyOut.getByRole('button', { name: 'Alex – Pocket: €500.00' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Alex – Pocket · November 2026' })).toBeVisible()
+    await expect(dlg.getByLabel('Amount in EUR')).toHaveValue('500')
+    await expect(dlg).toHaveCSS('opacity', '1')
+    await page.screenshot({ path: 'e2e/output/statement-row-dialog-phone.png' })
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+    await expect(dlg).toBeHidden()
     await page.setViewportSize({ width: 1400, height: 900 })
 
     // the month before keeps what it showed

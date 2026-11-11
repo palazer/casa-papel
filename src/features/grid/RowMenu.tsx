@@ -7,15 +7,14 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { useStore } from '@/app/store'
-import { canCarryRule, monthOfDate, type Household, type Row, type Tables } from '@/model'
+import { canCarryRule, type Household, type Row, type Tables } from '@/model'
 import { derivedRowReason, moveRow, removeIfFree, renameRow, restoreRow, updateRow } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
-import { RuleDialog } from '@/features/rules/RuleDialog'
 import { RowAccountDialog, RowCurrencyDialog, RowDeductionDialog, RowFollowDialog, RowScopeDialog, RowSourceDialog } from './RowDialogs'
 import { RowCategoryDialog } from './RowCategoryDialog'
 import { accountVerb } from './rowAccount'
 
-type Open = 'rename' | 'category' | 'scope' | 'currency' | 'source' | 'deduction' | 'account' | 'follow' | 'rule' | 'remove' | null
+type Open = 'rename' | 'category' | 'scope' | 'currency' | 'source' | 'deduction' | 'account' | 'follow' | 'remove' | null
 
 /** In the Grid the "…" shows while its row is hovered; another screen says when it shows on its own lines. */
 const GRID_TRIGGER = 'size-6 opacity-0 group-hover:opacity-100 focus:opacity-100 data-popup-open:opacity-100'
@@ -24,8 +23,10 @@ const GRID_TRIGGER = 'size-6 opacity-0 group-hover:opacity-100 focus:opacity-100
  * Everything that can be done to a row, behind the "…" beside its name. The Grid and the Statement show the same
  * menu; `triggerClassName` is the one thing that differs, when the "…" is visible.
  */
-export function RowMenu({ row, tables, household, onError, onDeleted, triggerClassName = GRID_TRIGGER }: {
+export function RowMenu({ row, tables, household, onError, onDeleted, onRule, triggerClassName = GRID_TRIGGER }: {
   row: Row; tables: Tables; household: Household; onError: (msg: string) => void
+  /** "Rule…" for a row that can carry one: the screen opens the row's dialog, which holds the rule. */
+  onRule?: () => void
   /** A row was deleted in one click (a household that is being set up); the screen can say so and offer the way back. */
   onDeleted?: (name: string) => void
   triggerClassName?: string
@@ -71,7 +72,7 @@ export function RowMenu({ row, tables, household, onError, onDeleted, triggerCla
           {row.section === 'expense' && <DropdownMenuItem onClick={() => setOpen('source')}>Comes out of…</DropdownMenuItem>}
           {row.section === 'expense' && <DropdownMenuItem onClick={() => setOpen('deduction')}>{deductedFrom ? `Deducted from ${deductedFrom.name}…` : 'Deducted from an income…'}</DropdownMenuItem>}
           {row.kind !== 'pool-allocation' && <DropdownMenuItem onClick={() => setOpen('account')}>{accountVerb(row)}…</DropdownMenuItem>}
-          {canCarryRule(row) && !row.archivedMonth && <DropdownMenuItem onClick={() => setOpen('rule')}>Rule…</DropdownMenuItem>}
+          {onRule && canCarryRule(row) && !row.archivedMonth && <DropdownMenuItem onClick={onRule}>Rule…</DropdownMenuItem>}
           {canFollow && <DropdownMenuItem onClick={() => setOpen('follow')}>{followed ? `Follows ${followed.name}…` : 'Follow another row…'}</DropdownMenuItem>}
           <DropdownMenuSeparator />
           {row.archivedMonth ? (
@@ -99,7 +100,6 @@ export function RowMenu({ row, tables, household, onError, onDeleted, triggerCla
       {open === 'source' && <RowSourceDialog row={row} tables={tables} household={household} onClose={close} />}
       {open === 'account' && <RowAccountDialog row={row} tables={tables} household={household} onClose={close} />}
       {open === 'follow' && <RowFollowDialog row={row} tables={tables} household={household} onClose={close} />}
-      {open === 'rule' && <RuleDialog tables={tables} household={household} target={{ rowId: row.id }} month={monthOfDate()} onClose={close} />}
       {open === 'remove' && <RemoveDialog target={{ kind: 'row', id: row.id }} tables={tables} household={household} onClose={close} />}
     </>
   )

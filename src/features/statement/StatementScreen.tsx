@@ -14,8 +14,8 @@ import { clearHandedMonth, handedOverMonth } from '@/app/screens'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { useStoreVersion } from '@/app/useStoreVersion'
 import { buildStatement, cellKey, currentAccountsIn, type GoalProgress, type StatementLine } from '@/engine'
-import { canCarryRule, isPocketRow, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type MonthKey, type Row, type Section } from '@/model'
-import { accountSuggestions, addPlanYear, closeMonth, removeIfFree, reopenMonth, rowSuggestions, setCellDone, setDerivedDone, setItemStatus, setupSteps, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupStepKey } from '@/store'
+import { isPocketRow, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type MonthKey, type Row, type Section } from '@/model'
+import { accountSuggestions, addPlanYear, closeMonth, removeIfFree, reopenMonth, rowSuggestions, ruleRowOf, setCellDone, setDerivedDone, setItemStatus, setupSteps, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupStepKey } from '@/store'
 import { GoalDialog } from '@/features/goals/GoalDialog'
 import { goalStatusLine } from '@/features/goals/goalText'
 import { AddRowInline } from '@/features/grid/AddRowInline'
@@ -63,7 +63,8 @@ export function StatementScreen() {
   useEffect(() => clearHandedMonth(), [])
   /** Lines someone opened or closed; the rest follow their own default. */
   const [openLines, setOpenLines] = useState<Record<string, boolean>>({})
-  const [editorRow, setEditorRow] = useState<string | null>(null)
+  /** The row whose dialog is open: its amount and, for a row that can carry one, its rule (which may start on a choice). */
+  const [editor, setEditor] = useState<{ rowId: string; start?: RuleChoice['kind'] } | null>(null)
   /** The goal dialog: an existing goal, or a new one starting on the line it was asked from. */
   const [goalEdit, setGoalEdit] = useState<{ goal: Goal | null; preset?: { kind: GoalKind; accountId?: string | null; poolId?: string | null } } | null>(null)
   const [removingGoal, setRemovingGoal] = useState<Goal | null>(null)
@@ -72,7 +73,7 @@ export function StatementScreen() {
   const [currentBalance, setCurrentBalance] = useState(false)
   /** The expense category whose estimate is being typed. */
   const [estimateFor, setEstimateFor] = useState<string | null>(null)
-  /** The transfer, account or virtual account whose rule is being set. */
+  /** An account or a virtual account that no row fills yet, asked how much goes to it: the short dialog that adds the row. */
   const [ruleFor, setRuleFor] = useState<RuleTarget | null>(null)
   /** For an account added a moment ago: the choice its rule dialog opens on. */
   const [ruleStart, setRuleStart] = useState<RuleChoice['kind'] | undefined>(undefined)
@@ -133,7 +134,7 @@ export function StatementScreen() {
   const progress = monthProgress(engine.rows, engine.cells, m)
   const horizon = engine.months.length ? monthDiff(m, engine.months[engine.months.length - 1]) : 0
   const goalText = (g: GoalProgress) => goalStatusLine(g, locale, horizon)
-  const editing = editorRow ? engine.rows.find((r) => r.id === editorRow) : undefined
+  const editing = editor ? engine.rows.find((r) => r.id === editor.rowId) : undefined
   const balanceAccount = balanceFor ? tables.accounts.find((a) => a.id === balanceFor) : undefined
   const mainLine = statement.position.left.lines.find((l) => l.id === 'main')
   const balanceResult = balanceFor ? engine.accounts[balanceFor]?.months[m] : undefined
@@ -163,12 +164,22 @@ export function StatementScreen() {
     run.catch((e) => setError(e instanceof Error ? e.message : 'Action failed')).finally(() => setBusy(null))
   }
 
-  /** A new row opens its category and, in an open month, the editor for its first amount; a transfer to an account asks for its rule. */
+  /** A new row opens its category and, in an open month, its dialog for the first amount (and, where it can carry one, its rule). */
   function onAdded(row: Row) {
     setOpenLines((s) => ({ ...s, [row.kind === 'pocket-money' ? 'pocket' : `cat:${row.section}:${row.categoryId ?? 'none'}`]: true }))
-    if (statement!.closed) return
-    if (canCarryRule(row)) setRuleFor({ rowId: row.id })
-    else setEditorRow(row.id)
+    if (!statement!.closed) setEditor({ rowId: row.id })
+  }
+  /** How much goes to an account: the dialog of the row that fills it, or the short one while nothing does. */
+  function askRule(target: RuleTarget, start?: RuleChoice['kind']) {
+    let row: Row | null = null
+    try {
+      row = ruleRowOf(tables!, target)
+    } catch {
+      // an account saved a moment ago is not in the tables yet, and one that cannot have a rule says so in the short dialog
+    }
+    if (row) return setEditor({ rowId: row.id, start })
+    setRuleStart(start)
+    setRuleFor(target)
   }
   /** A step of the setup strip: go to its part of the page, with the cursor in the first thing that can be filled. */
   function jump(selector: string) {
@@ -186,10 +197,9 @@ export function StatementScreen() {
     const restRowId = resolveRules(engine!.rows, household!.closingRule).restRowId
     const savings = tables!.accounts.find((a) => a.type === 'savings' && !a.deletedAt && !a.archivedMonth)
     if (statement!.closed) return jump('[data-testid="band-assets"]')
-    if (restRowId) return setRuleFor({ rowId: restRowId })
+    if (restRowId) return setEditor({ rowId: restRowId })
     if (!savings) return setAccountNew({ name: 'Savings', type: 'savings', types: ASSET_TYPES })
-    setRuleStart('rest')
-    setRuleFor({ accountId: savings.id })
+    askRule({ accountId: savings.id }, 'rest')
   }
   /**
    * A suggested row came with its amount, so no editor opens; its category stays open once its suggestions are gone.
@@ -197,7 +207,7 @@ export function StatementScreen() {
    */
   function onSuggested(row: Row, amount: number | null) {
     setOpenLines((s) => ({ ...s, [row.kind === 'pocket-money' ? 'pocket' : `cat:${row.section}:${row.categoryId ?? 'none'}`]: true }))
-    if (isPocketRow(row) && !(amount != null && amount > 0) && !statement!.closed) setRuleFor({ rowId: row.id })
+    if (isPocketRow(row) && !(amount != null && amount > 0) && !statement!.closed) setEditor({ rowId: row.id })
   }
   const suggested = (line: StatementLine) => (showing && m
     ? <SuggestionLines suggestions={suggestions.get(line.id) ?? []} label={line.label} month={m} currency={household!.baseCurrency} locale={household!.locale} onAdded={onSuggested} onError={setError} />
@@ -209,14 +219,13 @@ export function StatementScreen() {
   function onAccountSaved(account: Account) {
     if (statement!.closed || (account.type !== 'savings' && account.type !== 'investment')) return
     const restTaken = resolveRules(engine!.rows, household!.closingRule).restRowId !== null
-    setRuleStart(account.type === 'savings' && !restTaken ? 'rest' : undefined)
-    setRuleFor({ accountId: account.id })
+    askRule({ accountId: account.id }, account.type === 'savings' && !restTaken ? 'rest' : undefined)
   }
-  /** The rule sits on a row; an account or a virtual account that no row feeds yet gets one when the rule is saved. */
+  /** The rule sits on a row, so its symbol opens that row's dialog; an account or a virtual account that no row feeds yet gets one when the rule is saved. */
   function onRule(line: StatementLine) {
-    if (line.rule?.rowId) setRuleFor({ rowId: line.rule.rowId })
-    else if (line.poolId) setRuleFor({ poolId: line.poolId })
-    else if (line.accountId) setRuleFor({ accountId: line.accountId })
+    if (line.rule?.rowId) setEditor({ rowId: line.rule.rowId })
+    else if (line.poolId) askRule({ poolId: line.poolId })
+    else if (line.accountId) askRule({ accountId: line.accountId })
   }
   const categoriesOf = (section: Section) => tables!.categories.filter((c) => !c.deletedAt && c.section === section)
   const addRow = (section: Section, over: Pick<ComponentProps<typeof AddRowInline>, 'label' | 'defaultCategoryId' | 'only' | 'without'> = {}) => (
@@ -272,7 +281,7 @@ export function StatementScreen() {
   /** The "…" after a row's name: the Grid's own row menu. */
   function rowMenu(rowId: string): ReactNode {
     const row = engine!.rows.find((r) => r.id === rowId)
-    return row ? <RowMenu row={row} tables={tables!} household={household!} onError={setError} onDeleted={onDeleted} triggerClassName={LINE_MENU} /> : null
+    return row ? <RowMenu row={row} tables={tables!} household={household!} onError={setError} onDeleted={onDeleted} onRule={() => setEditor({ rowId })} triggerClassName={LINE_MENU} /> : null
   }
   const editButton = (label: string, onClick: () => void) => (
     <Button variant="ghost" size="icon" className={LINE_MENU} aria-label={`Edit ${label}`} title="Edit" onClick={onClick}><MoreHorizontal /></Button>
@@ -307,7 +316,7 @@ export function StatementScreen() {
 
   // a closed month shows its rules and changes none
   const base = { locale, ccy, isOpen, onToggle, goalText, onRule: statement.closed ? undefined : onRule, onTopUp: statement.closed ? undefined : setTopUpFor }
-  const flowCtx: LineContext = { ...base, withChange: false, closed: statement.closed, doneOf, onTick, onEdit: setEditorRow, busy, footer, onEstimate: setEstimateFor, rowMenu, menu: lineMenu }
+  const flowCtx: LineContext = { ...base, withChange: false, closed: statement.closed, doneOf, onTick, onEdit: (rowId) => setEditor({ rowId }), busy, footer, onEstimate: setEstimateFor, rowMenu, menu: lineMenu }
   // the estimate dialog reads the category's line: what the month shows now, and what its rows explain
   const estimateCategory = estimateFor ? tables.categories.find((c) => c.id === estimateFor && !c.deletedAt) : undefined
   const estimateLine = estimateFor ? walk(statement.flow.right.lines).find((l) => l.id === `cat:expense:${estimateFor}`) : undefined
@@ -388,7 +397,7 @@ export function StatementScreen() {
           </button>
         </div>
       )}
-      {editing && <CellEditor key={`${editing.id}:${m}`} tables={tables} engine={engine} household={household} row={editing} month={m} onClose={() => setEditorRow(null)} />}
+      {editing && <CellEditor key={`${editing.id}:${m}`} tables={tables} engine={engine} household={household} row={editing} month={m} startRule={editor?.start} onClose={() => setEditor(null)} />}
       {goalEdit && (
         <GoalDialog
           household={household} tables={tables} goal={goalEdit.goal} preset={goalEdit.preset} onClose={() => setGoalEdit(null)}

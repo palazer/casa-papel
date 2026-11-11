@@ -178,7 +178,8 @@ test.describe('wave 1b', () => {
 
     // pocket money added without an amount asks straight away how much: an amount or a percentage, never the rest
     await general.getByRole('button', { name: 'Add Ben – Pocket' }).click()
-    await expect(dlg.getByRole('heading', { name: 'How much pocket money does Ben get?' })).toBeVisible()
+    await expect(dlg.getByRole('heading', { name: 'Ben – Pocket · November 2026' })).toBeVisible()
+    await expect(dlg.getByRole('radio', { name: 'A fixed amount' })).toBeChecked()
     await expect(dlg.getByRole('radio', { name: 'The rest' })).toHaveCount(0)
     await dlg.getByRole('radio', { name: 'A percentage of Ben\'s income' }).click()
     await dlg.getByLabel('Percentage of Ben\'s income').fill('10')

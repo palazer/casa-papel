@@ -55,7 +55,7 @@ export const GUIDE: GuideTopic[] = [
     summary: 'One month on one page: money in beside money out, and under it what you have beside what you owe. The first screen, and the place to tick what has moved.',
     what: [
       'The Statement shows one month in two halves that always balance. "The month" has "Money in" on the left and "Money out" on the right; what is neither spent nor set aside closes the right side as the rest. "At the end of the month" has "Assets" on the left and "Debts and net worth" on the right, with a "change" column for how the month moved each figure. A category opens to its rows, an itemized row to its items.',
-      'Every line with an amount has a tick, and the progress line under the toolbar counts them: "7 of 21 done · €… still to pay · €… to come in", then "All 21 done" or "Closed · all done". An estimate sits on a light yellow shade; press a line to overwrite its amount or to say how sure you are. A line the app works out carries its rule as a small symbol and opens the rule instead.',
+      'Every line with an amount has a tick, and the progress line under the toolbar counts them: "7 of 21 done · €… still to pay · €… to come in", then "All 21 done" or "Closed · all done". An estimate sits on a light yellow shade; press a line to overwrite its amount or to say how sure you are. A line the app works out carries its rule as a small symbol, and the same dialog opens on that rule.',
       '"Close month" locks the month: its numbers stay as they are and all of it counts as done; "Reopen month" unlocks it. With two or more adults the page ends with "Per person". While a household is new, a "Setting up" strip leads through the page, and "Suggestions" offers the usual rows where they will appear.',
     ],
     steps: [
@@ -196,8 +196,8 @@ export const GUIDE: GuideTopic[] = [
       'Pocket money is a line per adult, like "Sam – Pocket" and "Alex – Pocket", with a rule of its own: "A fixed amount", "A percentage of income", "A percentage of Sam\'s income" or "A percentage of what is left", never the rest. Rows the app works out carry an (i), can be ticked when the money has moved, and cannot be typed into.',
     ],
     steps: [
-      'Statement → "Assets" → the symbol beside an account or a virtual account opens "How much goes to <account>?"; so does the symbol after a transfer\'s name under "Set aside, pay off", and Grid → row menu → "Rule…". The symbol after a pocket line asks "How much pocket money does Sam get?".',
-      'Pick "A fixed amount", "A percentage of income", "A percentage of what is left" or "The rest"; "Counts from" is the month the rule starts in, and earlier months keep their amounts.',
+      'Statement → "Set aside, pay off" → press a transfer like "To investments": one dialog holds its amount and its rule, under "How the amount is set". The symbol beside an account or a virtual account under "Assets" opens the same dialog, and so does Grid → row menu → "Rule…".',
+      'Pick "A fixed amount", "A percentage of income", "A percentage of what is left" or "The rest". A fixed amount is typed with "Applies to"; for a percentage or the rest, "Counts from" is the month the rule starts in, and earlier months keep their amounts.',
       'Household → "Household settings" → "Cash kept in the account at month end (EUR)"; "Cash buffer changes apply to" picks "This month and onwards (earlier months keep what they show)", "Only this month" or "Every open month".',
       'Statement → "Set aside, pay off" → "Add row" (or Grid → Transfers → "Add row") → say what the row does: "Moves money between your accounts", "Goes into a savings account", "Deposits into an investment account", "Fills a virtual account", "Pocket money for an adult" or, for a card whose purchases are expense rows, "Pays off a credit card", then pick the "Account", "Virtual account" or "Adult" and press "Add".',
       'Row menu → "Goes into…" changes a deposit row\'s account for every month.',
@@ -277,8 +277,8 @@ export const GUIDE: GuideTopic[] = [
     ],
     steps: [
       'Statement → "Suggestions" → under "Expenses", type an amount beside "Sam – Pocket" and press Enter; or press "Add" with the field empty to be asked for a rule.',
-      'To change it, press the symbol after "Sam – Pocket" (or Grid → row menu → "Rule…"). "How much pocket money does Sam get?" offers "A fixed amount", "A percentage of income", "A percentage of Sam\'s income" and "A percentage of what is left".',
-      '"Counts from" is the month the new amount or rule starts in; earlier months keep what they showed.',
+      'To change it, press "Sam – Pocket" (or Grid → row menu → "Rule…"). "How the amount is set" offers "A fixed amount", "A percentage of income", "A percentage of Sam\'s income" and "A percentage of what is left".',
+      'A fixed amount is typed with "Applies to": "This month and onwards" or "Only this month". For a percentage, "Counts from" is the month the rule starts in; earlier months keep what they showed.',
       'For a line of your own: "Add row" under Transfers → "Pocket money for an adult" → pick the "Adult".',
       'Say whose a row is: row menu → "Belongs to…" → "This row is for". A percentage of Sam\'s income counts the income lines that belong to Sam.',
       'Read "Per person" under the Statement\'s two halves to see what each adult leaves for the household this month.',

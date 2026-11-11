@@ -266,9 +266,10 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   `role="status"` line with an (i), `7 of 21 done · €… still to pay · €… to come in`, then `All 21 done`, and `Closed ·
   all done` for a closed month; a month with nothing in it shows no line. The month is worked in its upper half: a row and each of its items
   carry the `Tick` before the name (44 px on phones, 24 px with a 12 px dot from 768 px), and the rest of the line is
-  a button named `<line>: <amount>` (`, an estimate` when shaded) that opens the cell editor for that row and month.
-  An itemized row's chevron is a button of its own, `Items of <row>`. An automatic row has the tick (it marks the
-  money as moved) but no button; a closed month has neither. A different amount than planned is typed in the cell
+  a button named `<line>: <amount>` (`, an estimate` when shaded) that opens the row's one dialog, the cell editor
+  (§8), for that row and month. An itemized row's chevron is a button of its own, `Items of <row>`. An automatic row
+  has the tick (it marks the money as moved) and, when a rule works it out, the same button; any other automatic row
+  has none; a closed month has neither. A different amount than planned is typed in the cell
   editor ("Only this month", "Done"); there is no quick sheet for it.
   **Per person** (`src/features/statement/PerPerson.tsx`) closes the page when the household has two or more adults:
   a dense island with an (i), as wide as a half's left side from 1024 px (`lg:w-1/2`, so a label is never a screen
@@ -297,16 +298,16 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   (`10%`), the percentage followed by a 12 px `ArrowDownToLine` for a share of what is left (`20% ↓`), `Equal` for
   a fixed amount, the same sign at half strength for an account no row feeds yet. Muted, 20 px high, 32 px where
   the pointer is a finger; a button named `Rule for <line>: <rule>` (`Set a rule for <account>` when there is none)
-  that opens the rule dialog, and the bare symbol with the same name in a closed month. A line a rule works out
-  opens the rule dialog when pressed, a fixed one the cell editor; where a line holds both controls, the line's
-  button is its name stretched over the line and the symbol sits above it. An account fed by several rows shows no
-  symbol of its own. A new transfer to an account opens the rule dialog instead of the cell editor. An adult's
-  pocket money line carries the same symbol and opens the same dialog: it takes every rule but the rest, and one
-  of its own, a share of that adult's own income, shown as the percentage followed by a 12 px `UserRound`
-  (`10% 👤`). A pocket line added without an amount ("Add row", or a suggestion whose amount field was left empty)
-  opens the rule dialog straight away. The Grid names
+  and the bare symbol with the same name in a closed month. **A row has one dialog**: the name, the amount and the
+  symbol of a row line all open the cell editor, which starts with "How the amount is set" for a row that can carry
+  a rule (§8). The symbol stays a button of its own above the line's stretched button only so that it says the rule
+  when pointed at or read out. On an account or a virtual account the symbol opens the dialog of the row that fills
+  it; while no row does, it opens the short rule dialog, which adds the row. An account fed by several rows shows no
+  symbol of its own. An adult's pocket money line carries the same symbol and opens the same dialog: it takes every
+  rule but the rest, and one of its own, a share of that adult's own income, shown as the percentage followed by a
+  12 px `UserRound` (`10% 👤`). The Grid names
   the same rule after the row's name the way a follower names its row (`= 10% of income`, `= the rest`) and offers
-  `Rule…` in the row menu.
+  `Rule…` in the row menu, which opens the same dialog in the current month (a worked-out cell is not a button there).
   Things are added where they will appear: the foot of Income and Expenses holds the Grid's `AddRowInline` (`Add row`)
   and `AddCategoryInline` (`Add category`, a name and Enter), the foot of Set aside, pay off holds `Add row`, and an
   opened category ends with `Add row to <category>` with that category already chosen. A category is a line from
@@ -324,7 +325,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   **Accounts are added in the lower half too**, in the same ghost `+` buttons as rows: the foot of the Assets side
   holds `Add account` (current, joint, savings, investments, other asset, cash) and, once a savings account exists,
   `Add virtual account`; `Add a card or loan` sits at the foot of the Debts group, and at the foot of that side while
-  nothing is owed. A new savings or investment account opens the rule dialog as soon as it is saved, on `The rest`
+  nothing is owed. A new savings or investment account opens the short rule dialog as soon as it is saved, on `The rest`
   for a savings account while nothing takes the rest yet; a new virtual account asks for its monthly amount in its own
   dialog, counting from the month on screen.
   **Changing and removing.** What is added on the Statement is changed and removed there too. In an open month a
@@ -358,8 +359,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   filled: `Income`, `Accounts`, `Expenses`, `Where the rest goes`, `Goals (optional)`. A pill is a rounded-full
   outline button with a 14 px mark: an empty circle while its part is empty (the label in medium weight), a check in
   the income hue once it has something in it (the label muted). Pressing one goes to its part with the cursor in the
-  first field; `Where the rest goes` opens the rule dialog on the savings account, or the account dialog for one
-  while there is none. Two muted sentences follow: what to do next (the first open step), and which month is being
+  first field; `Where the rest goes` opens the dialog of the row that takes the rest (for a savings account that has
+  none yet, the short rule dialog on `The rest`), or the account dialog while there is no savings account. Two muted sentences follow: what to do next (the first open step), and which month is being
   filled. `Done` (`xs outline`, at the end of the title row) hides the strip for good and turns the suggestions
   off; the page works the same without it. The Statement opens on the household's first month while the strip shows.
   **Category estimates.** An expense category can carry an estimate: what it should come to in a month, typed before
@@ -388,7 +389,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 - One name per idea, the same in every control: a repeating amount is a **schedule** (dialog "New schedule" / "Edit
   schedule", button "Add schedule", never "recurring item"); how a transfer into an account, or an adult's pocket money, is worked out is its **rule** ("A fixed amount", "A
   percentage of income", "A percentage of what is left", "The rest"; for pocket money "A percentage of <Adult>'s
-  income" in place of the rest), set in the rule dialog and nowhere else. There is no household-wide pocket money
+  income" in place of the rest), set under "How the amount is set" in the row's dialog and nowhere else. There is no household-wide pocket money
   total: each adult's line has its own amount or rule; money
   set aside is a **virtual account**, never an envelope.
 - Rates are always spelled with both codes in the orientation whose number is ≥ 1 (`1 EUR = 1.08 USD`, `1 USD = 48.58 TRY`;
@@ -442,18 +443,33 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   is typed (`Rows this month`, `Not broken down yet`; a muted sentence when the rows already add up to more), then
   "Applies to" as the cell editor's `Segmented` (`This month and onwards` / `Only this month`). Footer: a ghost
   `Remove estimate` when there is one, Cancel, Save. A closed month disables it.
-- The rule dialog (`src/features/rules/RuleDialog.tsx`), titled `How much goes to <account>?`: "Rule" as a
-  `Segmented` (`A fixed amount`, `A percentage of income`, `A percentage of what is left`, `The rest`) with the
-  chosen option's sentence under it (for the rest, also what a month that overruns does to that account), then that option's one field (`Amount per month in
-  <CCY>` or the percentage), then "Counts from" as a `MonthField` with an (i) and the sentence that earlier months
-  keep their amounts. It opens on the month it was called from, or on the first month after the last closed one.
-  Two read-only lines follow what is typed: what the account gets in that month, with the sum the percentage is
-  taken of, and what is then left for the rest (or as leftover). A muted sentence says so when the rest would
-  move from another account or stop being taken. The figures and every refusal come from running the save on a
-  copy, so the dialog never shows a number or allows a Save the store would not. Footer: Cancel, Save.
-  For an adult's pocket money the same dialog is titled `How much pocket money does <Adult> get?` and offers `A
-  fixed amount`, `A percentage of income`, `A percentage of <Adult>'s income` and `A percentage of what is left`,
-  never `The rest`; the first read-only line then names whose income (`10% of €4,200.00, Sam's take-home income`).
+- **One dialog per row: the amount and the rule together.** The cell editor (`src/features/grid/CellEditor.tsx`),
+  titled `<row> · <month>`, is the only dialog a row has, on the Statement and in the Grid. For a row that can carry
+  a rule (the transfer that fills a savings account, an investment account or a virtual account; an adult's pocket
+  money) it starts with **"How the amount is set"** (`RulePicker` in `src/features/rules/RuleDialog.tsx`): a
+  `Segmented` (`A fixed amount`, `A percentage of income`, `A percentage of what is left`, `The rest`; for pocket
+  money `A percentage of <Adult>'s income` in place of `The rest`) with an (i) and the chosen option's sentence under
+  it (for the rest, also what a month that overruns does to that account). What follows depends on the choice:
+  - `A fixed amount`, in a month whose amount is typed: the editor's own fields (Single amount / Itemized, the
+    amount, "Applies to", "How sure") and its footer (Clear, Make recurring…, Cancel, Save).
+  - A percentage or the rest, and any choice in a month the app works out: the rule's fields (`RuleFields`): that
+    option's one field (`Amount per month in <CCY>` or the percentage), then "Counts from" as a `MonthField` with an
+    (i) and the sentence that earlier months keep their amounts (it starts on the month the dialog was opened from,
+    or on the first month after the last closed one), then two read-only lines that follow what is typed: what the
+    row gets in that month, with the sum the percentage is taken of (for pocket money naming whose income, `10% of
+    €4,200.00, Sam's take-home income`), and what is then left for the rest (or as leftover). A muted sentence says
+    so when the rest would move from another account or stop being taken. The figures and every refusal come from
+    running the save on a copy, so the dialog never shows a number or allows a Save the store would not. Footer:
+    Cancel, Save.
+  The dialog opens on how the month's amount is set now: on the rule in a month the app works out, on `A fixed
+  amount` in a typed one. A typed month on a row whose other months a rule works out is for that month alone: "Applies
+  to" gives way to a muted sentence that says so, `Clear` reads `Clear (back to the rule)`, and saving never holds
+  the next month (`freezeNext` in `src/store/actions.ts` leaves a row with a rule alone). Rows that cannot carry a
+  rule show the amount fields only.
+- The short rule dialog (`RuleDialog` in the same file), titled `How much goes to <account>?`: the picker and the
+  rule's fields by themselves, for a savings account, an investment account or a virtual account that no row fills
+  yet. It says that saving adds the row (`To <account>`), and it is what a new savings or investment account opens
+  as soon as it is saved.
   A pocket line that still is a share of the pocket money total from before says so in the description; saving
   gives it its own rule from the chosen month on.
 - The top-up dialog (`src/features/statement/TopUpDialog.tsx`), titled `<virtual account> is short in <month>`: one
