@@ -58,7 +58,6 @@ const TIP: Record<string, HelpKey> = {
   free: 'statement.free',
   'net-worth': 'statement.netWorth',
   'set-aside': 'statement.setAside',
-  sources: 'derived.fromSavings',
   'from-accounts': 'statement.fromAccounts',
 }
 
@@ -76,6 +75,8 @@ const ROW = 'flex min-h-11 items-center gap-1.5 pr-2 text-sm md:min-h-7 md:text-
 const LABEL = 'flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5 py-1'
 const CHEVRON_SLOT = 'flex w-3.5 shrink-0 items-center justify-center self-stretch'
 const TICK_SLOT = 'size-11 shrink-0 md:size-6'
+/** As wide as the tick, with no height of its own: the place a tick would take on a line that has none. */
+const TICK_GAP = 'w-11 shrink-0 md:w-6'
 /** A control on a line whose own button covers the whole line: it stays above that button. */
 const ABOVE = 'relative z-10'
 
@@ -113,8 +114,10 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
   const tip = TIP[line.id]
   const inner = group ? level : level + 1
   const pad = INDENT[Math.min(level, INDENT.length - 1)]
+  /** A row shown under its account's name keeps its own name in what its controls are called. */
+  const nameOf = (l: Line) => (l.ownName ? `${l.label}, ${l.ownName}` : l.label)
   /** An item is named with its row, so every tick and button on the page has a name of its own. */
-  const fullLabel = item && parent ? `${parent.label}: ${line.label}` : line.label
+  const fullLabel = item && parent ? `${nameOf(parent)}: ${line.label}` : nameOf(line)
 
   const amountText = line.empty ? '·' : formatAmount(line.amount, line.currency ?? ccy, locale)
   const shaded = !!line.estimate && !line.empty
@@ -141,6 +144,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
   const tags = (
     <>
       {item && line.scheduled && <Repeat className="size-3 shrink-0 text-muted-foreground" aria-hidden />}
+      {line.accountKind && <span className="shrink-0 text-[11px] text-muted-foreground">{line.accountKind}</span>}
       {line.native && (
         <>
           <Chip tone="zinc">{line.native.currency}</Chip>
@@ -152,6 +156,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
       {line.budget != null && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">estimate {formatAmount(line.budget, ccy, locale)}</span>}
       {line.chip && <Chip tone="zinc">{line.chip}</Chip>}
       {!!line.paidFor?.length && <span className="min-w-0 max-w-64 truncate text-[11px] text-muted-foreground" title={line.paidFor.join(', ')}>for {line.paidFor.join(', ')}</span>}
+      {line.ownName && <span className="min-w-0 max-w-64 truncate text-[11px] text-muted-foreground" title={line.ownName}>{line.ownName}</span>}
       {line.note && <span className="min-w-0 max-w-64 truncate text-[11px] text-muted-foreground" title={line.note}>{line.note}</span>}
       {line.short != null && line.kind === 'pool' && <Chip tone="rose">short {formatAmount(line.short, ccy, locale)}</Chip>}
       {line.short != null && line.kind === 'source' && (
@@ -217,7 +222,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
         <div className={cn(ROW, pad, 'group/line', item && 'bg-muted/20')} data-line={line.id}>
           {expandable ? (
             <button
-              type="button" aria-label={`Items of ${line.label}`} aria-expanded={open} aria-controls={listId} onClick={() => ctx.onToggle(line)}
+              type="button" aria-label={`Items of ${nameOf(line)}`} aria-expanded={open} aria-controls={listId} onClick={() => ctx.onToggle(line)}
               className={cn(CHEVRON_SLOT, 'rounded outline-none focus-visible:ring-2 focus-visible:ring-ring')}
             >
               <ChevronRight className={cn('size-3.5 shrink-0 text-muted-foreground transition-transform', open && 'rotate-90')} aria-hidden />
@@ -233,6 +238,10 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
     )
   }
 
+  // Among rows that carry a tick, a line without one keeps the tick's place, so the names of a group stay in one
+  // column; what such a line opens to follows it, so it stays further in than its heading.
+  const untickedAmongRows = line.kind === 'source' || line.kind === 'figure' || (line.kind === 'note' && parent?.kind === 'source')
+  const tickGap = !ctx.closed && !!ctx.doneOf && untickedAmongRows ? <span className={TICK_GAP} aria-hidden /> : null
   // A line that opens is pressed anywhere: its button is stretched over the whole line (as a row's is), and the other
   // controls on it sit above that.
   const head = expandable ? (
@@ -241,11 +250,13 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
       className="flex min-w-0 max-w-full items-center gap-1.5 rounded text-left outline-none after:absolute after:inset-0 after:rounded focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring"
     >
       <ChevronRight className={cn('size-3.5 shrink-0 text-muted-foreground transition-transform', open && 'rotate-90')} aria-hidden />
+      {tickGap}
       {name}
     </button>
   ) : (
     <span className="flex min-w-0 max-w-full items-center gap-1.5">
       {!group && <span className="w-3.5 shrink-0" aria-hidden />}
+      {tickGap}
       {name}
     </span>
   )

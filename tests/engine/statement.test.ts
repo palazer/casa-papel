@@ -25,6 +25,10 @@ function statementFor(t: Tables, m: MonthKey, range: MonthKey[] = months): { s: 
 }
 
 /** Both halves agree, every heading is the sum of what sits under it, and the figures match the engine's own totals. */
+/** The lines of "From accounts" the app works out from the expenses, and the ones that cover a month that overran. */
+const calculatedOf = (s: Statement) => (topLine(s, 'in', 'from-accounts')?.children ?? []).filter((l) => l.kind === 'source')
+const coveringOf = (s: Statement) => (topLine(s, 'in', 'from-accounts')?.children ?? []).filter((l) => l.chip === 'to cover the month')
+
 function expectSound(t: Tables, range: MonthKey[]) {
   const out = computeEngine({ tables: t, months: range })
   for (const m of range) {
@@ -43,11 +47,15 @@ function expectSound(t: Tables, range: MonthKey[]) {
       if (l.change != null && l.kind !== 'account') expect(l.change, `${m} ${l.label} change`).toBe(l.children.reduce((a, c) => a + (c.change ?? 0), 0))
     }
     const amountOf = (sideKey: 'in' | 'out', id: string) => topLine(s, sideKey, id)?.amount ?? 0
-    expect(amountOf('in', 'income') + amountOf('in', 'from-accounts'), `${m} income`).toBe(tot.income)
-    expect(amountOf('in', 'from-accounts'), `${m} taken from accounts`).toBe(tot.fromAccounts)
-    expect(amountOf('in', 'sources'), `${m} from savings`).toBe(tot.fromSavingsDerived)
+    // "From accounts" holds three kinds of line: taken by hand, worked out from the expenses, and what covers a short month
+    const worked = calculatedOf(s).reduce((a, l) => a + l.amount, 0)
+    const covered = coveringOf(s).reduce((a, l) => a + l.amount, 0)
+    const taken = amountOf('in', 'from-accounts') - worked - covered
+    expect(amountOf('in', 'income') + taken, `${m} income`).toBe(tot.income)
+    expect(taken, `${m} taken from accounts`).toBe(tot.fromAccounts)
+    expect(worked, `${m} from savings`).toBe(tot.fromSavingsDerived)
     // what covers a short month sits on the left; taken back out, the right side is the engine's outflows and closing figures
-    expect(s.flow.right.total - amountOf('in', 'cover'), `${m} outflows`).toBe(tot.expensesTotal + tot.allocations + tot.toInvestment + tot.toSavings + tot.leftover)
+    expect(s.flow.right.total - covered, `${m} outflows`).toBe(tot.expensesTotal + tot.allocations + tot.toInvestment + tot.toSavings + tot.leftover)
     // one net worth: the Statement's is the engine's, and both count what stays in the main account
     expect(find(s, 'main')?.amount ?? 0, `${m} main account`).toBe(out.main?.months[m]?.balance ?? 0)
     expect(topLine(s, 'claims', 'net-worth')!.amount, `${m} net worth`).toBe(out.netWorth[m] ?? 0)
@@ -116,8 +124,8 @@ describe('the Statement, the month', () => {
     const t = buildDemoTables()
     const { s } = statementFor(t, '2026-09', monthRange('2026-09', '2026-12'))
     expect(s.closed).toBe(true)
-    expect(s.flow.left.lines.map((l) => l.label)).toEqual(['Income', 'Taken from accounts'])
-    // the section for money taken out of accounts by hand is always there, empty until a row is added in it
+    expect(s.flow.left.lines.map((l) => l.label)).toEqual(['Income', 'From accounts'])
+    // the section for money from the household's accounts is always there, empty until something comes out of one
     expect(topLine(s, 'in', 'from-accounts')).toMatchObject({ amount: 0, empty: true, children: [] })
     expect(s.flow.left.total).toBe(725500)
     expect(s.flow.right.lines.map((l) => l.label)).toEqual(['Expenses', 'Set aside, pay off'])
@@ -136,11 +144,14 @@ describe('the Statement, the month', () => {
 
   it('shows spending from a virtual account on both sides', () => {
     const { s } = statementFor(buildDemoTables(), '2026-10', monthRange('2026-09', '2026-12'))
-    const sources = topLine(s, 'in', 'sources')!
-    expect(sources).toMatchObject({ label: 'From savings and virtual accounts', amount: 48000 })
-    expect(sources.children.map((c) => [c.kind, c.label, c.amount])).toEqual([['source', 'Travel', 48000]])
-    expect(sources.children[0].children.map((c) => [c.kind, c.label])).toEqual([['note', 'Travel']])
-    expect(find(s, 'cat:expense:' + sources.children[0].children[0].rowId)).toBeUndefined()
+    // one group on the left for everything from the accounts; what an expense took is a calculated line in it
+    expect(s.flow.left.lines.map((l) => l.label)).toEqual(['Income', 'From accounts'])
+    expect(topLine(s, 'in', 'from-accounts')).toMatchObject({ label: 'From accounts', amount: 48000 })
+    const sources = calculatedOf(s)
+    // every line there leads with the account the money came out of and says what kind of account it is
+    expect(sources.map((c) => [c.kind, c.label, c.accountKind, c.amount, c.chip, c.calculated])).toEqual([['source', 'From Travel', 'virtual account', 48000, 'calculated', true]])
+    expect(sources[0].children.map((c) => [c.kind, c.label])).toEqual([['note', 'Travel']])
+    expect(find(s, 'cat:expense:' + sources[0].children[0].rowId)).toBeUndefined()
     expect(all(s).find((l) => l.kind === 'row' && l.label === 'Travel')!.amount).toBe(48000)
   })
 
@@ -164,9 +175,8 @@ describe('the Statement, the month', () => {
     const toSavings = row({ name: 'To savings', section: 'transfer', kind: 'to-savings', accountId: savings.id, order: 'c0' })
     const t = tables({ household: [household({ cashBuffer: 50_00 })], accounts: [savings], rows: [salary, rent, toSavings], cells: [cellValue(salary.id, '2026-01', 1000_00), cellValue(rent.id, '2026-01', 1500_00)] })
     const { s } = statementFor(t, '2026-01')
-    const cover = topLine(s, 'in', 'cover')!
-    expect(cover.label).toBe('To cover the month')
-    expect(cover.children.map((c) => [c.label, c.amount, c.balancing, c.rowId])).toEqual([['From Savings', 550_00, true, toSavings.id]])
+    expect(coveringOf(s).map((c) => [c.label, c.accountKind, c.amount, c.balancing, c.rowId, c.chip])).toEqual([['From Savings', 'savings account', 550_00, true, toSavings.id, 'to cover the month']])
+    expect(s.flow.left.lines.map((l) => l.label)).toEqual(['Income', 'From accounts'])
     expect(topLine(s, 'out', 'set-aside')!.children.map((c) => [c.label, c.amount])).toEqual([['Kept in account', 50_00]])
     expect([s.flow.left.total, s.flow.right.total]).toEqual([1550_00, 1550_00])
     expect(find(s, `acc:${savings.id}`)).toMatchObject({ amount: 1450_00, change: -550_00 })
@@ -180,12 +190,12 @@ describe('the Statement, the month', () => {
     const toSavings = row({ name: 'To savings', section: 'transfer', kind: 'to-savings', order: 'c0' })
     const t = tables({ household: [household({ closingRule: 'leftover-plug' })], accounts: [main], rows: [salary, rent, toSavings], cells: [cellValue(salary.id, '2026-01', 1000_00), cellValue(rent.id, '2026-01', 1200_00), cellValue(toSavings.id, '2026-01', 100_00), cellValue(rent.id, '2026-02', 600_00)] })
     const { s } = statementFor(t, '2026-01')
-    expect(topLine(s, 'in', 'cover')!.children.map((c) => [c.label, c.amount, c.balancing])).toEqual([['From the account', 300_00, true]])
+    expect(coveringOf(s).map((c) => [c.label, c.accountKind, c.amount, c.balancing])).toEqual([['From the account', 'current account', 300_00, true]])
     expect(topLine(s, 'out', 'set-aside')!.children.map((c) => [c.label, c.amount, c.balancing])).toEqual([['To savings', 100_00, undefined]])
     expect(find(s, 'main')).toMatchObject({ label: 'Main', amount: 200_00, change: -300_00, calculated: true })
     // a good month closes on the right with the leftover
     const feb = statementFor(t, '2026-02').s
-    expect(topLine(feb, 'in', 'cover')).toBeUndefined()
+    expect(coveringOf(feb)).toEqual([])
     expect(topLine(feb, 'out', 'set-aside')!.children.map((c) => [c.label, c.amount, c.balancing])).toEqual([['To savings', 100_00, undefined], ['Leftover', 300_00, true]])
     expectSound(t, months)
   })
@@ -218,7 +228,8 @@ describe('the Statement, the month', () => {
     // the items stay in the row's own currency
     expect(hotelLine.children.map((c) => [c.label, c.amount, c.currency])).toEqual([['Night one', 33_33, 'USD'], ['Night two', 33_33, 'USD'], ['Tax', 1_11, 'USD']])
     expect(all(s).find((l) => l.label === 'Fees')).toMatchObject({ missingRate: true, amount: 10_00, native: { amount: 10_00, currency: 'GBP' } })
-    expect(topLine(s, 'in', 'sources')!.children.map((c) => [c.label, c.amount])).toEqual([['Savings', f.savings]])
+    // spending "from savings" names the savings account it comes out of
+    expect(calculatedOf(s).map((c) => [c.label, c.accountKind, c.amount])).toEqual([['From Savings', 'savings account', f.savings]])
     expectSound(t, months)
   })
 
@@ -249,7 +260,9 @@ describe('the Statement, the month', () => {
     const sell = row({ name: 'Sell fund', section: 'transfer', kind: 'from-investment', accountId: invest.id, order: 'c1' })
     const t = tables({ household: [household()], accounts: [invest], rows: [salary, tax, gift, sell], cells: [cellValue(salary.id, '2026-01', 4000_00), cellValue(gift.id, '2026-01', 100_00), cellValue(sell.id, '2026-01', 500_00)] })
     const { s } = statementFor(t, '2026-01')
-    expect(s.flow.left.lines.map((l) => [l.label, l.amount])).toEqual([['Income', 4000_00], ['Taken from accounts', 500_00]])
+    expect(s.flow.left.lines.map((l) => [l.label, l.amount])).toEqual([['Income', 4000_00], ['From accounts', 500_00]])
+    // a row that takes money out of an account is shown under that account's name; its own name follows
+    expect(topLine(s, 'in', 'from-accounts')!.children.map((c) => [c.kind, c.rowId, c.label, c.accountKind, c.ownName, c.chip])).toEqual([['row', sell.id, 'From Fund', 'investment account', 'Sell fund', undefined]])
     expect(all(s).find((l) => l.label === 'Salary')!.net).toBe(3000_00)
     expect(all(s).find((l) => l.label === 'Tax')).toMatchObject({ amount: 1000_00, automatic: true })
     expect(s.flow.right.lines.map((l) => [l.label, l.amount])).toEqual([['Expenses', 1000_00], ['Moved elsewhere', 100_00], ['Set aside, pay off', 3400_00]])

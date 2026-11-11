@@ -54,7 +54,7 @@ const KINDS: Kind[] = [
  * "Add row" at the foot of a section: a name, a category when the section has any, and under Transfers and Expenses what
  * the row does. The Statement also puts one inside each category: `defaultCategoryId` starts it there, `label` names
  * the button ("Add row to Housing"), and `onAdded` hands back the new row so the screen can open it. Where the place
- * says what the row does (the Statement's "Taken from accounts"), `only` narrows the choices to those, and `without`
+ * says what the row does (the Statement's "From accounts"), `only` narrows the choices to those, and `without`
  * leaves out the ones that have a place of their own.
  */
 export function AddRowInline({ section, categories, tables, household, onError, defaultCategoryId = '', label, onAdded, only, without }: {

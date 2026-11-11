@@ -175,6 +175,8 @@ export interface EngineOutput {
   netWorth: Record<MonthKey, Money>
   /** Rows whose months are filled by recurring items instead of carry-forward. */
   recurringRowIds: string[]
+  /** The savings account that spending "from savings" comes out of; null without a savings account. */
+  primarySavingsId: string | null
   warnings: string[]
 }
 

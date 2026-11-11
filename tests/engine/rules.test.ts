@@ -83,9 +83,9 @@ describe('rules: how a transfer is worked out', () => {
     expect(tot.rest).toBe(-130000)
     expect(out.accounts[savings.id].months['2026-02'].balance).toBe(150000 - 130000)
     const s = buildStatement(short, out, '2026-02')!
-    const cover = s.flow.left.lines.find((l) => l.id === 'cover')!
-    expect(cover.children).toHaveLength(1)
-    expect(cover.children[0]).toMatchObject({ rowId: r.toSavings.id, label: 'From Savings', amount: 130000, balancing: true })
+    const cover = s.flow.left.lines.find((l) => l.id === 'from-accounts')!.children.filter((c) => c.chip === 'to cover the month')
+    expect(cover).toHaveLength(1)
+    expect(cover[0]).toMatchObject({ rowId: r.toSavings.id, label: 'From Savings', amount: 130000, balancing: true })
     expectIdentity(out)
     expectBalanced(short, out)
   })
@@ -118,8 +118,10 @@ describe('rules: how a transfer is worked out', () => {
     expect(out.accounts[savings.id].months['2026-02']).toMatchObject({ balance: 275000, inflow: 225000, outflow: 100000 })
     const s = buildStatement(withTaken, out, '2026-02')!
     const group = s.flow.left.lines.find((l) => l.id === 'from-accounts')!
-    expect(group).toMatchObject({ label: 'Taken from accounts', amount: 100000 })
-    expect(group.children).toMatchObject([{ kind: 'row', rowId: taken.id, label: 'From Savings', amount: 100000 }])
+    expect(group).toMatchObject({ label: 'From accounts', amount: 100000 })
+    expect(group.children).toMatchObject([{ kind: 'row', rowId: taken.id, label: 'From Savings', accountKind: 'savings account', amount: 100000 }])
+    // the row is already named after its account, so its own name is not said twice
+    expect(group.children[0].ownName).toBeUndefined()
     // nothing was earned by it: net worth grows by income minus spending, as in any other month
     expect(s.position.right.lines.find((l) => l.id === 'net-worth')!.change).toBe(500000 - 250000)
     expect(out.totals['2026-03'].fromAccounts).toBe(0)
@@ -176,7 +178,7 @@ describe('rules: how a transfer is worked out', () => {
     expect(out.accounts[rainy.id].months['2026-02'].balance).toBe(60000)
     expect(out.accounts[broker.id].months['2026-03'].capital).toBe(270000)
     const s = buildStatement(short, out, '2026-02')!
-    expect(s.flow.left.lines.find((l) => l.id === 'cover')!.children).toMatchObject([{ rowId: r.toBroker.id, label: 'From Broker', amount: 90000, balancing: true }])
+    expect(s.flow.left.lines.find((l) => l.id === 'from-accounts')!.children.filter((c) => c.chip === 'to cover the month')).toMatchObject([{ rowId: r.toBroker.id, label: 'From Broker', amount: 90000, balancing: true }])
     expect(all(buildStatement(short, out, '2026-01')!).find((l) => l.id === r.toBroker.id)).toMatchObject({ amount: 180000, balancing: true, rule: { kind: 'rest' } })
     expectIdentity(out)
     expectBalanced(short, out)
@@ -198,7 +200,7 @@ describe('rules: how a transfer is worked out', () => {
     // the virtual account lives in the savings account, which moves with it
     expect(out.accounts[base.savings.id].months['2026-02'].balance).toBe(150000)
     const s = buildStatement(t, out, '2026-02')!
-    expect(s.flow.left.lines.find((l) => l.id === 'cover')!.children).toMatchObject([{ rowId: alloc.id, label: 'From Travel', amount: 90000, balancing: true }])
+    expect(s.flow.left.lines.find((l) => l.id === 'from-accounts')!.children.filter((c) => c.chip === 'to cover the month')).toMatchObject([{ rowId: alloc.id, label: 'From Travel', amount: 90000, balancing: true }])
     expectIdentity(out)
     expectBalanced(t, out)
   })

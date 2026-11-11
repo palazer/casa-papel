@@ -237,13 +237,13 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 - **Progress bars** (goals): `h-2 rounded-full bg-goal-tint` with a `bg-goal` fill, `bg-income` once reached.
 - **Statement lines** (`src/features/statement/`, figures from `buildStatement` in `src/engine/statement.ts`): the
   Statement is one month in accounting form, two halves that each balance. "The month": Money in beside Money out,
-  closed by the rest (to savings) or the leftover; a month that overruns shows "To cover the month" on the left.
+  closed by the rest (to savings) or the leftover; a month that overruns shows a line tagged `to cover the month` under "From accounts" on the left.
   "At the end of the month": Assets beside Debts and net worth, closed by Free (net worth is one figure in the whole
   app: tracked accounts and what stays in the current accounts, minus debts; `engine.netWorth`), with a muted `change` column before
   the balance on both sides (`+€460.00`, a `·` for none) and the day as the balance column's head. A side opens with
   its name in small caps and closes with its total in `font-semibold` over a hairline. Lines are `min-h-11 text-sm`
   on phones and `md:min-h-7 md:text-xs`, separated by `divide-border/60`, amounts in a fixed right-aligned column:
-  a **group** (Income, Taken from accounts, Expenses, Set aside, pay off, Debts, Net worth) is a heading in its hue
+  a **group** (Income, From accounts, Expenses, Set aside, pay off, Debts, Net worth) is a heading in its hue
   on the hue's `tint` with its lines always under it; a **category**, an account that holds virtual accounts and an itemized row open as an
   accordion (a chevron button with `aria-expanded`, each level 20 px further in, items on `bg-muted/20` with the
   `Repeat` icon when scheduled); a category's amount is the sum of its rows. A category or an account that opens is
@@ -278,15 +278,24 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   and the rows Income, Own spending, Pocket money and, in `font-semibold` over a full hairline, Leaves for the
   household (signed, the expense hue below zero). Rows keep the Statement's heights; more adults than fit scroll
   sideways inside the island.
-  **Money in from your own accounts** has two sections that must not be mixed up. `Taken from accounts` is typed:
-  rows that move money out of a savings or an investment account into the month, always shown (a faint `·` while
-  empty) with `Add row` at its foot offering only those two kinds. `From savings and virtual accounts` is worked out
-  from the expenses that come straight out of them: its heading carries the `calculated` chip and an (i), and each
-  line names the expenses it paid for in muted `text-[11px]` (`for Weekend trip, Flights`, cut with an ellipsis,
-  the full list in the title).
+  **Money in from your own accounts is one section, `From accounts`**, so that Money in reads as Income plus From
+  accounts. It is always shown (a faint `·` while empty), has an (i), and holds three kinds of line that each say
+  which they are. **Every line there leads with the account the money came out of**, `From <account>`, followed by
+  the kind of account in muted `text-[11px]` (`savings account`, `investment account`, `virtual account`,
+  `current account`), so no line leaves open where its money came from. What an expense took straight out of
+  savings or a virtual account is worked out: such a line carries the `calculated` chip and names the expenses it
+  paid for in muted `text-[11px]` (`for Weekend trip, Flights`, cut with an ellipsis, the full list in the title),
+  and it opens to those expenses. What is taken by hand is a row like any other, with its tick and no chip; it too
+  is shown under its account's name, with the row's own name after it in muted text when that says something else
+  (`From Savings · savings account · Car repair`), and its controls are named with both (`From Savings, Car
+  repair: €400.00`). `Add row` at the section's foot offers only the two kinds that take money out of an account. In a month that overruns, the line that fills the gap carries
+  the chip `to cover the month`. The chip sits on the lines, never on the heading. A line without a tick among rows
+  that have one (a calculated line here, `Kept in account` or `Leftover` under Set aside) keeps the tick's place
+  empty while the month is open, so the names of a group stay in one column. The Grid keeps its own row `of
+  which from savings & virtual accounts` under the expenses.
   **A virtual account that is short.** A virtual account never shows less than zero. In a month that takes more out of it
   than it holds, its line in the lower half carries a rose `short €2,730.00` chip and an `xs outline` button `Top
-  up…` (named `Top up <virtual account>`), and its line under "From savings and virtual accounts" says `€2,730.00 more
+  up…` (named `Top up <virtual account>`), and its calculated line under "From accounts" says `€2,730.00 more
   than it held, taken from <savings account>` in muted `text-[11px]` with the same button. When a virtual account
   becomes short while its month is on screen, the top-up dialog opens by itself; one that was short already only
   shows the chip. The Grid shows the balance at zero in the expense hue with the reason in the

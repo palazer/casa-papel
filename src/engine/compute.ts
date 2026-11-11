@@ -74,7 +74,7 @@ function addFunding(f: Funding, fundedBy: string, amount: Money): void {
 }
 
 function emptyOutput(months: MonthKey[]): EngineOutput {
-  return { months, rows: [], cells: {}, totals: {}, accounts: {}, pools: {}, rowTotals: {}, incomeTotal: 0, main: null, netWorth: {}, recurringRowIds: [], warnings: [] }
+  return { months, rows: [], cells: {}, totals: {}, accounts: {}, pools: {}, rowTotals: {}, incomeTotal: 0, main: null, netWorth: {}, recurringRowIds: [], primarySavingsId: null, warnings: [] }
 }
 
 /**
@@ -618,7 +618,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
   for (const m of requested) if (netWorth[m] != null) outNetWorth[m] = netWorth[m]
   for (const m of Object.keys(main.months)) if (!requestedSet.has(m)) delete main.months[m]
 
-  return { months: requested, rows, cells: outCells, totals: outTotals, accounts: accountSeries, pools: poolSeries, rowTotals, incomeTotal, main, netWorth: outNetWorth, recurringRowIds: [...recurringRowIds], warnings: dedupe(warnings) }
+  return { months: requested, rows, cells: outCells, totals: outTotals, accounts: accountSeries, pools: poolSeries, rowTotals, incomeTotal, main, netWorth: outNetWorth, recurringRowIds: [...recurringRowIds], primarySavingsId, warnings: dedupe(warnings) }
 }
 
 function savingsInflow(acc: Account, m: MonthKey, rows: Row[], cells: Record<string, CellResult>, pools: EngineInput['tables']['pools'], t: MonthTotals): Money {

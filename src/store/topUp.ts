@@ -9,7 +9,7 @@ import { applyMutations } from './impact'
 
 /**
  * Where a top-up comes from: an account (the unassigned part of a savings account, or an investment account), which
- * leaves a line under "Taken from accounts", or the month itself, which leaves less for the rest.
+ * leaves a line under "From accounts", or the month itself, which leaves less for the rest.
  */
 export type TopUpSource = { kind: 'account'; accountId: string } | { kind: 'income' }
 

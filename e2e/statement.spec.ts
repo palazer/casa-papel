@@ -99,8 +99,13 @@ test.describe('the Statement', () => {
     await openStatement(page)
     await goToMonth(page, 'October 2026')
     const moneyIn = page.getByRole('region', { name: 'Money in' })
-    await expect(moneyIn.locator('[data-line="sources"]')).toContainText('From savings and virtual accounts')
-    await expect(moneyIn.locator('[data-line="sources"]')).toContainText('€480.00')
+    // one section for everything that came out of the accounts; what the trip took out of Travel is a calculated line in it
+    await expect(moneyIn.locator('[data-line="from-accounts"]')).toContainText('From accounts')
+    await expect(moneyIn.locator('[data-line="from-accounts"]')).toContainText('€480.00')
+    await expect(moneyIn.locator('[data-line^="src:"]')).toContainText(['Travel'])
+    await expect(moneyIn.locator('[data-line^="src:"]').first()).toContainText('calculated')
+    await expect(moneyIn.getByText('Taken from accounts')).toHaveCount(0)
+    await expect(moneyIn.getByText('From savings and virtual accounts')).toHaveCount(0)
     const totalIn = (await total(page, 'in').innerText()).replace(/^Total in\s*/, '')
     const totalOut = (await total(page, 'out').innerText()).replace(/^Total out\s*/, '')
     expect(totalIn).toBe(totalOut)
@@ -864,7 +869,7 @@ test.describe('working the month in the Statement', () => {
     await expect(page.getByRole('button', { name: /^Edit / })).toHaveCount(0)
   })
 
-  test('money taken from an account by hand has its own section; what expenses took from savings and virtual accounts is marked calculated', async ({ page }) => {
+  test('one section for money from the accounts: what an expense took is marked calculated, what is taken by hand is a row with no tag', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'November 2026')
     const moneyIn = page.getByRole('region', { name: 'Money in' })
@@ -872,31 +877,45 @@ test.describe('working the month in the Statement', () => {
     const dlg = page.getByRole('dialog')
     const rest = async () => euros(await moneyOut.locator('[data-line]').filter({ has: page.locator('[data-rule="rest"]') }).innerText())
 
-    // worked out from the expenses: tagged, and each line names what it paid for
-    await expect(moneyIn.locator('[data-line="sources"]')).toContainText('calculated')
-    await expect(moneyIn.locator('[data-line^="src:"]').filter({ hasText: 'Clothing' })).toContainText('for Clothing')
-
-    // typed by hand: a section that is always there, empty until a row is added in it
+    // worked out from the expenses: each such line is tagged and names what it paid for
     const taken = moneyIn.locator('[data-line="from-accounts"]')
-    await expect(taken).toContainText('Taken from accounts')
+    await expect(taken).toContainText('From accounts')
+    await expect(taken).not.toContainText('calculated')
+    const clothing = moneyIn.locator('[data-line^="src:"]').filter({ hasText: 'Clothing' })
+    await expect(clothing).toContainText('calculated')
+    await expect(clothing).toContainText('for Clothing')
+    // every line of the section leads with the account the money came out of and says what kind of account that is
+    await expect(clothing).toContainText('From Clothing')
+    await expect(clothing).toContainText('virtual account')
+    const before = euros(await taken.innerText())
+
+    // typed by hand: a row in the same section, added at its foot
     await moneyIn.getByRole('button', { name: 'Add transfer row' }).click()
     await expect(moneyIn.getByLabel('What the new transfer row does').locator('option')).toHaveText(['Taken from a savings account', 'Taken from an investment account'])
-    await moneyIn.getByLabel('New transfer row name').fill('From Savings')
+    await moneyIn.getByLabel('New transfer row name').fill('Car repair')
     await moneyIn.getByRole('button', { name: 'Add', exact: true }).click()
+    await expect(dlg.getByRole('heading', { name: 'Car repair · November 2026' })).toBeVisible()
     // the editor opens for the first amount, and for these rows it starts on this month only
     await expect(dlg.getByRole('radio', { name: 'Only this month' })).toBeChecked()
     await dlg.getByLabel('Amount in EUR').fill('400')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-    await expect(moneyIn.getByRole('button', { name: 'From Savings: €400.00' })).toBeVisible()
-    await expect(taken).toContainText('€400.00')
+    // the row is shown under the account it takes from, with its own name after it
+    const own = moneyIn.locator('[data-line]').filter({ has: page.getByRole('button', { name: 'From Savings, Car repair: €400.00' }) })
+    await expect(own).toContainText('From Savings')
+    await expect(own).toContainText('savings account')
+    await expect(own).toContainText('Car repair')
+    await expect(page.getByRole('checkbox', { name: 'From Savings, Car repair done' })).toBeVisible()
+    // a row of your own has no tag, and the section's amount counts both kinds
+    await expect(own).not.toContainText('calculated')
+    expect(euros(await taken.innerText())).toBe(before + 400)
     // the month has 400 more, so the rest grows by it, and the two sides still agree
     expect(await rest()).toBe(2769)
     expect((await total(page, 'in').innerText()).replace(/^Total in\s*/, '')).toBe((await total(page, 'out').innerText()).replace(/^Total out\s*/, ''))
     await page.screenshot({ path: 'e2e/output/statement-taken.png', fullPage: true })
     // nothing is taken the month after
     await goToMonth(page, 'December 2026')
-    await expect(moneyIn.getByRole('button', { name: /^From Savings:/ })).toHaveAccessibleName('From Savings: €0.00')
+    await expect(moneyIn.getByRole('button', { name: /^From Savings, Car repair:/ })).toHaveAccessibleName('From Savings, Car repair: €0.00')
     expect(await rest()).toBe(2369)
     // the right side does not offer what has its own place on the left
     await moneyOut.getByRole('button', { name: 'Add transfer row' }).click()
@@ -952,6 +971,7 @@ test.describe('working the month in the Statement', () => {
     const fromSavings = moneyIn.getByRole('button', { name: 'From Savings: €2,550.00' })
     await expect(fromSavings).toBeVisible()
     await expect(moneyIn.locator('[data-line]').filter({ has: page.getByRole('button', { name: 'From Savings: €2,550.00' }) })).toContainText('Top-up for Clothing')
+    await expect(moneyIn.locator('[data-line]').filter({ has: page.getByRole('button', { name: 'From Savings: €2,550.00' }) })).toContainText('savings account')
     await expect(moneyOut.getByRole('button', { name: /^To Clothing: €2,650\.00/ })).toBeVisible()
     await expect(poolLine).not.toContainText('short')
     await expect(assets.getByRole('button', { name: 'Top up Clothing' })).toHaveCount(0)
