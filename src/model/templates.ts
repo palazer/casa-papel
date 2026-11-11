@@ -137,7 +137,7 @@ export const RULE_KIND_INFO: Array<{ value: RowRule; label: string; help: string
 ]
 
 export const ACCOUNT_TYPE_INFO: Array<{ value: AccountType; label: string; help: string }> = [
-  { value: 'checking', label: 'Current account', help: 'Where salary lands and bills leave. Day-to-day money; its balance is not tracked.' },
+  { value: 'checking', label: 'Current account', help: 'Where salary lands and bills leave. Day-to-day money; its balance is worked out, and you can type what the bank says.' },
   { value: 'joint', label: 'Joint account', help: 'A shared account partners pay into for shared bills. Pick this when a fixed amount moves there every month.' },
   { value: 'savings', label: 'Savings', help: 'Where the month\'s leftover goes. The balance is tracked month by month, and pool accounts live inside it.' },
   { value: 'investment', label: 'Investments', help: 'Broker, fund or pension account. Deposits and value are tracked.' },

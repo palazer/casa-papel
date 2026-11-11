@@ -37,6 +37,8 @@ export interface LineContext {
   onGoal?: (line: Line, goal?: GoalProgress) => void
   /** Enter what an account really held at the end of the month. */
   onBalance?: (accountId: string) => void
+  /** The same for the line of the current accounts, which takes a balance for each of them. */
+  onCurrentBalance?: () => void
   /** Set or change a category's estimate; "Not broken down yet" opens it too. */
   onEstimate?: (categoryId: string) => void
   /** Open the rule dialog for a transfer line, or for the account or pool account it feeds. Leave out to show the rule without the button. */
@@ -267,9 +269,9 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
           {!ctx.closed && ctx.menu?.(line)}
         </div>
         {ctx.withChange && <span className={cn(CHANGE_COL, 'text-muted-foreground', group && 'font-medium')}>{line.change != null ? changeText(line.change, ccy, locale) : ''}</span>}
-        {ctx.onBalance && line.accountId ? (
+        {(ctx.onBalance && line.accountId) || (ctx.onCurrentBalance && line.currentAccountIds?.length) ? (
           <button
-            type="button" aria-label={`${line.label} balance: ${amountText}${line.entered ? ', entered' : ''}`} onClick={() => ctx.onBalance!(line.accountId!)}
+            type="button" aria-label={`${line.label} balance: ${amountText}${line.entered ? ', entered' : ''}`} onClick={() => (line.accountId ? ctx.onBalance!(line.accountId) : ctx.onCurrentBalance!())}
             className={cn(AMOUNT_COL, '-my-1 rounded py-1 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring', line.amount < 0 && 'text-expense', line.entered && 'underline decoration-dotted underline-offset-4')}
           >
             {amountText}

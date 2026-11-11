@@ -235,7 +235,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   Statement is one month in accounting form, two halves that each balance. "The month": Money in beside Money out,
   closed by the rest (to savings) or the leftover; a month that overruns shows "To cover the month" on the left.
   "At the end of the month": Assets beside Debts and net worth, closed by Free (net worth is one figure in the whole
-  app: tracked accounts and the main account's calculated line, minus debts; `engine.netWorth`), with a muted `change` column before
+  app: tracked accounts and what stays in the current accounts, minus debts; `engine.netWorth`), with a muted `change` column before
   the balance on both sides (`+€460.00`, a `·` for none) and the day as the balance column's head. A side opens with
   its name in small caps and closes with its total in `font-semibold` over a hairline. Lines are `min-h-11 text-sm`
   on phones and `md:min-h-7 md:text-xs`, separated by `divide-border/60`, amounts in a fixed right-aligned column:
@@ -308,8 +308,12 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   have a goal (an account, a pool account, a debt, Net worth) shows a 20 px ghost `Target` button after its name on
   hover or focus, always where the pointer is a finger, named `Set a goal for <line>`; it opens the goal dialog with
   what the goal watches settled, so the dialog asks for the amount only. A goal's detail carries an `xs ghost` `Edit`. An account's balance
-  is a button named `<account> balance: <amount>` (`, entered` once it is) that opens the Grid's `BalanceDialog`; the
-  line for the current accounts is calculated and has none.
+  is a button named `<account> balance: <amount>` (`, entered` once it is) that opens the Grid's `BalanceDialog`.
+  The line for what stays in the current accounts (the one account's name, else `Current accounts`) is worked out
+  and says so with the `calculated` chip; its amount is the same kind of button and opens `CurrentBalanceDialog` (§8).
+  Once the real balances are typed for a month the chip goes, the amount is underlined like any entered balance, the
+  line says `entered, -€120.00 against the plan`, and its parts (At the start of the month, Kept this month, the card
+  lines) gain `Not in the plan`, so they still add up. The month after is `calculated` again, from the real number.
   **Accounts are added in the lower half too**, in the same ghost `+` buttons as rows: the foot of the Assets side
   holds `Add account` (current, joint, savings, investments, other asset, cash) and, once a savings account exists,
   `Add pool account`; `Add a card or loan` sits at the foot of the Debts group, and at the foot of that side while
@@ -416,6 +420,16 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   with no line to explain it. Ticked for a balance typed now, unticked when the dialog opens on an older difference.
   Other accounts never see it: for a card that records only its payments it would count the money twice
   (`setCardBalanceBooked` in `src/store/actions.ts`).
+- The current accounts' balance dialog (`src/features/grid/CurrentBalanceDialog.tsx`, the same frame as the balance
+  dialog) asks for what every current account held at the end of the month: `Worked out, together` as a muted line,
+  then one field per account that exists in that month, labelled `<account> (<CCY>)` (one account alone: the dialog
+  carries its name and the field reads `Real balance in <CCY>`), then `Together` and `Difference` as soon as every
+  field holds a number (household currency only; another currency is converted on saving and the dialog says so).
+  All or none: a half-filled dialog says "Fill in every account, or leave them all empty to use the calculated
+  amount." in place and saves nothing, because the plan only knows what the accounts hold together. `Use the
+  calculated amount` (ghost, left) clears them; a closed month disables the fields and says why. The difference is
+  shown, never booked as spending: where an account takes the rest, extra spending would lower that transfer in the
+  plan, not the current accounts (`setCurrentBalances` in `src/store/householdActions.ts`).
 - The estimate dialog (`src/features/statement/EstimateDialog.tsx`), titled `Estimate for <category> · <month>`: one
   amount in the household currency with an (i) (`row.categoryEstimate`), then two read-only lines that follow what
   is typed (`Rows this month`, `Not broken down yet`; a muted sentence when the rows already add up to more), then

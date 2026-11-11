@@ -13,13 +13,14 @@ import { useStore } from '@/app/store'
 import { clearHandedMonth, handedOverMonth } from '@/app/screens'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { useStoreVersion } from '@/app/useStoreVersion'
-import { buildStatement, cellKey, type GoalProgress, type StatementLine } from '@/engine'
+import { buildStatement, cellKey, currentAccountsIn, type GoalProgress, type StatementLine } from '@/engine'
 import { canCarryRule, isPocketRow, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type MonthKey, type Row, type Section } from '@/model'
 import { accountSuggestions, addPlanYear, closeMonth, removeIfFree, reopenMonth, rowSuggestions, setCellDone, setDerivedDone, setItemStatus, setupSteps, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupStepKey } from '@/store'
 import { GoalDialog } from '@/features/goals/GoalDialog'
 import { goalStatusLine } from '@/features/goals/goalText'
 import { AddRowInline } from '@/features/grid/AddRowInline'
 import { BalanceDialog } from '@/features/grid/BalanceDialog'
+import { CurrentBalanceDialog } from '@/features/grid/CurrentBalanceDialog'
 import { CellEditor } from '@/features/grid/CellEditor'
 import { RowMenu } from '@/features/grid/RowMenu'
 import { HouseholdAccountDialog } from '@/features/household/HouseholdAccountDialog'
@@ -67,6 +68,8 @@ export function StatementScreen() {
   const [goalEdit, setGoalEdit] = useState<{ goal: Goal | null; preset?: { kind: GoalKind; accountId?: string | null; poolId?: string | null } } | null>(null)
   const [removingGoal, setRemovingGoal] = useState<Goal | null>(null)
   const [balanceFor, setBalanceFor] = useState<string | null>(null)
+  /** The real balances of the current accounts are being typed. */
+  const [currentBalance, setCurrentBalance] = useState(false)
   /** The expense category whose estimate is being typed. */
   const [estimateFor, setEstimateFor] = useState<string | null>(null)
   /** The transfer, account or pool account whose rule is being set. */
@@ -132,6 +135,7 @@ export function StatementScreen() {
   const goalText = (g: GoalProgress) => goalStatusLine(g, locale, horizon)
   const editing = editorRow ? engine.rows.find((r) => r.id === editorRow) : undefined
   const balanceAccount = balanceFor ? tables.accounts.find((a) => a.id === balanceFor) : undefined
+  const mainLine = statement.position.left.lines.find((l) => l.id === 'main')
   const balanceResult = balanceFor ? engine.accounts[balanceFor]?.months[m] : undefined
 
   /** A row counts its items; an item is done or not; an empty line has nothing to tick. */
@@ -311,7 +315,7 @@ export function StatementScreen() {
   // a card or a loan is added under Debts; while the household owes nothing, at the foot of that side
   const hasDebts = statement.position.right.lines.some((l) => l.id === 'debts')
   const debtsFoot = <Button variant="ghost" size="sm" className={ADD} onClick={() => setAccountNew({ types: DEBT_TYPES })}><Plus /> Add a card or loan</Button>
-  const positionCtx: LineContext = { ...base, withChange: true, onGoal, onBalance: setBalanceFor, footer: (line) => (line.id === 'debts' ? debtsFoot : null), menu: lineMenu }
+  const positionCtx: LineContext = { ...base, withChange: true, onGoal, onBalance: setBalanceFor, onCurrentBalance: () => setCurrentBalance(true), footer: (line) => (line.id === 'debts' ? debtsFoot : null), menu: lineMenu }
   const day = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${lastDayOfMonth(m)}T00:00:00Z`))
   const foldable = walk([...statement.flow.left.lines, ...statement.flow.right.lines, ...statement.position.left.lines, ...statement.position.right.lines])
     .filter((l) => l.kind !== 'group' && (l.children.length > 0 || !!l.goals?.length || autoOpen.has(l.id)))
@@ -393,6 +397,12 @@ export function StatementScreen() {
       )}
       {balanceAccount && balanceResult && (
         <BalanceDialog key={`${balanceAccount.id}:${m}`} account={balanceAccount} month={m} result={balanceResult} locale={locale} closed={statement.closed} onClose={() => setBalanceFor(null)} />
+      )}
+      {currentBalance && mainLine && engine.main?.months[m] && (
+        <CurrentBalanceDialog
+          key={m} title={mainLine.label} accounts={currentAccountsIn(tables.accounts, m)} month={m} result={engine.main.months[m]} actuals={tables.accountMonths}
+          baseCurrency={ccy} locale={locale} closed={statement.closed} onClose={() => setCurrentBalance(false)}
+        />
       )}
       {estimateCategory && (
         <EstimateDialog
