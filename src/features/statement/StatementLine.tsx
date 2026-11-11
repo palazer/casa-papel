@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react'
-import { ArrowDownToLine, ChevronRight, Equal, Repeat, Target } from 'lucide-react'
+import { ArrowDownToLine, ChevronRight, Equal, Repeat, Target, UserRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { InfoTip } from '@/components/InfoTip'
 import { Tick } from '@/components/Tick'
 import { cn } from '@/lib/utils'
+import { isShareRule } from '@/model'
 import { ruleText, type DoneState } from '@/app/display'
 import { formatAmount, formatPercent, formatShare } from '@/app/format'
 import type { HelpKey } from '@/app/help'
@@ -172,7 +173,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
     const working = !ctx.closed && !!ctx.doneOf
     const d = working ? ctx.doneOf!(line) : null
     // a line a rule works out has no amount to type: it opens its rule instead of the cell editor
-    const byRule = !!line.rule && (line.automatic || line.rule.kind === 'share-of-income' || line.rule.kind === 'share-of-rest')
+    const byRule = !!line.rule && (line.automatic || isShareRule(line.rule.kind))
     const ruleOpens = !ctx.closed && !!ctx.onRule && byRule
     const editable = !ctx.closed && !!ctx.onEdit && !!line.rowId && !line.automatic && !byRule
     // what is left of a category's estimate is worked out, so the line opens the estimate it comes from
@@ -284,8 +285,9 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
 
 /**
  * The rule symbol (DESIGN.md §7): how the amount for an account is worked out, on the transfer line and on the account
- * it feeds. An arrow to a line for the rest, the percentage for a share of income, the percentage and the arrow for a
- * share of what is left, an equals sign for a fixed amount (faint where there is no rule yet). A button when the
+ * it feeds, and how an adult's pocket money is. An arrow to a line for the rest, the percentage for a share of income,
+ * the percentage and a person for a share of the adult's own income, the percentage and the arrow for a share of what
+ * is left, an equals sign for a fixed amount (faint where there is no rule yet). A button when the
  * rule can be changed from here, the bare symbol otherwise; its name says the rule in full.
  */
 function RuleMark({ line, ctx, className }: { line: Line; ctx: LineContext; className?: string }) {
@@ -295,6 +297,7 @@ function RuleMark({ line, ctx, className }: { line: Line; ctx: LineContext; clas
   const pct = rule.share != null ? <span className="tabular-nums">{formatShare(rule.share, ctx.locale)}</span> : null
   const glyph = rule.kind === 'rest' ? <ArrowDownToLine className="size-3.5" aria-hidden />
     : rule.kind === 'share-of-income' ? pct
+    : rule.kind === 'share-of-own-income' ? <>{pct}<UserRound className="size-3" aria-hidden /></>
     : rule.kind === 'share-of-rest' ? <>{pct}<ArrowDownToLine className="size-3" aria-hidden /></>
     : <Equal className="size-3.5" aria-hidden />
   const look = cn(

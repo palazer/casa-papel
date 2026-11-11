@@ -43,7 +43,10 @@ export const HouseholdSchema = BaseRecord.extend({
   locale: z.string().min(2),
   startMonth: MonthKeySchema,
   closingRule: ClosingRuleSchema.default('savings-plug'),
-  /** Total pocket money per month, split between adults by their pocket rows. */
+  /**
+   * The pocket money total households had before pocket rows got rules. Nothing sets it any more; the engine reads it
+   * only for a pocket row that is still a share of it (`pocketMode` 'share-of-pocket-total' and no rule).
+   */
   pocketTotal: MoneySchema.default(0),
   /** Cash deliberately left in checking at month end. Default 0. */
   cashBuffer: MoneySchema.default(0),

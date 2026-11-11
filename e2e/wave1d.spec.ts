@@ -18,15 +18,23 @@ test.describe('wave 1d', () => {
     await expect(page.getByRole('cell', { name: 'Leaves for the household' })).toBeVisible()
     await expect(page.getByText('Net worth', { exact: true })).toBeVisible()
 
-    // pocket money from this month on: October keeps 500 each, November shows 750 each
+    // pocket money is set on each adult's own line, not under Household: 750 for Sam from this month on
     await page.getByRole('link', { name: 'Household' }).click()
-    const pocket = page.getByLabel(/^Pocket money per month, all adults/)
-    await pocket.fill('1500')
-    await pocket.press('Tab')
+    await expect(page.getByLabel(/^Pocket money per month/)).toHaveCount(0)
+    await expect(page.getByLabel('Cash buffer changes apply to')).toBeVisible()
     await page.getByRole('link', { name: 'Grid' }).click()
+    await page.getByRole('button', { name: 'Row menu for Sam – Pocket' }).click()
+    await page.getByRole('menuitem', { name: 'Rule…' }).click()
+    const rule = page.getByRole('dialog')
+    await expect(rule.getByRole('heading', { name: 'How much pocket money does Sam get?' })).toBeVisible()
+    await expect(rule.getByRole('radio', { name: 'The rest' })).toHaveCount(0)
+    await rule.getByLabel('Amount per month in EUR').fill('750')
+    await rule.getByRole('button', { name: 'Save' }).click()
+    await expect(rule).toBeHidden()
     const samPocket = page.getByRole('row', { name: /^Sam – Pocket/ })
     await expect(samPocket).toContainText('€500.00')
     await expect(samPocket).toContainText('€750.00')
+    await expect(page.getByRole('row', { name: /^Alex – Pocket/ })).not.toContainText('€750.00')
 
     // switch to proportional contributions
     await page.getByRole('link', { name: 'Household' }).click()

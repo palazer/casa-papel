@@ -12,7 +12,7 @@ import { HUES, SECTION_HUE, type Hue } from '@/app/hues'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { cellKey, groupRowsByCategory, type EngineOutput } from '@/engine'
-import { monthOfDate, parseMonth, resolveRules, type Household, type Money, type MonthKey, type Row, type RuleState, type Section, type Tables } from '@/model'
+import { isOldPocketShare, isShareRule, monthOfDate, parseMonth, resolveRules, type Household, type Money, type MonthKey, type Row, type RuleState, type Section, type Tables } from '@/model'
 import { addPlanYear, closeMonth, derivedRowReason, reopenMonth } from '@/store'
 import { AddRowInline } from './AddRowInline'
 import { BalanceDialog } from './BalanceDialog'
@@ -309,7 +309,9 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
           </div>
           {followed && <InfoTip help="row.follows" text={`${shareTag ? `${shareTag}the amount of` : 'Same amount as'} "${followed.name}" every month. Edit that row; this one has no amount of its own.`} />}
           {deductedFrom && <InfoTip help="row.deductedFrom" />}
-          {automatic && <InfoTip help={rule?.kind === 'share-of-income' || rule?.kind === 'share-of-rest' || (rule?.kind === 'rest' && row.kind !== 'to-savings') ? 'row.rule' : row.kind === 'to-savings' ? 'row.toSavingsPlug' : row.kind === 'category-estimate' ? 'row.categoryEstimate' : 'row.pocketShare'} />}
+          {automatic && (isOldPocketShare(row)
+            ? <InfoTip help="row.rule" text={'A share of the pocket money total the household had before. Give it an amount or a rule of its own: row menu, "Rule…".'} />
+            : <InfoTip help={row.kind === 'category-estimate' ? 'row.categoryEstimate' : row.kind === 'to-savings' && !isShareRule(rule?.kind) ? 'row.toSavingsPlug' : 'row.rule'} />)}
           <RowMenu row={row} tables={tables} household={household} onError={onError} />
         </div>
       </th>

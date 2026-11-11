@@ -176,6 +176,20 @@ test.describe('wave 1b', () => {
     await expect(dlg).toContainText('Resolve these first')
     await dlg.getByRole('button', { name: 'Cancel' }).click()
 
+    // pocket money added without an amount asks straight away how much: an amount or a percentage, never the rest
+    await general.getByRole('button', { name: 'Add Ben – Pocket' }).click()
+    await expect(dlg.getByRole('heading', { name: 'How much pocket money does Ben get?' })).toBeVisible()
+    await expect(dlg.getByRole('radio', { name: 'The rest' })).toHaveCount(0)
+    await dlg.getByRole('radio', { name: 'A percentage of Ben\'s income' }).click()
+    await dlg.getByLabel('Percentage of Ben\'s income').fill('10')
+    await expect(dlg.getByTestId('rule-preview')).toContainText('10% of €2,500.00, Ben\'s take-home income')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(moneyOut.getByRole('button', { name: 'Ben – Pocket: €250.00' })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: 'Rule for Ben – Pocket: 10% of their own income' })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: 'To Savings: €3,350.00' })).toBeVisible()
+    await page.screenshot({ path: 'e2e/output/setup-pocket-rule.png' })
+
     // "Done" puts the strip and the suggestions away; the month stays where it was
     await strip.getByRole('button', { name: 'Done', exact: true }).click()
     await expect(strip).toHaveCount(0)

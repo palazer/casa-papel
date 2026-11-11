@@ -51,7 +51,7 @@ export function HouseholdScreen() {
         {error && <p role="alert" className="basis-full text-destructive">{error}</p>}
       </PageHeader>
       <GroupTabs />
-      <SettingsCard household={household} tables={tables} onSave={(p) => act(() => updateHousehold(store, p))} onMonthly={(key, value, scope) => act(() => setMonthlyDefault(store, key, value, scope, monthOfDate()))} />
+      <SettingsCard household={household} tables={tables} onSave={(p) => act(() => updateHousehold(store, p))} onBuffer={(value, scope) => act(() => setMonthlyDefault(store, value, scope, monthOfDate()))} />
       {household.moneyMode === 'proportional' && <SharesCard household={household} tables={tables} engine={engine} onError={setError} />}
       <EntitiesCard household={household} tables={tables} entities={tables.entities.filter((e) => !e.deletedAt)} onError={setError} />
       <AccountsCard household={household} tables={tables} accounts={tables.accounts.filter((a) => !a.deletedAt)} entities={tables.entities} engine={engine} months={months} onError={setError} />
@@ -66,14 +66,14 @@ export function HouseholdScreen() {
   )
 }
 
-function SettingsCard({ household: h, tables, onSave, onMonthly }: { household: Household; tables: Tables; onSave: (p: Partial<Household>) => void; onMonthly: (key: 'pocketTotal' | 'cashBuffer', value: number, scope: MonthlyDefaultScope) => void }) {
+function SettingsCard({ household: h, tables, onSave, onBuffer }: { household: Household; tables: Tables; onSave: (p: Partial<Household>) => void; onBuffer: (value: number, scope: MonthlyDefaultScope) => void }) {
   const thisMonth = monthOfDate()
   const state = tables.monthStates.find((s) => s.month === thisMonth)
-  const effective = (key: 'pocketTotal' | 'cashBuffer') => (key === 'pocketTotal' ? state?.pocketTotalOverride : state?.cashBufferOverride) ?? h[key]
+  /** The cash buffer this month: its own value when the month has one, else the household's. */
+  const bufferNow = state?.cashBufferOverride ?? h.cashBuffer
   const [name, setName] = useState(h.name)
   const [scope, setScope] = useState<MonthlyDefaultScope>('from-now-on')
-  const [pocket, setPocket] = useState(amountToInput(effective('pocketTotal'), h.baseCurrency, h.locale))
-  const [buffer, setBuffer] = useState(amountToInput(effective('cashBuffer'), h.baseCurrency, h.locale))
+  const [buffer, setBuffer] = useState(amountToInput(bufferNow, h.baseCurrency, h.locale))
   const money = (s: string) => (s.trim() ? parseAmount(s, h.baseCurrency, h.locale) ?? 0 : 0)
   return (
     <Island air title="Household settings" description="Closed months keep the values they were closed with.">
@@ -94,7 +94,7 @@ function SettingsCard({ household: h, tables, onSave, onMonthly }: { household: 
           </NativeSelect>
         </div>
         <div className="space-y-1.5 sm:col-span-2">
-          <TipLabel htmlFor="s-scope" help="household.pocketScope">Pocket money and cash buffer changes apply to</TipLabel>
+          <TipLabel htmlFor="s-scope" help="household.bufferScope">Cash buffer changes apply to</TipLabel>
           <NativeSelect id="s-scope" className="w-full" value={scope} onChange={(e) => setScope(e.target.value as MonthlyDefaultScope)}>
             <option value="from-now-on">This month and onwards (earlier months keep what they show)</option>
             <option value="this-month">Only this month</option>
@@ -103,14 +103,9 @@ function SettingsCard({ household: h, tables, onSave, onMonthly }: { household: 
           <p className="text-muted-foreground">Closed months are never changed. "This month" is {formatMonth(thisMonth, h.locale)}.</p>
         </div>
         <div className="space-y-1.5">
-          <TipLabel htmlFor="s-pocket" help="household.pocket">Pocket money per month, all adults ({h.baseCurrency})</TipLabel>
-          <Input id="s-pocket" inputMode="decimal" value={pocket} onChange={(e) => setPocket(e.target.value)} onBlur={() => { const v = money(pocket); if (v !== effective('pocketTotal')) onMonthly('pocketTotal', v, scope) }} />
-          {effective('pocketTotal') !== h.pocketTotal && <p className="text-muted-foreground">This month {formatAmount(effective('pocketTotal'), h.baseCurrency, h.locale)} · default {formatAmount(h.pocketTotal, h.baseCurrency, h.locale)}</p>}
-        </div>
-        <div className="space-y-1.5">
           <TipLabel htmlFor="s-buffer" help="household.buffer">Cash kept in the account at month end ({h.baseCurrency})</TipLabel>
-          <Input id="s-buffer" inputMode="decimal" value={buffer} onChange={(e) => setBuffer(e.target.value)} onBlur={() => { const v = money(buffer); if (v !== effective('cashBuffer')) onMonthly('cashBuffer', v, scope) }} />
-          {effective('cashBuffer') !== h.cashBuffer && <p className="text-muted-foreground">This month {formatAmount(effective('cashBuffer'), h.baseCurrency, h.locale)} · default {formatAmount(h.cashBuffer, h.baseCurrency, h.locale)}</p>}
+          <Input id="s-buffer" inputMode="decimal" value={buffer} onChange={(e) => setBuffer(e.target.value)} onBlur={() => { const v = money(buffer); if (v !== bufferNow) onBuffer(v, scope) }} />
+          {bufferNow !== h.cashBuffer && <p className="text-muted-foreground">This month {formatAmount(bufferNow, h.baseCurrency, h.locale)} · default {formatAmount(h.cashBuffer, h.baseCurrency, h.locale)}</p>}
         </div>
         <div className="sm:col-span-2">
           <Check label="Show expenses as negative red numbers" checked={h.displayExpensesNegative} onChange={(e) => onSave({ displayExpensesNegative: e.target.checked })} />
@@ -198,16 +193,16 @@ function EntitiesCard({ household, tables, entities: allEntities, onError }: { h
             <Button size="sm" disabled={!name.trim()} onClick={add}>Add</Button>
           </div>
         </div>
-        {templatesFor && <TemplatesDialog household={household} entity={templatesFor} onClose={() => setTemplatesFor(null)} onError={onError} />}
+        {templatesFor && <TemplatesDialog entity={templatesFor} onClose={() => setTemplatesFor(null)} onError={onError} />}
         {removing && <RemoveDialog target={{ kind: 'entity', id: removing.id }} tables={tables} household={household} onClose={() => setRemoving(null)} />}
       </div>
     </Island>
   )
 }
 
-function TemplatesDialog({ household, entity, onClose, onError }: { household: Household; entity: Entity; onClose: () => void; onError: (m: string) => void }) {
+function TemplatesDialog({ entity, onClose, onError }: { entity: Entity; onClose: () => void; onError: (m: string) => void }) {
   const store = useStore()
-  const all = ENTITY_TEMPLATES[entity.kind].filter((t) => !(t.pocket && household.moneyMode !== 'pooled'))
+  const all = ENTITY_TEMPLATES[entity.kind]
   const [chosen, setChosen] = useState<Set<string>>(() => new Set(all.filter((t) => t.recommended).map((t) => t.key)))
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>

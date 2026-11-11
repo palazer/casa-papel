@@ -29,7 +29,8 @@ export function SuggestionLines({ suggestions, label, month, currency, locale, o
   month: MonthKey
   currency: string
   locale: string
-  onAdded: (row: Row) => void
+  /** The row a suggestion made, and the amount typed with it (null when the field was left empty). */
+  onAdded: (row: Row, amount: number | null) => void
   onError: (message: string) => void
 }) {
   const [more, setMore] = useState(false)
@@ -54,7 +55,7 @@ export function SuggestionLines({ suggestions, label, month, currency, locale, o
 
 function SuggestionLine({ suggestion: s, month, currency, locale, onAdded, onError, dismissable }: {
   suggestion: RowSuggestion; month: MonthKey; currency: string; locale: string
-  onAdded: (row: Row) => void; onError: (message: string) => void; dismissable: boolean
+  onAdded: (row: Row, amount: number | null) => void; onError: (message: string) => void; dismissable: boolean
 }) {
   const store = useStore()
   const [text, setText] = useState('')
@@ -66,7 +67,7 @@ function SuggestionLine({ suggestion: s, month, currency, locale, onAdded, onErr
   function add() {
     if (unreadable || busy || s.needs) return
     setBusy(true)
-    addSuggestion(store, s.id, { amount, month }).then(onAdded).catch(fail).finally(() => setBusy(false))
+    addSuggestion(store, s.id, { amount, month }).then((row) => onAdded(row, amount)).catch(fail).finally(() => setBusy(false))
   }
 
   return (

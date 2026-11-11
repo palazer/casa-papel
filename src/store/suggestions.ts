@@ -36,7 +36,6 @@ export interface RowSuggestion {
 /** Transfers into a savings or an investment account come from the account's own line and its rule, not from a suggestion. */
 const FROM_THE_ACCOUNT = new Set(['h.toSavings', 'h.toInvestments'])
 const HOUSEHOLD = 'household'
-const POCKET = 'Money this adult spends freely each month. An amount of its own, typed like any other.'
 const byOrder = <T extends { order: string }>(a: T, b: T) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0)
 const sameName = (a: string, b: string) => a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase()
 const live = <T extends { deletedAt: number | null; archivedMonth?: MonthKey | null }>(xs: T[]) => xs.filter((x) => !x.deletedAt && !x.archivedMonth)
@@ -78,8 +77,7 @@ export function rowSuggestions(tables: Tables): RowSuggestion[] {
     const id = suggestionId(entityId, t.key)
     const needs = t.pool ? (has('savings') ? null : 'savings') : t.account && !has(t.account) ? t.account : null
     out.push({
-      // a pocket line added from here has an amount of its own, so the template's "computed" wording does not fit it
-      id, template: t, entityId, title, description: t.pocket ? POCKET : t.description, section: t.section, place: placeOf(t),
+      id, template: t, entityId, title, description: t.description, section: t.section, place: placeOf(t),
       usual: (t.recommended ?? false) && !dismissed.has(id), dismissed: dismissed.has(id), needs, pool: t.pool ?? false,
     })
   }
@@ -133,7 +131,7 @@ export function setupSteps(tables: Tables): SetupStep[] {
 
 /**
  * Add a suggested row, with its first amount when one was typed: the amount starts in `month` and carries forward.
- * Pure; the caller commits. A pocket line gets an amount of its own, typed like any other.
+ * Pure; the caller commits.
  */
 export function suggestionMutations(tables: Tables, id: string, opts: { amount?: Money | null; month?: MonthKey } = {}): { mutations: Mutation[]; row: Row } {
   const household = tables.household.find((h) => !h.deletedAt)
@@ -155,8 +153,7 @@ export function suggestionMutations(tables: Tables, id: string, opts: { amount?:
     ? accounts.find((a) => a.type === s.template.account && entity && a.ownerEntityId === entity.id) ?? accounts.find((a) => a.type === s.template.account) ?? null
     : null
   const last = tables.rows.filter((r) => !r.deletedAt).map((r) => r.order).sort().at(-1) ?? null
-  const adultCount = live(tables.entities).filter((e) => e.kind === 'adult').length
-  return buildTemplateMutations(s.template, { tables, household, entity, adultCount }, generateKeyBetween(last, null), accounts, { destination, amount, month, typedPocket: true })
+  return buildTemplateMutations(s.template, { tables, household, entity }, generateKeyBetween(last, null), accounts, { destination, amount, month })
 }
 
 /** Add a suggested row; one undoable step. */

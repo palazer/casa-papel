@@ -14,7 +14,7 @@ export interface RowTemplate {
   /** Tag the row with the entity so per-entity views can find it. */
   tag?: boolean
   inShareBasis?: boolean
-  /** Pocket money row sharing the household pocket total. */
+  /** An adult's pocket money: a line of its own, with an amount or a rule. */
   pocket?: boolean
   /** Needs a destination account of this type. */
   account?: 'savings' | 'investment' | 'loan'
@@ -50,7 +50,7 @@ export const ENTITY_TEMPLATES: Record<EntityKind, RowTemplate[]> = {
     { key: 'a.salary', title: '{name} – Salary', description: 'Net salary after tax. Counted as certain.', section: 'income', kind: 'salary', defaultStatus: 'committed', scope: 'entity', inShareBasis: true, recommended: true },
     { key: 'a.extra', title: '{name} – Extra income', description: 'Bonuses, freelance work, side income.', section: 'income', scope: 'entity' },
     { key: 'a.personal', title: '{name} – Personal', description: 'Own spending the household pays for, like a phone contract or a membership.', section: 'expense', scope: 'entity', recommended: true, category: 'Personal' },
-    { key: 'a.pocket', title: '{name} – Pocket', description: 'This adult\'s share of the pocket money total. Computed, not typed.', section: 'transfer', kind: 'pocket-money', defaultStatus: 'committed', scope: 'entity', pocket: true, recommended: true },
+    { key: 'a.pocket', title: '{name} – Pocket', description: 'Money this adult spends freely each month: an amount you type, or a percentage once the line has a rule.', section: 'transfer', kind: 'pocket-money', defaultStatus: 'committed', scope: 'entity', pocket: true, recommended: true },
   ],
   child: [
     { key: 'c.benefit', title: '{name} – Child benefit', description: 'State child benefit or allowance.', section: 'income', defaultStatus: 'committed', scope: 'entity', tag: true, recommended: true },
@@ -125,10 +125,14 @@ export const GOAL_KIND_INFO: Array<{ value: GoalFamily; label: string; help: str
   { value: 'net-worth', label: 'Reach a net worth', help: 'Tracked assets minus tracked debts, in your base currency. Set it from the "Net worth" line on the Statement.' },
 ]
 
-/** How the transfer into an account is worked out each month: the rule dialog's four choices, one sentence each. */
+/**
+ * How the transfer into an account, or an adult's pocket money, is worked out each month: the rule dialog's choices,
+ * one sentence each. An account is offered all but the adult's own income; pocket money all but the rest.
+ */
 export const RULE_KIND_INFO: Array<{ value: RowRule; label: string; help: string }> = [
   { value: 'fixed', label: 'A fixed amount', help: 'The same amount every month until you change it.' },
   { value: 'share-of-income', label: 'A percentage of income', help: 'A share of the month\'s take-home income: what comes in, minus what is deducted from it. Money taken out of investments does not count.' },
+  { value: 'share-of-own-income', label: 'A percentage of their own income', help: 'Pocket money only: a share of what the adult it is for takes home, the income lines that belong to them minus what is deducted from those. An income the household shares counts for nobody.' },
   { value: 'share-of-rest', label: 'A percentage of what is left', help: 'A share of what the month has left after spending, fixed amounts, percentages of income and the cash kept in the account. Nothing in a month that overruns.' },
   { value: 'rest', label: 'The rest', help: 'Everything that is left after all of that. One account can take the rest, and the same account fills the gap in a month that overruns.' },
 ]

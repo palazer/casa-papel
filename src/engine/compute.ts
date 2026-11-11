@@ -301,7 +301,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
   for (const m of months) {
     const t: MonthTotals = {
       month: m, closed: isClosed(m), income: 0, cashExpense: 0, savingsFunded: 0, poolFunded: 0, poolFundedByPool: {},
-      allocations: 0, allocationsByPool: {}, toInvestment: 0, pocket: 0, pocketTotal: pocketTotalFor(m), debt: 0,
+      allocations: 0, allocationsByPool: {}, toInvestment: 0, pocket: 0, debt: 0,
       buffer: bufferFor(m), toSavings: 0, leftover: 0, fromSavingsDerived: 0, expensesTotal: 0, transfersTotal: 0,
       fromAccounts: 0, takeHome: 0, takeHomeBy: {}, leftForShares: 0, rest: null,
     }

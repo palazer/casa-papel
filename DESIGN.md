@@ -279,7 +279,11 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   that opens the rule dialog, and the bare symbol with the same name in a closed month. A line a rule works out
   opens the rule dialog when pressed, a fixed one the cell editor; where a line holds both controls, the line's
   button is its name stretched over the line and the symbol sits above it. An account fed by several rows shows no
-  symbol of its own. A new transfer to an account opens the rule dialog instead of the cell editor. The Grid names
+  symbol of its own. A new transfer to an account opens the rule dialog instead of the cell editor. An adult's
+  pocket money line carries the same symbol and opens the same dialog: it takes every rule but the rest, and one
+  of its own, a share of that adult's own income, shown as the percentage followed by a 12 px `UserRound`
+  (`10% 👤`). A pocket line added without an amount ("Add row", or a suggestion whose amount field was left empty)
+  opens the rule dialog straight away. The Grid names
   the same rule after the row's name the way a follower names its row (`= 10% of income`, `= the rest`) and offers
   `Rule…` in the row menu.
   Things are added where they will appear: the foot of Income and Expenses holds the Grid's `AddRowInline` (`Add row`)
@@ -357,8 +361,10 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   way to an `xs outline` `Add <year>`, the Grid toolbar's action: the plan always ends in a December and grows a calendar
   year at a time (`planEnd` in `src/store/months.ts`; this year's December, next year's from October on).
 - One name per idea, the same in every control: a repeating amount is a **schedule** (dialog "New schedule" / "Edit
-  schedule", button "Add schedule", never "recurring item"); how a transfer into an account is worked out is its **rule** ("A fixed amount", "A
-  percentage of income", "A percentage of what is left", "The rest"), set in the rule dialog and nowhere else; money
+  schedule", button "Add schedule", never "recurring item"); how a transfer into an account, or an adult's pocket money, is worked out is its **rule** ("A fixed amount", "A
+  percentage of income", "A percentage of what is left", "The rest"; for pocket money "A percentage of <Adult>'s
+  income" in place of the rest), set in the rule dialog and nowhere else. There is no household-wide pocket money
+  total: each adult's line has its own amount or rule; money
   set aside is a **pool account**, never an envelope.
 - Rates are always spelled with both codes in the orientation whose number is ≥ 1 (`1 EUR = 1.08 USD`, `1 USD = 48.58 TRY`;
   `readableRate` in `src/features/household/fxDisplay.ts`); the rates table's columns read `1 EUR in USD` and store
@@ -385,7 +391,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 - Checkboxes are the native `Check` (16 px) in lists that tick things off (Moves). The Month view's `Tick`
   (`src/components/Tick.tsx`) is a `role="checkbox"` button of 44 × 44 px whose face is the `DoneDot` at 20 px
   (`aria-checked` true, `mixed` or false), named `<line> done`; one tap marks done, a second tap goes back to the row's
-  default. The Statement uses the same `Tick`, smaller on desktop through `className` and `dotClassName`. Automatic rows (the savings plug, pocket shares, followers) tick through `Cell.markedDone`; Moves shows the
+  default. The Statement uses the same `Tick`, smaller on desktop through `className` and `dotClassName`. Automatic rows (the rest, a row a rule works out, followers) tick through `Cell.markedDone`; Moves shows the
   same tick before their `automatic` chip.
 - The Paid sheet (`src/features/month/PaidSheet.tsx`) is the shadcn `Dialog` docked to the bottom edge under 640 px
   (`SHEET_CLASS`: `max-sm:bottom-0 … rounded-t-2xl` with safe-area padding): amount, date (today in the current month),
@@ -412,6 +418,11 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   taken of, and what is then left for the rest (or as leftover). A muted sentence says so when the rest would
   move from another account or stop being taken. The figures and every refusal come from running the save on a
   copy, so the dialog never shows a number or allows a Save the store would not. Footer: Cancel, Save.
+  For an adult's pocket money the same dialog is titled `How much pocket money does <Adult> get?` and offers `A
+  fixed amount`, `A percentage of income`, `A percentage of <Adult>'s income` and `A percentage of what is left`,
+  never `The rest`; the first read-only line then names whose income (`10% of €4,200.00, Sam's take-home income`).
+  A pocket line that still is a share of the pocket money total from before says so in the description; saving
+  gives it its own rule from the chosen month on.
 - The top-up dialog (`src/features/statement/TopUpDialog.tsx`), titled `<pool account> is short in <month>`: one
   sentence with what comes out, what it holds and what is missing; "Top it up from" as a `Segmented` (the pool
   account's own savings account first, as `<account>, not set aside · <free amount>`, then the other savings and

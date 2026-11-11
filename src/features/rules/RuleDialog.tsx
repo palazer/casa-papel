@@ -9,7 +9,7 @@ import { Segmented } from '@/components/Segmented'
 import { amountToInput, formatAmount, formatMonth, formatShare, parseAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import { cellKey, computeEngine, sortRows } from '@/engine'
-import { RULE_KIND_INFO, addMonths, compareMonths, parseMonth, resolveRules, type Household, type MonthKey, type Row, type Tables } from '@/model'
+import { RULE_KIND_INFO, addMonths, compareMonths, isOldPocketShare, isPocketRow, isShareRule, parseMonth, resolveRules, type Household, type MonthKey, type Row, type Tables } from '@/model'
 import { previewRule, ruleRowOf, setRule, type RuleChoice, type RuleTarget } from '@/store'
 import { useSave } from '@/features/grid/RowDialogs'
 
@@ -42,7 +42,7 @@ function choiceKeyOf(kind: Kind, amount: number | null, share: number | null): s
 function choiceOf(key: string): RuleChoice {
   const [kind, value] = key.split(':')
   if (kind === 'fixed') return { kind, amount: Number(value) }
-  if (kind === 'share-of-income' || kind === 'share-of-rest') return { kind, share: Number(value) }
+  if (isShareRule(kind)) return { kind, share: Number(value) }
   return { kind: 'rest' }
 }
 
@@ -51,8 +51,9 @@ const shareInput = (share: number): string => String(Math.round(share * 1000) / 
 
 /**
  * How much goes to an account each month (DESIGN.md §8): a fixed amount, a percentage of income, a percentage of what
- * is left, or the rest. The rule counts from a month on; the dialog runs it on a copy first, so the figure it shows
- * and every refusal are the ones saving would give.
+ * is left, or the rest. For an adult's pocket money the same dialog asks how much they get: never the rest, and a
+ * percentage of that adult's own income instead. The rule counts from a month on; the dialog runs it on a copy first,
+ * so the figure it shows and every refusal are the ones saving would give.
  */
 export function RuleDialog({ tables, household, target: given, month, start, onClose }: Props) {
   const store = useStore()
@@ -70,6 +71,13 @@ export function RuleDialog({ tables, household, target: given, month, start, onC
   const pool = 'poolId' in target ? tables.pools.find((p) => p.id === target.poolId) : row ? tables.pools.find((p) => !p.deletedAt && p.allocationRowId === row.id) : undefined
   const account = 'accountId' in target ? tables.accounts.find((a) => a.id === target.accountId) : row?.accountId ? tables.accounts.find((a) => a.id === row.accountId) : undefined
   const name = pool?.name ?? account?.name ?? row?.name ?? 'this account'
+  /** Pocket money: who it is for (the adult the row belongs to), and whether it still reads the old pocket total. */
+  const pocket = !!row && isPocketRow(row)
+  const adult = row && isPocketRow(row) ? tables.entities.find((e) => e.id === row.scope && !e.deletedAt && e.kind === 'adult') : undefined
+  const wasShareOfTotal = !!row && isOldPocketShare(row)
+  const kinds = KINDS
+    .filter((k) => (pocket ? k.value !== 'rest' : k.value !== 'share-of-own-income'))
+    .map((k) => (k.value === 'share-of-own-income' && adult ? { ...k, label: `A percentage of ${adult.name}'s income` } : k))
   /** What a month that overruns does to the account that takes the rest, in that account's own terms. */
   const shortMonth = pool
     ? `A month that overruns takes the difference back out of ${name}.`
@@ -82,7 +90,7 @@ export function RuleDialog({ tables, household, target: given, month, start, onC
   const now = useMemo(() => {
     const rules = resolveRules(sortRows(tables.rows.filter((r) => !r.deletedAt), tables.categories), household.closingRule)
     const state = row ? rules.byRow.get(row.id) : undefined
-    const kind: Kind = state?.kind === 'share-of-income' || state?.kind === 'share-of-rest' || state?.kind === 'rest' ? state.kind : 'fixed'
+    const kind: Kind = state && (isShareRule(state.kind) || state.kind === 'rest') ? state.kind : 'fixed'
     let othersOfRest = 0
     for (const [id, s] of rules.byRow) if (s.kind === 'share-of-rest' && id !== row?.id) othersOfRest += s.share
     return { kind, share: state && state.share > 0 ? state.share : null, restRowName: tables.rows.find((r) => r.id === rules.restRowId)?.name ?? null, hasRest: !!row && rules.restRowId === row.id, othersOfRest }
@@ -101,7 +109,7 @@ export function RuleDialog({ tables, household, target: given, month, start, onC
   const [shareText, setShareText] = useState(seededShare)
   const { error, busy, save } = useSave(onClose)
 
-  const share = kind === 'share-of-income' || kind === 'share-of-rest'
+  const share = isShareRule(kind)
   // an untouched field keeps the stored fraction exactly
   const typedShare = shareText.trim() === '' ? null : shareText === seededShare && now.share != null ? now.share : Number(shareText.replace(',', '.')) / 100
   const typedAmount = amountText.trim() === '' ? null : parseAmount(amountText, ccy, locale)
@@ -114,7 +122,7 @@ export function RuleDialog({ tables, household, target: given, month, start, onC
     try {
       const { row: r, engine } = previewRule(tables, target, choiceOf(choiceKey), from, [from])
       const t = engine.totals[from]
-      return { amount: engine.cells[cellKey(r.id, from)]?.valueBase ?? 0, takeHome: t.takeHome, left: t.leftForShares, rest: t.rest, leftover: t.leftover }
+      return { amount: engine.cells[cellKey(r.id, from)]?.valueBase ?? 0, takeHome: t.takeHome, own: t.takeHomeBy[r.scope] ?? 0, left: t.leftForShares, rest: t.rest, leftover: t.leftover }
     } catch (e) {
       return { error: e instanceof Error ? e.message : 'That rule cannot be saved.' }
     }
@@ -135,17 +143,17 @@ export function RuleDialog({ tables, household, target: given, month, start, onC
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>How much goes to {name}?</DialogTitle>
+          <DialogTitle>{pocket ? (adult ? `How much pocket money does ${adult.name} get?` : `How much is ${name}?`) : `How much goes to ${name}?`}</DialogTitle>
           <DialogDescription>
-            {found.error ?? (row ? <>Row &quot;{row.name}&quot;. Each month the app works the amount out from the rule you pick.</> : <>Nothing moves money to {name} yet. Saving adds the row &quot;{pool ? `${pool.name} pool` : `To ${name}`}&quot; under Transfers.</>)}
+            {found.error ?? (row ? <>Row &quot;{row.name}&quot;. Each month the app works the amount out from the rule you pick.{wasShareOfTotal ? ' Until now it was a share of the household\'s pocket money total; from the month below on it has an amount of its own.' : ''}</> : <>Nothing moves money to {name} yet. Saving adds the row &quot;{pool ? `${pool.name} pool` : `To ${name}`}&quot; under Transfers.</>)}
           </DialogDescription>
         </DialogHeader>
         {!found.error && (
           <div className="space-y-4">
             <fieldset className="space-y-1.5">
               <legend className="flex items-center gap-1 text-sm font-medium">Rule <InfoTip help="row.rule" /></legend>
-              <Segmented label="Rule" value={kind} onChange={(v) => setKind(v as Kind)} options={KINDS.map(({ value, label }) => ({ value, label }))} />
-              <p className="text-xs text-muted-foreground">{KINDS.find((k) => k.value === kind)?.text}{kind === 'rest' ? ` ${shortMonth}` : ''}</p>
+              <Segmented label="Rule" value={kind} onChange={(v) => setKind(v as Kind)} options={kinds.map(({ value, label }) => ({ value, label }))} />
+              <p className="text-xs text-muted-foreground">{kinds.find((k) => k.value === kind)?.text}{kind === 'rest' ? ` ${shortMonth}` : ''}</p>
             </fieldset>
 
             {kind === 'fixed' && (
@@ -156,9 +164,9 @@ export function RuleDialog({ tables, household, target: given, month, start, onC
             )}
             {share && (
               <div className="space-y-1.5">
-                <Label htmlFor="rule-share">{kind === 'share-of-income' ? 'Percentage of income' : 'Percentage of what is left'}</Label>
+                <Label htmlFor="rule-share">{kind === 'share-of-income' ? 'Percentage of income' : kind === 'share-of-own-income' ? (adult ? `Percentage of ${adult.name}'s income` : 'Percentage of their own income') : 'Percentage of what is left'}</Label>
                 <Input id="rule-share" className="w-28" autoFocus inputMode="decimal" value={shareText} onChange={(e) => setShareText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} placeholder="e.g. 10" />
-                {kind === 'share-of-rest' && othersOfRest > 0 && <p className="text-xs text-muted-foreground">Other accounts already take {formatShare(othersOfRest, locale)} of what is left.</p>}
+                {kind === 'share-of-rest' && othersOfRest > 0 && <p className="text-xs text-muted-foreground">Other accounts and pocket money already take {formatShare(othersOfRest, locale)} of what is left.</p>}
               </div>
             )}
             {kind === 'rest' && !hasRest && restRowName && (
@@ -179,6 +187,7 @@ export function RuleDialog({ tables, household, target: given, month, start, onC
                 <dt className="text-muted-foreground">
                   {figures.amount < 0 ? `Taken back from ${name}` : name} in {monthName}
                   {kind === 'share-of-income' && typedShare != null && <> · {formatShare(typedShare, locale)} of {money(figures.takeHome)} take-home income</>}
+                  {kind === 'share-of-own-income' && typedShare != null && <> · {formatShare(typedShare, locale)} of {money(figures.own)}, {adult ? `${adult.name}'s` : 'their own'} take-home income</>}
                   {kind === 'share-of-rest' && typedShare != null && <> · {formatShare(typedShare, locale)} of {money(figures.left)} left</>}
                 </dt>
                 <dd className="text-right tabular-nums" data-testid="rule-amount">{money(Math.abs(figures.amount))}</dd>

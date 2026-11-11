@@ -125,7 +125,7 @@ describe('the Statement, the month', () => {
     const expenses = topLine(s, 'out', 'expenses')!
     expect(expenses.children.map((c) => c.label)).toEqual(['Housing', 'Living', 'Transport', 'Family & pets', 'Fun', 'Personal', 'Pocket money'])
     expect(expenses.children.find((c) => c.label === 'Housing')).toMatchObject({ kind: 'category', amount: 186000 })
-    expect(expenses.children.find((c) => c.label === 'Pocket money')!.children.map((c) => [c.label, c.amount, c.automatic])).toEqual([['Sam – Pocket', 50000, true], ['Alex – Pocket', 50000, true]])
+    expect(expenses.children.find((c) => c.label === 'Pocket money')!.children.map((c) => [c.label, c.amount, c.automatic])).toEqual([['Sam – Pocket', 50000, false], ['Alex – Pocket', 50000, false]])
     // an itemized row opens to its items
     expect(find(s, expenses.children.find((c) => c.label === 'Personal')!.children[0].id)!.children.map((c) => [c.label, c.amount, c.status])).toEqual([['Concert tickets', 9000, 'done'], ['Books', 3200, 'done']])
     const setAside = topLine(s, 'out', 'set-aside')!

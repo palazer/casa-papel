@@ -79,8 +79,8 @@ export function buildDemoTables(): Tables {
     { ...base(ID.rowToInvestment, 'c1'), name: 'To investments', section: 'transfer', kind: 'to-investment', categoryId: ID.catTransfers, accountId: ID.invest, defaultStatus: 'committed' },
     { ...base(ID.rowTravelAlloc, 'c2'), name: 'Travel pool', section: 'transfer', kind: 'pool-allocation', categoryId: ID.catTransfers, accountId: ID.savings, defaultStatus: 'committed' },
     { ...base(ID.rowClothingAlloc, 'c3'), name: 'Clothing pool', section: 'transfer', kind: 'pool-allocation', categoryId: ID.catTransfers, accountId: ID.savings, defaultStatus: 'committed' },
-    { ...base(ID.rowPocketSam, 'c4'), name: 'Sam – Pocket', section: 'transfer', kind: 'pocket-money', categoryId: ID.catTransfers, scope: ID.sam, pocketMode: 'share-of-pocket-total', pocketShare: 0.5, defaultStatus: 'committed' },
-    { ...base(ID.rowPocketAlex, 'c5'), name: 'Alex – Pocket', section: 'transfer', kind: 'pocket-money', categoryId: ID.catTransfers, scope: ID.alex, pocketMode: 'share-of-pocket-total', pocketShare: 0.5, defaultStatus: 'committed' },
+    { ...base(ID.rowPocketSam, 'c4'), name: 'Sam – Pocket', section: 'transfer', kind: 'pocket-money', categoryId: ID.catTransfers, scope: ID.sam, pocketMode: 'fixed', defaultStatus: 'committed' },
+    { ...base(ID.rowPocketAlex, 'c5'), name: 'Alex – Pocket', section: 'transfer', kind: 'pocket-money', categoryId: ID.catTransfers, scope: ID.alex, pocketMode: 'fixed', defaultStatus: 'committed' },
   ]
 
   const cells = [
@@ -92,6 +92,8 @@ export function buildDemoTables(): Tables {
     items(ID.rowSamPersonal, '2026-09', [['Concert tickets', 9000, 'done'], ['Books', 3200, 'done']]),
     items(ID.rowAlexPersonal, '2026-09', [['Gym', 4000, 'done']]),
     value(ID.rowToInvestment, '2026-09', 50000), value(ID.rowTravelAlloc, '2026-09', 20000), value(ID.rowClothingAlloc, '2026-09', 10000),
+    // pocket money: a fixed amount per adult, carried forward
+    value(ID.rowPocketSam, '2026-09', 50000), value(ID.rowPocketAlex, '2026-09', 50000),
     // October 2026
     value(ID.rowSamSalary, '2026-10', 420000), value(ID.rowAlexSalary, '2026-10', 280000), value(ID.rowChildBenefit, '2026-10', 25500),
     value(ID.rowGroceries, '2026-10', 70000), value(ID.rowTransport, '2026-10', 9800),
@@ -106,7 +108,7 @@ export function buildDemoTables(): Tables {
   const tables = {
     household: [{
       ...base(ID.household, 'a0'), name: 'Demo household', baseCurrency: 'EUR', locale: 'en-IE', startMonth: '2026-09',
-      closingRule: 'savings-plug', pocketTotal: 100000, cashBuffer: 0, moneyMode: 'pooled', shareBasis: 'basis-rows',
+      closingRule: 'savings-plug', pocketTotal: 0, cashBuffer: 0, moneyMode: 'pooled', shareBasis: 'basis-rows',
       manualShares: {}, displayExpensesNegative: true, fxDriftDefault: 0, fxMonthRate: 'first',
     }],
     entities: [

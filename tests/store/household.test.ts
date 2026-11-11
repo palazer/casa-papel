@@ -2,16 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { cellKey, computeEngine } from '@/engine'
 import { monthRange, newId } from '@/model'
 import {
-  CasaDb, Store, addAccount, addEntity, applyTemplates, buildSetupMutations, createHouseholdFromSetup, loadTables, setAccountActual, setCellDone, setCellValue,
+  CasaDb, Store, addAccount, addEntity, applyTemplates, createHouseholdFromSetup, loadTables, setAccountActual, setCellDone, setCellValue,
 } from '@/store'
 
 const setup = {
-  household: { name: 'Palaz', baseCurrency: 'EUR', locale: 'de-DE', startMonth: '2026-11', pocketTotal: 120000 },
+  household: { name: 'Palaz', baseCurrency: 'EUR', locale: 'de-DE', startMonth: '2026-11' },
   adults: [{ name: 'A' }, { name: 'B' }],
   dependents: [{ kind: 'child' as const, name: 'Kid', paidByIndex: 1 }, { kind: 'pet' as const, name: 'Dog' }],
   accounts: [{ name: 'Main', type: 'checking' as const }, { name: 'Savings', type: 'savings' as const, openingBalance: 500000 }, { name: 'ETF', type: 'investment' as const }],
   householdTemplates: ['h.groceries', 'h.toSavings', 'h.toInvestments', 'h.poolTravel'],
-  entityTemplates: { 0: ['a.salary', 'a.pocket'], 1: ['a.salary', 'a.pocket', 'a.personal'], 2: ['c.benefit', 'c.longterm'], 3: ['p.food'] },
+  entityTemplates: { 0: ['a.salary', { key: 'a.pocket', amount: 60000 }], 1: ['a.salary', 'a.pocket', 'a.personal'], 2: ['c.benefit', 'c.longterm'], 3: ['p.food'] },
 }
 
 describe('setup and household actions', () => {
@@ -30,19 +30,13 @@ describe('setup and household actions', () => {
     expect(t.rows.find((r) => r.name === 'To savings')?.accountId).toBe(t.accounts.find((a) => a.type === 'savings')?.id)
     expect(t.rows.find((r) => r.name === 'Kid – Long-term savings')).toMatchObject({ kind: 'to-investment', scope: t.entities[2].id })
     const pocket = t.rows.find((r) => r.name === 'A – Pocket')!
-    expect(pocket.pocketShare).toBeCloseTo(0.5)
+    // pocket money is a line of its own with a typed amount, not a share of a household total
+    expect(pocket).toMatchObject({ pocketMode: 'fixed', pocketShare: null, scope: t.entities[0].id })
     const out = computeEngine({ tables: t, months: monthRange('2026-11', '2026-12') })
     expect(out.cells[cellKey(pocket.id, '2026-11')].value).toBe(60000)
     expect(await store.db.events.count()).toBeGreaterThan(10)
     await store.undo()
     expect(await store.db.household.count()).toBe(0)
-  })
-
-  it('skips pocket rows in proportional mode', () => {
-    const { mutations } = buildSetupMutations({ ...setup, household: { ...setup.household, moneyMode: 'proportional' } })
-    const rows = mutations.filter((m) => m.op === 'put' && m.table === 'rows').map((m) => (m as { record: { name: string } }).record.name)
-    expect(rows.some((n) => n.startsWith('Pocket'))).toBe(false)
-    expect(rows).toContain('A – Salary')
   })
 
   it('adds entities, accounts, templates and actual balances later', async () => {

@@ -61,7 +61,6 @@ export interface MonthTotals {
   allocationsByPool: Record<string, Money>
   toInvestment: Money
   pocket: Money
-  pocketTotal: Money
   debt: Money
   buffer: Money
   /** Positive = into savings, negative = drawn from savings. */

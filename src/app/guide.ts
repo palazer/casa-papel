@@ -179,19 +179,19 @@ export const GUIDE: GuideTopic[] = [
     what: [
       'Deposits into savings or investments, pool rows and pocket money are transfers: not spending, so they never count as an expense; they show up as balances instead.',
       'Every transfer into a savings account, an investment account or a pool account has a rule that says how its amount is worked out. One account at a time can take "The rest", and the same account fills the gap in a month that overruns. While an account takes the rest, the total row reads "Kept in account", the cash buffer you keep; while none does, it reads "Leftover".',
-      'A pooled household splits "Pocket money per month, all adults (EUR)" equally into automatic rows like "Sam – Pocket" and "Alex – Pocket". Automatic rows carry an (i), can be ticked when the money has moved, and cannot be typed into.',
+      'Pocket money is a line per adult, like "Sam – Pocket" and "Alex – Pocket", with a rule of its own: "A fixed amount", "A percentage of income", "A percentage of Sam\'s income" or "A percentage of what is left", never the rest. Rows the app works out carry an (i), can be ticked when the money has moved, and cannot be typed into.',
     ],
     steps: [
-      'Statement → "Assets" → the symbol beside an account or a pool account opens "How much goes to <account>?"; so does the symbol after a transfer\'s name under "Set aside, pay off", and Grid → row menu → "Rule…".',
+      'Statement → "Assets" → the symbol beside an account or a pool account opens "How much goes to <account>?"; so does the symbol after a transfer\'s name under "Set aside, pay off", and Grid → row menu → "Rule…". The symbol after a pocket line asks "How much pocket money does Sam get?".',
       'Pick "A fixed amount", "A percentage of income", "A percentage of what is left" or "The rest"; "Counts from" is the month the rule starts in, and earlier months keep their amounts.',
-      'Set "Pocket money per month, all adults (EUR)" and "Cash kept in the account at month end (EUR)"; "Pocket money and cash buffer changes apply to" picks "This month and onwards (earlier months keep what they show)", "Only this month" or "Every open month".',
+      'Household → "Household settings" → "Cash kept in the account at month end (EUR)"; "Cash buffer changes apply to" picks "This month and onwards (earlier months keep what they show)", "Only this month" or "Every open month".',
       'Grid → Transfers → "Add row" → say what the row does: "Moves money between your accounts", "Goes into a savings account", "Deposits into an investment account", "Fills a pool account", "Pocket money for an adult" or, for a card whose purchases are expense rows, "Pays off a credit card", then pick the "Account", "Pool account" or "Adult" and press "Add".',
       'Row menu → "Goes into…" changes a deposit row\'s account for every month.',
       'Moves → "Transfers to make" lists them for the month; automatic ones carry the "automatic" chip.',
     ],
-    factsTitle: 'The four rules',
+    factsTitle: 'The rules',
     facts: rules,
-    tips: ['section.transfer', 'derived.keptInAccount', 'derived.leftover', 'row.toSavingsPlug', 'row.pocketShare', 'household.pocket', 'household.buffer', 'household.pocketScope', 'row.automatic', 'row.rule', 'row.ruleFrom', 'stat.toSavings'],
+    tips: ['section.transfer', 'derived.keptInAccount', 'derived.leftover', 'row.toSavingsPlug', 'household.buffer', 'household.bufferScope', 'row.automatic', 'row.rule', 'row.ruleFrom', 'stat.toSavings'],
     open: 'household',
   },
   {
@@ -269,7 +269,7 @@ export const GUIDE: GuideTopic[] = [
     ],
     factsTitle: 'The two ways, and what a proportional split is based on',
     facts: sharing,
-    tips: ['household.moneyMode', 'household.shareBasis', 'row.inShareBasis', 'row.belongsTo', 'row.pocketShare', 'household.pocket'],
+    tips: ['household.moneyMode', 'household.shareBasis', 'row.inShareBasis', 'row.belongsTo'],
     open: 'household',
   },
   {

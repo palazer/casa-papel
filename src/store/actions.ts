@@ -1,7 +1,7 @@
 import { generateKeyBetween } from 'fractional-indexing'
 import { computeEngine, cellKey, sortRows, type EngineOutput } from '@/engine'
 import {
-  ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RowSchema, addMonths, canCarryRule, cardIsItemized, compareMonths, monthKey, monthOfDate, monthRange, newId, parseMonth, poolIdOf, resolveRules, sharePercent,
+  ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RowSchema, addMonths, canCarryRule, canTakeRest, cardIsItemized, compareMonths, isOldPocketShare, isShareRule, monthKey, monthOfDate, monthRange, newId, parseMonth, poolIdOf, resolveRules, sharePercent,
   type Account, type Category, type Cell, type CellInput, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Pool, type Row, type RowKind, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
@@ -551,16 +551,17 @@ export async function markPaid(store: Store, rowId: string, month: MonthKey, ite
 export type MonthlyDefaultScope = 'from-now-on' | 'this-month' | 'all-open'
 
 /**
- * Change the pocket money total or the cash buffer. Closed months are never touched.
+ * Change the cash buffer (the cash kept in the account at month end). Closed months are never touched.
  * - 'this-month': an override for that month only; the default stays
  * - 'from-now-on': earlier open months are frozen at what they show now, the default changes
  * - 'all-open': every open month follows the new default (overrides dropped)
  */
-export async function setMonthlyDefault(store: Store, key: 'pocketTotal' | 'cashBuffer', value: Money, scope: MonthlyDefaultScope, month: MonthKey): Promise<void> {
+export async function setMonthlyDefault(store: Store, value: Money, scope: MonthlyDefaultScope, month: MonthKey): Promise<void> {
   const tables = await loadTables(store)
   const household = tables.household.find((h) => !h.deletedAt)
   if (!household) throw new Error('No household yet')
-  const overrideKey = key === 'pocketTotal' ? 'pocketTotalOverride' : 'cashBufferOverride'
+  const key = 'cashBuffer' as const
+  const overrideKey = 'cashBufferOverride' as const
   const states = new Map(tables.monthStates.map((s) => [s.month, s]))
   const ts = now()
   const mutations: Mutation[] = []
@@ -637,14 +638,14 @@ export function planRowFundedBy(tables: Tables, row: Row, fundedBy: FundedBy, sc
 export function derivedRowReason(row: Row, closingRule: Household['closingRule']): string | null {
   if (row.kind === 'category-estimate') return `"${row.name}" is what is left of its category's estimate.`
   const rule = row.rule ?? null
-  if (canCarryRule(row) && (rule === 'share-of-income' || rule === 'share-of-rest')) {
-    return `"${row.name}" is worked out by its rule: ${sharePercent(row.ruleShare ?? 0)} of ${rule === 'share-of-income' ? 'income' : 'what is left'}.`
+  if (canCarryRule(row) && isShareRule(rule)) {
+    return `"${row.name}" is worked out by its rule: ${sharePercent(row.ruleShare ?? 0)} of ${rule === 'share-of-income' ? 'income' : rule === 'share-of-own-income' ? 'their own income' : 'what is left'}.`
   }
   // the row that takes the rest (a transfer to any account), and under the first-savings-row default the idle ones
   // beside it; a savings row with a fixed amount is typed like any other
-  const takesRest = closingRule === 'savings-plug' && ((canCarryRule(row) && rule === 'rest') || (row.kind === 'to-savings' && rule !== 'fixed'))
+  const takesRest = closingRule === 'savings-plug' && ((canTakeRest(row) && rule === 'rest') || (row.kind === 'to-savings' && rule !== 'fixed'))
   if (takesRest) return `"${row.name}" is worked out by the app from the rest of the month.`
-  if (row.kind === 'pocket-money' && row.pocketMode === 'share-of-pocket-total') return `"${row.name}" is a share of the pocket total.`
+  if (isOldPocketShare(row)) return `"${row.name}" is a share of the pocket money total the household had before. Give it an amount or a rule of its own: row menu, "Rule…".`
   return null
 }
 

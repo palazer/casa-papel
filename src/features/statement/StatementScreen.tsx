@@ -12,7 +12,7 @@ import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { useStoreVersion } from '@/app/useStoreVersion'
 import { buildStatement, cellKey, computeMainAccount, type GoalProgress, type StatementLine } from '@/engine'
-import { canCarryRule, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type MonthKey, type Row, type Section } from '@/model'
+import { canCarryRule, isPocketRow, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type MonthKey, type Row, type Section } from '@/model'
 import { accountSuggestions, addPlanYear, removeIfFree, rowSuggestions, setCellDone, setDerivedDone, setItemStatus, setupSteps, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupStepKey } from '@/store'
 import { GoalDialog } from '@/features/goals/GoalDialog'
 import { goalStatusLine } from '@/features/goals/goalText'
@@ -154,7 +154,7 @@ export function StatementScreen() {
 
   /** A new row opens its category and, in an open month, the editor for its first amount; a transfer to an account asks for its rule. */
   function onAdded(row: Row) {
-    setOpenLines((s) => ({ ...s, [`cat:${row.section}:${row.categoryId ?? 'none'}`]: true }))
+    setOpenLines((s) => ({ ...s, [row.kind === 'pocket-money' ? 'pocket' : `cat:${row.section}:${row.categoryId ?? 'none'}`]: true }))
     if (statement!.closed) return
     if (canCarryRule(row)) setRuleFor({ rowId: row.id })
     else setEditorRow(row.id)
@@ -180,9 +180,13 @@ export function StatementScreen() {
     setRuleStart('rest')
     setRuleFor({ accountId: savings.id })
   }
-  /** A suggested row came with its amount, so no editor opens; its category stays open once its suggestions are gone. */
-  function onSuggested(row: Row) {
+  /**
+   * A suggested row came with its amount, so no editor opens; its category stays open once its suggestions are gone.
+   * Pocket money added without an amount asks for its rule instead: an amount, or a percentage.
+   */
+  function onSuggested(row: Row, amount: number | null) {
     setOpenLines((s) => ({ ...s, [row.kind === 'pocket-money' ? 'pocket' : `cat:${row.section}:${row.categoryId ?? 'none'}`]: true }))
+    if (isPocketRow(row) && !(amount != null && amount > 0) && !statement!.closed) setRuleFor({ rowId: row.id })
   }
   const suggested = (line: StatementLine) => (showing && m
     ? <SuggestionLines suggestions={suggestions.get(line.id) ?? []} label={line.label} month={m} currency={household!.baseCurrency} locale={household!.locale} onAdded={onSuggested} onError={setError} />

@@ -131,11 +131,11 @@ describe('suggestions for setting up on the Statement', () => {
     const month = computeEngine({ tables: t, months: monthRange('2026-09', '2026-10') })
     expect(month.cells[cellKey(pocket.id, '2026-10')].value).toBe(300_00)
     expect(month.totals['2026-10'].pocket).toBe(300_00)
-    // the Household screen's own "Suggested rows" still makes the shared kind, and counts as the same suggestion
+    // the Household screen's own "Suggested rows" makes the same kind of line, and counts as the same suggestion
     const alex = t.entities.find((e) => e.name === 'Alex')!
     await applyTemplates(store, ['a.pocket'], alex.id)
     t = await loadTables(store)
-    expect(t.rows.find((r) => r.name === 'Alex – Pocket')).toMatchObject({ pocketMode: 'share-of-pocket-total', templateKey: 'a.pocket' })
+    expect(t.rows.find((r) => r.name === 'Alex – Pocket')).toMatchObject({ pocketMode: 'fixed', pocketShare: null, templateKey: 'a.pocket' })
     expect(titles(rowSuggestions(t))).not.toContain('Alex – Pocket')
   })
 
