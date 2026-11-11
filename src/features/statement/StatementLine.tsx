@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { ArrowDownToLine, ChevronRight, Equal, Repeat, Target, UserRound } from 'lucide-react'
+import { ArrowDownToLine, Banknote, ChevronRight, Equal, Repeat, Target, UserRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { InfoTip } from '@/components/InfoTip'
@@ -301,7 +301,8 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
 /**
  * The rule symbol (DESIGN.md §7): how the amount for an account is worked out, on the transfer line and on the account
  * it feeds, and how an adult's pocket money is. An arrow to a line for the rest, the percentage for a share of income,
- * the percentage and a person for a share of the adult's own income, the percentage and the arrow for a share of what
+ * the percentage and a person for a share of the adult's own income, the percentage and a banknote for a share of one
+ * income line, the percentage and the arrow for a share of what
  * is left, an equals sign for a fixed amount (faint where there is no rule yet). A button when the
  * rule can be changed from here (it opens the row's dialog), the bare symbol otherwise; its name says the rule in full.
  */
@@ -313,6 +314,7 @@ function RuleMark({ line, ctx, className }: { line: Line; ctx: LineContext; clas
   const glyph = rule.kind === 'rest' ? <ArrowDownToLine className="size-3.5" aria-hidden />
     : rule.kind === 'share-of-income' ? pct
     : rule.kind === 'share-of-own-income' ? <>{pct}<UserRound className="size-3" aria-hidden /></>
+    : rule.kind === 'share-of-row' ? <>{pct}<Banknote className="size-3" aria-hidden /></>
     : rule.kind === 'share-of-rest' ? <>{pct}<ArrowDownToLine className="size-3" aria-hidden /></>
     : <Equal className="size-3.5" aria-hidden />
   const look = cn(

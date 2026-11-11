@@ -505,7 +505,7 @@ test.describe('working the month in the Statement', () => {
     // one dialog per row: the name, the amount and the rule symbol all open it, with how the amount is set on top
     await moneyOut.getByRole('button', { name: /^To investments: €500\.00/ }).click()
     await expect(dlg.getByRole('heading', { name: 'To investments · November 2026' })).toBeVisible()
-    await expect(dlg.getByRole('radiogroup', { name: 'How the amount is set' }).getByRole('radio')).toHaveText(['A fixed amount', 'A percentage of income', 'A percentage of what is left', 'The rest'])
+    await expect(dlg.getByRole('radiogroup', { name: 'How the amount is set' }).getByRole('radio')).toHaveText(['A fixed amount', 'A percentage of income', 'A percentage of one income', 'A percentage of what is left', 'The rest'])
     await expect(dlg.getByText('Applies to')).toBeVisible()
     await dlg.getByRole('button', { name: 'Cancel' }).click()
     await expect(dlg).toBeHidden()
@@ -605,6 +605,68 @@ test.describe('working the month in the Statement', () => {
     await dlg.getByRole('button', { name: 'Cancel' }).click()
   })
 
+  test('a percentage of one income: all of the child benefit goes to the investments, and follows that line', async ({ page }) => {
+    await openStatement(page)
+    await goToMonth(page, 'November 2026')
+    const moneyIn = page.getByRole('region', { name: 'Money in' })
+    const moneyOut = page.getByRole('region', { name: 'Money out' })
+    const assets = page.getByRole('region', { name: 'Assets' })
+    const dlg = page.getByRole('dialog')
+    const rest = async () => euros(await moneyOut.locator('[data-line]').filter({ has: page.locator('[data-rule="rest"]') }).innerText())
+    expect(await rest()).toBe(2369)
+
+    await moneyOut.getByRole('button', { name: /^To investments: €500\.00/ }).click()
+    await dlg.getByRole('radio', { name: 'A percentage of one income' }).click()
+    await expect(dlg).toContainText('A share of one income line: what it brings in, minus what is deducted from it.')
+    // the list holds the income lines, and nothing that only takes money out of an account
+    await expect(dlg.getByLabel('Which income').locator('option')).toHaveText(['Sam – Salary', 'Alex – Salary', 'Robin – Child benefit', 'Other income'])
+    await dlg.getByLabel('Which income').selectOption({ label: 'Robin – Child benefit' })
+    await expect(dlg.getByRole('button', { name: 'Save' })).toBeDisabled()
+    await dlg.getByLabel('Percentage of that income').fill('100')
+    await expect(dlg.getByTestId('rule-preview')).toContainText('100% of €255.00, Robin – Child benefit')
+    await expect(dlg.getByTestId('rule-amount')).toHaveText('€255.00')
+    // what the investments get less than their €500, the rest gets more
+    await expect(dlg.getByTestId('rule-rest')).toHaveText('€2,614.00')
+    await expect(dlg).toHaveCSS('opacity', '1')
+    await page.screenshot({ path: 'e2e/output/statement-income-rule-dialog.png' })
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+
+    // the line and the account it fills say the rule by the income's name
+    await expect(moneyOut.getByRole('button', { name: 'To investments: €255.00' })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: 'Rule for To investments: 100% of Robin – Child benefit' })).toBeVisible()
+    await expect(assets.getByRole('button', { name: 'Rule for Index fund: 100% of Robin – Child benefit' })).toBeVisible()
+    expect(await rest()).toBe(2614)
+    await page.screenshot({ path: 'e2e/output/statement-income-rule.png', fullPage: true })
+
+    // the transfer follows its income: a raise of the benefit is a raise of the transfer, and the rest stays as it was
+    await moneyIn.getByRole('button', { name: /^Robin – Child benefit: €255\.00/ }).click()
+    await dlg.getByLabel('Amount in EUR').fill('300')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(moneyOut.getByRole('button', { name: 'To investments: €300.00' })).toBeVisible()
+    expect(await rest()).toBe(2614)
+    expect((await total(page, 'in').innerText()).replace(/^Total in\s*/, '')).toBe((await total(page, 'out').innerText()).replace(/^Total out\s*/, ''))
+
+    // the dialog opens on the rule with its income, on a phone too
+    await page.setViewportSize({ width: 390, height: 844 })
+    await moneyOut.getByRole('button', { name: 'To investments: €300.00' }).click()
+    await expect(dlg.getByRole('radio', { name: 'A percentage of one income' })).toBeChecked()
+    await expect(dlg.getByLabel('Which income')).toHaveValue(/.+/)
+    await expect(dlg.getByLabel('Which income').locator('option:checked')).toHaveText('Robin – Child benefit')
+    await expect(dlg.getByLabel('Percentage of that income')).toHaveValue('100')
+    await expect(dlg).toHaveCSS('opacity', '1')
+    await page.screenshot({ path: 'e2e/output/statement-income-rule-dialog-phone.png' })
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+    await page.setViewportSize({ width: 1440, height: 900 })
+
+    // the month before keeps its €500, and the Grid names the rule the same way
+    await goToMonth(page, 'October 2026')
+    await expect(moneyOut.getByRole('button', { name: /^To investments: €500\.00/ })).toBeVisible()
+    await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Grid' }).click()
+    await expect(page.getByText('= 100% of Robin – Child benefit')).toBeVisible()
+  })
+
   test('pocket money by rule: a percentage of the adult\'s own income from the pocket line, never the rest', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'November 2026')
@@ -616,7 +678,7 @@ test.describe('working the month in the Statement', () => {
     // a pocket line carries the rule symbol, like a transfer to an account
     await moneyOut.getByRole('button', { name: 'Rule for Sam – Pocket: a fixed amount' }).click()
     await expect(dlg.getByRole('heading', { name: 'Sam – Pocket · November 2026' })).toBeVisible()
-    await expect(dlg.getByRole('radiogroup', { name: 'How the amount is set' }).getByRole('radio')).toHaveText(['A fixed amount', 'A percentage of income', 'A percentage of Sam\'s income', 'A percentage of what is left'])
+    await expect(dlg.getByRole('radiogroup', { name: 'How the amount is set' }).getByRole('radio')).toHaveText(['A fixed amount', 'A percentage of income', 'A percentage of Sam\'s income', 'A percentage of one income', 'A percentage of what is left'])
     await expect(dlg.getByRole('radio', { name: 'A fixed amount' })).toBeChecked()
     await expect(dlg.getByLabel('Amount in EUR')).toHaveValue('500')
     await expect(dlg).toHaveCSS('opacity', '1')

@@ -304,7 +304,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   **The rule symbol.** A transfer that feeds a savings account, an investment account or a virtual account, and that
   account in the lower half, say how the amount is worked out with one small symbol after the name, never a word
   tag: `ArrowDownToLine` (14 px) for the rest, the percentage in `text-[11px] tabular-nums` for a share of income
-  (`10%`), the percentage followed by a 12 px `ArrowDownToLine` for a share of what is left (`20% ↓`), `Equal` for
+  (`10%`), the percentage followed by a 12 px `Banknote` for a share of one income line (its name says which:
+  `100% of Robin – Child benefit`), the percentage followed by a 12 px `ArrowDownToLine` for a share of what is left (`20% ↓`), `Equal` for
   a fixed amount, the same sign at half strength for an account no row feeds yet. Muted, 20 px high, 32 px where
   the pointer is a finger; a button named `Rule for <line>: <rule>` (`Set a rule for <account>` when there is none)
   and the bare symbol with the same name in a closed month. **A row has one dialog**: the name, the amount and the
@@ -398,8 +399,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   year at a time (`planEnd` in `src/store/months.ts`; this year's December, next year's from October on).
 - One name per idea, the same in every control: a repeating amount is a **schedule** (dialog "New schedule" / "Edit
   schedule", button "Add schedule", never "recurring item"); how a transfer into an account, or an adult's pocket money, is worked out is its **rule** ("A fixed amount", "A
-  percentage of income", "A percentage of what is left", "The rest"; for pocket money "A percentage of <Adult>'s
-  income" in place of the rest), set under "How the amount is set" in the row's dialog and nowhere else. There is no household-wide pocket money
+  percentage of income", "A percentage of one income", "A percentage of what is left", "The rest"; for pocket money
+  "A percentage of <Adult>'s income" in place of the rest), set under "How the amount is set" in the row's dialog and nowhere else. There is no household-wide pocket money
   total: each adult's line has its own amount or rule; money
   set aside is a **virtual account**, never an envelope.
 - Rates are always spelled with both codes in the orientation whose number is ≥ 1 (`1 EUR = 1.08 USD`, `1 USD = 48.58 TRY`;
@@ -461,8 +462,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   titled `<row> · <month>`, is the only dialog a row has, on the Statement and in the Grid. For a row that can carry
   a rule (the transfer that fills a savings account, an investment account or a virtual account; an adult's pocket
   money) it starts with **"How the amount is set"** (`RulePicker` in `src/features/rules/RuleDialog.tsx`): a
-  `Segmented` (`A fixed amount`, `A percentage of income`, `A percentage of what is left`, `The rest`; for pocket
-  money `A percentage of <Adult>'s income` in place of `The rest`) with an (i) and the chosen option's sentence under
+  `Segmented` (`A fixed amount`, `A percentage of income`, `A percentage of one income`, `A percentage of what is
+  left`, `The rest`; for pocket money `A percentage of <Adult>'s income` in place of `The rest`) with an (i) and the chosen option's sentence under
   it (for the rest, also what a month that overruns does to that account). What follows depends on the choice:
   - `A fixed amount`, in a month whose amount is typed: the editor's own fields (Single amount / Itemized, the
     amount, "Applies to", "How sure") and its footer (Clear, Make recurring…, Cancel, Save).
@@ -471,7 +472,12 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
     (i) and the sentence that earlier months keep their amounts (it starts on the month the dialog was opened from,
     or on the first month after the last closed one), then two read-only lines that follow what is typed: what the
     row gets in that month, with the sum the percentage is taken of (for pocket money naming whose income, `10% of
-    €4,200.00, Sam's take-home income`), and what is then left for the rest (or as leftover). A muted sentence says
+    €4,200.00, Sam's take-home income`), and what is then left for the rest (or as leftover). `A percentage of one
+    income` adds "Which income" before the percentage: a `NativeSelect` of the live income lines (money taken from
+    accounts is not income and is not listed); the amount is that line's take-home, what it brings in minus what is
+    deducted from it, and the first read-only line names it (`100% of €255.00, Robin – Child benefit`). Without an
+    income line the field gives way to a sentence that says to add one, and when the line the rule named is gone,
+    a muted sentence under the list says so; such a row gets nothing and the Statement says why in a warning. A muted sentence says
     so when the rest would move from another account or stop being taken. The figures and every refusal come from
     running the save on a copy, so the dialog never shows a number or allows a Save the store would not. Footer:
     Cancel, Save.

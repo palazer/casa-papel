@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { InfoTip, TipLabel } from '@/components/InfoTip'
 import { MonthField } from '@/components/MonthField'
+import { NativeSelect } from '@/components/NativeSelect'
 import { Segmented } from '@/components/Segmented'
 import { amountToInput, formatAmount, formatMonth, formatShare, parseAmount } from '@/app/format'
 import { useStore } from '@/app/store'
@@ -15,19 +16,22 @@ import { useSave } from '@/features/grid/RowDialogs'
 import { ruleFacts, type RuleFacts, type RuleKind } from './ruleFacts'
 
 /**
- * What the fields say, as text (`fixed:30000`, `share-of-income:0.1`, `rest`): a plain value the preview can depend
- * on. Null while the field is empty or cannot be read.
+ * What the fields say, as text (`fixed:30000`, `share-of-income:0.1`, `share-of-row:1:<income row>`, `rest`): a plain
+ * value the preview can depend on. Null while a field is empty or cannot be read, or no income is picked.
  */
-function choiceKeyOf(kind: RuleKind, amount: number | null, share: number | null): string | null {
+function choiceKeyOf(kind: RuleKind, amount: number | null, share: number | null, ofRowId: string): string | null {
   if (kind === 'rest') return 'rest'
   if (kind === 'fixed') return amount != null ? `fixed:${amount}` : null
-  return share != null && Number.isFinite(share) ? `${kind}:${share}` : null
+  if (share == null || !Number.isFinite(share)) return null
+  if (kind === 'share-of-row') return ofRowId ? `${kind}:${share}:${ofRowId}` : null
+  return `${kind}:${share}`
 }
 
 function choiceOf(key: string): RuleChoice {
-  const [kind, value] = key.split(':')
+  const [kind, value, ...rest] = key.split(':')
   if (kind === 'fixed') return { kind, amount: Number(value) }
-  if (isShareRule(kind)) return { kind, share: Number(value) }
+  if (kind === 'share-of-row') return { kind, share: Number(value), rowId: rest.join(':') }
+  if (kind === 'share-of-income' || kind === 'share-of-own-income' || kind === 'share-of-rest') return { kind, share: Number(value) }
   return { kind: 'rest' }
 }
 
@@ -35,9 +39,9 @@ function choiceOf(key: string): RuleChoice {
 const shareInput = (share: number): string => String(Math.round(share * 1000) / 10)
 
 /**
- * "How the amount is set" (DESIGN.md §8): a fixed amount, a percentage of income, a percentage of what is left, or the
- * rest; for an adult's pocket money never the rest, and a percentage of that adult's own income instead. It opens the
- * dialog of every row that can carry a rule; the fields of the choice follow it.
+ * "How the amount is set" (DESIGN.md §8): a fixed amount, a percentage of income, a percentage of one income line, a
+ * percentage of what is left, or the rest; for an adult's pocket money never the rest, and a percentage of that
+ * adult's own income as well. It opens the dialog of every row that can carry a rule; the fields of the choice follow it.
  */
 export function RulePicker({ facts, kind, onKind }: { facts: RuleFacts; kind: RuleKind; onKind: (kind: RuleKind) => void }) {
   /** What a month that overruns does to the account that takes the rest, in that account's own terms. */
@@ -85,13 +89,16 @@ export function RuleFields({ tables, household, target, facts, month, kind, onCl
   const [amountText, setAmountText] = useState(facts.current === 'fixed' && shown && shown.value > 0 ? amountToInput(shown.value, shown.currency, locale) : '')
   const seededShare = facts.share != null ? shareInput(facts.share) : ''
   const [shareText, setShareText] = useState(seededShare)
+  /** For a share of one income: the income line picked, the one its rule names now or the first there is. */
+  const [ofRowId, setOfRowId] = useState(facts.ofRowId && facts.incomes.some((i) => i.id === facts.ofRowId) ? facts.ofRowId : facts.incomes[0]?.id ?? '')
+  const ofName = facts.incomes.find((i) => i.id === ofRowId)?.name
   const { error, busy, save } = useSave(onClose)
 
   const share = isShareRule(kind)
   // an untouched field keeps the stored fraction exactly
   const typedShare = shareText.trim() === '' ? null : shareText === seededShare && facts.share != null ? facts.share : Number(shareText.replace(',', '.')) / 100
   const typedAmount = amountText.trim() === '' ? null : parseAmount(amountText, ccy, locale)
-  const choiceKey = choiceKeyOf(kind, typedAmount, typedShare)
+  const choiceKey = choiceKeyOf(kind, typedAmount, typedShare, ofRowId)
   const typedSomething = kind === 'fixed' ? amountText.trim() !== '' : share && shareText.trim() !== ''
   const fieldError = !choiceKey && typedSomething ? 'That is not a number I can read.' : null
   /** The rule tried on a copy: what the start month would show, or why it cannot be saved. */
@@ -100,11 +107,11 @@ export function RuleFields({ tables, household, target, facts, month, kind, onCl
     try {
       const { row: r, engine } = previewRule(tables, target, choiceOf(choiceKey), from, [from])
       const t = engine.totals[from]
-      return { amount: engine.cells[cellKey(r.id, from)]?.valueBase ?? 0, takeHome: t.takeHome, own: t.takeHomeBy[r.scope] ?? 0, left: t.leftForShares, rest: t.rest, leftover: t.leftover }
+      return { amount: engine.cells[cellKey(r.id, from)]?.valueBase ?? 0, takeHome: t.takeHome, own: t.takeHomeBy[r.scope] ?? 0, of: ofRowId ? engine.cells[cellKey(ofRowId, from)]?.netBase ?? 0 : 0, left: t.leftForShares, rest: t.rest, leftover: t.leftover }
     } catch (e) {
       return { error: e instanceof Error ? e.message : 'That rule cannot be saved.' }
     }
-  }, [tables, target, from, choiceKey])
+  }, [tables, target, from, choiceKey, ofRowId])
   const problem = fieldError ?? (preview && 'error' in preview ? preview.error : null)
   const figures = preview && !('error' in preview) ? preview : null
   const monthName = formatMonth(from, locale, 'long')
@@ -126,10 +133,23 @@ export function RuleFields({ tables, household, target, facts, month, kind, onCl
             <Input id="rule-amount" className="w-40" autoFocus inputMode="decimal" value={amountText} onChange={(e) => setAmountText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} placeholder="e.g. 300" />
           </div>
         )}
-        {share && (
+        {kind === 'share-of-row' && (facts.incomes.length > 0 ? (
           <div className="space-y-1.5">
-            <Label htmlFor="rule-share">{kind === 'share-of-income' ? 'Percentage of income' : kind === 'share-of-own-income' ? (adult ? `Percentage of ${adult.name}'s income` : 'Percentage of their own income') : 'Percentage of what is left'}</Label>
-            <Input id="rule-share" className="w-28" autoFocus inputMode="decimal" value={shareText} onChange={(e) => setShareText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} placeholder="e.g. 10" />
+            <Label htmlFor="rule-of">Which income</Label>
+            <NativeSelect id="rule-of" className="w-full max-w-xs" value={ofRowId} onChange={(e) => setOfRowId(e.target.value)}>
+              {facts.incomes.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+            </NativeSelect>
+            {facts.ofRowId && !facts.incomes.some((i) => i.id === facts.ofRowId) && (
+              <p className="text-xs text-muted-foreground" data-testid="rule-income-gone">The income this was a percentage of is no longer there, so nothing comes of it now. Saving takes it of the income picked here.</p>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground" data-testid="rule-no-income">There is no income line yet to take a percentage of. Add one under Income first.</p>
+        ))}
+        {share && (kind !== 'share-of-row' || facts.incomes.length > 0) && (
+          <div className="space-y-1.5">
+            <Label htmlFor="rule-share">{kind === 'share-of-income' ? 'Percentage of income' : kind === 'share-of-own-income' ? (adult ? `Percentage of ${adult.name}'s income` : 'Percentage of their own income') : kind === 'share-of-row' ? 'Percentage of that income' : 'Percentage of what is left'}</Label>
+            <Input id="rule-share" className="w-28" autoFocus={kind !== 'share-of-row'} inputMode="decimal" value={shareText} onChange={(e) => setShareText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} placeholder={kind === 'share-of-row' ? 'e.g. 100' : 'e.g. 10'} />
             {kind === 'share-of-rest' && othersOfRest > 0 && <p className="text-xs text-muted-foreground">Other accounts and pocket money already take {formatShare(othersOfRest, locale)} of what is left.</p>}
           </div>
         )}
@@ -155,6 +175,7 @@ export function RuleFields({ tables, household, target, facts, month, kind, onCl
               {figures.amount < 0 ? `Taken back from ${name}` : name} in {monthName}
               {kind === 'share-of-income' && typedShare != null && <> · {formatShare(typedShare, locale)} of {money(figures.takeHome)} take-home income</>}
               {kind === 'share-of-own-income' && typedShare != null && <> · {formatShare(typedShare, locale)} of {money(figures.own)}, {adult ? `${adult.name}'s` : 'their own'} take-home income</>}
+              {kind === 'share-of-row' && typedShare != null && <> · {formatShare(typedShare, locale)} of {money(figures.of)}{ofName ? `, ${ofName}` : ''}</>}
               {kind === 'share-of-rest' && typedShare != null && <> · {formatShare(typedShare, locale)} of {money(figures.left)} left</>}
             </dt>
             <dd className="text-right tabular-nums" data-testid="rule-amount">{money(Math.abs(figures.amount))}</dd>

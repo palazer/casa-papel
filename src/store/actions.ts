@@ -587,7 +587,7 @@ export function derivedRowReason(row: Row, closingRule: Household['closingRule']
   if (row.kind === 'category-estimate') return `"${row.name}" is what is left of its category's estimate.`
   const rule = row.rule ?? null
   if (canCarryRule(row) && isShareRule(rule)) {
-    return `"${row.name}" is worked out by its rule: ${sharePercent(row.ruleShare ?? 0)} of ${rule === 'share-of-income' ? 'income' : rule === 'share-of-own-income' ? 'their own income' : 'what is left'}.`
+    return `"${row.name}" is worked out by its rule: ${sharePercent(row.ruleShare ?? 0)} of ${rule === 'share-of-income' ? 'income' : rule === 'share-of-own-income' ? 'their own income' : rule === 'share-of-row' ? 'one income line' : 'what is left'}.`
   }
   // the row that takes the rest (a transfer to any account), and under the first-savings-row default the idle ones
   // beside it; a savings row with a fixed amount is typed like any other

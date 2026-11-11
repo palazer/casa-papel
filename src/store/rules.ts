@@ -1,6 +1,6 @@
 import { cellKey, computeEngine, sortRows, type EngineOutput } from '@/engine'
 import {
-  CellSchema, HouseholdSchema, PoolSchema, RowSchema, addMonths, canCarryRule, canTakeRest, compareMonths, isOldPocketShare, isPocketRow, monthRange, newId, poolRowName,
+  CellSchema, HouseholdSchema, PoolSchema, RowSchema, addMonths, canCarryRule, canTakeRest, compareMonths, isOldPocketShare, isPocketRow, isTakenFromAccount, monthRange, newId, poolRowName,
   resolveRules, rowsFeeding, sharePercent,
   type Cell, type CellItem, type Money, type MonthKey, type Pool, type Row, type RuleState, type Tables,
 } from '@/model'
@@ -16,6 +16,8 @@ export type RuleChoice =
   | { kind: 'fixed'; amount: Money }
   | { kind: 'share-of-income'; share: number }
   | { kind: 'share-of-own-income'; share: number }
+  /** A share of one income row's take-home; `rowId` is that income row. */
+  | { kind: 'share-of-row'; share: number; rowId: string }
   | { kind: 'share-of-rest'; share: number }
   | { kind: 'rest' }
 
@@ -99,6 +101,12 @@ export function ruleMutations(tables: Tables, target: RuleTarget, choice: RuleCh
     const adult = tables.entities.find((e) => e.id === row.scope && !e.deletedAt && e.kind === 'adult')
     if (!adult) throw new Error(`"${row.name}" does not belong to an adult. Say who it is for first: row menu, "Belongs to…".`)
   }
+  if (choice.kind === 'share-of-row') {
+    const of = working.rows.find((r) => r.id === choice.rowId && !r.deletedAt)
+    if (!of) throw new Error('Pick the income the percentage is taken of.')
+    if (of.section !== 'income' || isTakenFromAccount(of)) throw new Error(`"${of.name}" is not an income line, so there is nothing to take a percentage of.`)
+    if (of.archivedMonth && compareMonths(of.archivedMonth, from) <= 0) throw new Error(`"${of.name}" is archived in ${from}. Pick an income that is still coming in.`)
+  }
 
   const liveRows = sortRows(working.rows.filter((r) => !r.deletedAt), working.categories)
   const before = resolveRules(liveRows, household.closingRule)
@@ -156,6 +164,8 @@ export function ruleMutations(tables: Tables, target: RuleTarget, choice: RuleCh
   rework(row, before.byRow.get(row.id), choice.kind === 'fixed' ? { amount: choice.amount } : 'rule')
   rowPatches.set(row.id, {
     rule: choice.kind, ruleShare: 'share' in choice ? choice.share : null,
+    // only a share of one income names a row; any other rule lets go of it
+    ruleRowId: choice.kind === 'share-of-row' ? choice.rowId : null,
     followsRowId: null, followShare: null,
     // pocket money with a rule of its own no longer reads the household's pocket total
     ...(isPocketRow(row) ? { pocketMode: 'fixed' as const, pocketShare: null } : {}),

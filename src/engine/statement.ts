@@ -24,9 +24,11 @@ export type StatementLineKind = 'group' | 'category' | 'row' | 'item' | 'source'
 /** The rule behind a transfer line, and behind the account or virtual account that transfer feeds. */
 export interface StatementRule {
   /** `idle`: a savings row that gets nothing because another takes the rest. `none`: no row feeds the account yet. */
-  kind: 'fixed' | 'share-of-income' | 'share-of-own-income' | 'share-of-rest' | 'rest' | 'idle' | 'none'
+  kind: 'fixed' | 'share-of-income' | 'share-of-own-income' | 'share-of-row' | 'share-of-rest' | 'rest' | 'idle' | 'none'
   /** The fraction of a share rule. */
   share?: number
+  /** For a share of one income: that income line's name; left out when the line is gone. */
+  of?: string
   /** The row the rule sits on; absent for `none`. */
   rowId?: string
 }
@@ -168,7 +170,8 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   const rules = resolveRules(engine.rows, household.closingRule)
   const ruleOf = (row: Row): StatementRule => {
     const state = rules.byRow.get(row.id)
-    return { kind: state?.kind ?? 'fixed', share: state && state.share > 0 ? state.share : undefined, rowId: row.id }
+    const of = state?.kind === 'share-of-row' && state.ofRowId ? engine.rows.find((r) => r.id === state.ofRowId)?.name : undefined
+    return { kind: state?.kind ?? 'fixed', share: state && state.share > 0 ? state.share : undefined, rowId: row.id, ...(of ? { of } : {}) }
   }
   /** An account or virtual account shows the rule of the one row that feeds it; fed by several, it shows none of its own. */
   const ruleOfRows = (feeding: Row[]): StatementRule | undefined =>
@@ -267,6 +270,13 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
     const c = cellOf(row)
     if (!c) continue
     const v = c.valueBase
+    // a share of one income whose income line is gone this month gets nothing: say why, on the page that shows the zero
+    const state = rules.byRow.get(row.id)
+    if (state?.kind === 'share-of-row' && c.source === 'derived') {
+      const of = state.ofRowId ? engine.rows.find((r) => r.id === state.ofRowId) : undefined
+      const ofCell = of && of.section === 'income' && !isTakenFromAccount(of) ? cellOf(of) : null
+      if (!ofCell) warnings.push(`"${row.name}" takes a percentage of an income line that is no longer there, so it gets nothing.`)
+    }
     switch (bucketOf(row, accountsById)) {
       case 'income':
         income.push({ row, line: rowLine(row, c, v) })

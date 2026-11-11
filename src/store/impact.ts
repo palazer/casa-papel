@@ -159,6 +159,8 @@ function describeRow(ctx: Ctx, row: Row): Described {
   const schedules = ctx.schedules.filter((s) => s.rowId === row.id)
   const followers = ctx.rows.filter((r) => r.followsRowId === row.id)
   const deductions = ctx.rows.filter((r) => r.deductedFromRowId === row.id)
+  /** Rows whose rule takes a share of this income line: with the line gone they get nothing, and say so. */
+  const sharers = ctx.rows.filter((r) => r.rule === 'share-of-row' && r.ruleRowId === row.id)
   const pool = ctx.pools.find((p) => p.allocationRowId === row.id)
   const savingsAcc = row.kind === 'to-savings' && ctx.household.closingRule === 'savings-plug' && row.accountId ? ctx.accounts.find((a) => a.id === row.accountId) : undefined
   const scheduleWords = `Its ${pick(schedules.length, 'schedule', `${schedules.length} schedules`)} ${quoteNames(schedules.map((s) => s.name))}`
@@ -168,6 +170,7 @@ function describeRow(ctx: Ctx, row: Row): Described {
   const changes: string[] = []
   if (followers.length) changes.push(`${quoteNames(followers.map((f) => f.name))} ${pick(followers.length, 'stops following it and keeps its', 'stop following it and keep their')} own amounts`)
   if (deductions.length) changes.push(`${quoteNames(deductions.map((d) => d.name))} ${pick(deductions.length, 'is', 'are')} no longer deducted from it and ${pick(deductions.length, 'counts', 'count')} as ordinary spending`)
+  if (sharers.length) changes.push(`${quoteNames(sharers.map((s) => s.name))} ${pick(sharers.length, 'takes a percentage of it and gets', 'take a percentage of it and get')} nothing until another rule is picked`)
   if (pool) changes.push(`The virtual account "${pool.name}" is no longer filled each month`)
   if (savingsAcc) changes.push(`"${savingsAcc.name}" no longer receives the month's leftover`)
   return {
@@ -179,6 +182,7 @@ function describeRow(ctx: Ctx, row: Row): Described {
       if (schedules.length) out.push(`${scheduleWords} ${pick(schedules.length, 'stops', 'stop')} after ${monthLabel(addMonths(from, -1), locale)}`)
       if (followers.length) out.push(`${quoteNames(followers.map((f) => f.name))} ${pick(followers.length, 'stops following it and keeps', 'stop following it and keep')} the last amount as ${pick(followers.length, 'its', 'their')} own from ${at}`)
       if (deductions.length) out.push(`${quoteNames(deductions.map((d) => d.name))} ${pick(deductions.length, 'is', 'are')} no longer deducted from it and ${pick(deductions.length, 'counts', 'count')} as ordinary spending from ${at}`)
+      if (sharers.length) out.push(`${quoteNames(sharers.map((s) => s.name))} ${pick(sharers.length, 'takes a percentage of it and gets', 'take a percentage of it and get')} nothing from ${at}, until another rule is picked`)
       if (pool) out.push(`The virtual account "${pool.name}" is no longer filled from ${at}`)
       if (savingsAcc) out.push(`"${savingsAcc.name}" no longer receives the month's leftover from ${at}`)
       return out

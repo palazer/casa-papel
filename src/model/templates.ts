@@ -125,13 +125,14 @@ export const GOAL_KIND_INFO: Array<{ value: GoalFamily; label: string; help: str
 ]
 
 /**
- * How the transfer into an account, or an adult's pocket money, is worked out each month: the rule dialog's choices,
- * one sentence each. An account is offered all but the adult's own income; pocket money all but the rest.
+ * How the transfer into an account, or an adult's pocket money, is worked out each month: the choices under "How the
+ * amount is set", one sentence each. An account is offered all but the adult's own income; pocket money all but the rest.
  */
 export const RULE_KIND_INFO: Array<{ value: RowRule; label: string; help: string }> = [
   { value: 'fixed', label: 'A fixed amount', help: 'The same amount every month until you change it.' },
   { value: 'share-of-income', label: 'A percentage of income', help: 'A share of the month\'s take-home income: what comes in, minus what is deducted from it. Money taken out of investments does not count.' },
   { value: 'share-of-own-income', label: 'A percentage of their own income', help: 'Pocket money only: a share of what the adult it is for takes home, the income lines that belong to them minus what is deducted from those. An income the household shares counts for nobody.' },
+  { value: 'share-of-row', label: 'A percentage of one income', help: 'A share of one income line: what it brings in, minus what is deducted from it. When that income changes, so does this amount.' },
   { value: 'share-of-rest', label: 'A percentage of what is left', help: 'A share of what the month has left after spending, fixed amounts, percentages of income and the cash kept in the account. Nothing in a month that overruns.' },
   { value: 'rest', label: 'The rest', help: 'Everything that is left after all of that. One account can take the rest, and the same account fills the gap in a month that overruns.' },
 ]

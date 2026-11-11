@@ -34,6 +34,9 @@ const STEPS: Record<number, Step> = {
   // 8 → 9: the rule 'share-of-own-income' (pocket money as a share of its adult's own income), and pocket money rows
   // that carry a rule at all. Nothing to rewrite; the version keeps an older app from reading a rule it does not know.
   8: (raw) => raw,
+  // 9 → 10: the rule 'share-of-row' (a share of one income row) and `Row.ruleRowId`, the income it is taken of.
+  // Nothing to rewrite; the version keeps an older app from reading a rule it does not know.
+  9: (raw) => raw,
 }
 
 export function migrateExport(raw: unknown): unknown {

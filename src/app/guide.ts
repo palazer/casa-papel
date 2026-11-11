@@ -193,11 +193,12 @@ export const GUIDE: GuideTopic[] = [
     what: [
       'Deposits into savings or investments, the rows that fill virtual accounts and pocket money are transfers: not spending, so they never count as an expense; they show up as balances instead.',
       'Every transfer into a savings account, an investment account or a virtual account has a rule that says how its amount is worked out. One account at a time can take "The rest", and the same account fills the gap in a month that overruns. While an account takes the rest, the total row reads "Kept in account", the cash buffer you keep; while none does, it reads "Leftover".',
-      'Pocket money is a line per adult, like "Sam – Pocket" and "Alex – Pocket", with a rule of its own: "A fixed amount", "A percentage of income", "A percentage of Sam\'s income" or "A percentage of what is left", never the rest. Rows the app works out carry an (i), can be ticked when the money has moved, and cannot be typed into.',
+      'Pocket money is a line per adult, like "Sam – Pocket" and "Alex – Pocket", with a rule of its own: "A fixed amount", "A percentage of income", "A percentage of Sam\'s income", "A percentage of one income" or "A percentage of what is left", never the rest. Rows the app works out carry an (i), can be ticked when the money has moved, and cannot be typed into.',
     ],
     steps: [
       'Statement → "Set aside, pay off" → press a transfer like "To investments": one dialog holds its amount and its rule, under "How the amount is set". The symbol beside an account or a virtual account under "Assets" opens the same dialog, and so does Grid → row menu → "Rule…".',
-      'Pick "A fixed amount", "A percentage of income", "A percentage of what is left" or "The rest". A fixed amount is typed with "Applies to"; for a percentage or the rest, "Counts from" is the month the rule starts in, and earlier months keep their amounts.',
+      'Pick "A fixed amount", "A percentage of income", "A percentage of one income", "A percentage of what is left" or "The rest". A fixed amount is typed with "Applies to"; for a percentage or the rest, "Counts from" is the month the rule starts in, and earlier months keep their amounts.',
+      'To pass one income on in full, pick "A percentage of one income", choose it under "Which income" and type 100: in the demo, "Robin – Child benefit" into "To investments". The amount follows that income line, after what is deducted from it.',
       'Household → "Household settings" → "Cash kept in the account at month end (EUR)"; "Cash buffer changes apply to" picks "This month and onwards (earlier months keep what they show)", "Only this month" or "Every open month".',
       'Statement → "Set aside, pay off" → "Add row" (or Grid → Transfers → "Add row") → say what the row does: "Moves money between your accounts", "Goes into a savings account", "Deposits into an investment account", "Fills a virtual account", "Pocket money for an adult" or, for a card whose purchases are expense rows, "Pays off a credit card", then pick the "Account", "Virtual account" or "Adult" and press "Add".',
       'Row menu → "Goes into…" changes a deposit row\'s account for every month.',
@@ -277,7 +278,7 @@ export const GUIDE: GuideTopic[] = [
     ],
     steps: [
       'Statement → "Suggestions" → under "Expenses", type an amount beside "Sam – Pocket" and press Enter; or press "Add" with the field empty to be asked for a rule.',
-      'To change it, press "Sam – Pocket" (or Grid → row menu → "Rule…"). "How the amount is set" offers "A fixed amount", "A percentage of income", "A percentage of Sam\'s income" and "A percentage of what is left".',
+      'To change it, press "Sam – Pocket" (or Grid → row menu → "Rule…"). "How the amount is set" offers "A fixed amount", "A percentage of income", "A percentage of Sam\'s income", "A percentage of one income" and "A percentage of what is left".',
       'A fixed amount is typed with "Applies to": "This month and onwards" or "Only this month". For a percentage, "Counts from" is the month the rule starts in; earlier months keep what they showed.',
       'For a line of your own: "Add row" under Transfers → "Pocket money for an adult" → pick the "Adult".',
       'Say whose a row is: row menu → "Belongs to…" → "This row is for". A percentage of Sam\'s income counts the income lines that belong to Sam.',

@@ -1,4 +1,4 @@
-import { RULE_KIND_INFO, isOldPocketShare, isPocketRow, isShareRule, resolveRules, type Account, type Entity, type Household, type Pool, type Row, type Tables } from '@/model'
+import { RULE_KIND_INFO, isOldPocketShare, isPocketRow, isShareRule, isTakenFromAccount, resolveRules, type Account, type Entity, type Household, type Pool, type Row, type Tables } from '@/model'
 import { sortRows } from '@/engine'
 import { ruleRowOf, type RuleChoice, type RuleTarget } from '@/store'
 
@@ -28,6 +28,10 @@ export interface RuleFacts {
   current: RuleKind
   /** The fraction of the rule it has now, when that is a percentage. */
   share: number | null
+  /** The income line its rule takes a share of now, when it is a share of one income. */
+  ofRowId: string | null
+  /** The income lines a share can be taken of, in the Grid's order: live, not archived, and really income. */
+  incomes: Array<{ id: string; name: string }>
   /** The row that takes the rest now, and whether that is this one. */
   restRowName: string | null
   hasRest: boolean
@@ -52,8 +56,11 @@ export function ruleFacts(tables: Tables, household: Household, target: RuleTarg
   const kinds = KINDS
     .filter((k) => (pocket ? k.value !== 'rest' : k.value !== 'share-of-own-income'))
     .map((k) => (k.value === 'share-of-own-income' && adult ? { ...k, label: `A percentage of ${adult.name}'s income` } : k))
-  const rules = resolveRules(sortRows(tables.rows.filter((r) => !r.deletedAt), tables.categories), household.closingRule)
+  const liveRows = sortRows(tables.rows.filter((r) => !r.deletedAt), tables.categories)
+  const rules = resolveRules(liveRows, household.closingRule)
   const state = row ? rules.byRow.get(row.id) : undefined
+  // money taken out of an account sits beside the income lines but is not income to take a share of
+  const incomes = liveRows.filter((r) => r.section === 'income' && !isTakenFromAccount(r) && !r.archivedMonth).map((r) => ({ id: r.id, name: r.name }))
   let othersOfRest = 0
   for (const [id, s] of rules.byRow) if (s.kind === 'share-of-rest' && id !== row?.id) othersOfRest += s.share
   return {
@@ -62,6 +69,8 @@ export function ruleFacts(tables: Tables, household: Household, target: RuleTarg
     wasShareOfTotal: !!row && isOldPocketShare(row),
     current: state && (isShareRule(state.kind) || state.kind === 'rest') ? state.kind : 'fixed',
     share: state && state.share > 0 ? state.share : null,
+    ofRowId: state?.kind === 'share-of-row' ? state.ofRowId ?? null : null,
+    incomes,
     restRowName: tables.rows.find((r) => r.id === rules.restRowId)?.name ?? null,
     hasRest: !!row && rules.restRowId === row.id,
     othersOfRest,

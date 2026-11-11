@@ -332,7 +332,7 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
   const openMonth = (m: MonthKey) => !engine.totals[m]?.closed
   const ruleMonth = months.find((m) => m === thisMonth && openMonth(m)) ?? months.find((m) => m > thisMonth && openMonth(m)) ?? months.find(openMonth) ?? months[0]
   /** A row a rule works out says which, the way a follower names its row. */
-  const ruleTag = rule && rule.kind !== 'idle' ? ruleText(rule, locale) : null
+  const ruleTag = rule && rule.kind !== 'idle' ? ruleText({ ...rule, of: rule.ofRowId ? tables.rows.find((r) => r.id === rule.ofRowId && !r.deletedAt)?.name : undefined }, locale) : null
   return (
     <tr className={cn('group', band)}>
       <th scope="row" className={cn('sticky left-0 z-10 px-2 py-0.5 text-left font-normal', band ?? 'bg-card')}>

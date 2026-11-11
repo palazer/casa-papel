@@ -118,7 +118,7 @@ export function TopUpDialog({ tables, engine, household, poolId, month, onClose 
               <p className="text-xs text-muted-foreground" data-testid="top-up-rule">
                 {rule.kind === 'rest'
                   ? `${pool.name} takes the rest of the month. A top-up fixes what it gets in ${monthName} at what that is now, ${money(setAsideCell.valueBase)}, plus the top-up; from then on, what ${monthName} has left over or is short stays in the main account. The rest goes to ${pool.name} again the month after.`
-                  : `What ${pool.name} gets is worked out by its rule (${ruleText(rule, locale)}). A top-up fixes it for ${monthName} at what it is now, ${money(setAsideCell.valueBase)}, plus the top-up; the rule goes on the month after.`}
+                  : `What ${pool.name} gets is worked out by its rule (${ruleText({ ...rule, of: rule.ofRowId ? engine.rows.find((r) => r.id === rule.ofRowId)?.name : undefined }, locale)}). A top-up fixes it for ${monthName} at what it is now, ${money(setAsideCell.valueBase)}, plus the top-up; the rule goes on the month after.`}
               </p>
             )}
           </fieldset>

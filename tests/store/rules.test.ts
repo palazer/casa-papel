@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { cellKey, computeEngine, type EngineOutput } from '@/engine'
+import { buildStatement, cellKey, computeEngine, type EngineOutput, type StatementLine } from '@/engine'
 import { monthRange, newId, type MonthKey, type Row } from '@/model'
 import {
-  CasaDb, Store, addAccount, addPool, addRow, addRowOfKind, closeMonth, derivedRowReason, followRow, loadTables, planRemoval, previewRule,
-  quickCreateHousehold, setCellValue, setDerivedDone, setRule,
+  CasaDb, Store, addAccount, addPool, addRow, addRowOfKind, archiveRow, closeMonth, derivedRowReason, describeRemoval, followRow, loadTables, planRemoval, previewRule,
+  quickCreateHousehold, removeThing, setCellValue, setDerivedDone, setRowDeductedFrom, setRule,
 } from '@/store'
+
+const walk = (lines: StatementLine[]): StatementLine[] => lines.flatMap((l) => [l, ...walk(l.children)])
 
 const months = monthRange('2026-01', '2026-06')
 const before = (m: MonthKey) => months.filter((x) => x < m)
@@ -242,6 +244,70 @@ describe('setRule', () => {
     expect(value(engine, toSavings, '2026-03')).toBe(125000)
     expect((await loadTables(store)).rows.find((r) => r.id === toBroker.id)?.rule).toBeNull()
     expect(() => previewRule(t, { rowId: toBroker.id }, { kind: 'share-of-income', share: 0 }, '2026-03', months)).toThrow(/above 0 and at most 100/)
+  })
+
+  it('a share of one income line follows that line, after what is deducted from it, from its month on', async () => {
+    const { store, toBroker, toSavings, rent, salary } = await fresh()
+    const benefit = await addRow(store, { section: 'income', name: 'Child benefit' })
+    await setCellValue(store, benefit.id, '2026-01', 25900, 'from-now-on')
+    const was = await engineOf(store)
+    await setRule(store, { rowId: toBroker.id }, { kind: 'share-of-row', share: 1, rowId: benefit.id }, '2026-03')
+    let out = await engineOf(store)
+    expect(await rowOf(store, toBroker.id)).toMatchObject({ rule: 'share-of-row', ruleShare: 1, ruleRowId: benefit.id })
+    // the months before keep every figure; from March on the Broker gets the whole benefit
+    expectSameBefore(was, out, '2026-03')
+    expect(out.cells[cellKey(toBroker.id, '2026-02')]).toMatchObject({ value: 30000, source: 'value' })
+    expect(out.cells[cellKey(toBroker.id, '2026-03')]).toMatchObject({ value: 25900, source: 'derived' })
+    // what the Broker gets less than its 300, the rest gets more
+    expect(value(out, toSavings, '2026-03')).toBe(value(was, toSavings, '2026-03') + 4100)
+    // the line changes, and so does the transfer; half of it is half
+    await setCellValue(store, benefit.id, '2026-04', 30000, 'from-now-on')
+    await setRule(store, { rowId: toBroker.id }, { kind: 'share-of-row', share: 0.5, rowId: benefit.id }, '2026-05')
+    out = await engineOf(store)
+    expect([value(out, toBroker, '2026-03'), value(out, toBroker, '2026-04'), value(out, toBroker, '2026-05')]).toEqual([25900, 30000, 15000])
+    // an expense deducted from the income comes off first: the share is of what the line brings home
+    const tax = await addRow(store, { section: 'expense', name: 'Tax on the benefit' })
+    await setCellValue(store, tax.id, '2026-05', 10000, 'from-now-on')
+    await setRowDeductedFrom(store, tax.id, benefit.id)
+    out = await engineOf(store)
+    expect(value(out, toBroker, '2026-05')).toBe(10000)
+    expect(derivedRowReason(await rowOf(store, toBroker.id), 'savings-plug')).toMatch(/50% of one income line/)
+    // what cannot be: a line that is not income, a line that is not there, a line archived by then
+    const rule = (rowId: string, from: MonthKey = '2026-05') => setRule(store, { rowId: toBroker.id }, { kind: 'share-of-row', share: 1, rowId }, from)
+    await expect(rule(rent.id)).rejects.toThrow(/"Rent" is not an income line/)
+    await expect(rule('nowhere')).rejects.toThrow(/Pick the income/)
+    await archiveRow(store, salary.id, '2026-05')
+    await expect(rule(salary.id)).rejects.toThrow(/"Salary" is archived in 2026-05/)
+    // another way to set the amount lets go of the income
+    await setRule(store, { rowId: toBroker.id }, { kind: 'fixed', amount: 20000 }, '2026-06')
+    expect(await rowOf(store, toBroker.id)).toMatchObject({ rule: 'fixed', ruleShare: null, ruleRowId: null })
+  })
+
+  it('a share of an income line that is archived or deleted gets nothing, and both the Grid and the Statement say why', async () => {
+    const { store, toBroker } = await fresh()
+    const benefit = await addRow(store, { section: 'income', name: 'Child benefit' })
+    await setCellValue(store, benefit.id, '2026-01', 25900, 'from-now-on')
+    await setRule(store, { rowId: toBroker.id }, { kind: 'share-of-row', share: 1, rowId: benefit.id }, '2026-02')
+    // the remove dialog names the row that depends on the line
+    const plan = describeRemoval(await loadTables(store), { kind: 'row', id: benefit.id }, { today: '2026-03', archiveFrom: '2026-04' })
+    expect(plan.changes).toContain('"To Broker" takes a percentage of it and gets nothing until another rule is picked')
+    expect(plan.archiveChanges).toContain('"To Broker" takes a percentage of it and gets nothing from Apr 2026, until another rule is picked')
+    await archiveRow(store, benefit.id, '2026-04')
+    let t = await loadTables(store)
+    let out = computeEngine({ tables: t, months })
+    expect([value(out, toBroker, '2026-03'), value(out, toBroker, '2026-04'), value(out, toBroker, '2026-05')]).toEqual([25900, 0, 0])
+    expect(out.warnings).toContain('"To Broker" takes a percentage of an income line that is no longer there (2026-04).')
+    expect(buildStatement(t, out, '2026-03')!.warnings).toEqual([])
+    expect(buildStatement(t, out, '2026-04')!.warnings).toEqual(['"To Broker" takes a percentage of an income line that is no longer there, so it gets nothing.'])
+    // both halves still agree in a month without the income
+    expect([buildStatement(t, out, '2026-04')!.flow.difference, buildStatement(t, out, '2026-04')!.position.difference]).toEqual([0, 0])
+    // the line names its rule by the income while it is there
+    expect(walk(buildStatement(t, out, '2026-03')!.flow.right.lines).find((l) => l.rowId === toBroker.id)!.rule).toMatchObject({ kind: 'share-of-row', share: 1, of: 'Child benefit' })
+    await removeThing(store, { kind: 'row', id: benefit.id })
+    t = await loadTables(store)
+    out = computeEngine({ tables: t, months })
+    expect(value(out, toBroker, '2026-03')).toBe(0)
+    expect(walk(buildStatement(t, out, '2026-03')!.flow.right.lines).find((l) => l.rowId === toBroker.id)!.rule).toMatchObject({ kind: 'share-of-row', share: 1 })
   })
 
   it('an amount typed for one month only leaves the next month to the rule', async () => {

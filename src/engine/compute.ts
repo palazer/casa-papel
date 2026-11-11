@@ -387,6 +387,14 @@ export function computeEngine(input: EngineInput): EngineOutput {
         // pocket money as a share of what its adult brings home; a row that belongs to no adult has nothing to take it of
         if (!adultIds.has(e.row.scope)) warnOnce(`own-income|${e.row.id}`, `"${e.row.name}" takes a percentage of its adult's own income, but it does not belong to an adult.`)
         fill(e, Math.max(0, scaleMoney(adultIds.has(e.row.scope) ? t.takeHomeBy[e.row.scope] ?? 0 : 0, e.rule.share)))
+      } else if (e.rule.kind === 'share-of-row') {
+        // a share of one income line's take-home (its amount minus what is deducted from it); a line that is gone,
+        // archived by this month or not an income has nothing to take it of
+        const of = e.rule.ofRowId ? rowsById.get(e.rule.ofRowId) : undefined
+        const ofCell = of && of.section === 'income' && !isTakenFromAccount(of) ? cells[cellKey(of.id, m)] : undefined
+        const there = ofCell != null && ofCell.source !== 'archived'
+        if (!there) warnOnce(`share-of-row|${e.row.id}`, `"${e.row.name}" takes a percentage of an income line that is no longer there (${m}).`)
+        fill(e, Math.max(0, scaleMoney(there ? ofCell.netBase : 0, e.rule.share)))
       }
     }
     const restCell = open.find((e) => e.rule.kind === 'rest')
