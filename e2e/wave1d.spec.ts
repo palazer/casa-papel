@@ -9,19 +9,27 @@ async function loadDemo(page: Page) {
 test.describe('wave 1d', () => {
   test.use({ viewport: { width: 1400, height: 900 } })
 
-  test('per-person view, proportional split, a loan and a card in Balances, net worth', async ({ page }) => {
+  test('per-person view, pocket money on its own line, a loan and a card in Balances, net worth', async ({ page }) => {
     await loadDemo(page)
 
-    // pooled mode: what each adult leaves for the household
+    // what each adult brings, spends on themselves and takes; there is one way of sharing, so nothing to choose
     await page.getByRole('link', { name: 'Moves' }).click()
     await expect(page.getByText('Per person', { exact: true })).toBeVisible()
+    await expect(page.getByRole('columnheader', { name: 'Sam' })).toBeVisible()
+    await expect(page.getByRole('columnheader', { name: 'Alex' })).toBeVisible()
     await expect(page.getByRole('cell', { name: 'Leaves for the household' })).toBeVisible()
+    await expect(page.getByText('Who pays what')).toHaveCount(0)
     await expect(page.getByText('Net worth', { exact: true })).toBeVisible()
+    await page.screenshot({ path: 'e2e/output/moves-per-person.png', fullPage: true })
 
     // pocket money is set on each adult's own line, not under Household: 750 for Sam from this month on
     await page.getByRole('link', { name: 'Household' }).click()
     await expect(page.getByLabel(/^Pocket money per month/)).toHaveCount(0)
     await expect(page.getByLabel('Cash buffer changes apply to')).toBeVisible()
+    await expect(page.getByLabel('How you share money')).toHaveCount(0)
+    await expect(page.getByText('Shares come from')).toHaveCount(0)
+    await expect(page.getByLabel('Who pays for Robin')).toHaveCount(0)
+    await page.screenshot({ path: 'e2e/output/household-settings.png' })
     await page.getByRole('link', { name: 'Grid' }).click()
     await page.getByRole('button', { name: 'Row menu for Sam – Pocket' }).click()
     await page.getByRole('menuitem', { name: 'Rule…' }).click()
@@ -35,20 +43,6 @@ test.describe('wave 1d', () => {
     await expect(samPocket).toContainText('€500.00')
     await expect(samPocket).toContainText('€750.00')
     await expect(page.getByRole('row', { name: /^Alex – Pocket/ })).not.toContainText('€750.00')
-
-    // switch to proportional contributions
-    await page.getByRole('link', { name: 'Household' }).click()
-    await page.getByLabel('How you share money', { exact: true }).selectOption('proportional')
-    await expect(page.getByText('Shares come from')).toBeVisible()
-    await expect(page.getByRole('cell', { name: 'Keeps' })).toBeVisible()
-    await page.screenshot({ path: 'e2e/output/shares-card.png', fullPage: true })
-
-    await page.getByRole('link', { name: 'Moves' }).click()
-    await expect(page.getByText(/Shared lines are split/)).toBeVisible()
-    await expect(page.getByRole('columnheader', { name: 'Sam' })).toBeVisible()
-    await expect(page.getByRole('columnheader', { name: 'Alex' })).toBeVisible()
-    await expect(page.getByText('Transfers per person')).toBeVisible()
-    await page.screenshot({ path: 'e2e/output/who-pays-what.png', fullPage: true })
 
     // a loan and a credit card
     await page.getByRole('link', { name: 'Household' }).click()

@@ -8,7 +8,7 @@
  */
 import { computeEngine, cellKey, type CellResult, type EngineOutput } from '@/engine'
 import {
-  AccountSchema, CategorySchema, CellSchema, EntitySchema, GoalSchema, HouseholdSchema, PoolSchema, RecurringItemSchema, RowSchema,
+  AccountSchema, CategorySchema, CellSchema, EntitySchema, GoalSchema, PoolSchema, RecurringItemSchema, RowSchema,
   ENTITY_KIND_LABEL, addMonths, compareMonths, monthOfDate, monthRange, parseMonth, poolRef,
   type Account, type Category, type Cell, type CellInput, type Entity, type Goal, type Household, type MonthKey, type Pool, type RecurringItem, type Row,
   type TableName, type Tables,
@@ -261,25 +261,19 @@ function describeEntity(ctx: Ctx, e: Entity): Described {
   const { locale } = ctx
   const own = ctx.rows.filter((r) => r.scope === e.id)
   const tagged = ctx.rows.filter((r) => r.scope !== e.id && r.entityTags.includes(e.id))
-  const dependents = ctx.entities.filter((x) => x.paidBy === e.id)
   const owned = ctx.accounts.filter((a) => a.ownerEntityId === e.id)
   const schedules = ctx.schedules.filter((s) => s.scope === e.id)
-  const manual = e.id in ctx.household.manualShares
   const activity = [...new Set([...own, ...tagged].flatMap((r) => amountMonths(ctx, r.id)))].sort()
   const changes: string[] = []
   if (own.length) changes.push(`${quoteNames(own.map((r) => r.name))} ${pick(own.length, 'becomes', 'become')} shared`)
   if (tagged.length) changes.push(`${quoteNames(tagged.map((r) => r.name))} ${pick(tagged.length, 'loses its tag', 'lose their tag')}`)
-  if (dependents.length) changes.push(`The costs of ${quoteNames(dependents.map((d) => d.name))} become shared`)
   if (owned.length) changes.push(`${quoteNames(owned.map((a) => a.name))} ${pick(owned.length, 'becomes', 'become')} a household account`)
   if (schedules.length) changes.push(`${plural(schedules.length, 'schedule')} ${pick(schedules.length, 'becomes', 'become')} shared`)
-  if (manual) changes.push('Its share of the manual split is dropped')
   return {
     kindLabel: ENTITY_KIND_LABEL[e.kind], subject: e.name, loses: [], changes, blockers: [], note: null, activity, canArchive: true,
     archive: (from) => {
       const at = monthLabel(from, locale)
-      const out = [`Hidden from People & things from ${at}; its rows and earlier months stay as they are`]
-      if (e.kind === 'adult' && ctx.household.moneyMode === 'proportional') out.push(`No longer part of the split from ${at}`)
-      return out
+      return [`Hidden from People & things from ${at}; its rows and earlier months stay as they are`]
     },
   }
 }
@@ -506,14 +500,8 @@ function entityRemoval(ctx: Ctx, e: Entity, ts: number): Mutation[] {
     if (r.scope !== e.id && !r.entityTags.includes(e.id)) continue
     muts.push(put('rows', RowSchema, r, { scope: r.scope === e.id ? 'shared' : r.scope, entityTags: r.entityTags.filter((t) => t !== e.id) }, ts))
   }
-  for (const x of ctx.entities) if (x.paidBy === e.id) muts.push(put('entities', EntitySchema, x, { paidBy: null }, ts))
   for (const a of ctx.accounts) if (a.ownerEntityId === e.id) muts.push(put('accounts', AccountSchema, a, { ownerEntityId: null }, ts))
   for (const s of ctx.schedules) if (s.scope === e.id) muts.push(put('recurringItems', RecurringItemSchema, s, { scope: 'shared' }, ts))
-  if (e.id in ctx.household.manualShares) {
-    const { [e.id]: _dropped, ...manualShares } = ctx.household.manualShares
-    void _dropped
-    muts.push(put('household', HouseholdSchema, ctx.household, { manualShares }, ts))
-  }
   return muts
 }
 

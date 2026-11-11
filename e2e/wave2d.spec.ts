@@ -215,25 +215,34 @@ test('a row can follow a share of another row', async ({ page }) => {
   await expect(row).toContainText('€127.50')
 })
 
-test('"Belongs to" gives a row to one adult, and Who pays what routes it to them', async ({ page }) => {
+test('"Belongs to" gives a row to one adult, and Per person on Moves counts it as theirs', async ({ page }) => {
   await loadDemo(page)
-  // an income row also offers the split check
+  const moves = async () => page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Moves' }).click()
+  const ownSpending = page.getByRole('row', { name: /^Own spending/ })
+  await moves()
+  await expect(page.getByText('Per person', { exact: true })).toBeVisible()
+  await expect(page.getByRole('row', { name: /^Income/ })).toContainText('€4,200.00')
+  await expect(ownSpending).toContainText('€110.00')
+  await expect(ownSpending).not.toContainText('€810.00')
+
+  // who a row is for is all the dialog asks, for an income row too
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Grid' }).click()
   await page.getByRole('button', { name: 'Row menu for Other income' }).click()
   await page.getByRole('menuitem', { name: 'Belongs to…' }).click()
-  await expect(page.getByRole('dialog').getByRole('checkbox', { name: 'Counts for the split' })).toBeVisible()
+  const dlg = page.getByRole('dialog')
+  await expect(dlg.getByLabel('This row is for', { exact: true })).toBeVisible()
+  await expect(dlg.getByRole('checkbox')).toHaveCount(0)
   await page.keyboard.press('Escape')
-  await expect(page.getByRole('dialog')).toBeHidden()
+  await expect(dlg).toBeHidden()
 
   await page.getByRole('button', { name: 'Row menu for Groceries' }).click()
   await page.getByRole('menuitem', { name: 'Belongs to…' }).click()
-  const dlg = page.getByRole('dialog')
-  await expect(dlg.getByRole('checkbox', { name: 'Counts for the split' })).toHaveCount(0)
   await dlg.getByLabel('This row is for', { exact: true }).selectOption({ label: 'Sam' })
   await dlg.getByRole('button', { name: 'Save' }).click()
   await expect(dlg).toBeHidden()
 
-  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Household' }).click()
-  await page.getByLabel('How you share money', { exact: true }).selectOption('proportional')
-  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Moves' }).click()
-  await expect(page.getByRole('row', { name: /^Groceries/ })).toContainText('own')
+  // the groceries are Sam's own spending now; nothing splits them between the adults
+  await moves()
+  await expect(ownSpending).toContainText('€810.00')
+  await expect(page.getByText('Who pays what')).toHaveCount(0)
 })

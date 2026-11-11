@@ -50,6 +50,10 @@ export const HouseholdSchema = BaseRecord.extend({
   pocketTotal: MoneySchema.default(0),
   /** Cash deliberately left in checking at month end. Default 0. */
   cashBuffer: MoneySchema.default(0),
+  /**
+   * The proportional split (each adult's share of the shared costs, "Who pays what") was removed on the `statement`
+   * branch in November 2026. These three, `Row.inShareBasis` and `Entity.paidBy` stay in stored data and are no longer read.
+   */
   moneyMode: MoneyModeSchema.default('pooled'),
   shareBasis: ShareBasisSchema.default('basis-rows'),
   manualShares: z.record(IdSchema, FractionSchema).default({}),
@@ -77,7 +81,7 @@ export const EntitySchema = BaseRecord.extend({
   kind: EntityKindSchema,
   name: z.string().min(1),
   attributes: z.record(z.string(), z.string()).default({}),
-  /** Adult charged for rows scoped to this entity (children, pets, vehicles…). */
+  /** No longer read (see `Household.moneyMode`): the adult who was charged for this entity's rows in the proportional split. */
   paidBy: IdSchema.nullable().default(null),
   archivedMonth: MonthKeySchema.nullable().default(null),
   order: z.string().default('a0'),
@@ -160,8 +164,9 @@ export const RowSchema = BaseRecord.extend({
   kind: RowKindSchema.default('plain'),
   categoryId: IdSchema.nullable().default(null),
   entityTags: z.array(IdSchema).default([]),
-  /** 'shared' or an entity id: who this row belongs to for splitting. */
+  /** 'shared' or an entity id: who this row belongs to ("Belongs to…"). */
   scope: z.string().default('shared'),
+  /** No longer read (see `Household.moneyMode`). */
   inShareBasis: z.boolean().default(false),
   /** null = household base currency. */
   currency: CurrencyCodeSchema.nullable().default(null),

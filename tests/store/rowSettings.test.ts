@@ -131,18 +131,17 @@ describe('setRowDeductedFrom and setRowScope', () => {
   it('ties a spending row to an income row, gives it the same owner, and lets go again', async () => {
     const { store, salary, rent } = await fresh()
     const pat = await addEntity(store, { kind: 'adult', name: 'Pat' })
-    await setRowScope(store, salary.id, pat.id, true)
+    await setRowScope(store, salary.id, pat.id)
     await setRowDeductedFrom(store, rent.id, salary.id)
     let t = await loadTables(store)
-    expect(t.rows.find((r) => r.id === salary.id)).toMatchObject({ scope: pat.id, inShareBasis: true })
+    expect(t.rows.find((r) => r.id === salary.id)).toMatchObject({ scope: pat.id, entityTags: [pat.id] })
     expect(t.rows.find((r) => r.id === rent.id)).toMatchObject({ deductedFromRowId: salary.id, scope: pat.id })
     expect(t.rows.find((r) => r.id === rent.id)!.entityTags).toContain(pat.id)
 
     // the income row's new owner takes its deductions along
     await setRowScope(store, salary.id, 'shared')
     t = await loadTables(store)
-    // a shared income cannot count for anyone's share
-    expect(t.rows.find((r) => r.id === salary.id)).toMatchObject({ scope: 'shared', inShareBasis: false })
+    expect(t.rows.find((r) => r.id === salary.id)).toMatchObject({ scope: 'shared', entityTags: [] })
     expect(t.rows.find((r) => r.id === rent.id)?.scope).toBe('shared')
     expect(t.rows.find((r) => r.id === rent.id)!.entityTags).not.toContain(pat.id)
 
@@ -153,12 +152,10 @@ describe('setRowDeductedFrom and setRowScope', () => {
   })
 
   it('refuses the wrong kinds of row and people who are gone', async () => {
-    const { store, salary, rent, toSavings } = await fresh()
+    const { store, salary, rent } = await fresh()
     await expect(setRowDeductedFrom(store, salary.id, rent.id)).rejects.toThrow(/Only spending rows/)
     await expect(setRowDeductedFrom(store, rent.id, rent.id)).rejects.toThrow(/Pick an income row/)
     await expect(setRowDeductedFrom(store, rent.id, newId())).rejects.toThrow(/Pick an income row/)
     await expect(setRowScope(store, rent.id, newId())).rejects.toThrow(/no longer exists/)
-    await expect(setRowScope(store, rent.id, 'shared', true)).rejects.toThrow(/Only income rows/)
-    await expect(setRowScope(store, toSavings.id, 'shared', false)).rejects.toThrow(/Only income rows/)
   })
 })

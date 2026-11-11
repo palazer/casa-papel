@@ -217,7 +217,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 - **List rows inside an island**: `divide-y divide-border/60`, `py-1` to `py-1.5`, a chip for the type, the name in
   `font-medium`, muted facts after it, actions as `xs` buttons at `ml-auto`. No outer border around a list that is the
   island's whole body.
-- **Tables** (Schedules, Who pays what, rates): `w-full`, header cells `px-1.5 py-1 font-semibold text-muted-foreground`,
+- **Tables** (Schedules, Per person, rates): `w-full`, header cells `px-1.5 py-1 font-semibold text-muted-foreground`,
   body cells `px-1.5 py-0.5`, rows separated by `divide-border/60`; a table that is not the island's whole body sits in
   `rounded-md border`. No zebra striping.
 - **Stat tiles** (`src/components/ui/stat-tile.tsx`): a small-caps label (in a kind-of-money hue when the number is one)
@@ -381,8 +381,10 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 - A row's menu (`src/features/grid/RowMenu.tsx`) runs Rename…, Move up, Move down, Category…, Belongs to…, Currency…,
   then Treat new values as…, Comes out of…, Deducted from an income… (spending rows, followers included; it names the
   income once set), the account verb, Follow another row…, then Archive or delete… or Restore. Belongs to offers the
-  household, an Adults group and an Other people & things group (`name · kind`), plus a "Counts for the split" check on
-  income rows (disabled while shared); Deducted from lists the live income rows after "Nothing: a normal expense" (an archived income the row still points at stays listed as "<name> (archived)");
+  household, an Adults group and an Other people & things group (`name · kind`), and nothing else: who a row is for
+  is what "Per person" on Moves counts and what a pocket money rule's "percentage of <Adult>'s income" is taken of.
+  There is one way of sharing money (each adult's income lines are what they put in), so no screen asks for a mode,
+  a split or who pays for a child, pet or thing; Deducted from lists the live income rows after "Nothing: a normal expense" (an archived income the row still points at stays listed as "<name> (archived)");
   Follow another row shows "Share (%)" once a row is chosen (100 mirrors it). Each dialog's help sentence is the
   `HELP` text of its field, so the (i) and the explanation never drift apart.
 - `TabBar` switches an island's view (`src/components/ui/tab-bar.tsx`); `ViewToggle` filters a list

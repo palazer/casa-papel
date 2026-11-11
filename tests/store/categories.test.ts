@@ -84,7 +84,7 @@ describe('categories', () => {
 
     const { mutations } = buildSetupMutations({
       household: { name: 'W', baseCurrency: 'EUR', locale: 'en-IE', startMonth: '2026-01', pocketTotal: 0 },
-      adults: [{ name: 'A' }], dependents: [{ kind: 'pet', name: 'Dog', paidByIndex: null }],
+      adults: [{ name: 'A' }], dependents: [{ kind: 'pet', name: 'Dog' }],
       accounts: [{ name: 'Savings', type: 'savings' }],
       householdTemplates: ['h.groceries', 'h.transport', 'h.other', 'h.poolTravel'],
       entityTemplates: { 0: ['a.personal'], 1: ['p.food'] },

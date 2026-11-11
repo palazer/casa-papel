@@ -1,4 +1,4 @@
-import type { AccountType, Household } from '@/model'
+import type { AccountType } from '@/model'
 
 /**
  * Every explanation the app shows behind an (i) icon, in one place (DESIGN.md §8). Plain words, sentence case, two or
@@ -12,7 +12,7 @@ export interface HelpText {
 
 export const HELP = {
   // Sections and the rows the app works out itself
-  'section.income': { title: 'Income', text: 'What arrives during the month: salaries, benefits, anything else that comes in. Income rows marked "counts for the split" also set each adult\'s share when contributions are proportional.' },
+  'section.income': { title: 'Income', text: 'What arrives during the month: salaries, benefits, anything else that comes in. An income line that belongs to an adult counts as that adult\'s own income.' },
   'section.expense': { title: 'Expenses', text: 'What leaves and does not come back. Each expense can come out of this month\'s income, the savings balance or a pool account.' },
   'section.transfer': { title: 'Transfers', text: 'Money that moves from one of your accounts to another, or into a person\'s pocket. Not spending, so it never counts as an expense; it shows up as a balance instead.' },
   'derived.incomeTotal': { title: 'Income total', text: 'All income rows of the month added up, in your base currency. Rows in another currency are converted at that month\'s rate.' },
@@ -26,9 +26,8 @@ export const HELP = {
   'row.toSavingsPlug': { title: 'To savings', text: 'Worked out for you: income minus spending from income minus pocket money and the cash buffer. Whatever is left moves to savings, so you never type it.' },
   'row.follows': { title: 'Follows another row', text: 'This row copies another row\'s amount every month, or a share of it, like a child\'s savings following the child benefit or a tax taking a quarter of a salary. Edit the row it follows; this one has no amount of its own.' },
   'row.followShare': { title: 'Share of the followed row', text: 'The row shows this percentage of the row it follows, month by month. 100 mirrors it exactly; 25 puts a quarter of it here, like a tax that takes a fixed slice of a salary.' },
-  'row.deductedFrom': { title: 'Deducted from an income', text: 'A tax or contribution taken off an income before it reaches you. It stays an expense in its own row, the income shows what is left as a net line, and when costs are split in proportion each adult\'s share uses the net amount.' },
-  'row.belongsTo': { title: 'Belongs to', text: 'Who the row is for. An adult\'s own row is theirs alone; a row for a child, pet or thing goes to whoever pays for them; a shared row is split between the adults. Moves uses this to work out who sends what where.' },
-  'row.inShareBasis': { title: 'Counts for the split', text: 'Ticked, this income sets its adult\'s share of the shared costs when shares come from salaries. Leave it off for child benefit or one-off income that should not move the split.' },
+  'row.deductedFrom': { title: 'Deducted from an income', text: 'A tax or contribution taken off an income before it reaches you. It stays an expense in its own row, the income shows what is left as a net line, and percentages of income count the net amount.' },
+  'row.belongsTo': { title: 'Belongs to', text: 'Who the row is for: the household, an adult, or a child, pet or thing. An adult\'s own rows count for them in "Per person" on Moves, and their income lines are what a pocket money rule takes a percentage of.' },
   'row.category': { title: 'Category', text: 'A named group inside the section, like Housing or Transport. Rows sort by category in the grid and share a faint band, so related lines sit together. Categories are managed under Household.' },
   'row.rule': { title: 'Rule', text: 'How the amount for an account, or an adult\'s pocket money, is worked out each month: an amount, a percentage of take-home income, a percentage of what is left, or the rest. Pocket money never takes the rest; it can be a percentage of its adult\'s own income. Percentages of income come first, then the cash kept, then what is left; one account takes the rest.' },
   'row.ruleFrom': { title: 'Counts from', text: 'A rule counts from this month on. The months before it keep the amounts they showed, so changing a percentage never rewrites the past. Amounts typed for this account from this month on are replaced by the rule.' },
@@ -60,8 +59,6 @@ export const HELP = {
 
   'row.categoryEstimate': { title: 'Category estimate', text: 'What you expect a category to come to in a month, before you know every row. Its rows are taken off it and what is left counts as "Not broken down yet"; once the rows add up to more, the category is their sum. Set it on the Statement, inside the category.' },
   // Household settings
-  'household.moneyMode': { title: 'How you share money', text: 'Pooled: all income is household money and each adult gets pocket money. Proportional: each adult pays a share of the shared costs in proportion to their income, and Moves shows who sends what where.' },
-  'household.shareBasis': { title: 'What the split is based on', text: 'Salaries only: rows marked "counts for the split" set each adult\'s share. All income: everything each adult brings in. Manual: you set the percentages yourself.' },
   'household.bufferScope': { title: 'Where changes apply', text: 'The cash buffer can change from this month on, leaving earlier months as they were, for this month only, or for every open month at once. Closed months never change.' },
   'household.buffer': { title: 'Cash kept in the account', text: 'With the savings-plug rule, this much stays in the current account at month end instead of going to savings.' },
   'household.tracked': { title: 'Tracked balance', text: 'A tracked account gets a running balance in the grid, month by month, and counts towards net worth. Untick it for an account you only name, like one that just receives a transfer.' },
@@ -101,17 +98,4 @@ export function balanceHelp(type: AccountType | undefined): HelpKey {
     case 'other-asset': return 'balance.otherAsset'
     default: return 'balance.savings'
   }
-}
-
-/** How money is shared, one line each. */
-export const MODE_HELP: Record<Household['moneyMode'], string> = {
-  pooled: 'All income is household money. Each adult gets pocket money to spend freely.',
-  proportional: 'Each adult pays a share of the shared costs in proportion to their income. Moves shows who sends what where.',
-}
-
-/** What a proportional split is based on, one line each. */
-export const BASIS_HELP: Record<Household['shareBasis'], string> = {
-  'basis-rows': 'Salaries only. Rows marked "counts for the split" set each adult\'s share; child benefit and one-off income do not.',
-  'all-income': 'Everything each adult brings in, including income for the children they pay for.',
-  manual: 'You set the percentages yourself.',
 }

@@ -12,11 +12,11 @@ const now = () => Date.now()
 
 // ---------- entities ----------
 
-export async function addEntity(store: Store, input: { kind: EntityKind; name: string; paidBy?: string | null; attributes?: Record<string, string> }): Promise<Entity> {
+export async function addEntity(store: Store, input: { kind: EntityKind; name: string; attributes?: Record<string, string> }): Promise<Entity> {
   const tables = await loadTables(store)
   const last = tables.entities.filter((e) => !e.deletedAt).map((e) => e.order).sort().at(-1) ?? null
   const ts = now()
-  const entity = EntitySchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, order: generateKeyBetween(last, null), attributes: {}, paidBy: null, ...input })
+  const entity = EntitySchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, order: generateKeyBetween(last, null), attributes: {}, ...input })
   await store.commit([{ op: 'put', table: 'entities', record: entity }])
   return entity
 }
@@ -107,7 +107,6 @@ export function buildTemplateMutations(t: RowTemplate, ctx: TemplateContext, ord
     defaultStatus: t.defaultStatus ?? 'projected',
     scope: t.scope === 'entity' && ctx.entity ? ctx.entity.id : 'shared',
     entityTags: ctx.entity && (t.tag || t.scope === 'entity') ? [ctx.entity.id] : [],
-    inShareBasis: t.inShareBasis ?? false,
     accountId: destination?.id ?? null,
     defaultFundedBy,
     categoryId: t.category ? ctx.tables.categories?.find((c) => !c.deletedAt && c.section === t.section && c.name === t.category)?.id ?? null : null,
@@ -150,7 +149,7 @@ export interface TemplateChoice {
 export interface SetupInput {
   household: Pick<Household, 'name' | 'baseCurrency' | 'locale' | 'startMonth'> & Partial<Household>
   adults: Array<{ name: string }>
-  dependents: Array<{ kind: Exclude<EntityKind, 'adult'>; name: string; paidByIndex?: number | null }>
+  dependents: Array<{ kind: Exclude<EntityKind, 'adult'>; name: string }>
   /** `ownerIndex` points into the entities (adults first, then dependents); null or absent = the household's. */
   accounts: Array<Pick<Account, 'name' | 'type'> & Partial<Account> & { ownerIndex?: number | null }>
   /** household template keys, or choices with an account and an amount */
@@ -175,8 +174,7 @@ export function buildSetupMutations(input: SetupInput): { mutations: Mutation[];
   )
   const dependents: Entity[] = input.dependents.map((d, i) =>
     EntitySchema.parse({
-      id: newId(), createdAt: ts, updatedAt: ts, kind: d.kind, name: d.name.trim() || d.kind,
-      paidBy: d.paidByIndex != null ? adults[d.paidByIndex]?.id ?? null : null, order: entityOrders[input.adults.length + i],
+      id: newId(), createdAt: ts, updatedAt: ts, kind: d.kind, name: d.name.trim() || d.kind, order: entityOrders[input.adults.length + i],
     }),
   )
   const entities = [...adults, ...dependents]

@@ -13,7 +13,6 @@ export interface RowTemplate {
   scope?: 'entity' | 'shared'
   /** Tag the row with the entity so per-entity views can find it. */
   tag?: boolean
-  inShareBasis?: boolean
   /** An adult's pocket money: a line of its own, with an amount or a rule. */
   pocket?: boolean
   /** Needs a destination account of this type. */
@@ -47,7 +46,7 @@ export const HOUSEHOLD_TEMPLATES: RowTemplate[] = [
 
 export const ENTITY_TEMPLATES: Record<EntityKind, RowTemplate[]> = {
   adult: [
-    { key: 'a.salary', title: '{name} – Salary', description: 'Net salary after tax. Counted as certain.', section: 'income', kind: 'salary', defaultStatus: 'committed', scope: 'entity', inShareBasis: true, recommended: true },
+    { key: 'a.salary', title: '{name} – Salary', description: 'Net salary after tax. Counted as certain.', section: 'income', kind: 'salary', defaultStatus: 'committed', scope: 'entity', recommended: true },
     { key: 'a.extra', title: '{name} – Extra income', description: 'Bonuses, freelance work, side income.', section: 'income', scope: 'entity' },
     { key: 'a.personal', title: '{name} – Personal', description: 'Own spending the household pays for, like a phone contract or a membership.', section: 'expense', scope: 'entity', recommended: true, category: 'Personal' },
     { key: 'a.pocket', title: '{name} – Pocket', description: 'Money this adult spends freely each month: an amount you type, or a percentage once the line has a rule.', section: 'transfer', kind: 'pocket-money', defaultStatus: 'committed', scope: 'entity', pocket: true, recommended: true },
@@ -97,7 +96,7 @@ export const ENTITY_KIND_LABEL: Record<EntityKind, string> = {
 
 export const ENTITY_KIND_HELP: Record<EntityKind, string> = {
   adult: 'Someone with their own income or personal spending.',
-  child: 'Child benefit, childcare and long-term savings rows. "Paid by" says whose income carries the costs when contributions are split.',
+  child: 'Child benefit, childcare and long-term savings rows.',
   pet: 'Food, vet, insurance and tax rows.',
   vehicle: 'Insurance, fuel, loan or lease, maintenance rows.',
   property: 'The place you live, rented or owned, or another property. Rent or mortgage, utilities, internet and insurance rows.',

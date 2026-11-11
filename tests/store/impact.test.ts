@@ -104,7 +104,7 @@ describe('describeRemoval', () => {
     expect(robin.changes).toEqual(['"Robin – Child benefit" and "Robin – Childcare" become shared'])
     expect(robin.archiveChanges).toEqual(['Hidden from People & things from Nov 2026; its rows and earlier months stay as they are'])
     const alex = describeRemoval(t, { kind: 'entity', id: idOf(t, 'entities', 'Alex') }, OPTS)
-    expect(alex.changes).toEqual(['"Alex – Salary", "Alex – Personal" and "Alex – Pocket" become shared', 'The costs of "Robin" become shared'])
+    expect(alex.changes).toEqual(['"Alex – Salary", "Alex – Personal" and "Alex – Pocket" become shared'])
     const car = describeRemoval(t, { kind: 'entity', id: idOf(t, 'entities', 'The car') }, OPTS)
     expect(car).toMatchObject({ kindLabel: 'Vehicle', closedHistory: null, canDelete: true, loses: [] })
     expect(car.changes).toEqual(['"The car – Insurance" loses its tag'])

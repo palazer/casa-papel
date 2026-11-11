@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Check } from '@/components/Check'
 import { Segmented } from '@/components/Segmented'
 import { formatMonth } from '@/app/format'
 import { useStore } from '@/app/store'
@@ -14,7 +13,7 @@ import { NativeSelect } from '@/components/NativeSelect'
 import { fundingOptions } from './funding'
 import { currencyChoices, currencyLabel } from '@/app/currencies'
 import { HELP } from '@/app/help'
-import { InfoTip, TipLabel } from '@/components/InfoTip'
+import { TipLabel } from '@/components/InfoTip'
 import { accountHelp, accountVerb } from './rowAccount'
 
 interface Base {
@@ -272,14 +271,13 @@ export function RowDeductionDialog({ row, tables, household, onClose }: Base) {
   )
 }
 
-/** Who a row is for: the household, an adult, or a child, pet or thing (routed to whoever pays for them). */
+/** Who a row is for: the household, an adult, or a child, pet or thing. */
 export function RowScopeDialog({ row, tables, onClose }: Base) {
   const store = useStore()
   const live = tables.entities.filter((e) => !e.deletedAt && (!e.archivedMonth || e.id === row.scope)).sort((a, b) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0))
   const adults = live.filter((e) => e.kind === 'adult')
   const others = live.filter((e) => e.kind !== 'adult')
   const [scope, setScope] = useState(row.scope)
-  const [inShareBasis, setInShareBasis] = useState(row.inShareBasis)
   const { error, busy, save } = useSave(onClose)
 
   return (
@@ -299,17 +297,11 @@ export function RowScopeDialog({ row, tables, onClose }: Base) {
             </NativeSelect>
             <p className="text-xs text-muted-foreground">{HELP['row.belongsTo'].text}</p>
           </div>
-          {row.section === 'income' && (
-            <div className="flex items-center gap-1">
-              <Check label="Counts for the split" checked={inShareBasis} disabled={scope === 'shared'} onChange={(e) => setInShareBasis(e.target.checked)} />
-              <InfoTip help="row.inShareBasis" />
-            </div>
-          )}
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button onClick={() => void save(() => setRowScope(store, row.id, scope, row.section === 'income' ? inShareBasis : undefined))} disabled={busy}>Save</Button>
+          <Button onClick={() => void save(() => setRowScope(store, row.id, scope))} disabled={busy}>Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

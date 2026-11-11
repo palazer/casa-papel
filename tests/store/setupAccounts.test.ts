@@ -22,7 +22,7 @@ describe('setup: owners, destinations, first amounts, deposits and own rows', ()
   const input = {
     household: { name: 'T', baseCurrency: 'EUR', locale: 'en-IE', startMonth: '2026-11' },
     adults: [{ name: 'A' }],
-    dependents: [{ kind: 'child' as const, name: 'Kid', paidByIndex: 0 }],
+    dependents: [{ kind: 'child' as const, name: 'Kid' }],
     accounts: [
       { name: 'Main', type: 'checking' as const },
       { name: 'Savings', type: 'savings' as const },

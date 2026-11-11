@@ -418,7 +418,7 @@ export async function quickCreateHousehold(store: Store, input: QuickHousehold):
     openingBalance: 0, openingMonth: input.startMonth, tracked: true,
   })
   const starters: Array<Partial<Row> & { name: string; section: Row['section'] }> = [
-    { name: 'Salary', section: 'income', kind: 'salary', defaultStatus: 'committed', inShareBasis: true },
+    { name: 'Salary', section: 'income', kind: 'salary', defaultStatus: 'committed' },
     { name: 'Other income', section: 'income' },
     { name: 'Rent', section: 'expense', defaultStatus: 'committed' },
     { name: 'Groceries', section: 'expense' },
@@ -682,26 +682,23 @@ function scopePatch(row: Row, scope: string): Pick<Row, 'scope' | 'entityTags'> 
 }
 
 /**
- * Who a row belongs to: 'shared' or a person or thing. Income rows can also join or leave the share basis. An income row
- * takes the rows deducted from it along, since a tax on one person's salary is that person's.
+ * Who a row belongs to: 'shared' or a person or thing. An income row takes the rows deducted from it along, since a
+ * tax on one person's salary is that person's.
  */
-export async function setRowScope(store: Store, rowId: string, scope: string, inShareBasis?: boolean): Promise<void> {
+export async function setRowScope(store: Store, rowId: string, scope: string): Promise<void> {
   const tables = await loadTables(store)
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
   if (!row) throw new Error('Row not found')
   if (scope !== 'shared' && !tables.entities.some((e) => e.id === scope && !e.deletedAt)) throw new Error('That person or thing no longer exists.')
-  if (inShareBasis != null && row.section !== 'income') throw new Error('Only income rows can count for the split.')
   const ts = now()
-  // a shared income has no adult to count for, so the flag goes with the scope
-  const basis = scope === 'shared' ? false : (inShareBasis ?? row.inShareBasis)
-  const mutations: Mutation[] = [{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, ...scopePatch(row, scope), inShareBasis: basis, updatedAt: ts }) }]
+  const mutations: Mutation[] = [{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, ...scopePatch(row, scope), updatedAt: ts }) }]
   if (row.section === 'income') {
     for (const d of tables.rows) if (!d.deletedAt && d.deductedFromRowId === row.id) mutations.push({ op: 'put', table: 'rows', record: RowSchema.parse({ ...d, ...scopePatch(d, scope), updatedAt: ts }) })
   }
   await store.commit(mutations)
 }
 
-/** Take a spending row out of an income row (tax, a pension contribution): the income's net is what the shares count. `null` undoes it. */
+/** Take a spending row out of an income row (tax, a pension contribution): the income's net is what its owner takes home. `null` undoes it. */
 export async function setRowDeductedFrom(store: Store, rowId: string, incomeRowId: string | null): Promise<void> {
   const tables = await loadTables(store)
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)

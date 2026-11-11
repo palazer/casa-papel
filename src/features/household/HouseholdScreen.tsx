@@ -2,7 +2,6 @@ import { GroupTabs } from '@/components/GroupTabs'
 import { PageHeader } from '@/components/PageHeader'
 import { RecurringList } from '@/features/recurring/RecurringList'
 import { FxCard } from './FxCard'
-import { SharesCard } from './SharesCard'
 import { HUES } from '@/app/hues'
 import { InfoTip, TipLabel } from '@/components/InfoTip'
 import { PoolsCard } from './PoolsCard'
@@ -26,7 +25,7 @@ import {
   ENTITY_KIND_LABEL, ENTITY_TEMPLATES, monthOfDate, templateTitle,
   ACCOUNT_TYPE_INFO, ENTITY_KIND_HELP, type Account, type Entity, type EntityKind, type Household, type Tables,
 } from '@/model'
-import { addEntity, applyTemplates, restoreAccount, restoreEntity, setAccountActual, setMonthlyDefault, updateEntity, updateHousehold, type MonthlyDefaultScope } from '@/store'
+import { addEntity, applyTemplates, restoreAccount, restoreEntity, setAccountActual, setMonthlyDefault, updateHousehold, type MonthlyDefaultScope } from '@/store'
 
 const LOCALES = ['en-IE', 'en-GB', 'en-US', 'de-DE', 'de-AT', 'tr-TR', 'fr-FR', 'es-ES', 'nl-NL', 'it-IT', 'pt-PT', 'sv-SE']
 const ACCOUNT_TYPES = ACCOUNT_TYPE_INFO
@@ -52,7 +51,6 @@ export function HouseholdScreen() {
       </PageHeader>
       <GroupTabs />
       <SettingsCard household={household} tables={tables} onSave={(p) => act(() => updateHousehold(store, p))} onBuffer={(value, scope) => act(() => setMonthlyDefault(store, value, scope, monthOfDate()))} />
-      {household.moneyMode === 'proportional' && <SharesCard household={household} tables={tables} engine={engine} onError={setError} />}
       <EntitiesCard household={household} tables={tables} entities={tables.entities.filter((e) => !e.deletedAt)} onError={setError} />
       <AccountsCard household={household} tables={tables} accounts={tables.accounts.filter((a) => !a.deletedAt)} entities={tables.entities} engine={engine} months={months} onError={setError} />
       <PoolsCard household={household} tables={tables} engine={engine} onError={setError} />
@@ -86,12 +84,10 @@ function SettingsCard({ household: h, tables, onSave, onBuffer }: { household: H
           <Label htmlFor="s-locale">Number format</Label>
           <NativeSelect id="s-locale" className="w-full" value={h.locale} onChange={(e) => onSave({ locale: e.target.value })}>{LOCALES.map((l) => <option key={l} value={l}>{localeLabel(l)} — {localeExample(l)}</option>)}</NativeSelect>
         </div>
-        <div className="space-y-1.5">
-          <TipLabel htmlFor="s-mode" help="household.moneyMode">How you share money</TipLabel>
-          <NativeSelect id="s-mode" className="w-full" value={h.moneyMode} onChange={(e) => onSave({ moneyMode: e.target.value as Household['moneyMode'] })}>
-            <option value="pooled">Pooled, with pocket money</option>
-            <option value="proportional">In proportion to income</option>
-          </NativeSelect>
+        <div className="space-y-1.5 sm:col-span-2">
+          <TipLabel htmlFor="s-buffer" help="household.buffer">Cash kept in the account at month end ({h.baseCurrency})</TipLabel>
+          <Input id="s-buffer" className="sm:w-64" inputMode="decimal" value={buffer} onChange={(e) => setBuffer(e.target.value)} onBlur={() => { const v = money(buffer); if (v !== bufferNow) onBuffer(v, scope) }} />
+          {bufferNow !== h.cashBuffer && <p className="text-muted-foreground">This month {formatAmount(bufferNow, h.baseCurrency, h.locale)} · default {formatAmount(h.cashBuffer, h.baseCurrency, h.locale)}</p>}
         </div>
         <div className="space-y-1.5 sm:col-span-2">
           <TipLabel htmlFor="s-scope" help="household.bufferScope">Cash buffer changes apply to</TipLabel>
@@ -101,11 +97,6 @@ function SettingsCard({ household: h, tables, onSave, onBuffer }: { household: H
             <option value="all-open">Every open month</option>
           </NativeSelect>
           <p className="text-muted-foreground">Closed months are never changed. "This month" is {formatMonth(thisMonth, h.locale)}.</p>
-        </div>
-        <div className="space-y-1.5">
-          <TipLabel htmlFor="s-buffer" help="household.buffer">Cash kept in the account at month end ({h.baseCurrency})</TipLabel>
-          <Input id="s-buffer" inputMode="decimal" value={buffer} onChange={(e) => setBuffer(e.target.value)} onBlur={() => { const v = money(buffer); if (v !== bufferNow) onBuffer(v, scope) }} />
-          {bufferNow !== h.cashBuffer && <p className="text-muted-foreground">This month {formatAmount(bufferNow, h.baseCurrency, h.locale)} · default {formatAmount(h.cashBuffer, h.baseCurrency, h.locale)}</p>}
         </div>
         <div className="sm:col-span-2">
           <Check label="Show expenses as negative red numbers" checked={h.displayExpensesNegative} onChange={(e) => onSave({ displayExpensesNegative: e.target.checked })} />
@@ -120,15 +111,13 @@ function EntitiesCard({ household, tables, entities: allEntities, onError }: { h
   const store = useStore()
   const [kind, setKind] = useState<EntityKind>('adult')
   const [name, setName] = useState('')
-  const [paidBy, setPaidBy] = useState('')
   const [templatesFor, setTemplatesFor] = useState<Entity | null>(null)
   const [removing, setRemoving] = useState<Entity | null>(null)
   const entities = allEntities.filter((e) => !e.archivedMonth)
   const archived = allEntities.filter((e) => e.archivedMonth)
-  const adults = entities.filter((e) => e.kind === 'adult')
   const act = (fn: () => Promise<unknown>) => void fn().catch((e) => onError(e instanceof Error ? e.message : 'Action failed'))
   const add = () => {
-    act(() => addEntity(store, { kind, name: name.trim(), paidBy: kind === 'adult' ? null : paidBy || null }))
+    act(() => addEntity(store, { kind, name: name.trim() }))
     setName('')
   }
 
@@ -140,12 +129,6 @@ function EntitiesCard({ household, tables, entities: allEntities, onError }: { h
             <li key={e.id} className="flex min-h-8 flex-wrap items-center gap-2 py-1">
               <Chip tone="zinc">{ENTITY_KIND_LABEL[e.kind].toLowerCase()}</Chip>
               <span className="font-medium">{e.name}</span>
-              {e.kind !== 'adult' && (
-                <NativeSelect aria-label={`Who pays for ${e.name}`} className="h-6 text-xs" value={e.paidBy ?? ''} onChange={(ev) => act(() => updateEntity(store, e.id, { paidBy: ev.target.value || null }))}>
-                  <option value="">Costs shared</option>
-                  {adults.map((a) => <option key={a.id} value={a.id}>Paid by {a.name}</option>)}
-                </NativeSelect>
-              )}
               <span className="ml-auto flex gap-1">
                 <Button size="xs" variant="outline" onClick={() => setTemplatesFor(e)}>Suggested rows…</Button>
                 <Button size="xs" variant="ghost" onClick={() => setRemoving(e)}>Archive or delete…</Button>
@@ -181,15 +164,6 @@ function EntitiesCard({ household, tables, entities: allEntities, onError }: { h
               <Label htmlFor="e-name">{ENTITY_KIND_LABEL[kind]} name</Label>
               <Input id="e-name" className="w-44" value={name} placeholder={kind === 'property' ? 'e.g. Flat, Elm Street' : 'Name'} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) add() }} />
             </div>
-            {kind !== 'adult' && (
-              <div className="space-y-1">
-                <Label htmlFor="e-paidby">Who pays</Label>
-                <NativeSelect id="e-paidby" value={paidBy} onChange={(e) => setPaidBy(e.target.value)}>
-                  <option value="">Costs shared</option>
-                  {adults.map((a) => <option key={a.id} value={a.id}>Paid by {a.name}</option>)}
-                </NativeSelect>
-              </div>
-            )}
             <Button size="sm" disabled={!name.trim()} onClick={add}>Add</Button>
           </div>
         </div>

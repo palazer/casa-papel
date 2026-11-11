@@ -1,5 +1,5 @@
 import { ACCOUNT_TYPE_INFO, ENTITY_KIND_HELP, ENTITY_KIND_LABEL, GOAL_KIND_INFO, RULE_KIND_INFO, type EntityKind } from '@/model'
-import { BASIS_HELP, MODE_HELP, type HelpKey } from './help'
+import type { HelpKey } from './help'
 import type { Screen } from './screens'
 
 /**
@@ -13,7 +13,7 @@ export const REPO_URL = 'https://github.com/palazer/casa-papel'
 export const GUIDE_LEAD = {
   title: 'What Casa Papel is',
   paragraphs: [
-    'Casa Papel is local-first household budgeting: your household budget as a month-by-month grid that knows what a household is. Who lives in it, what it owns, what recurs, what is saved for, who pays what. It runs in your browser, on your phone as well as your laptop, and works offline.',
+    'Casa Papel is local-first household budgeting: your household budget as a month-by-month grid that knows what a household is. Who lives in it, what it owns, what recurs, what is saved for. It runs in your browser, on your phone as well as your laptop, and works offline.',
     'Money comes in three kinds, each with its own colour: Income, Expenses and Transfers, with Balances beneath them. You type positive numbers and the section says which way the money goes; the "Show expenses as negative red numbers" setting only changes how spending looks, never how it adds up. Nothing hides behind a formula: every total, balance and automatic row has an (i) that says in a sentence how it was worked out.',
     'Your data stays on your device unless you export it; Casa Papel has no server of its own. Optional cloud sync keeps an encrypted copy that only your password can open, for the same household on several devices. Apart from that, only currency codes and dates ever leave the device, when rates are fetched. To try everything without touching your own numbers, the demo sandbox is a separate store with a made-up household: Sam and Alex, their child Robin, Biscuit the dog, The car and The flat.',
   ],
@@ -45,13 +45,6 @@ export interface GuideTopic {
 
 const kinds: GuideFact[] = (Object.keys(ENTITY_KIND_LABEL) as EntityKind[]).map((k) => ({ label: ENTITY_KIND_LABEL[k], text: ENTITY_KIND_HELP[k] }))
 const rules: GuideFact[] = RULE_KIND_INFO.map((r) => ({ label: r.label, text: r.help }))
-const sharing: GuideFact[] = [
-  { label: 'Pooled, with pocket money', text: MODE_HELP.pooled },
-  { label: 'In proportion to income', text: MODE_HELP.proportional },
-  { label: 'Shares come from: Salaries', text: BASIS_HELP['basis-rows'] },
-  { label: 'Shares come from: All income', text: BASIS_HELP['all-income'] },
-  { label: 'Shares come from: Percentages I set', text: BASIS_HELP.manual },
-]
 const accountTypes: GuideFact[] = ACCOUNT_TYPE_INFO.map((a) => ({ label: a.label, text: a.help }))
 const goalKinds: GuideFact[] = GOAL_KIND_INFO.map((g) => ({ label: g.label, text: g.help }))
 
@@ -82,19 +75,18 @@ export const GUIDE: GuideTopic[] = [
     title: 'People & things',
     summary: 'Tell the app who and what it pays for; each one suggests the rows it usually needs.',
     what: [
-      'Under Household, "People & things" lists the adults, children, pets, vehicles, homes, companies and anything else with running costs. For anyone but an adult, "Who pays" says whose income carries the costs when money is shared in proportion: "Costs shared" or "Paid by Alex".',
+      'Under Household, "People & things" lists the adults, children, pets, vehicles, homes, companies and anything else with running costs.',
       'Each kind suggests rows named subject first: "Sam – Salary", "Robin – Child benefit", "Biscuit – Food & supplies", "The car – Insurance". A row\'s person or thing can be changed any time with "Belongs to…" in the row menu.',
     ],
     steps: [
       'Household → "People & things" → "Add adult", "Add child", "Add pet", "Add vehicle", "Add home", "Add company" or "Add other".',
-      'Type the name, choose "Who pays" for anyone but an adult, then "Add".',
+      'Type the name, then "Add".',
       'Open "Suggested rows…" beside the new entry, tick the rows you want and press "Add 3 rows" (the count follows your ticks). Or Statement → "Suggestions": the same rows are offered where they will appear, each with a field for its monthly amount.',
       'To move a row to someone else, open the row menu (the … at the right of its name) → "Belongs to…" → "This row is for": "The household (shared)", an adult, or a name under "Other people & things".',
-      'Change "Paid by …" later from the same list under Household.',
     ],
     factsTitle: 'The kinds',
     facts: kinds,
-    tips: ['row.belongsTo', 'row.inShareBasis', 'household.archived'],
+    tips: ['row.belongsTo', 'household.archived'],
     open: 'household',
   },
   {
@@ -102,17 +94,17 @@ export const GUIDE: GuideTopic[] = [
     title: 'Income',
     summary: 'Income rows are what arrives; a few switches say whose income it is and what comes off it first.',
     what: [
-      'Salaries count as certain from the start; other income is an estimate until you say otherwise. "Counts for the split", inside "Belongs to…", marks the incomes that set each adult\'s share when costs are split in proportion; child benefit should stay unticked.',
-      'A tax or pension contribution is a spending row of its own, marked "Deducted from an income…". The salary cell then shows "net €…" beneath the gross, the cell editor lists what was taken off under "Deducted from this income" with a "Net" line, and the shares use the net amount.',
+      'Salaries count as certain from the start; other income is an estimate until you say otherwise. An income line that belongs to an adult ("Belongs to…") is that adult\'s own: it shows under their name in "Per person" on Moves, and a pocket money rule can take a percentage of it.',
+      'A tax or pension contribution is a spending row of its own, marked "Deducted from an income…". The salary cell then shows "net €…" beneath the gross, the cell editor lists what was taken off under "Deducted from this income" with a "Net" line, and percentages of income use the net amount.',
       '"Follow another row…" makes a row mirror another month by month, whole or as a "Share (%)": a tax at 25 of a salary, or Robin\'s long-term savings following "Robin – Child benefit".',
     ],
     steps: [
       'Type the salary into "Sam – Salary" with "This month and onwards".',
-      'Row menu → "Belongs to…" → tick "Counts for the split" (leave it off for child benefit).',
+      'Row menu → "Belongs to…" → "This row is for" → "Sam" makes it Sam\'s own income; "Robin – Child benefit" stays with Robin.',
       'For a tax: its row menu → "Deducted from an income…" → "This expense is taken off" → "Sam – Salary". The menu item then reads "Deducted from Sam – Salary…".',
       'To mirror a row: row menu → "Follow another row…" → "Same amount as" → the row, then "Share (%)": 100 mirrors it, 25 takes a quarter. "Nothing: its own amounts" stops following.',
     ],
-    tips: ['section.income', 'row.inShareBasis', 'row.deductedFrom', 'cell.deductions', 'row.follows', 'row.followShare', 'derived.incomeTotal'],
+    tips: ['section.income', 'row.deductedFrom', 'cell.deductions', 'row.follows', 'row.followShare', 'derived.incomeTotal'],
     open: 'grid',
   },
   {
@@ -253,24 +245,23 @@ export const GUIDE: GuideTopic[] = [
     open: 'moves',
   },
   {
-    key: 'sharing',
-    title: 'Sharing money',
-    summary: 'Pool all income with pocket money, or split shared costs in proportion to what each adult brings in.',
+    key: 'pocket-money',
+    title: 'Pocket money & per person',
+    summary: 'Each adult has a pocket money line with an amount or a rule of its own; Moves shows what each adult brings and takes.',
     what: [
-      '"How you share money" under "Household settings" is either "Pooled, with pocket money" or "In proportion to income". Pooled: all income is household money, each adult gets pocket money, and Moves shows "Per person" with "Income", "Own spending", "Pocket money" and "Leaves for the household".',
-      'In proportion: Household shows "Who pays what" with "Shares come from" ("Salaries", "All income" or "Percentages I set") and a table of "Share", "Income", "Pays this month" and "Keeps" per adult. Moves splits every shared line by share, lists "own" and "pays for" lines in full, and ends with "Transfers per person": who sends what to which account. Robin\'s rows go to Alex because Robin is "Paid by Alex".',
+      'Pocket money is a line per adult under "Pocket money" on the Statement: "Sam – Pocket", "Alex – Pocket". Each line has its own amount or its own rule, so two adults can take different amounts, and nothing is set for the household as a whole. How much each adult puts into the household is what their income lines say.',
+      'With two or more adults, Moves shows "Per person": "Income", "Own spending", "Pocket money" and "Leaves for the household" for each. A row counts for an adult when it belongs to them ("Belongs to…" in the row menu); rows for Robin, Biscuit, The car or The flat are the household\'s.',
     ],
     steps: [
-      'Household → "Household settings" → "How you share money".',
-      'In proportion: "Who pays what" → "Shares come from"; with "Percentages I set", type the "Shares (%)" and press "Apply".',
-      'Mark the incomes that set the shares: row menu → "Belongs to…" → "Counts for the split".',
-      'Under "People & things", set "Paid by Alex" or "Costs shared" for each child, pet or thing.',
-      'Read Moves: "Who pays what" ("Pays this month", "Income", "Keeps", "Transfers per person" with "→ <account>" lines) or, pooled, "Per person".',
+      'Statement → "Suggestions" → under "Expenses", type an amount beside "Sam – Pocket" and press Enter; or press "Add" with the field empty to be asked for a rule.',
+      'To change it, press the symbol after "Sam – Pocket" (or Grid → row menu → "Rule…"). "How much pocket money does Sam get?" offers "A fixed amount", "A percentage of income", "A percentage of Sam\'s income" and "A percentage of what is left".',
+      '"Counts from" is the month the new amount or rule starts in; earlier months keep what they showed.',
+      'For a line of your own: "Add row" under Transfers → "Pocket money for an adult" → pick the "Adult".',
+      'Say whose a row is: row menu → "Belongs to…" → "This row is for". A percentage of Sam\'s income counts the income lines that belong to Sam.',
+      'Read Moves → "Per person" to see what each adult leaves for the household this month.',
     ],
-    factsTitle: 'The two ways, and what a proportional split is based on',
-    facts: sharing,
-    tips: ['household.moneyMode', 'household.shareBasis', 'row.inShareBasis', 'row.belongsTo'],
-    open: 'household',
+    tips: ['row.belongsTo', 'row.rule', 'row.ruleFrom'],
+    open: 'statement',
   },
   {
     key: 'currencies',

@@ -56,8 +56,8 @@ export function buildDemoTables(): Tables {
   orderCursor = 0
   const rows = [
     // income
-    { ...base(ID.rowSamSalary, 'a0'), name: 'Sam – Salary', section: 'income', kind: 'salary', scope: ID.sam, inShareBasis: true, defaultStatus: 'committed' },
-    { ...base(ID.rowAlexSalary, 'a1'), name: 'Alex – Salary', section: 'income', kind: 'salary', scope: ID.alex, inShareBasis: true, defaultStatus: 'committed' },
+    { ...base(ID.rowSamSalary, 'a0'), name: 'Sam – Salary', section: 'income', kind: 'salary', scope: ID.sam, defaultStatus: 'committed' },
+    { ...base(ID.rowAlexSalary, 'a1'), name: 'Alex – Salary', section: 'income', kind: 'salary', scope: ID.alex, defaultStatus: 'committed' },
     { ...base(ID.rowChildBenefit, 'a2'), name: 'Robin – Child benefit', section: 'income', scope: ID.robin, entityTags: [ID.robin], defaultStatus: 'committed' },
     { ...base(ID.rowOtherIncome, 'a3'), name: 'Other income', section: 'income' },
     // expenses
@@ -108,16 +108,15 @@ export function buildDemoTables(): Tables {
   const tables = {
     household: [{
       ...base(ID.household, 'a0'), name: 'Demo household', baseCurrency: 'EUR', locale: 'en-IE', startMonth: '2026-09',
-      closingRule: 'savings-plug', pocketTotal: 0, cashBuffer: 0, moneyMode: 'pooled', shareBasis: 'basis-rows',
-      manualShares: {}, displayExpensesNegative: true, fxDriftDefault: 0, fxMonthRate: 'first',
+      closingRule: 'savings-plug', cashBuffer: 0, displayExpensesNegative: true, fxDriftDefault: 0, fxMonthRate: 'first',
     }],
     entities: [
-      { ...base(ID.sam, 'a0'), kind: 'adult', name: 'Sam', attributes: {}, paidBy: null },
-      { ...base(ID.alex, 'a1'), kind: 'adult', name: 'Alex', attributes: {}, paidBy: null },
-      { ...base(ID.robin, 'a2'), kind: 'child', name: 'Robin', attributes: { born: '2021' }, paidBy: ID.alex },
-      { ...base(ID.biscuit, 'a3'), kind: 'pet', name: 'Biscuit', attributes: { species: 'dog' }, paidBy: null },
-      { ...base(ID.car, 'a4'), kind: 'vehicle', name: 'The car', attributes: {}, paidBy: null },
-      { ...base(ID.flat, 'a5'), kind: 'property', name: 'The flat', attributes: { tenure: 'rent' }, paidBy: null },
+      { ...base(ID.sam, 'a0'), kind: 'adult', name: 'Sam', attributes: {} },
+      { ...base(ID.alex, 'a1'), kind: 'adult', name: 'Alex', attributes: {} },
+      { ...base(ID.robin, 'a2'), kind: 'child', name: 'Robin', attributes: { born: '2021' } },
+      { ...base(ID.biscuit, 'a3'), kind: 'pet', name: 'Biscuit', attributes: { species: 'dog' } },
+      { ...base(ID.car, 'a4'), kind: 'vehicle', name: 'The car', attributes: {} },
+      { ...base(ID.flat, 'a5'), kind: 'property', name: 'The flat', attributes: { tenure: 'rent' } },
     ],
     accounts: [
       { ...base(ID.main, 'a0'), name: 'Main account', type: 'checking', currency: 'EUR', ownerEntityId: null, openingBalance: 0, openingMonth: '2026-09', tracked: false },

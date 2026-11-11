@@ -8,7 +8,7 @@ import {
 const setup = {
   household: { name: 'Palaz', baseCurrency: 'EUR', locale: 'de-DE', startMonth: '2026-11' },
   adults: [{ name: 'A' }, { name: 'B' }],
-  dependents: [{ kind: 'child' as const, name: 'Kid', paidByIndex: 1 }, { kind: 'pet' as const, name: 'Dog' }],
+  dependents: [{ kind: 'child' as const, name: 'Kid' }, { kind: 'pet' as const, name: 'Dog' }],
   accounts: [{ name: 'Main', type: 'checking' as const }, { name: 'Savings', type: 'savings' as const, openingBalance: 500000 }, { name: 'ETF', type: 'investment' as const }],
   householdTemplates: ['h.groceries', 'h.toSavings', 'h.toInvestments', 'h.poolTravel'],
   entityTemplates: { 0: ['a.salary', { key: 'a.pocket', amount: 60000 }], 1: ['a.salary', 'a.pocket', 'a.personal'], 2: ['c.benefit', 'c.longterm'], 3: ['p.food'] },
@@ -20,7 +20,6 @@ describe('setup and household actions', () => {
     await createHouseholdFromSetup(store, setup)
     const t = await loadTables(store)
     expect(t.entities.map((e) => e.name)).toEqual(['A', 'B', 'Kid', 'Dog'])
-    expect(t.entities[2].paidBy).toBe(t.entities[1].id)
     expect(t.accounts.find((a) => a.type === 'savings')).toMatchObject({ tracked: true, openingBalance: 500000 })
     const names = t.rows.map((r) => r.name)
     expect(names).toEqual(expect.arrayContaining(['A – Salary', 'A – Pocket', 'B – Personal', 'Kid – Child benefit', 'Kid – Long-term savings', 'Dog – Food & supplies', 'Groceries', 'To savings', 'To investments', 'Travel', 'Travel pool']))

@@ -27,11 +27,13 @@ test.describe('archiving people and things', () => {
     await expect(page.getByText('Archived', { exact: true })).toBeVisible()
     const archivedRobin = page.getByRole('listitem').filter({ hasText: 'Robin' }).filter({ hasText: 'since Nov 2026' })
     await expect(archivedRobin).toBeVisible()
-    await expect(page.getByLabel('Who pays for Robin')).toHaveCount(0)
+    // an archived entry offers only "Restore": no suggested rows for someone who is put away
+    const robinRows = page.getByRole('listitem').filter({ hasText: 'Robin' }).getByRole('button', { name: 'Suggested rows…' })
+    await expect(robinRows).toHaveCount(0)
 
     await archivedRobin.getByRole('button', { name: 'Restore' }).click()
     await expect(page.getByText('Archived', { exact: true })).toHaveCount(0)
-    await expect(page.getByLabel('Who pays for Robin')).toBeVisible()
+    await expect(robinRows).toBeVisible()
 
     // The car has nothing in a closed month: it can be deleted, and the dialog says what changes
     const car = page.getByRole('listitem').filter({ hasText: 'The car' }).first()
