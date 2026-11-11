@@ -21,6 +21,10 @@ test.describe('wave 1d', () => {
     // Sam brings 4,200, spends 110 on Sam and takes 500: 3,590 is left for the household
     await expect(perPerson.getByRole('row', { name: /^Leaves for the household/ })).toContainText('+€3,590.00')
     await expect(page.getByText('Who pays what')).toHaveCount(0)
+    // it is as wide as the left side of the halves above it, so the names sit close to their amounts
+    const card = (await perPerson.boundingBox())!
+    const leftSide = (await page.getByRole('region', { name: 'Assets' }).boundingBox())!
+    expect(Math.abs(card.x + card.width - (leftSide.x + leftSide.width))).toBeLessThanOrEqual(2)
     await perPerson.scrollIntoViewIfNeeded()
     await page.screenshot({ path: 'e2e/output/statement-per-person.png' })
 

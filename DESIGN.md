@@ -264,7 +264,9 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   money as moved) but no button; a closed month has neither. A different amount than planned is typed in the cell
   editor ("Only this month", "Done"); there is no quick sheet for it.
   **Per person** (`src/features/statement/PerPerson.tsx`) closes the page when the household has two or more adults:
-  a dense island with an (i), a column per adult (the names as small-caps column heads in the amount column's width)
+  a dense island with an (i), as wide as a half's left side from 1024 px (`lg:w-1/2`, so a label is never a screen
+  away from its amounts) and full width below, a column per adult (the names as small-caps column heads in the amount
+  column's width)
   and the rows Income, Own spending, Pocket money and, in `font-semibold` over a full hairline, Leaves for the
   household (signed, the expense hue below zero). Rows keep the Statement's heights; more adults than fit scroll
   sideways inside the island.

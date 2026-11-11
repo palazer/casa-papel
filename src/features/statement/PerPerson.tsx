@@ -15,14 +15,15 @@ const CELL = 'h-11 px-2 md:h-7'
 
 /**
  * Under the Statement's two halves, with two or more adults: what each brings, spends on themselves and takes as pocket
- * money, and what that leaves for the household. A dense island like the halves above it, a column per adult.
+ * money, and what that leaves for the household. A dense island like the halves above it, a column per adult. From
+ * 1024 px it is as wide as a half's left side, so the names stay close to their amounts.
  */
 export function PerPerson({ household, tables, engine, month }: { household: Household; tables: Tables; engine: EngineOutput; month: MonthKey }) {
   const { locale, baseCurrency: ccy } = household
   const people = useMemo(() => computePersonBudgets(tables, engine, month), [tables, engine, month])
   if (people.length < 2) return null
   return (
-    <Island title="Per person" help="statement.perPerson" bodyClassName="overflow-x-auto px-0 pb-0 pt-1" data-testid="per-person">
+    <Island title="Per person" help="statement.perPerson" className="lg:w-1/2" bodyClassName="overflow-x-auto px-0 pb-0 pt-1" data-testid="per-person">
       <table className="w-full text-sm md:text-xs">
         <thead>
           <tr className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
