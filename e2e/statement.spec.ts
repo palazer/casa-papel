@@ -76,6 +76,16 @@ test.describe('the Statement', () => {
     await page.getByRole('button', { name: 'What the colours and marks mean' }).click()
     await expect(page.getByRole('dialog').getByText('An estimate: on the yellow shade', { exact: false })).toBeVisible()
     await page.keyboard.press('Escape')
+    // reopened, the month can be worked and closed again
+    await page.getByRole('button', { name: 'Reopen month' }).click()
+    await expect(page.getByText('closed', { exact: true })).toHaveCount(0)
+    await expect(page.getByTestId('progress')).toHaveText(/^(\d+ of \d+ done|All \d+ done)/)
+    await expect(page.getByRole('checkbox', { name: 'To savings done' })).toBeVisible()
+    await page.getByRole('button', { name: 'Close month' }).click()
+    await expect(page.getByText('closed', { exact: true })).toBeVisible()
+    await expect(page.getByTestId('progress')).toHaveText('Closed · all done')
+    await expect(page.getByRole('checkbox')).toHaveCount(0)
+    await expect(total(page, 'in')).toHaveText('Total in€7,255.00')
   })
 
   test('spending from a pool account shows on both sides', async ({ page }) => {

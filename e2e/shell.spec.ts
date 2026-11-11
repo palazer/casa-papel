@@ -96,6 +96,12 @@ test.describe('shell on a phone', () => {
     await pages.getByRole('tab', { name: 'Data' }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Data' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Where your data lives' })).toBeVisible()
+    // the Grid on a phone: the plan from this month on, in its own scroll box
+    await tabs.getByRole('link', { name: 'Grid' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Grid' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Earlier months (2)' })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
+    await page.screenshot({ path: 'e2e/output/grid-phone.png' })
     // the group remembers the page open last
     await tabs.getByRole('link', { name: 'Statement' }).click()
     await tabs.getByRole('link', { name: 'Settings' }).click()

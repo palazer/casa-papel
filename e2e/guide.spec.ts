@@ -20,6 +20,11 @@ test.describe('guide', () => {
     await expect(page.getByRole('link', { name: 'Open on GitHub' })).toHaveAttribute('href', /github\.com/)
     const contents = page.getByRole('navigation', { name: 'Topics' })
     await expect(contents.getByRole('link')).toHaveCount(16)
+    // the Guide starts where the app does: the Statement first, then the Grid as the planning view
+    await expect(contents.getByRole('link').nth(0)).toContainText('Start & the Statement')
+    await expect(contents.getByRole('link').nth(1)).toContainText('The grid: planning ahead')
+    await expect(page.getByText('It opens on the Statement, one month in accounting form', { exact: false })).toBeVisible()
+    await expect(page.getByText(/Month view|\bMoves (shows|lists)\b/)).toHaveCount(0)
     await page.screenshot({ path: 'e2e/output/guide.png' })
 
     // the contents jump to a topic
@@ -59,6 +64,9 @@ test.describe('guide', () => {
     await page.locator('#guide-pools').getByRole('button', { name: 'Open Household' }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Household' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Pool accounts', exact: true })).toBeVisible()
+    await rail.getByRole('link', { name: 'Guide' }).click()
+    await page.locator('#guide-statement').getByRole('button', { name: 'Open Statement' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Statement' })).toBeVisible()
   })
 
   test('the welcome screen and the legend lead into the Guide', async ({ page }) => {

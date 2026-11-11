@@ -12,6 +12,9 @@ test.describe('grid', () => {
   test('edit a cell, itemize, close and reopen a month', async ({ page }) => {
     await loadDemo(page)
     await page.screenshot({ path: 'e2e/output/grid.png' })
+    // an estimate sits on the yellow shade here as on the Statement; a certain amount is plain
+    await expect(page.getByRole('button', { name: /^The flat – Utilities Nov 2026/ }).locator('.bg-estimate')).toHaveText(/210/)
+    await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ }).locator('.bg-estimate')).toHaveCount(0)
     // the months before the current one are needed here: September is the closed month, October the one that keeps its amount
     await page.getByRole('button', { name: 'Earlier months (2)' }).click()
 
