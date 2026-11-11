@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
 async function loadDemo(page: Page) {
-  await page.goto('?demo=1')
+  await page.goto('?demo=1&screen=grid')
   await page.getByRole('button', { name: 'Load the demo household' }).click()
   await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
 }
@@ -11,6 +11,8 @@ test.describe('done dots', () => {
 
   test('this month shows a dot per cell; itemized cells go from partly to all done', async ({ page }) => {
     await loadDemo(page)
+    // the Grid starts at the current month; the closed September is one button away
+    await page.getByRole('button', { name: 'Earlier months (2)' }).click()
     const rent = page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })
     await expect(rent.getByRole('img', { name: 'Not done yet' })).toBeVisible()
     // a closed month is done, so it carries the green dot; future months carry none
@@ -39,18 +41,5 @@ test.describe('done dots', () => {
     await expect(dlg).toBeHidden()
     await expect(groceries.getByRole('img', { name: 'Done' })).toBeVisible()
     await page.screenshot({ path: 'e2e/output/done-dots.png' })
-  })
-})
-
-test.describe('done dots phone', () => {
-  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
-
-  test('month view shows the same dots', async ({ page }) => {
-    await page.goto('?demo=1')
-    await page.getByRole('button', { name: 'Load the demo household' }).click()
-    await expect(page.getByRole('heading', { name: 'November 2026' })).toBeVisible()
-    await expect(page.getByRole('button', { name: /^The flat – Rent:.*Not done yet$/ })).toBeVisible()
-    await expect(page.getByRole('checkbox', { name: 'The flat – Rent done' })).not.toBeChecked()
-    await page.screenshot({ path: 'e2e/output/done-dots-phone.png', fullPage: true })
   })
 })

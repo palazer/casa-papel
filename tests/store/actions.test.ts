@@ -48,6 +48,16 @@ describe('actions: cells', () => {
     expect(await values(store, rent.id)).toEqual([150000, 150000, 150000, 150000])
   })
 
+  it('this-month on a row that never had an amount leaves the months after it without one', async () => {
+    const { store, rent } = await fresh()
+    await setCellValue(store, rent.id, '2026-02', 99000, 'this-month')
+    expect(await values(store, rent.id)).toEqual([0, 99000, 0, 0])
+    // and as a single item with its own certainty, the same
+    const { store: other, rent: again } = await fresh()
+    await setCellItems(other, again.id, '2026-02', [{ id: newId(), label: '', amount: 5000, status: 'projected', fundedBy: 'cash', date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }], 'this-month')
+    expect(await values(other, again.id)).toEqual([0, 5000, 0, 0])
+  })
+
   it('clear goes back to inheriting', async () => {
     const { store, rent } = await fresh()
     await setCellValue(store, rent.id, '2026-01', 100000, 'from-now-on')

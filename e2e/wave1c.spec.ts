@@ -1,15 +1,18 @@
 import { expect, test, type Page } from '@playwright/test'
 
 async function loadDemo(page: Page) {
-  await page.goto('?demo=1')
+  await page.goto('?demo=1&screen=grid')
   await page.getByRole('button', { name: 'Load the demo household' }).click()
   await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
 }
 
 test.describe('wave 1c', () => {
-  test.use({ viewport: { width: 1400, height: 900 } })
+  // service workers are blocked so page.route can stand in for the rate service
+  test.use({ viewport: { width: 1400, height: 900 }, serviceWorkers: 'block' })
 
   test('a USD investment account, a manual rate, a pool, and a real value pinned from the grid', async ({ page }) => {
+    // the rate service cannot be reached: a new currency then has no rate until one is typed
+    await page.route('https://api.frankfurter.dev/**', (r) => r.abort())
     await loadDemo(page)
     await page.getByRole('link', { name: 'Household' }).click()
 
@@ -18,8 +21,13 @@ test.describe('wave 1c', () => {
     const dlg = page.getByRole('dialog')
     await dlg.getByLabel('Name', { exact: true }).fill('Broker')
     await dlg.getByLabel('Type').selectOption('investment')
-    await dlg.getByLabel('Currency').fill('USD')
-    await dlg.getByLabel('Opening balance').fill('10000')
+    // the short form asks the name, the type and what it holds; the rest waits behind "More options"
+    await expect(dlg.getByLabel('Growth per year (%)')).toHaveCount(0)
+    await dlg.getByRole('button', { name: /^More options/ }).click()
+    await expect(dlg.getByLabel('Currency').locator('option').first()).toHaveText('EUR (household currency)')
+    await dlg.getByLabel('Currency').selectOption('USD')
+    await expect(dlg).toContainText('The rates come from the European Central Bank by themselves')
+    await dlg.getByLabel('Holds at the start of September 2026 (USD)').fill('10000')
     await expect(dlg.getByLabel('Growth per year (%)')).toBeVisible()
     await dlg.getByLabel('Growth per year (%)').fill('6')
     await dlg.getByRole('button', { name: 'Save' }).click()
@@ -34,17 +42,17 @@ test.describe('wave 1c', () => {
     await page.screenshot({ path: 'e2e/output/fx-card.png', fullPage: true })
 
     // a pool with a monthly amount and a spending row
-    await page.getByRole('button', { name: 'Add pool account' }).click()
+    await page.getByRole('button', { name: 'Add virtual account' }).click()
     await page.getByRole('dialog').getByLabel('Name', { exact: true }).fill('Gifts')
     await page.getByRole('dialog').getByLabel(/^Set aside each month/).fill('50')
     await page.getByRole('dialog').getByRole('button', { name: 'Save' }).click()
     await expect(page.getByRole('dialog')).toBeHidden()
-    await expect(page.getByText(/filled by the row "Gifts pool"/)).toBeVisible()
+    await expect(page.getByText(/filled by the row "To Gifts"/)).toBeVisible()
 
     // grid: balances show the broker and the pool; pin a real value and watch December project from it
     await page.getByRole('link', { name: 'Grid' }).click()
-    await expect(page.getByText('Pool account · Gifts')).toBeVisible()
-    await expect(page.getByRole('button', { name: /^Gifts pool Nov 2026/ })).toContainText('50')
+    await expect(page.getByText('Virtual account · Gifts')).toBeVisible()
+    await expect(page.getByRole('button', { name: /^To Gifts Nov 2026/ })).toContainText('50')
     const brokerNov = page.getByRole('button', { name: /^Broker · value Nov 2026/ })
     await expect(brokerNov).toBeVisible()
     await brokerNov.click()

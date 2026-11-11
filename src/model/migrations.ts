@@ -18,6 +18,22 @@ const STEPS: Record<number, Step> = {
   // 3 → 4: `Household.planUntil` ("Add <year>"), `FxRate.date`, `Row.followShare`, `Row.deductedFromRowId`, and the
   // 'first' month-rate default for new households (a stored 'last' is a choice and stays); everything fills in from its default
   3: (raw) => raw,
+  // 4 → 5: the row kind 'category-estimate' (a category's estimate, counted as what its rows have not explained yet).
+  // Nothing to rewrite; the version only keeps an older app from reading a row it would count in full.
+  4: (raw) => raw,
+  // 5 → 6: `Row.rule` and `Row.ruleShare` (a share of income, a share of what is left, or the rest for a chosen
+  // savings row). Both fill in from their defaults; the version keeps an older app from typing over a worked-out row.
+  5: (raw) => raw,
+  // 6 → 7: the row kind 'from-savings' (money taken out of a savings account into the month). Nothing to rewrite; the
+  // version keeps an older app from reading such a row as an ordinary transfer out.
+  6: (raw) => raw,
+  // 7 → 8: `Household.setupOpen` and `Household.dismissedSuggestions` (setting up on the Statement) and
+  // `Row.templateKey` (the suggestion a row came from). All fill in from their defaults; the version keeps an older
+  // app from dropping them when it writes a record back.
+  7: (raw) => raw,
+  // 8 → 9: the rule 'share-of-own-income' (pocket money as a share of its adult's own income), and pocket money rows
+  // that carry a rule at all. Nothing to rewrite; the version keeps an older app from reading a rule it does not know.
+  8: (raw) => raw,
 }
 
 export function migrateExport(raw: unknown): unknown {

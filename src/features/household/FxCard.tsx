@@ -8,8 +8,8 @@ import { NativeSelect } from '@/components/NativeSelect'
 import { formatMonth } from '@/app/format'
 import { useStore } from '@/app/store'
 import { buildFxIndex, driftFor, rateInfo } from '@/engine'
-import { addMonths, compareMonths, monthOfDate, type FxMonthRate, type Household, type MonthKey, type Tables } from '@/model'
-import { fetchEcbRates, neededPairs, setFxSettings, setManualRate } from '@/store'
+import { monthOfDate, type FxMonthRate, type Household, type MonthKey, type Tables } from '@/model'
+import { fetchRatesFor, neededPairs, setFxSettings, setManualRate } from '@/store'
 import { TAG_TONE, formatRate, rateTag, readableRate, toStored } from './fxDisplay'
 
 /**
@@ -52,10 +52,7 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
     setBusy(true)
     setNote(null)
     try {
-      // a year before the first month too, so the average change has something to work with
-      const yearAgo = addMonths(monthOfDate(), -13)
-      const from = compareMonths(yearAgo, household.startMonth) < 0 ? yearAgo : household.startMonth
-      const res = await fetchEcbRates(store, { base, symbols: pairs.map((p) => p.split('/')[1]), from, to: monthOfDate(), policy: household.fxMonthRate })
+      const res = await fetchRatesFor(store, pairs.map((p) => p.split('/')[1]))
       setNote(`Stored ${res.written} month rate${res.written === 1 ? '' : 's'} from the ECB.${res.unsupported.length ? ` Not published by the ECB: ${res.unsupported.join(', ')}; enter those by hand.` : ''} The average change per month is shown under the drift setting.`)
     } catch (e) {
       onError(e instanceof Error ? e.message : 'Could not fetch rates')

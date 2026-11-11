@@ -1,9 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Check } from '@/components/Check'
 import { Segmented } from '@/components/Segmented'
 import { formatMonth } from '@/app/format'
 import { useStore } from '@/app/store'
@@ -12,9 +11,9 @@ import { ENTITY_KIND_LABEL, monthOfDate, type FundedBy, type Household, type Row
 import { accountTypeForRow, derivedRowReason, followRow, setRowAccount, setRowDeductedFrom, setRowFundedBy, setRowScope, updateRow } from '@/store'
 import { NativeSelect } from '@/components/NativeSelect'
 import { fundingOptions } from './funding'
-import { CURRENCIES } from '@/app/currencies'
+import { currencyChoices, currencyLabel } from '@/app/currencies'
 import { HELP } from '@/app/help'
-import { InfoTip, TipLabel } from '@/components/InfoTip'
+import { TipLabel } from '@/components/InfoTip'
 import { accountHelp, accountVerb } from './rowAccount'
 
 interface Base {
@@ -34,7 +33,12 @@ const SECTIONS: Array<{ key: Section; title: string }> = [
 export function useSave(onClose: () => void) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // Buttons are disabled while a save runs, but Enter in a field is not a button: a second press before the first
+  // has finished must not save twice (a top-up would be added twice).
+  const running = useRef(false)
   const save = async (fn: () => Promise<void>) => {
+    if (running.current) return
+    running.current = true
     setBusy(true)
     setError(null)
     try {
@@ -43,6 +47,7 @@ export function useSave(onClose: () => void) {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save.')
     } finally {
+      running.current = false
       setBusy(false)
     }
   }
@@ -83,8 +88,8 @@ export function RowSourceDialog({ row, tables, household, onClose }: Base) {
             />
             <p className="text-xs text-muted-foreground">
               {scope === 'from-month'
-                ? `Earlier months stay as they are (${oldLabel}), so past savings and pool balances do not move.`
-                : 'Earlier months change too: the savings balance and pool accounts are worked out again from the start.'}
+                ? `Earlier months stay as they are (${oldLabel}), so past savings and virtual account balances do not move.`
+                : 'Earlier months change too: the savings balance and virtual accounts are worked out again from the start.'}
             </p>
           </fieldset>
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
@@ -206,7 +211,7 @@ export function RowFollowDialog({ row, tables, household, onClose }: Base) {
 export function RowCurrencyDialog({ row, household, onClose }: Base) {
   const store = useStore()
   const base = household.baseCurrency
-  const codes = [base, ...CURRENCIES.filter((c) => c !== base), ...(row.currency && row.currency !== base && !CURRENCIES.includes(row.currency) ? [row.currency] : [])]
+  const codes = currencyChoices(base, row.currency)
   const [ccy, setCcy] = useState(row.currency ?? base)
   const { error, busy, save } = useSave(onClose)
 
@@ -221,7 +226,7 @@ export function RowCurrencyDialog({ row, household, onClose }: Base) {
           <div className="space-y-1.5">
             <TipLabel htmlFor="row-currency" help="row.currency">Amounts in this row are in</TipLabel>
             <NativeSelect id="row-currency" className="w-full" value={ccy} onChange={(e) => setCcy(e.target.value)}>
-              {codes.map((c) => <option key={c} value={c}>{c === base ? `${c} (household currency)` : c}</option>)}
+              {codes.map((c) => <option key={c} value={c}>{currencyLabel(c, base)}</option>)}
             </NativeSelect>
             <p className="text-xs text-muted-foreground">{HELP['row.currency'].text}</p>
           </div>
@@ -272,14 +277,13 @@ export function RowDeductionDialog({ row, tables, household, onClose }: Base) {
   )
 }
 
-/** Who a row is for: the household, an adult, or a child, pet or thing (routed to whoever pays for them). */
+/** Who a row is for: the household, an adult, or a child, pet or thing. */
 export function RowScopeDialog({ row, tables, onClose }: Base) {
   const store = useStore()
   const live = tables.entities.filter((e) => !e.deletedAt && (!e.archivedMonth || e.id === row.scope)).sort((a, b) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0))
   const adults = live.filter((e) => e.kind === 'adult')
   const others = live.filter((e) => e.kind !== 'adult')
   const [scope, setScope] = useState(row.scope)
-  const [inShareBasis, setInShareBasis] = useState(row.inShareBasis)
   const { error, busy, save } = useSave(onClose)
 
   return (
@@ -299,17 +303,11 @@ export function RowScopeDialog({ row, tables, onClose }: Base) {
             </NativeSelect>
             <p className="text-xs text-muted-foreground">{HELP['row.belongsTo'].text}</p>
           </div>
-          {row.section === 'income' && (
-            <div className="flex items-center gap-1">
-              <Check label="Counts for the split" checked={inShareBasis} disabled={scope === 'shared'} onChange={(e) => setInShareBasis(e.target.checked)} />
-              <InfoTip help="row.inShareBasis" />
-            </div>
-          )}
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button onClick={() => void save(() => setRowScope(store, row.id, scope, row.section === 'income' ? inShareBasis : undefined))} disabled={busy}>Save</Button>
+          <Button onClick={() => void save(() => setRowScope(store, row.id, scope))} disabled={busy}>Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

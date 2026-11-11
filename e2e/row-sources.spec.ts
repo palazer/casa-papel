@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
 async function loadDemo(page: Page) {
-  await page.goto('?demo=1')
+  await page.goto('?demo=1&screen=grid')
   await page.getByRole('button', { name: 'Load the demo household' }).click()
   await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
 }
@@ -11,24 +11,27 @@ const money = (text: string) => Number(text.replace(/[^\d.-]/g, ''))
 test.describe('row sources, accounts and followers', () => {
   test.use({ viewport: { width: 1400, height: 900 } })
 
-  test('a single amount can come out of a pool account', async ({ page }) => {
+  test('a single amount can come out of a virtual account', async ({ page }) => {
     await loadDemo(page)
     const headers = await page.getByRole('columnheader').allInnerTexts()
     const novIdx = headers.findIndex((h) => h.startsWith('Nov 2026')) - 1
-    const travel = page.getByRole('row', { name: /^Pool account · Travel/ })
+    const travel = page.getByRole('row', { name: /^Virtual account · Travel/ })
     const before = money(await travel.getByRole('cell').nth(novIdx).innerText())
 
     const groceries = page.getByRole('button', { name: /^Groceries Nov 2026/ })
     await groceries.click()
     const dlg = page.getByRole('dialog')
     await expect(dlg.getByLabel('Comes out of', { exact: true })).toHaveValue('cash')
-    await dlg.getByLabel('Comes out of', { exact: true }).selectOption({ label: 'Pool account: Travel' })
+    await dlg.getByLabel('Comes out of', { exact: true }).selectOption({ label: 'Virtual account: Travel' })
     await page.screenshot({ path: 'e2e/output/cell-source.png' })
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
 
-    // the pool went down by the groceries amount, and the cell reopens as a single amount from the pool
-    await expect.poll(async () => money(await travel.getByRole('cell').nth(novIdx).innerText())).toBe(before - 700)
+    // the virtual account held less than the groceries: it stops at zero and says by how much it is short
+    expect(before).toBe(240)
+    await expect.poll(async () => money(await travel.getByRole('cell').nth(novIdx).innerText())).toBe(0)
+    await expect(travel.getByRole('cell').nth(novIdx)).toHaveAttribute('title', /^Short by €460\.00/)
+    // the cell reopens as a single amount from the pool
     await groceries.click()
     await expect(dlg.getByRole('tab', { name: 'Single amount' })).toHaveAttribute('aria-selected', 'true')
     await expect(dlg.getByLabel('Comes out of', { exact: true })).toHaveValue(/^pool:/)

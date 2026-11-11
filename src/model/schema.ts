@@ -8,7 +8,7 @@ import { FUNDED_BY_PATTERN } from './fundedBy'
 z.config({ jitless: true })
 
 /** Bump when the shape of stored data changes; add a migration in migrations.ts. */
-export const SCHEMA_VERSION = 4
+export const SCHEMA_VERSION = 9
 
 // ---------- primitives ----------
 export const IdSchema = z.string().regex(ID_PATTERN, 'expected ULID')
@@ -43,10 +43,17 @@ export const HouseholdSchema = BaseRecord.extend({
   locale: z.string().min(2),
   startMonth: MonthKeySchema,
   closingRule: ClosingRuleSchema.default('savings-plug'),
-  /** Total pocket money per month, split between adults by their pocket rows. */
+  /**
+   * The pocket money total households had before pocket rows got rules. Nothing sets it any more; the engine reads it
+   * only for a pocket row that is still a share of it (`pocketMode` 'share-of-pocket-total' and no rule).
+   */
   pocketTotal: MoneySchema.default(0),
   /** Cash deliberately left in checking at month end. Default 0. */
   cashBuffer: MoneySchema.default(0),
+  /**
+   * The proportional split (each adult's share of the shared costs, "Who pays what") was removed on the `statement`
+   * branch in November 2026. These three, `Row.inShareBasis` and `Entity.paidBy` stay in stored data and are no longer read.
+   */
   moneyMode: MoneyModeSchema.default('pooled'),
   shareBasis: ShareBasisSchema.default('basis-rows'),
   manualShares: z.record(IdSchema, FractionSchema).default({}),
@@ -61,6 +68,10 @@ export const HouseholdSchema = BaseRecord.extend({
   fxPairDrift: z.record(z.string(), z.number()).default({}),
   /** "Add <year>": the plan reaches at least this December. null = the calendar rule alone decides (see store/months.ts). */
   planUntil: MonthKeySchema.nullable().default(null),
+  /** The Statement shows its setup strip: true from the first screen until "Done". Households made before it have none. */
+  setupOpen: z.boolean().default(false),
+  /** Suggestions the household said no to (`<entity id or "household">:<template key>`); they sit behind "More suggestions". */
+  dismissedSuggestions: z.array(z.string()).default([]),
 })
 
 // ---------- entities ----------
@@ -70,7 +81,7 @@ export const EntitySchema = BaseRecord.extend({
   kind: EntityKindSchema,
   name: z.string().min(1),
   attributes: z.record(z.string(), z.string()).default({}),
-  /** Adult charged for rows scoped to this entity (children, pets, vehicles…). */
+  /** No longer read (see `Household.moneyMode`): the adult who was charged for this entity's rows in the proportional split. */
   paidBy: IdSchema.nullable().default(null),
   archivedMonth: MonthKeySchema.nullable().default(null),
   order: z.string().default('a0'),
@@ -131,7 +142,21 @@ export const CategorySchema = BaseRecord.extend({
 export const RowKindSchema = z.enum([
   'plain', 'salary', 'to-savings', 'to-investment', 'from-investment',
   'pocket-money', 'pool-allocation', 'debt-payment', 'card-payment',
+  // An expense category's estimate: its cells hold what the whole category is expected to come to, and the engine
+  // counts only what the category's other rows have not explained yet ("Not broken down yet"). One per category.
+  'category-estimate',
+  // Money taken out of a savings account into the month by hand: to fill a gap, or to top up a virtual account. The
+  // counterpart of 'from-investment'; both count as money in and lower the account they come from.
+  'from-savings',
 ])
+
+/**
+ * How the transfer that feeds a savings account, an investment account or a virtual account, or an adult's pocket money,
+ * is worked out each month: a typed amount that carries forward, a share of the month's take-home income, a share of
+ * what the month has left, or the rest of the month (one row, never pocket money). Pocket money can also be a share
+ * of its adult's own take-home income. `model/rules.ts` reads it for the engine, the store and the screens.
+ */
+export const RowRuleSchema = z.enum(['fixed', 'share-of-income', 'share-of-own-income', 'share-of-rest', 'rest'])
 
 export const RowSchema = BaseRecord.extend({
   name: z.string().min(1),
@@ -139,8 +164,9 @@ export const RowSchema = BaseRecord.extend({
   kind: RowKindSchema.default('plain'),
   categoryId: IdSchema.nullable().default(null),
   entityTags: z.array(IdSchema).default([]),
-  /** 'shared' or an entity id: who this row belongs to for splitting. */
+  /** 'shared' or an entity id: who this row belongs to ("Belongs to…"). */
   scope: z.string().default('shared'),
+  /** No longer read (see `Household.moneyMode`). */
   inShareBasis: z.boolean().default(false),
   /** null = household base currency. */
   currency: CurrencyCodeSchema.nullable().default(null),
@@ -156,6 +182,16 @@ export const RowSchema = BaseRecord.extend({
   followShare: FractionSchema.nullable().default(null),
   /** Expense rows only: the income row this is taken out of (tax, a pension contribution). The income's net is what the shares count. */
   deductedFromRowId: IdSchema.nullable().default(null),
+  /**
+   * The row's rule (see `RowRuleSchema`). null = as before rules existed: the amount is typed, and under the
+   * savings-plug month-end rule the first "to savings" row takes the rest. A month with a typed amount shows that
+   * amount whatever the rule says; that is how the months before a rule started keep theirs.
+   */
+  rule: RowRuleSchema.nullable().default(null),
+  /** With a share rule: the fraction of its base (0.1 = 10 %). */
+  ruleShare: FractionSchema.nullable().default(null),
+  /** The suggestion that made this row (`RowTemplate.key`); with the row's person or thing it keeps the Statement from suggesting it again. */
+  templateKey: z.string().nullable().default(null),
   archivedMonth: MonthKeySchema.nullable().default(null),
   order: z.string().default('a0'),
 })
@@ -217,7 +253,7 @@ export const RecurringItemSchema = BaseRecord.extend({
 // ---------- pools, fx, months ----------
 export const PoolSchema = BaseRecord.extend({
   name: z.string().min(1),
-  /** Savings account that holds this pool account. */
+  /** Savings account that holds this virtual account. */
   accountId: IdSchema,
   allocationRowId: IdSchema.nullable().default(null),
   openingBalance: MoneySchema.default(0),
@@ -249,15 +285,15 @@ export const MonthStateSchema = z.object({
 // ---------- goals ----------
 export const GoalKindSchema = z.enum(['account-balance', 'pool-balance', 'pay-off', 'net-worth'])
 
-/** A finish line: grow an account or pool account to an amount, clear a debt, or reach a net worth. */
+/** A finish line: fill an account or virtual account to an amount, pay a debt down to one, or reach a net worth. */
 export const GoalSchema = BaseRecord.extend({
   name: z.string().min(1),
   kind: GoalKindSchema,
   /** account-balance and pay-off: the account watched. */
   accountId: IdSchema.nullable().default(null),
-  /** pool-balance: the pool account watched. */
+  /** pool-balance: the virtual account watched. */
   poolId: IdSchema.nullable().default(null),
-  /** Minor units in the account's currency (account kinds) or the base currency (pool, net worth). 0 for pay-off. */
+  /** Minor units in the account's currency (account kinds) or the base currency (pool, net worth). Pay-off: what the debt comes down to, 0 to clear it. */
   target: MoneySchema.default(0),
   /** Month the goal was set; pay-off progress counts down from what was owed then. */
   startMonth: MonthKeySchema,
@@ -353,6 +389,7 @@ export type AccountMonth = z.infer<typeof AccountMonthSchema>
 export type Category = z.infer<typeof CategorySchema>
 export type Row = z.infer<typeof RowSchema>
 export type RowKind = z.infer<typeof RowKindSchema>
+export type RowRule = z.infer<typeof RowRuleSchema>
 export type Section = z.infer<typeof SectionSchema>
 export type Cell = z.infer<typeof CellSchema>
 /** A cell as written, before defaults fill in: what `putCell` and the demo build. */

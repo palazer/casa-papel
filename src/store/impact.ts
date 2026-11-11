@@ -3,12 +3,12 @@
  * dialog's text and the write, so what is said and what happens agree (DESIGN.md §8).
  *
  * The rule: a reference the engine needs for correct sums with no safe rewrite is a blocker (a typed row's
- * account, the account a pool account is held in); a nullable or safely rewritable one is a consequence applied
+ * account, the account a virtual account is held in); a nullable or safely rewritable one is a consequence applied
  * in the same commit. Anything with amounts in a closed month cannot be deleted, only archived from a later month.
  */
 import { computeEngine, cellKey, type CellResult, type EngineOutput } from '@/engine'
 import {
-  AccountSchema, CategorySchema, CellSchema, EntitySchema, GoalSchema, HouseholdSchema, PoolSchema, RecurringItemSchema, RowSchema,
+  AccountSchema, CategorySchema, CellSchema, EntitySchema, GoalSchema, PoolSchema, RecurringItemSchema, RowSchema,
   ENTITY_KIND_LABEL, addMonths, compareMonths, monthOfDate, monthRange, parseMonth, poolRef,
   type Account, type Category, type Cell, type CellInput, type Entity, type Goal, type Household, type MonthKey, type Pool, type RecurringItem, type Row,
   type TableName, type Tables,
@@ -43,7 +43,7 @@ export interface ImpactOptions {
 
 export interface Impact {
   kind: RemovalKind
-  /** `Row`, `Account`, `Pool account`, `Adult`, `Schedule`, `Goal`, `Category`. */
+  /** `Row`, `Account`, `Virtual account`, `Adult`, `Schedule`, `Goal`, `Category`. */
   kindLabel: string
   subject: string
   /** What deleting removes. */
@@ -149,7 +149,7 @@ interface Described {
 }
 
 const TYPED_VERB: Partial<Record<Row['kind'], string>> = {
-  'to-savings': 'sends money to it', 'to-investment': 'sends money to it', 'from-investment': 'takes money from it',
+  'to-savings': 'sends money to it', 'to-investment': 'sends money to it', 'from-investment': 'takes money from it', 'from-savings': 'takes money from it',
   'debt-payment': 'pays it off', 'card-payment': 'pays it off',
 }
 
@@ -168,7 +168,7 @@ function describeRow(ctx: Ctx, row: Row): Described {
   const changes: string[] = []
   if (followers.length) changes.push(`${quoteNames(followers.map((f) => f.name))} ${pick(followers.length, 'stops following it and keeps its', 'stop following it and keep their')} own amounts`)
   if (deductions.length) changes.push(`${quoteNames(deductions.map((d) => d.name))} ${pick(deductions.length, 'is', 'are')} no longer deducted from it and ${pick(deductions.length, 'counts', 'count')} as ordinary spending`)
-  if (pool) changes.push(`The pool account "${pool.name}" is no longer filled each month`)
+  if (pool) changes.push(`The virtual account "${pool.name}" is no longer filled each month`)
   if (savingsAcc) changes.push(`"${savingsAcc.name}" no longer receives the month's leftover`)
   return {
     kindLabel: 'Row', subject: row.name, loses, changes, blockers: [], note: null, activity: months, canArchive: true,
@@ -179,7 +179,7 @@ function describeRow(ctx: Ctx, row: Row): Described {
       if (schedules.length) out.push(`${scheduleWords} ${pick(schedules.length, 'stops', 'stop')} after ${monthLabel(addMonths(from, -1), locale)}`)
       if (followers.length) out.push(`${quoteNames(followers.map((f) => f.name))} ${pick(followers.length, 'stops following it and keeps', 'stop following it and keep')} the last amount as ${pick(followers.length, 'its', 'their')} own from ${at}`)
       if (deductions.length) out.push(`${quoteNames(deductions.map((d) => d.name))} ${pick(deductions.length, 'is', 'are')} no longer deducted from it and ${pick(deductions.length, 'counts', 'count')} as ordinary spending from ${at}`)
-      if (pool) out.push(`The pool account "${pool.name}" is no longer filled from ${at}`)
+      if (pool) out.push(`The virtual account "${pool.name}" is no longer filled from ${at}`)
       if (savingsAcc) out.push(`"${savingsAcc.name}" no longer receives the month's leftover from ${at}`)
       return out
     },
@@ -202,7 +202,7 @@ function describeAccount(ctx: Ctx, acc: Account): Described {
   if (goals.length) loses.push(`${goalWords}, which ${pick(goals.length, 'watches', 'watch')} it`)
   const blockers: Blocker[] = [
     ...typed.map((r) => ({ text: `"${r.name}" ${TYPED_VERB[r.kind] ?? 'uses it'}`, where: 'Point the row at another account from its row menu on the grid, or archive the row.' })),
-    ...pools.map((p) => ({ text: `The pool account "${p.name}" is held in it`, where: 'Move it to another savings account under Household → Pool accounts → Edit, or archive it.' })),
+    ...pools.map((p) => ({ text: `The virtual account "${p.name}" is held in it`, where: 'Move it to another savings account under Household → Virtual accounts → Edit, or archive it.' })),
   ]
   const changes: string[] = []
   // an expense names its paying account; a transfer or income names where the money goes
@@ -214,7 +214,7 @@ function describeAccount(ctx: Ctx, acc: Account): Described {
       const at = monthLabel(from, locale)
       const out = [acc.tracked ? `Its balance stops at ${monthLabel(addMonths(from, -1), locale)}; from ${at} it is hidden and no longer counts towards net worth` : `Hidden from ${at} on; rows that name it keep working`]
       if (typed.length) out.push(`${quoteNames(typed.map((r) => r.name))} ${pick(typed.length, 'keeps', 'keep')} moving money, but the balance is no longer tracked from ${at}`)
-      if (pools.length) out.push(`Its pool ${pick(pools.length, 'account', 'accounts')} ${quoteNames(pools.map((p) => p.name))} ${pick(pools.length, 'is', 'are')} archived with it from ${at}`)
+      if (pools.length) out.push(`Its virtual ${pick(pools.length, 'account', 'accounts')} ${quoteNames(pools.map((p) => p.name))} ${pick(pools.length, 'is', 'are')} archived with it from ${at}`)
       if (goals.length) out.push(`${goalWords} can no longer be measured`)
       return out
     },
@@ -244,13 +244,13 @@ function describePool(ctx: Ctx, pool: Pool): Described {
   if (cellsFunded.length) changes.push(`Spending that came out of it in ${plural(cellsFunded.length, 'month')} counts as spent from the savings balance`)
   if (schedules.length) changes.push(`${plural(schedules.length, 'schedule')} ${pick(schedules.length, 'comes', 'come')} out of the savings balance instead`)
   return {
-    kindLabel: 'Pool account', subject: pool.name, loses, changes, blockers: [], note: null, activity, canArchive: true,
+    kindLabel: 'Virtual account', subject: pool.name, loses, changes, blockers: [], note: null, activity, canArchive: true,
     archive: (from) => {
       const at = monthLabel(from, locale)
       const out = [`Its balance stops at ${monthLabel(addMonths(from, -1), locale)}`]
       if (alloc) out.push(`"${alloc.name}" is archived from ${at}; nothing more is set aside`)
       const movers = [...funded.map((r) => r.name), ...schedules.map((s) => s.name)]
-      if (movers.length) out.push(`From ${at}, ${quoteNames(movers)} ${pick(movers.length, 'comes', 'come')} out of the savings balance; earlier months keep the pool account as their source`)
+      if (movers.length) out.push(`From ${at}, ${quoteNames(movers)} ${pick(movers.length, 'comes', 'come')} out of the savings balance; earlier months keep the virtual account as their source`)
       if (goals.length) out.push(`${goalWords} can no longer be measured`)
       return out
     },
@@ -261,25 +261,19 @@ function describeEntity(ctx: Ctx, e: Entity): Described {
   const { locale } = ctx
   const own = ctx.rows.filter((r) => r.scope === e.id)
   const tagged = ctx.rows.filter((r) => r.scope !== e.id && r.entityTags.includes(e.id))
-  const dependents = ctx.entities.filter((x) => x.paidBy === e.id)
   const owned = ctx.accounts.filter((a) => a.ownerEntityId === e.id)
   const schedules = ctx.schedules.filter((s) => s.scope === e.id)
-  const manual = e.id in ctx.household.manualShares
   const activity = [...new Set([...own, ...tagged].flatMap((r) => amountMonths(ctx, r.id)))].sort()
   const changes: string[] = []
   if (own.length) changes.push(`${quoteNames(own.map((r) => r.name))} ${pick(own.length, 'becomes', 'become')} shared`)
   if (tagged.length) changes.push(`${quoteNames(tagged.map((r) => r.name))} ${pick(tagged.length, 'loses its tag', 'lose their tag')}`)
-  if (dependents.length) changes.push(`The costs of ${quoteNames(dependents.map((d) => d.name))} become shared`)
   if (owned.length) changes.push(`${quoteNames(owned.map((a) => a.name))} ${pick(owned.length, 'becomes', 'become')} a household account`)
   if (schedules.length) changes.push(`${plural(schedules.length, 'schedule')} ${pick(schedules.length, 'becomes', 'become')} shared`)
-  if (manual) changes.push('Its share of the manual split is dropped')
   return {
     kindLabel: ENTITY_KIND_LABEL[e.kind], subject: e.name, loses: [], changes, blockers: [], note: null, activity, canArchive: true,
     archive: (from) => {
       const at = monthLabel(from, locale)
-      const out = [`Hidden from People & things from ${at}; its rows and earlier months stay as they are`]
-      if (e.kind === 'adult' && ctx.household.moneyMode === 'proportional') out.push(`No longer part of the split from ${at}`)
-      return out
+      return [`Hidden from People & things from ${at}; its rows and earlier months stay as they are`]
     },
   }
 }
@@ -299,9 +293,10 @@ const describeGoal = (g: Goal): Described => ({
 })
 
 function describeCategory(ctx: Ctx, c: Category): Described {
-  const rows = ctx.rows.filter((r) => r.categoryId === c.id)
+  const rows = ctx.rows.filter((r) => r.categoryId === c.id && r.kind !== 'category-estimate')
+  const estimate = ctx.rows.some((r) => r.categoryId === c.id && r.kind === 'category-estimate')
   return {
-    kindLabel: 'Category', subject: c.name, loses: [], blockers: [], note: null, activity: [], canArchive: false, archive: () => [],
+    kindLabel: 'Category', subject: c.name, loses: estimate ? ['its estimate, in every month'] : [], blockers: [], note: null, activity: [], canArchive: false, archive: () => [],
     changes: rows.length ? [`${quoteNames(rows.map((r) => r.name))} ${pick(rows.length, 'keeps its', 'keep their')} place without a category`] : [],
   }
 }
@@ -316,7 +311,7 @@ function describe(ctx: Ctx, target: RemovalTarget): Described {
   switch (target.kind) {
     case 'row': return describeRow(ctx, find(ctx.rows, target.id, 'row'))
     case 'account': return describeAccount(ctx, find(ctx.accounts, target.id, 'account'))
-    case 'pool': return describePool(ctx, find(ctx.pools, target.id, 'pool account'))
+    case 'pool': return describePool(ctx, find(ctx.pools, target.id, 'virtual account'))
     case 'entity': return describeEntity(ctx, find(ctx.entities, target.id, 'person or thing'))
     case 'schedule': return describeSchedule(ctx, find(ctx.schedules, target.id, 'schedule'))
     case 'goal': return describeGoal(find(ctx.goals, target.id, 'goal'))
@@ -505,14 +500,8 @@ function entityRemoval(ctx: Ctx, e: Entity, ts: number): Mutation[] {
     if (r.scope !== e.id && !r.entityTags.includes(e.id)) continue
     muts.push(put('rows', RowSchema, r, { scope: r.scope === e.id ? 'shared' : r.scope, entityTags: r.entityTags.filter((t) => t !== e.id) }, ts))
   }
-  for (const x of ctx.entities) if (x.paidBy === e.id) muts.push(put('entities', EntitySchema, x, { paidBy: null }, ts))
   for (const a of ctx.accounts) if (a.ownerEntityId === e.id) muts.push(put('accounts', AccountSchema, a, { ownerEntityId: null }, ts))
   for (const s of ctx.schedules) if (s.scope === e.id) muts.push(put('recurringItems', RecurringItemSchema, s, { scope: 'shared' }, ts))
-  if (e.id in ctx.household.manualShares) {
-    const { [e.id]: _dropped, ...manualShares } = ctx.household.manualShares
-    void _dropped
-    muts.push(put('household', HouseholdSchema, ctx.household, { manualShares }, ts))
-  }
   return muts
 }
 
@@ -531,13 +520,14 @@ export function planRemoval(tables: Tables, target: RemovalTarget, ts: number, o
   switch (target.kind) {
     case 'row': return rowRemoval(ctx, find(ctx.rows, target.id, 'row'), ts)
     case 'account': return accountRemoval(ctx, find(ctx.accounts, target.id, 'account'), ts)
-    case 'pool': return poolRemoval(ctx, find(ctx.pools, target.id, 'pool account'), ts)
+    case 'pool': return poolRemoval(ctx, find(ctx.pools, target.id, 'virtual account'), ts)
     case 'entity': return entityRemoval(ctx, find(ctx.entities, target.id, 'person or thing'), ts)
     case 'schedule': return scheduleRemoval(ctx, find(ctx.schedules, target.id, 'schedule'), ts)
     case 'goal': return [put('goals', GoalSchema, find(ctx.goals, target.id, 'goal'), { deletedAt: ts }, ts)]
     case 'category': {
       const c = find(ctx.tables.categories.filter((x) => !x.deletedAt), target.id, 'category')
-      return [put('categories', CategorySchema, c, { deletedAt: ts }, ts), ...ctx.rows.filter((r) => r.categoryId === c.id).map((r) => put('rows', RowSchema, r, { categoryId: null }, ts))]
+      // the rows stay, without a category; the estimate belonged to the category and goes with it
+      return [put('categories', CategorySchema, c, { deletedAt: ts }, ts), ...ctx.rows.filter((r) => r.categoryId === c.id).map((r) => put('rows', RowSchema, r, r.kind === 'category-estimate' ? { deletedAt: ts } : { categoryId: null }, ts))]
     }
   }
 }
@@ -552,7 +542,7 @@ export function planArchive(tables: Tables, target: RemovalTarget, month: MonthK
   switch (target.kind) {
     case 'row': return rowArchive(ctx, find(ctx.rows, target.id, 'row'), month, ts)
     case 'account': return accountArchive(ctx, find(ctx.accounts, target.id, 'account'), month, ts)
-    case 'pool': return poolArchive(ctx, find(ctx.pools, target.id, 'pool account'), month, ts)
+    case 'pool': return poolArchive(ctx, find(ctx.pools, target.id, 'virtual account'), month, ts)
     case 'entity': return [put('entities', EntitySchema, find(ctx.entities, target.id, 'person or thing'), { archivedMonth: month }, ts)]
     default: throw new Error(`A ${impact.kindLabel.toLowerCase()} cannot be archived.`)
   }

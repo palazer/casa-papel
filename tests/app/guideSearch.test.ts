@@ -9,21 +9,21 @@ describe('searching the guide', () => {
   it('an empty query leaves every topic; a word filters by paragraph, step, tip or fact', () => {
     expect(searchGuide(GUIDE, '', HELP)).toHaveLength(GUIDE.length)
     expect(searchGuide(GUIDE, '   ', HELP)).toHaveLength(GUIDE.length)
-    expect(keys('lisbon')).toEqual(['pools']) // a paragraph's example
+    expect(keys('lisbon')).toEqual(['virtual-accounts']) // a paragraph's example
     expect(keys('make recurring')).toEqual(['schedules']) // a step's control
     expect(keys('honest')).toEqual(['debts']) // only in a related tip's text
     expect(keys('wallet')).toEqual(['investments']) // only in the account-type facts
   })
 
   it('every word must match and case does not matter', () => {
-    expect(keys('LISBON')).toEqual(['pools'])
-    expect(keys('lisbon travel')).toEqual(['pools'])
+    expect(keys('LISBON')).toEqual(['virtual-accounts'])
+    expect(keys('lisbon travel')).toEqual(['virtual-accounts'])
     expect(keys('lisbon xyzzy')).toEqual([])
-    expect(queryWords('  Pool   Account ')).toEqual(['pool', 'account'])
+    expect(queryWords('  Virtual   Account ')).toEqual(['virtual', 'account'])
   })
 
   it('highlights every occurrence, longest word first, without overlaps', () => {
-    expect(highlightRanges('Pool accounts pool', ['pool'])).toEqual([[0, 4], [14, 18]])
+    expect(highlightRanges('Virtual accounts virtual', ['virtual'])).toEqual([[0, 7], [17, 24]])
     expect(highlightRanges('pools', ['pool', 'pools'])).toEqual([[0, 5]])
     expect(highlightRanges('nothing here', ['xyz'])).toEqual([])
     expect(highlightRanges('abc', [])).toEqual([])
@@ -32,8 +32,8 @@ describe('searching the guide', () => {
   })
 
   it('ranks a hit in the title first, then the topics with the most hits, and counts them', () => {
-    const hits = searchGuide(GUIDE, 'pool', HELP)
-    expect(hits[0].topic.key).toBe('pools')
+    const hits = searchGuide(GUIDE, 'virtual', HELP)
+    expect(hits[0].topic.key).toBe('virtual-accounts')
     expect(hits[0].inTitle).toBe(true)
     expect(hits[0].count).toBeGreaterThan(1)
     const rest = hits.slice(1)
@@ -48,7 +48,7 @@ describe('searching the guide', () => {
     expect(s).toMatch(/^…\S.*lisbon.*\S…$/)
     expect(s.length).toBeLessThan(70)
     expect(snippetFor(['T', 'Pool first, then the rest of a sentence that goes on and on and on.'], ['pool'], 20)).toMatch(/^Pool first, then.*…$/) // no leading cut at the start
-    expect(snippetFor(['Pool accounts', 'Set money aside inside a savings account.'], ['pool'])).toBe('Set money aside inside a savings account.') // only the title matches: the summary
+    expect(snippetFor(['Virtual accounts', 'Set money aside inside a savings account.'], ['virtual'])).toBe('Set money aside inside a savings account.') // only the title matches: the summary
   })
 
   it('a topic is searched by its related tips too, so every (i) text can be found', () => {

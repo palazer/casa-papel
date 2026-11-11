@@ -17,6 +17,7 @@
     --color-todo: var(--todo);
     --color-partial: var(--partial);
     --color-done: var(--done);
+    --color-estimate: var(--estimate);
     --color-income-tint: var(--income-tint);
     --color-expense-tint: var(--expense-tint);
     --color-transfer-tint: var(--transfer-tint);
@@ -86,6 +87,8 @@
     --todo: oklch(64.5% 0.246 16.439);       /* rose-500 */
     --partial: oklch(76.9% 0.188 70.08);     /* amber-500 */
     --done: oklch(69.6% 0.17 162.48);        /* emerald-500 */
+    /* The shade an estimate sits on in the Statement: a light yellow, apart from the goal's gold. */
+    --estimate: oklch(94.5% 0.129 101.54);   /* yellow-200 */
     /* tint: the opaque fill of total rows; band: the fainter fill of a category group on the grid */
     --income-tint: color-mix(in oklch, var(--income) 9%, white);
     --expense-tint: color-mix(in oklch, var(--expense) 9%, white);
@@ -155,6 +158,7 @@
     --todo: oklch(71.2% 0.194 13.428);       /* rose-400 */
     --partial: oklch(82.8% 0.189 84.429);    /* amber-400 */
     --done: oklch(76.5% 0.177 163.223);      /* emerald-400 */
+    --estimate: color-mix(in oklch, oklch(85.2% 0.199 91.936) 28%, oklch(0.218 0.008 223.9)); /* yellow-400 on the card */
     --income-tint: color-mix(in oklch, var(--income) 16%, oklch(0.218 0.008 223.9));
     --expense-tint: color-mix(in oklch, var(--expense) 16%, oklch(0.218 0.008 223.9));
     --transfer-tint: color-mix(in oklch, var(--transfer) 16%, oklch(0.218 0.008 223.9));

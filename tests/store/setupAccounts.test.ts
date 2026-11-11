@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { buildSetupMutations } from '@/store'
 import type { Account } from '@/model'
 
-describe('setup wizard accounts', () => {
+describe('setup: accounts', () => {
   it('an account keeps the currency it was given; the others take the household currency', () => {
     const { mutations, household } = buildSetupMutations({
       household: { name: 'T', baseCurrency: 'EUR', locale: 'en-IE', startMonth: '2026-11' },
@@ -18,11 +18,11 @@ describe('setup wizard accounts', () => {
   })
 })
 
-describe('setup wizard: owners, destinations, first amounts, deposits and own rows', () => {
+describe('setup: owners, destinations, first amounts, deposits and own rows', () => {
   const input = {
     household: { name: 'T', baseCurrency: 'EUR', locale: 'en-IE', startMonth: '2026-11' },
     adults: [{ name: 'A' }],
-    dependents: [{ kind: 'child' as const, name: 'Kid', paidByIndex: 0 }],
+    dependents: [{ kind: 'child' as const, name: 'Kid' }],
     accounts: [
       { name: 'Main', type: 'checking' as const },
       { name: 'Savings', type: 'savings' as const },
@@ -66,8 +66,8 @@ describe('setup wizard: owners, destinations, first amounts, deposits and own ro
     expect(amount('Netflix')?.value).toBe(1500)
     expect(amount('To savings')).toBeUndefined()
     expect(amount('Kid – Piano')).toBeUndefined()
-    // a pool template's amount is the monthly set-aside: on the "Travel pool" row, not on the spending row
-    expect(amount('Travel pool')?.value).toBe(20000)
+    // a pool template's amount is the monthly set-aside: on the "To Travel" row, not on the spending row
+    expect(amount('To Travel')?.value).toBe(20000)
     expect(amount('Travel')).toBeUndefined()
     expect(cells).toHaveLength(7)
   })

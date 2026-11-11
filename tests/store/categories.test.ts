@@ -75,7 +75,7 @@ describe('categories', () => {
     await expect(addRow(store, { name: 'Bonus', section: 'income', categoryId: housing.id })).rejects.toThrow(/not in this section/)
   })
 
-  it('seeds the usual categories once; a new household from the wizard files its suggested rows into them', async () => {
+  it('seeds the usual categories once; a new household files its suggested rows into them', async () => {
     const { store } = await fresh()
     expect(await seedDefaultCategories(store)).toBe(DEFAULT_CATEGORIES.length)
     expect(await seedDefaultCategories(store)).toBe(0)
@@ -84,7 +84,7 @@ describe('categories', () => {
 
     const { mutations } = buildSetupMutations({
       household: { name: 'W', baseCurrency: 'EUR', locale: 'en-IE', startMonth: '2026-01', pocketTotal: 0 },
-      adults: [{ name: 'A' }], dependents: [{ kind: 'pet', name: 'Dog', paidByIndex: null }],
+      adults: [{ name: 'A' }], dependents: [{ kind: 'pet', name: 'Dog' }],
       accounts: [{ name: 'Savings', type: 'savings' }],
       householdTemplates: ['h.groceries', 'h.transport', 'h.other', 'h.poolTravel'],
       entityTemplates: { 0: ['a.personal'], 1: ['p.food'] },
@@ -94,7 +94,7 @@ describe('categories', () => {
     const catName = (id: string | null) => categories.find((c) => c.id === id)?.name ?? null
     expect(categories.map((c) => c.name)).toEqual([...DEFAULT_CATEGORIES])
     expect(Object.fromEntries(rows.map((r) => [r.name, catName(r.categoryId)]))).toMatchObject({
-      Groceries: 'Living', Transport: 'Transport', Other: null, Travel: 'Fun', 'Travel pool': null, 'A – Personal': 'Personal', 'Dog – Food & supplies': 'Family & pets',
+      Groceries: 'Living', Transport: 'Transport', Other: null, Travel: 'Fun', 'To Travel': null, 'A – Personal': 'Personal', 'Dog – Food & supplies': 'Family & pets',
     })
   })
 })

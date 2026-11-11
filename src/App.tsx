@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ErrorBoundary } from '@/app/ErrorBoundary'
-import { ScreenContext, isPhone, isUtility, readScreen, rememberScreen, type Screen } from '@/app/screens'
+import { ScreenContext, isUtility, readScreen, rememberScreen, type Screen } from '@/app/screens'
 import { createAppStore, isDemoMode, useStore } from '@/app/store'
 import { StoreProvider } from '@/app/StoreProvider'
 import { takeInviteFromUrl } from '@/app/url'
+import { useAutoRates } from '@/app/useAutoRates'
 import { activeHousehold, defaultMonths, useTables } from '@/app/useEngine'
 import { AppRail } from '@/components/AppRail'
 import { BottomTabs } from '@/components/BottomTabs'
@@ -12,8 +13,7 @@ import { GridScreen } from '@/features/grid/GridScreen'
 import { GuideScreen } from '@/features/guide/GuideScreen'
 import { HomeScreen } from '@/features/home/HomeScreen'
 import { HouseholdScreen } from '@/features/household/HouseholdScreen'
-import { MonthScreen } from '@/features/month/MonthScreen'
-import { MovesScreen } from '@/features/moves/MovesScreen'
+import { StatementScreen } from '@/features/statement/StatementScreen'
 import { AccountDialog, type AccountStep } from '@/features/sync/AccountDialog'
 import { planRecurringPosts } from '@/store'
 import { SyncContext, createSyncEngine, useSyncEngine } from '@/sync/useSync'
@@ -72,6 +72,8 @@ function Shell() {
     const mutations = planRecurringPosts(tables, months)
     if (mutations.length) void store.commitSystem(mutations)
   }, [tables, household, months, store])
+  // a currency that has no rate yet gets the ECB's by itself
+  useAutoRates(store, tables)
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -97,13 +99,12 @@ function Shell() {
         <main className="min-w-0 flex-1 p-4 pb-24 text-sm md:p-6 md:pb-6">
           <div className="mx-auto max-w-[1800px]">
             {showHome ? (
-              <HomeScreen onOpenData={() => go('data')} onCreated={() => go(isPhone() ? 'month' : 'grid')} syncAvailable={!!sync} onSignIn={() => openAccount('signin')} onJoin={() => openAccount('join')} notice={notice} />
+              <HomeScreen onOpenData={() => go('data')} onCreated={() => go('statement')} syncAvailable={!!sync} onSignIn={() => openAccount('signin')} onJoin={() => openAccount('join')} notice={notice} />
             ) : screen === 'data' ? <DataScreen />
               : screen === 'guide' ? <GuideScreen />
-              : screen === 'month' ? <MonthScreen />
-              : screen === 'moves' ? <MovesScreen />
+              : screen === 'grid' ? <GridScreen />
               : screen === 'household' ? <HouseholdScreen />
-              : <GridScreen />}
+              : <StatementScreen />}
           </div>
         </main>
         <BottomTabs />

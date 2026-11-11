@@ -21,7 +21,7 @@ interface Props {
 }
 
 /**
- * The one way anything is removed (DESIGN.md §8): a row, an account, a pool account, a person or thing, a schedule,
+ * The one way anything is removed (DESIGN.md §8): a row, an account, a virtual account, a person or thing, a schedule,
  * a goal or a category. It says what archiving from a month does and what deleting removes, lists what else changes
  * and what has to be resolved first, and offers only what is possible: a thing with amounts in a closed month can be
  * archived but not deleted. Everything it does is one undoable commit.

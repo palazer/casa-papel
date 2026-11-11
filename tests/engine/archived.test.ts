@@ -5,11 +5,11 @@ import { T0, account, cellItems, cellValue, household, pool, row, tables } from 
 
 const months = monthRange('2026-01', '2026-06')
 
-describe('archived accounts and pool accounts', () => {
+describe('archived accounts and virtual accounts', () => {
   const h = household()
   const savings = account({ name: 'Savings', type: 'savings', openingBalance: 100000, archivedMonth: '2026-04' })
   const fund = account({ name: 'Fund', type: 'investment', openingBalance: 50000, investment: { projectionMode: 'fixed-rate', annualRate: 0, depositTiming: 'start', depositFxMode: 'monthly-rate', fixedRate: null } })
-  const alloc = row({ name: 'Travel pool', section: 'transfer', kind: 'pool-allocation', accountId: savings.id, order: 'b0' })
+  const alloc = row({ name: 'To Travel', section: 'transfer', kind: 'pool-allocation', accountId: savings.id, order: 'b0' })
   const travel = pool({ name: 'Travel', accountId: savings.id, allocationRowId: alloc.id, openingBalance: 10000, archivedMonth: '2026-03' })
   const salary = row({ name: 'Salary', section: 'income', order: 'a0' })
   const spend = row({ name: 'Travel', section: 'expense', defaultFundedBy: poolRef(travel.id), order: 'a1' })
@@ -40,7 +40,7 @@ describe('archived accounts and pool accounts', () => {
     const after = computeGoals(withGoals, out, '2026-05')
     expect(after.map((g) => [g.status, g.problem])).toEqual([
       ['broken', '"Savings" is archived. Restore it under Household or edit the goal.'],
-      ['broken', 'The pool account "Travel" is archived. Restore it under Household or edit the goal.'],
+      ['broken', 'The virtual account "Travel" is archived. Restore it under Household or edit the goal.'],
     ])
   })
 })

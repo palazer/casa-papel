@@ -15,7 +15,7 @@ export interface MonthProgress {
   lines: number
 }
 
-/** What the Month view's header says: how much of the month has been ticked and what is still open. Pure. */
+/** What the Statement's progress line says: how much of the month has been ticked and what is still open. Pure. */
 export function monthProgress(rows: Row[], cells: Record<string, CellResult>, month: MonthKey): MonthProgress {
   const p: MonthProgress = { done: 0, total: 0, toPay: 0, toComeIn: 0, lines: 0 }
   for (const row of rows) {
@@ -44,4 +44,14 @@ export function progressText(p: MonthProgress, closed: boolean, currency: string
   if (p.toPay > 0) parts.push(`${formatAmount(p.toPay, currency, locale)} still to pay`)
   if (p.toComeIn > 0) parts.push(`${formatAmount(p.toComeIn, currency, locale)} to come in`)
   return parts.join(' · ')
+}
+
+/**
+ * The month a screen shows when it is asked for `month`: that month when the plan has it, else the nearest one the
+ * plan has (the first when the month lies before the plan, the last when it lies after). A plan without months has
+ * none to give: like `months[0]`, the result is then not a month, and the caller shows nothing.
+ */
+export function nearestMonth(months: MonthKey[], month: MonthKey): MonthKey {
+  if (months.includes(month)) return month
+  return month < months[0] ? months[0] : months[months.length - 1]
 }

@@ -56,8 +56,8 @@ export function buildDemoTables(): Tables {
   orderCursor = 0
   const rows = [
     // income
-    { ...base(ID.rowSamSalary, 'a0'), name: 'Sam – Salary', section: 'income', kind: 'salary', scope: ID.sam, inShareBasis: true, defaultStatus: 'committed' },
-    { ...base(ID.rowAlexSalary, 'a1'), name: 'Alex – Salary', section: 'income', kind: 'salary', scope: ID.alex, inShareBasis: true, defaultStatus: 'committed' },
+    { ...base(ID.rowSamSalary, 'a0'), name: 'Sam – Salary', section: 'income', kind: 'salary', scope: ID.sam, defaultStatus: 'committed' },
+    { ...base(ID.rowAlexSalary, 'a1'), name: 'Alex – Salary', section: 'income', kind: 'salary', scope: ID.alex, defaultStatus: 'committed' },
     { ...base(ID.rowChildBenefit, 'a2'), name: 'Robin – Child benefit', section: 'income', scope: ID.robin, entityTags: [ID.robin], defaultStatus: 'committed' },
     { ...base(ID.rowOtherIncome, 'a3'), name: 'Other income', section: 'income' },
     // expenses
@@ -77,10 +77,10 @@ export function buildDemoTables(): Tables {
     // transfers
     { ...base(ID.rowToSavings, 'c0'), name: 'To savings', section: 'transfer', kind: 'to-savings', categoryId: ID.catTransfers, accountId: ID.savings, defaultStatus: 'committed' },
     { ...base(ID.rowToInvestment, 'c1'), name: 'To investments', section: 'transfer', kind: 'to-investment', categoryId: ID.catTransfers, accountId: ID.invest, defaultStatus: 'committed' },
-    { ...base(ID.rowTravelAlloc, 'c2'), name: 'Travel pool', section: 'transfer', kind: 'pool-allocation', categoryId: ID.catTransfers, accountId: ID.savings, defaultStatus: 'committed' },
-    { ...base(ID.rowClothingAlloc, 'c3'), name: 'Clothing pool', section: 'transfer', kind: 'pool-allocation', categoryId: ID.catTransfers, accountId: ID.savings, defaultStatus: 'committed' },
-    { ...base(ID.rowPocketSam, 'c4'), name: 'Sam – Pocket', section: 'transfer', kind: 'pocket-money', categoryId: ID.catTransfers, scope: ID.sam, pocketMode: 'share-of-pocket-total', pocketShare: 0.5, defaultStatus: 'committed' },
-    { ...base(ID.rowPocketAlex, 'c5'), name: 'Alex – Pocket', section: 'transfer', kind: 'pocket-money', categoryId: ID.catTransfers, scope: ID.alex, pocketMode: 'share-of-pocket-total', pocketShare: 0.5, defaultStatus: 'committed' },
+    { ...base(ID.rowTravelAlloc, 'c2'), name: 'To Travel', section: 'transfer', kind: 'pool-allocation', categoryId: ID.catTransfers, accountId: ID.savings, defaultStatus: 'committed' },
+    { ...base(ID.rowClothingAlloc, 'c3'), name: 'To Clothing', section: 'transfer', kind: 'pool-allocation', categoryId: ID.catTransfers, accountId: ID.savings, defaultStatus: 'committed' },
+    { ...base(ID.rowPocketSam, 'c4'), name: 'Sam – Pocket', section: 'transfer', kind: 'pocket-money', categoryId: ID.catTransfers, scope: ID.sam, pocketMode: 'fixed', defaultStatus: 'committed' },
+    { ...base(ID.rowPocketAlex, 'c5'), name: 'Alex – Pocket', section: 'transfer', kind: 'pocket-money', categoryId: ID.catTransfers, scope: ID.alex, pocketMode: 'fixed', defaultStatus: 'committed' },
   ]
 
   const cells = [
@@ -92,6 +92,8 @@ export function buildDemoTables(): Tables {
     items(ID.rowSamPersonal, '2026-09', [['Concert tickets', 9000, 'done'], ['Books', 3200, 'done']]),
     items(ID.rowAlexPersonal, '2026-09', [['Gym', 4000, 'done']]),
     value(ID.rowToInvestment, '2026-09', 50000), value(ID.rowTravelAlloc, '2026-09', 20000), value(ID.rowClothingAlloc, '2026-09', 10000),
+    // pocket money: a fixed amount per adult, carried forward
+    value(ID.rowPocketSam, '2026-09', 50000), value(ID.rowPocketAlex, '2026-09', 50000),
     // October 2026
     value(ID.rowSamSalary, '2026-10', 420000), value(ID.rowAlexSalary, '2026-10', 280000), value(ID.rowChildBenefit, '2026-10', 25500),
     value(ID.rowGroceries, '2026-10', 70000), value(ID.rowTransport, '2026-10', 9800),
@@ -106,16 +108,15 @@ export function buildDemoTables(): Tables {
   const tables = {
     household: [{
       ...base(ID.household, 'a0'), name: 'Demo household', baseCurrency: 'EUR', locale: 'en-IE', startMonth: '2026-09',
-      closingRule: 'savings-plug', pocketTotal: 100000, cashBuffer: 0, moneyMode: 'pooled', shareBasis: 'basis-rows',
-      manualShares: {}, displayExpensesNegative: true, fxDriftDefault: 0, fxMonthRate: 'first',
+      closingRule: 'savings-plug', cashBuffer: 0, displayExpensesNegative: true, fxDriftDefault: 0, fxMonthRate: 'first',
     }],
     entities: [
-      { ...base(ID.sam, 'a0'), kind: 'adult', name: 'Sam', attributes: {}, paidBy: null },
-      { ...base(ID.alex, 'a1'), kind: 'adult', name: 'Alex', attributes: {}, paidBy: null },
-      { ...base(ID.robin, 'a2'), kind: 'child', name: 'Robin', attributes: { born: '2021' }, paidBy: ID.alex },
-      { ...base(ID.biscuit, 'a3'), kind: 'pet', name: 'Biscuit', attributes: { species: 'dog' }, paidBy: null },
-      { ...base(ID.car, 'a4'), kind: 'vehicle', name: 'The car', attributes: {}, paidBy: null },
-      { ...base(ID.flat, 'a5'), kind: 'property', name: 'The flat', attributes: { tenure: 'rent' }, paidBy: null },
+      { ...base(ID.sam, 'a0'), kind: 'adult', name: 'Sam', attributes: {} },
+      { ...base(ID.alex, 'a1'), kind: 'adult', name: 'Alex', attributes: {} },
+      { ...base(ID.robin, 'a2'), kind: 'child', name: 'Robin', attributes: { born: '2021' } },
+      { ...base(ID.biscuit, 'a3'), kind: 'pet', name: 'Biscuit', attributes: { species: 'dog' } },
+      { ...base(ID.car, 'a4'), kind: 'vehicle', name: 'The car', attributes: {} },
+      { ...base(ID.flat, 'a5'), kind: 'property', name: 'The flat', attributes: { tenure: 'rent' } },
     ],
     accounts: [
       { ...base(ID.main, 'a0'), name: 'Main account', type: 'checking', currency: 'EUR', ownerEntityId: null, openingBalance: 0, openingMonth: '2026-09', tracked: false },

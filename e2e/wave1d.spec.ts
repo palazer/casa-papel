@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
 async function loadDemo(page: Page) {
-  await page.goto('?demo=1')
+  await page.goto('?demo=1&screen=grid')
   await page.getByRole('button', { name: 'Load the demo household' }).click()
   await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
 }
@@ -9,38 +9,48 @@ async function loadDemo(page: Page) {
 test.describe('wave 1d', () => {
   test.use({ viewport: { width: 1400, height: 900 } })
 
-  test('per-person view, proportional split, a loan and a card in Balances, net worth', async ({ page }) => {
+  test('per-person view, pocket money on its own line, a loan and a card in Balances, net worth', async ({ page }) => {
     await loadDemo(page)
 
-    // pooled mode: what each adult leaves for the household
-    await page.getByRole('link', { name: 'Moves' }).click()
-    await expect(page.getByText('Per person', { exact: true })).toBeVisible()
-    await expect(page.getByRole('cell', { name: 'Leaves for the household' })).toBeVisible()
-    await expect(page.getByText('Net worth', { exact: true })).toBeVisible()
+    // what each adult brings, spends on themselves and takes closes the Statement; there is one way of sharing, so nothing to choose
+    await page.getByRole('link', { name: 'Statement' }).click()
+    const perPerson = page.getByTestId('per-person')
+    await expect(perPerson.getByRole('heading', { name: 'Per person' })).toBeVisible()
+    await expect(perPerson.getByRole('columnheader')).toHaveText(['Sam', 'Alex'])
+    await expect(perPerson.getByRole('rowheader')).toHaveText(['Income', 'Own spending', 'Pocket money', 'Leaves for the household'])
+    // Sam brings 4,200, spends 110 on Sam and takes 500: 3,590 is left for the household
+    await expect(perPerson.getByRole('row', { name: /^Leaves for the household/ })).toContainText('+€3,590.00')
+    await expect(page.getByText('Who pays what')).toHaveCount(0)
+    // it is as wide as the left side of the halves above it, so the names sit close to their amounts
+    const card = (await perPerson.boundingBox())!
+    const leftSide = (await page.getByRole('region', { name: 'Assets' }).boundingBox())!
+    expect(Math.abs(card.x + card.width - (leftSide.x + leftSide.width))).toBeLessThanOrEqual(2)
+    await perPerson.scrollIntoViewIfNeeded()
+    await page.screenshot({ path: 'e2e/output/statement-per-person.png' })
 
-    // pocket money from this month on: October keeps 500 each, November shows 750 each
+    // pocket money is set on each adult's own line, not under Household: 750 for Sam from this month on
     await page.getByRole('link', { name: 'Household' }).click()
-    const pocket = page.getByLabel(/^Pocket money per month, all adults/)
-    await pocket.fill('1500')
-    await pocket.press('Tab')
+    await expect(page.getByLabel(/^Pocket money per month/)).toHaveCount(0)
+    await expect(page.getByLabel('Cash buffer changes apply to')).toBeVisible()
+    await expect(page.getByLabel('How you share money')).toHaveCount(0)
+    await expect(page.getByText('Shares come from')).toHaveCount(0)
+    await expect(page.getByLabel('Who pays for Robin')).toHaveCount(0)
+    await page.screenshot({ path: 'e2e/output/household-settings.png' })
     await page.getByRole('link', { name: 'Grid' }).click()
+    await page.getByRole('button', { name: 'Row menu for Sam – Pocket' }).click()
+    await page.getByRole('menuitem', { name: 'Rule…' }).click()
+    const rule = page.getByRole('dialog')
+    await expect(rule.getByRole('heading', { name: 'Sam – Pocket · November 2026' })).toBeVisible()
+    await expect(rule.getByRole('radio', { name: 'A fixed amount' })).toBeChecked()
+    await expect(rule.getByRole('radio', { name: 'The rest' })).toHaveCount(0)
+    await rule.getByLabel('Amount in EUR').fill('750')
+    await rule.getByRole('button', { name: 'Save' }).click()
+    await expect(rule).toBeHidden()
+    await page.getByRole('button', { name: 'Earlier months (2)' }).click()
     const samPocket = page.getByRole('row', { name: /^Sam – Pocket/ })
     await expect(samPocket).toContainText('€500.00')
     await expect(samPocket).toContainText('€750.00')
-
-    // switch to proportional contributions
-    await page.getByRole('link', { name: 'Household' }).click()
-    await page.getByLabel('How you share money', { exact: true }).selectOption('proportional')
-    await expect(page.getByText('Shares come from')).toBeVisible()
-    await expect(page.getByRole('cell', { name: 'Keeps' })).toBeVisible()
-    await page.screenshot({ path: 'e2e/output/shares-card.png', fullPage: true })
-
-    await page.getByRole('link', { name: 'Moves' }).click()
-    await expect(page.getByText(/Shared lines are split/)).toBeVisible()
-    await expect(page.getByRole('columnheader', { name: 'Sam' })).toBeVisible()
-    await expect(page.getByRole('columnheader', { name: 'Alex' })).toBeVisible()
-    await expect(page.getByText('Transfers per person')).toBeVisible()
-    await page.screenshot({ path: 'e2e/output/who-pays-what.png', fullPage: true })
+    await expect(page.getByRole('row', { name: /^Alex – Pocket/ })).not.toContainText('€750.00')
 
     // a loan and a credit card
     await page.getByRole('link', { name: 'Household' }).click()
@@ -48,15 +58,17 @@ test.describe('wave 1d', () => {
     await page.getByRole('button', { name: 'Add account' }).click()
     await dlg.getByLabel('Name', { exact: true }).fill('Car loan')
     await dlg.getByLabel('Type').selectOption('loan')
-    await expect(dlg.getByText('Opening balance is the amount still owed')).toBeVisible()
-    await dlg.getByLabel('Opening balance').fill('5000')
+    await expect(dlg.getByText('What is still owed. A payment row that names this loan brings it down.')).toBeVisible()
+    await dlg.getByLabel('Owed at the start of September 2026 (EUR)').fill('5000')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
     await page.getByRole('button', { name: 'Add account' }).click()
     await dlg.getByLabel('Name', { exact: true }).fill('Visa')
     await dlg.getByLabel('Type').selectOption('credit-card')
-    await expect(dlg.getByLabel('How you record card spending')).toBeVisible()
-    await dlg.getByLabel('Opening balance').fill('300')
+    // the card question in plain words; everything bought with it is the usual answer
+    await expect(dlg.getByRole('radiogroup', { name: 'What do you record for this card?' }).getByRole('radio')).toHaveText(['Everything I buy with it', 'Only what I pay to it'])
+    await expect(dlg.getByRole('radio', { name: 'Everything I buy with it' })).toBeChecked()
+    await dlg.getByLabel(/^Owed at the start of/).fill('300')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
 

@@ -1,8 +1,9 @@
 import {
-  cardIsItemized, compareMonths, fromMinor, monthRange, poolIdOf, scaleMoney, toMinor,
-  type Account, type Category, type Cell, type Money, type MonthKey, type Row, type Section,
+  cardIsItemized, compareMonths, fromMinor, isOldPocketShare, isShareRule, isTakenFromAccount, monthRange, poolIdOf, resolveRules, scaleMoney, toMinor,
+  type Account, type Category, type Cell, type Money, type MonthKey, type Row, type RuleState, type Section,
 } from '@/model'
 import { buildFxIndex, convertMoney } from './fx'
+import { mainAccountSeries } from './mainAccount'
 import {
   cellKey,
   type AccountSeries, type CellResult, type CellStatus, type EngineInput, type EngineOutput,
@@ -73,7 +74,7 @@ function addFunding(f: Funding, fundedBy: string, amount: Money): void {
 }
 
 function emptyOutput(months: MonthKey[]): EngineOutput {
-  return { months, rows: [], cells: {}, totals: {}, accounts: {}, pools: {}, rowTotals: {}, incomeTotal: 0, netWorth: {}, recurringRowIds: [], warnings: [] }
+  return { months, rows: [], cells: {}, totals: {}, accounts: {}, pools: {}, rowTotals: {}, incomeTotal: 0, main: null, netWorth: {}, recurringRowIds: [], primarySavingsId: null, warnings: [] }
 }
 
 /**
@@ -103,6 +104,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
   const accounts = tables.accounts.filter((a) => !a.deletedAt)
   const accountsById = new Map(accounts.map((a) => [a.id, a]))
   const pools = tables.pools.filter((p) => !p.deletedAt)
+  const adultIds = new Set(tables.entities.filter((e) => !e.deletedAt && e.kind === 'adult').map((e) => e.id))
   const poolByAllocationRow = new Map(pools.filter((p) => p.allocationRowId).map((p) => [p.allocationRowId as string, p]))
   const rows = sortRows(tables.rows.filter((r) => !r.deletedAt), tables.categories)
   const rowsById = new Map(rows.map((r) => [r.id, r]))
@@ -122,12 +124,18 @@ export function computeEngine(input: EngineInput): EngineOutput {
 
   const cells: Record<string, CellResult> = {}
   const savingsPlug = household.closingRule === 'savings-plug'
+  /** Which rows a rule works out (a share of income, a share of what is left, the rest); see `model/rules.ts`. */
+  const rules = resolveRules(rows, household.closingRule)
+  warnings.push(...rules.warnings)
+  /** The cells pass 2 fills from a rule, per month, in row order. */
+  const ruled = new Map<MonthKey, { row: Row; rule: RuleState; c: CellResult }[]>()
 
   // ---------- pass 1: user rows ----------
   for (const row of pass1Order) {
-    const derivedToSavings = row.kind === 'to-savings' && savingsPlug
-    const derivedPocket = row.kind === 'pocket-money' && row.pocketMode === 'share-of-pocket-total'
-    const follows = row.followsRowId && !derivedToSavings ? row.followsRowId : null
+    const rule = rules.byRow.get(row.id)
+    // pocket money from before pocket rows had rules: a share of the household's pocket total, until the row gets a rule
+    const derivedPocket = isOldPocketShare(row)
+    const follows = row.followsRowId && !rule ? row.followsRowId : null
     if (follows && !rowsById.has(follows)) warnings.push(`"${row.name}" follows a row that no longer exists.`)
     const rowCells = cellsByRow.get(row.id)
     let prev: Money = 0
@@ -145,10 +153,18 @@ export function computeEngine(input: EngineInput): EngineOutput {
       let baseStatus: CellStatus = row.defaultStatus
       let items: ResolvedItem[] = []
       const funding = zeroFunding()
+      // A rule fills the month unless an amount was typed into it (the months before the rule started keep theirs
+      // that way). The rest row and the idle ones beside it are worked out even when archived, as they always were;
+      // a share stops with its row.
+      const byRule = rule != null
+        && !(rule.typedCounts && cell != null && cell.mode !== 'inherit')
+        && !(archived && isShareRule(rule.kind))
 
-      if (derivedToSavings) {
+      if (byRule) {
         source = 'derived'
         baseStatus = 'derived'
+        // worked out in the household currency, whatever the row is kept in
+        currency = base
       } else if (archived) {
         source = 'archived'
         baseStatus = 'done'
@@ -210,13 +226,53 @@ export function computeEngine(input: EngineInput): EngineOutput {
         for (const [pid, amt] of Object.entries(funding.pools)) fundingBase.pools[pid] = Math.round(amt * f)
       }
 
-      cells[cellKey(row.id, m)] = {
+      const result: CellResult = {
         rowId: row.id, month: m, value, valueBase: conv.value, deductionsBase: 0, netBase: conv.value, currency, source, status, items,
         funding: fundingBase, missingRate: conv.missingRate, rateProjected: conv.projected, cell,
       }
-      if (!derivedToSavings && !archived) {
+      cells[cellKey(row.id, m)] = result
+      if (byRule && rule && rule.kind !== 'idle') {
+        const list = ruled.get(m)
+        if (list) list.push({ row, rule, c: result })
+        else ruled.set(m, [{ row, rule, c: result }])
+      }
+      if (!byRule && !archived) {
         prev = value
         if (baseStatus !== 'derived') prevBase = baseStatus
+      }
+    }
+  }
+
+  // ---------- category estimates: what a category's rows have not explained yet ----------
+  // After pass 1 as a whole, so every row of the category has its amount. The typed estimate keeps carrying forward
+  // (pass 1 did that); what counts this month is the estimate minus the category's spending rows, never below zero:
+  // once the rows add up to more, they are the category. It always comes out of the month's income.
+  const liveCats = liveCategories(tables.categories)
+  for (const row of rows) {
+    if (row.kind !== 'category-estimate') continue
+    const cat = row.section === 'expense' ? categoryOf(row, liveCats) : null
+    const siblings = cat ? rows.filter((r) => r.id !== row.id && r.section === 'expense' && (r.kind === 'plain' || r.kind === 'salary') && categoryOf(r, liveCats)?.id === cat.id) : []
+    for (const m of months) {
+      const c = cells[cellKey(row.id, m)]
+      if (!c || c.source === 'archived') continue
+      let explained: Money = 0
+      for (const s of siblings) {
+        const sc = cells[cellKey(s.id, m)]
+        if (!sc || sc.source === 'archived') continue
+        // an expense counts by its funding parts, as the month's totals do
+        explained += sc.funding.cash + sc.funding.savings + Object.values(sc.funding.pools).reduce((a, b) => a + b, 0)
+      }
+      // an estimate whose category is gone counts nothing
+      const restBase: Money = cat ? Math.max(0, c.valueBase - explained) : 0
+      c.estimate = c.value
+      c.estimateBase = c.valueBase
+      c.value = c.currency === base ? restBase : c.valueBase > 0 ? Math.round(c.value * (restBase / c.valueBase)) : 0
+      c.valueBase = restBase
+      c.netBase = restBase
+      c.funding = { cash: restBase, savings: 0, pools: {} }
+      if (c.source !== 'empty') {
+        c.source = 'derived'
+        c.status = isClosed(m) || c.cell?.markedDone ? 'done' : 'derived'
       }
     }
   }
@@ -246,16 +302,26 @@ export function computeEngine(input: EngineInput): EngineOutput {
   for (const m of months) {
     const t: MonthTotals = {
       month: m, closed: isClosed(m), income: 0, cashExpense: 0, savingsFunded: 0, poolFunded: 0, poolFundedByPool: {},
-      allocations: 0, allocationsByPool: {}, toInvestment: 0, pocket: 0, pocketTotal: pocketTotalFor(m), debt: 0,
+      allocations: 0, allocationsByPool: {}, toInvestment: 0, pocket: 0, debt: 0,
       buffer: bufferFor(m), toSavings: 0, leftover: 0, fromSavingsDerived: 0, expensesTotal: 0, transfersTotal: 0,
+      fromAccounts: 0, takeHome: 0, takeHomeBy: {}, leftForShares: 0, rest: null,
     }
+    /** Every "to savings" amount except the rest: typed ones here, shares below. */
     let userToSavings = 0
     for (const row of rows) {
       const c = cells[cellKey(row.id, m)]
       if (!c || c.source === 'archived') continue
       const v = c.valueBase
+      if (isTakenFromAccount(row)) {
+        // money taken out of savings or investments is cash in wherever the row sits, but not income to take a share of
+        t.income += v
+        t.fromAccounts += v
+        continue
+      }
       if (row.section === 'income') {
         t.income += v
+        t.takeHome += c.netBase
+        if (row.scope !== 'shared') t.takeHomeBy[row.scope] = (t.takeHomeBy[row.scope] ?? 0) + c.netBase
         continue
       }
       switch (row.kind) {
@@ -282,10 +348,6 @@ export function computeEngine(input: EngineInput): EngineOutput {
           if (!acc || !cardIsItemized(acc)) t.debt += v
           break
         }
-        case 'from-investment':
-          // an inflow placed in the transfer section still counts as cash in
-          t.income += v
-          break
         default: {
           if (row.section === 'expense') {
             t.cashExpense += c.funding.cash
@@ -302,30 +364,68 @@ export function computeEngine(input: EngineInput): EngineOutput {
         }
       }
     }
-    const outflows = t.cashExpense + t.allocations + t.toInvestment + t.pocket + t.debt
-    if (savingsPlug) {
-      t.toSavings = t.income - outflows - t.buffer
+    // ---------- rules, in their order: shares of income, the buffer, shares of what is left, the rest ----------
+    // The sweep above counted every typed amount; a cell a rule fills was still zero in it.
+    const open = ruled.get(m) ?? []
+    /** Put a worked-out amount into its cell and into the month's sums. */
+    const fill = (e: { row: Row; c: CellResult }, amount: Money): void => {
+      e.c.value = amount
+      e.c.valueBase = amount
+      e.c.netBase = amount
+      if (e.row.kind === 'to-savings') userToSavings += amount
+      else if (e.row.kind === 'to-investment') t.toInvestment += amount
+      else if (e.row.kind === 'pocket-money') t.pocket += amount
+      else if (e.row.kind === 'pool-allocation') {
+        t.allocations += amount
+        const pool = poolByAllocationRow.get(e.row.id)
+        if (pool) t.allocationsByPool[pool.id] = (t.allocationsByPool[pool.id] ?? 0) + amount
+      }
+    }
+    for (const e of open) {
+      if (e.rule.kind === 'share-of-income') fill(e, Math.max(0, scaleMoney(t.takeHome, e.rule.share)))
+      else if (e.rule.kind === 'share-of-own-income') {
+        // pocket money as a share of what its adult brings home; a row that belongs to no adult has nothing to take it of
+        if (!adultIds.has(e.row.scope)) warnOnce(`own-income|${e.row.id}`, `"${e.row.name}" takes a percentage of its adult's own income, but it does not belong to an adult.`)
+        fill(e, Math.max(0, scaleMoney(adultIds.has(e.row.scope) ? t.takeHomeBy[e.row.scope] ?? 0 : 0, e.rule.share)))
+      }
+    }
+    const restCell = open.find((e) => e.rule.kind === 'rest')
+    // The rest is taken this month when its row is open for it. A savings-plug household without any row for it still
+    // works the rest out (the Statement shows it without a home); a typed month on the rest row means no rest then.
+    const plugged = restCell != null || (savingsPlug && rules.restRowId === null)
+    const outflows = () => t.cashExpense + t.allocations + t.toInvestment + t.pocket + t.debt
+    t.leftForShares = Math.max(0, t.income - outflows() - userToSavings - (plugged ? t.buffer : 0))
+    let shareOfRest = 0
+    for (const e of open) {
+      if (e.rule.kind !== 'share-of-rest') continue
+      shareOfRest += e.rule.share
+      fill(e, scaleMoney(t.leftForShares, e.rule.share))
+    }
+    if (shareOfRest > 1.000001) warnOnce('share-of-rest', 'The percentages of what is left add up to more than 100%.')
+    if (plugged) {
+      const rest = t.income - outflows() - userToSavings - t.buffer
+      t.rest = rest
       t.leftover = t.buffer
+      if (restCell && restCell.row.kind !== 'to-savings') {
+        // the rest goes to an investment or a virtual account: it joins that row's own sum, also when it is negative
+        fill(restCell, rest)
+        t.toSavings = userToSavings
+      } else {
+        t.toSavings = userToSavings + rest
+        if (restCell) {
+          restCell.c.value = rest
+          restCell.c.valueBase = rest
+          restCell.c.netBase = rest
+        }
+      }
     } else {
       t.toSavings = userToSavings
-      t.leftover = t.income - outflows - userToSavings
+      t.leftover = t.income - outflows() - userToSavings
     }
     t.fromSavingsDerived = t.savingsFunded + t.poolFunded
     t.expensesTotal = t.cashExpense + t.savingsFunded + t.poolFunded + t.pocket + t.debt
     t.transfersTotal = t.allocations + t.toInvestment + t.toSavings
     totals[m] = t
-
-    if (savingsPlug) {
-      toSavingsRows.forEach((row, i) => {
-        const c = cells[cellKey(row.id, m)]
-        if (!c) return
-        const v = i === 0 ? t.toSavings : 0
-        c.value = v
-        c.valueBase = v
-        c.netBase = v
-      })
-      if (toSavingsRows.length > 1 && m === months[0]) warnings.push('More than one "to savings" row: the plug goes to the first one.')
-    }
   }
 
   // ---------- pools ----------
@@ -334,12 +434,17 @@ export function computeEngine(input: EngineInput): EngineOutput {
     const series: PoolSeries = { poolId: pool.id, months: {} }
     let bal = pool.openingBalance
     for (const m of months) {
-      // an archived pool account's series stops at its archive month; net worth and later months no longer see it
+      // an archived virtual account's series stops at its archive month; net worth and later months no longer see it
       if (pool.archivedMonth && compareMonths(m, pool.archivedMonth) >= 0) break
       const allocation = totals[m].allocationsByPool[pool.id] ?? 0
       const spend = totals[m].poolFundedByPool[pool.id] ?? 0
-      bal = bal + allocation - spend
-      series.months[m] = { balance: bal, allocation, spend }
+      // A virtual account never holds less than nothing. What is taken beyond what it holds comes out of the unassigned
+      // part of its savings account: that account's balance already falls by the whole amount, so only the split
+      // inside it changes. `short` names the month's shortfall until a top-up covers it.
+      const after: Money = bal + allocation - spend
+      const short: Money = after < 0 ? -after : 0
+      bal = after < 0 ? 0 : after
+      series.months[m] = { balance: bal, allocation, spend, short }
     }
     poolSeries[pool.id] = series
   }
@@ -353,6 +458,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
 
   // ---------- savings accounts ----------
   const accountSeries: Record<string, AccountSeries> = {}
+  // Spending "from savings" comes out of the first savings account a "to savings" row feeds. Deliberately not the
+  // account that takes the rest: moving the rest would then move past spending between accounts.
   const primarySavingsId =
     toSavingsRows.map((r) => r.accountId).find((id) => id && accountsById.get(id)?.type === 'savings') ??
     accounts.find((a) => a.type === 'savings')?.id ?? null
@@ -365,7 +472,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
       if (acc.archivedMonth && compareMonths(m, acc.archivedMonth) >= 0) break
       const start: Money = prevBalance ?? acc.openingBalance
       const inflow = savingsInflow(acc, m, rows, cells, pools, totals[m])
-      const outflow = savingsOutflow(acc, m, pools, totals[m], acc.id === primarySavingsId)
+      const outflow = savingsOutflow(acc, m, rows, cells, pools, totals[m], acc.id === primarySavingsId)
       const computed: Money = start + inflow - outflow
       const actual = actuals.get(`${acc.id}|${m}`)?.actualBalance ?? null
       const balance: Money = actual ?? computed
@@ -402,8 +509,12 @@ export function computeEngine(input: EngineInput): EngineOutput {
         if (row.accountId !== acc.id) continue
         const c = cells[cellKey(row.id, m)]
         if (!c || c.value === 0) continue
-        if (row.kind === 'to-investment') deposit += toAccountCurrency(c, m)
-        else if (row.kind === 'from-investment') withdrawal += toAccountCurrency(c, m)
+        if (row.kind === 'to-investment') {
+          // a negative deposit is money taken out: the rest in a month that overran, or a typed correction
+          const v = toAccountCurrency(c, m)
+          if (v >= 0) deposit += v
+          else withdrawal -= v
+        } else if (row.kind === 'from-investment') withdrawal += toAccountCurrency(c, m)
       }
       if (am?.actualDeposit != null) deposit = am.actualDeposit
       const rate = inv.projectionMode === 'historical-average' && realised.length > 0 ? realised.reduce((a, b) => a + b, 0) / realised.length : fixedMonthly
@@ -471,10 +582,13 @@ export function computeEngine(input: EngineInput): EngineOutput {
     accountSeries[acc.id] = series
   }
 
-  // ---------- net worth ----------
+  // ---------- the main account, and net worth ----------
+  // What stays in the current accounts is money the household has, so it counts: the Statement's lower half would
+  // not balance without it, and every other screen shows the same figure.
+  const main = mainAccountSeries({ months, rows, cells, totals, accounts, actuals, fx, base })
   const netWorth: Record<MonthKey, Money> = {}
   for (const m of months) {
-    let nw = 0
+    let nw = main.months[m]?.balance ?? 0
     for (const s of Object.values(accountSeries)) {
       const r = s.months[m]
       if (!r) continue
@@ -502,8 +616,9 @@ export function computeEngine(input: EngineInput): EngineOutput {
   for (const s of Object.values(accountSeries)) for (const m of Object.keys(s.months)) if (!requestedSet.has(m)) delete s.months[m]
   const outNetWorth: Record<MonthKey, Money> = {}
   for (const m of requested) if (netWorth[m] != null) outNetWorth[m] = netWorth[m]
+  for (const m of Object.keys(main.months)) if (!requestedSet.has(m)) delete main.months[m]
 
-  return { months: requested, rows, cells: outCells, totals: outTotals, accounts: accountSeries, pools: poolSeries, rowTotals, incomeTotal, netWorth: outNetWorth, recurringRowIds: [...recurringRowIds], warnings: dedupe(warnings) }
+  return { months: requested, rows, cells: outCells, totals: outTotals, accounts: accountSeries, pools: poolSeries, rowTotals, incomeTotal, main, netWorth: outNetWorth, recurringRowIds: [...recurringRowIds], primarySavingsId, warnings: dedupe(warnings) }
 }
 
 function savingsInflow(acc: Account, m: MonthKey, rows: Row[], cells: Record<string, CellResult>, pools: EngineInput['tables']['pools'], t: MonthTotals): Money {
@@ -515,9 +630,15 @@ function savingsInflow(acc: Account, m: MonthKey, rows: Row[], cells: Record<str
   return inflow
 }
 
-function savingsOutflow(acc: Account, _m: MonthKey, pools: EngineInput['tables']['pools'], t: MonthTotals, isPrimary: boolean): Money {
+function savingsOutflow(acc: Account, m: MonthKey, rows: Row[], cells: Record<string, CellResult>, pools: EngineInput['tables']['pools'], t: MonthTotals, isPrimary: boolean): Money {
   let out = isPrimary ? t.savingsFunded : 0
   for (const pool of pools) if (pool.accountId === acc.id) out += t.poolFundedByPool[pool.id] ?? 0
+  // money taken out of this account into the month by hand
+  for (const row of rows) {
+    if (row.kind !== 'from-savings' || row.accountId !== acc.id) continue
+    const c = cells[cellKey(row.id, m)]
+    if (c && c.source !== 'archived') out += c.valueBase
+  }
   return out
 }
 

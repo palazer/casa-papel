@@ -20,7 +20,9 @@ describe('cards, loans, other assets and net worth', () => {
     // the plug counts the shopping (cash expense) but not the card payment
     expect(out.totals['2026-01'].toSavings).toBe(2000_00 - 150_00)
     expect(out.totals['2026-01'].debt).toBe(0)
-    expect(out.netWorth['2026-01']).toBe(-150_00)
+    // net worth: the 150 on the card, and the main account, which paid 200 while the month set 150 against the card
+    expect(out.main!.months['2026-01'].balance).toBe(-50_00)
+    expect(out.netWorth['2026-01']).toBe(-150_00 - 50_00)
   })
   it('lump card: the payment is the expense; what is owed only comes from real balances', () => {
     const card = account({ name: 'Amex', type: 'credit-card', openingBalance: 500_00, card: { cardMode: 'lump' } })

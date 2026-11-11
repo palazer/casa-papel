@@ -1,11 +1,12 @@
-import type { CellResult, CellStatus } from '@/engine'
+import type { CellResult, CellStatus, StatementRule } from '@/engine'
 import type { Money, Row } from '@/model'
-import { formatAmount } from './format'
+import { formatAmount, formatShare } from './format'
 
 export type Flow = 'in' | 'out' | 'net'
 
 export function flowOf(row: Row): Flow {
-  if (row.section === 'income') return 'in'
+  // money taken out of an account comes into the month, wherever the row sits
+  if (row.section === 'income' || row.kind === 'from-savings' || row.kind === 'from-investment') return 'in'
   if (row.kind === 'to-savings') return 'net'
   return 'out'
 }
@@ -13,7 +14,7 @@ export function flowOf(row: Row): Flow {
 export type Tone = 'in' | 'out' | 'draw' | 'neutral'
 
 /** Text and tone for an amount given its direction and the household's sign preference. Money coming in, and every
- *  balance, reads `in`; a balance below zero (an overdrawn pool account, savings in the red) is a warning and takes the
+ *  balance, reads `in`; a balance below zero (an overdrawn virtual account, savings in the red) is a warning and takes the
  *  expense hue whatever the negatives setting. */
 export function amountDisplay(minor: Money, flow: Flow, currency: string, locale: string, negatives: boolean, compact = false): { text: string; tone: Tone } {
   if (flow === 'in') return { text: formatAmount(minor, currency, locale, { compact }), tone: minor < 0 ? 'out' : 'in' }
@@ -29,8 +30,12 @@ export const toneClass: Record<Tone, string> = {
   neutral: '',
 }
 
+/** The light yellow an estimate sits on, on every screen (DESIGN.md §5): the amount in a rounded pill of the shade. */
+export const ESTIMATE_SHADE = 'rounded bg-estimate px-1 py-0.5'
+
 export const statusClass: Record<CellStatus, string> = {
-  projected: 'italic text-muted-foreground underline decoration-dashed decoration-partial underline-offset-4',
+  // pulled back by its own padding, so an estimate's digits line up with the plain amounts above and below it
+  projected: `-mr-1 ${ESTIMATE_SHADE}`,
   committed: '',
   done: '',
   derived: 'font-medium',
@@ -50,4 +55,17 @@ export function doneLabel(d: { done: number; total: number; state: DoneState }):
   if (d.state === 'all') return 'Done'
   if (d.state === 'none') return 'Not done yet'
   return `${d.done} of ${d.total} done`
+}
+
+/** A rule in the rule dialog's words: `a fixed amount`, `10% of income`, `30% of what is left`, `the rest`. */
+export function ruleText(rule: Pick<StatementRule, 'kind' | 'share'>, locale: string): string {
+  switch (rule.kind) {
+    case 'share-of-income': return `${formatShare(rule.share ?? 0, locale)} of income`
+    case 'share-of-own-income': return `${formatShare(rule.share ?? 0, locale)} of their own income`
+    case 'share-of-rest': return `${formatShare(rule.share ?? 0, locale)} of what is left`
+    case 'rest': return 'the rest'
+    case 'idle': return 'nothing, another account takes the rest'
+    case 'none': return 'no rule yet'
+    default: return 'a fixed amount'
+  }
 }

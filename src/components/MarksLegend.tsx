@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { HUES } from '@/app/hues'
 import { useScreen } from '@/app/screens'
 import { DoneDot } from './DoneDot'
-import { statusClass } from '@/app/display'
+import { ESTIMATE_SHADE } from '@/app/display'
 import { cn } from '@/lib/utils'
 
 const KINDS = [
@@ -13,7 +13,7 @@ const KINDS = [
   { hue: HUES.expense, label: 'Expenses' },
   { hue: HUES.transfer, label: 'Transfers' },
   { hue: HUES.worth, label: 'Balances and net worth' },
-  { hue: HUES.pool, label: 'Pool accounts' },
+  { hue: HUES.pool, label: 'Virtual accounts' },
   { hue: HUES.goal, label: 'Goals' },
 ]
 
@@ -29,7 +29,7 @@ function Mark({ sample, children }: { sample: ReactNode; children: ReactNode }) 
 }
 
 /**
- * "What the colours and marks mean" (DESIGN.md §5): the legend behind one button in the Grid and Month toolbars.
+ * "What the colours and marks mean" (DESIGN.md §5): the legend behind one button in the Statement and Grid toolbars.
  * Every kind of money has one hue, every mark one meaning; the samples use the same classes as the real cells.
  */
 export function MarksLegend({ neg }: { neg: boolean }) {
@@ -54,13 +54,13 @@ export function MarksLegend({ neg }: { neg: boolean }) {
         <section>
           <h4 className={H4}>Marks</h4>
           <ul className="space-y-1">
-            <Mark sample={<span className={statusClass.projected}>€210.00</span>}>An estimate: italic, dashed underline</Mark>
+            <Mark sample={<span className={ESTIMATE_SHADE}>€210.00</span>}>An estimate: on the yellow shade; a category too, while one of its lines is one</Mark>
             <Mark sample={<span>€210.00</span>}>Certain: you know the amount</Mark>
             <Mark sample={<DoneDot done={1} total={1} state="all" />}>Done: the money has moved</Mark>
             <Mark sample={<span className="flex gap-1"><DoneDot done={0} total={1} state="none" /><DoneDot done={1} total={2} state="partial" /></span>}>This month only: nothing done yet, partly done</Mark>
             {neg && <Mark sample={<span className={HUES.expense.text}>-€210.00</span>}>Spending, shown as a negative number</Mark>}
             <Mark sample={<span className="text-draw">+€120.00</span>}>Drawn from savings this month</Mark>
-            <Mark sample={<span className={HUES.expense.text}>-€80.00</span>}>A balance below zero: a pool account or savings in the red</Mark>
+            <Mark sample={<span className={HUES.expense.text}>-€80.00</span>}>A balance below zero: a virtual account or savings in the red</Mark>
             <Mark sample={<span className="underline decoration-dotted underline-offset-4">€8,000.00</span>}>A balance you entered yourself</Mark>
             <Mark sample={<span className="flex items-center gap-1 rounded bg-muted/60 px-1.5 py-0.5 text-muted-foreground"><Lock className="size-3" aria-hidden />Sept</span>}>A closed month: locked, all of it counts as done</Mark>
             <Mark sample={<span className={cn('block h-4 w-14 rounded-sm ring-1 ring-border', HUES.expense.band)} aria-hidden />}>A faint band: the rows of one category</Mark>

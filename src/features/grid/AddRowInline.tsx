@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useStore } from '@/app/store'
-import type { Account, Category, Household, Section, Tables } from '@/model'
+import type { Account, Category, Household, Row, Section, Tables } from '@/model'
 import { addRow, addRowOfKind, rowTargets, type ExpenseRowKind, type TransferRowKind } from '@/store'
 import { NativeSelect } from '@/components/NativeSelect'
 
@@ -17,9 +17,9 @@ interface Kind {
   section: 'expense' | 'transfer'
   label: string
   text: string
-  /** The accounts, pool accounts or adults the row can point at; null when it points at nothing. */
+  /** The accounts, virtual accounts or adults the row can point at; null when it points at nothing. */
   targets: ((t: Targets) => Target[]) | null
-  targetLabel: 'Account' | 'Pool account' | 'Adult'
+  targetLabel: 'Account' | 'Virtual account' | 'Adult'
   /** Which field of the store's input the target fills. */
   field: 'accountId' | 'poolId' | 'adultId'
   /** What to add first when there is no target. */
@@ -33,10 +33,12 @@ const withType = (a: Account): Target => ({ id: a.id, name: `${a.name} · ${a.ty
 /** Every choice, by section, in the order the select shows them. The store applies the same lists and rules in `addRowOfKind`. */
 const KINDS: Kind[] = [
   { key: 'plain', section: 'transfer', label: 'Moves money between your accounts', text: 'An amount you type each month. It is not spending, so it never counts as an expense.', targets: null, targetLabel: 'Account', field: 'accountId', empty: () => '' },
-  { key: 'to-savings', section: 'transfer', label: 'Goes into a savings account', text: 'An amount you type; that savings balance under Balances rises with it.', targets: (t) => t.savings, targetLabel: 'Account', field: 'accountId', empty: () => 'Add a savings account under Household first.', offered: (t) => !t.plugTaken },
+  { key: 'to-savings', section: 'transfer', label: 'Goes into a savings account', text: 'An amount you type; that savings balance under Balances rises with it. Its rule can make it a percentage instead.', targets: (t) => t.savings, targetLabel: 'Account', field: 'accountId', empty: () => 'Add a savings account under Household first.' },
   { key: 'to-investment', section: 'transfer', label: 'Deposits into an investment account', text: 'The account\'s value, deposited total and return under Balances follow this row.', targets: (t) => t.investments, targetLabel: 'Account', field: 'accountId', empty: () => 'Add an investment account under Household first.' },
-  { key: 'pool-allocation', section: 'transfer', label: 'Fills a pool account', text: 'For a pool account that lost its row: the amount lands in the pool account every month.', targets: (t) => t.orphanPools, targetLabel: 'Pool account', field: 'poolId', empty: () => '', offered: (t) => t.orphanPools.length > 0 },
-  { key: 'pocket-money', section: 'transfer', label: 'Pocket money for an adult', text: 'A fixed amount you type for that adult. It comes off the month\'s leftover, and in the proportional split it is theirs alone.', targets: (t) => t.adults, targetLabel: 'Adult', field: 'adultId', empty: () => 'Add an adult under Household first.' },
+  { key: 'pool-allocation', section: 'transfer', label: 'Fills a virtual account', text: 'For a virtual account that lost its row: the amount lands in the virtual account every month.', targets: (t) => t.orphanPools, targetLabel: 'Virtual account', field: 'poolId', empty: () => '', offered: (t) => t.orphanPools.length > 0 },
+  { key: 'pocket-money', section: 'transfer', label: 'Pocket money for an adult', text: 'Money that adult spends freely each month: an amount you type, or a percentage through its rule.', targets: (t) => t.adults, targetLabel: 'Adult', field: 'adultId', empty: () => 'Add an adult under Household first.' },
+  { key: 'from-savings', section: 'transfer', label: 'Taken from a savings account', text: 'Money you move out of that savings account into the month, to fill a gap or to top up a virtual account. Its balance falls by the amount, and the month has that much more.', targets: (t) => t.savings, targetLabel: 'Account', field: 'accountId', empty: () => 'Add a savings account under Household first.' },
+  { key: 'from-investment', section: 'transfer', label: 'Taken from an investment account', text: 'Money you take out of that investment account into the month. Its value falls by the amount, and the month has that much more.', targets: (t) => t.investments, targetLabel: 'Account', field: 'accountId', empty: () => 'Add an investment account under Household first.' },
   { key: 'card-payment', section: 'transfer', label: 'Pays off a credit card', text: 'For a card whose purchases are expense rows: the payment only moves money, and what is owed on the card falls by it.', targets: (t) => t.cardsItemized, targetLabel: 'Account', field: 'accountId', empty: () => '', offered: (t) => t.cardsItemized.length > 0 },
   { key: 'plain', section: 'expense', label: 'A normal expense', text: 'Spending you type each month, as one amount or a list of items.', targets: null, targetLabel: 'Account', field: 'accountId', empty: () => '' },
   {
@@ -48,18 +50,28 @@ const KINDS: Kind[] = [
   },
 ]
 
-/** "Add row" at the foot of a section: a name, a category when the section has any, and under Transfers and Expenses what the row does. */
-export function AddRowInline({ section, categories, tables, household, onError }: { section: Section; categories: Category[]; tables: Tables; household: Household; onError: (msg: string) => void }) {
+/**
+ * "Add row" at the foot of a section: a name, a category when the section has any, and under Transfers and Expenses what
+ * the row does. The Statement also puts one inside each category: `defaultCategoryId` starts it there, `label` names
+ * the button ("Add row to Housing"), and `onAdded` hands back the new row so the screen can open it. Where the place
+ * says what the row does (the Statement's "From accounts"), `only` narrows the choices to those, and `without`
+ * leaves out the ones that have a place of their own.
+ */
+export function AddRowInline({ section, categories, tables, household, onError, defaultCategoryId = '', label, onAdded, only, without }: {
+  section: Section; categories: Category[]; tables: Tables; household: Household; onError: (msg: string) => void
+  defaultCategoryId?: string; label?: string; onAdded?: (row: Row) => void
+  only?: Choice[]; without?: Choice[]
+}) {
   const store = useStore()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
-  const [categoryId, setCategoryId] = useState('')
+  const [categoryId, setCategoryId] = useState(defaultCategoryId)
   const [choice, setChoice] = useState<Choice>('plain')
   const [targetId, setTargetId] = useState('')
 
   // the lists and rules the store applies in addRowOfKind, so what is offered is what is accepted
   const t = rowTargets(tables, household)
-  const kinds = KINDS.filter((k) => k.section === section && (k.offered?.(t) ?? true))
+  const kinds = KINDS.filter((k) => k.section === section && (k.offered?.(t) ?? true) && (!only || only.includes(k.key)) && !without?.includes(k.key))
   // a choice that is no longer offered (the plug got its row, the pool was filled elsewhere) falls back to the first one
   const kind: Kind | undefined = kinds.find((k) => k.key === choice) ?? kinds[0]
   const targets = kind?.targets?.(t) ?? null
@@ -68,6 +80,7 @@ export function AddRowInline({ section, categories, tables, household, onError }
 
   const reset = () => {
     setName('')
+    setCategoryId(defaultCategoryId)
     setChoice('plain')
     setTargetId('')
     setOpen(false)
@@ -77,18 +90,20 @@ export function AddRowInline({ section, categories, tables, household, onError }
     const n = name.trim()
     if (!n || missing) return
     try {
+      let row: Row
       if (kind) {
         const id = chosen?.id ?? null
-        await addRowOfKind(store, {
+        row = await addRowOfKind(store, {
           section: kind.section, name: n, categoryId: categoryId || null, kind: kind.key,
           accountId: kind.field === 'accountId' ? id : null,
           poolId: kind.field === 'poolId' ? id : null,
           adultId: kind.field === 'adultId' ? id : null,
         })
       } else {
-        await addRow(store, { name: n, section, categoryId: categoryId || null })
+        row = await addRow(store, { name: n, section, categoryId: categoryId || null })
       }
       reset()
+      onAdded?.(row)
     } catch (e) {
       onError(e instanceof Error ? e.message : 'Could not add row')
     }
@@ -96,8 +111,8 @@ export function AddRowInline({ section, categories, tables, household, onError }
 
   if (!open) {
     return (
-      <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setOpen(true)} aria-label={`Add ${section} row`}>
-        <Plus /> Add row
+      <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setOpen(true)} aria-label={label ?? `Add ${section} row`}>
+        <Plus /> {label ?? 'Add row'}
       </Button>
     )
   }

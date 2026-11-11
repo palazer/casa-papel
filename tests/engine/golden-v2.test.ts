@@ -86,11 +86,13 @@ describe('golden: v2 template workbook', () => {
     months.forEach((m, i) => {
       const sheetPools = minor(sheet(57, i)) + minor(sheet(58, i)) + minor(sheet(59, i))
       const expected = minor(sheet(11, i)) + sheetPools - out.accounts[cardId].months[m].balance
-      expect(Math.abs(out.netWorth[m] - expected)).toBeLessThanOrEqual(i + 4)
+      // the sheet counts no current account, so what stays in the main account is taken out before comparing
+      const counted = out.netWorth[m] - (out.main?.months[m]?.balance ?? 0)
+      expect(Math.abs(counted - expected)).toBeLessThanOrEqual(i + 4)
     })
   })
 
-  it('matches the share-of-income column for rent and the travel pool', () => {
+  it('matches the share-of-income column for rent and the travel set-aside', () => {
     for (const r of [28, 43]) {
       const rowId = rowIdBySheetRow.get(r)!
       expect(out.rowTotals[rowId].shareOfIncome).toBeCloseTo(Math.abs(num(rows.get(r)?.a)), 6)

@@ -4,12 +4,12 @@ import { expect, test } from '@playwright/test'
 test.use({ viewport: { width: 1400, height: 900 }, serviceWorkers: 'block' })
 
 async function loadDemo(page: import('@playwright/test').Page) {
-  await page.goto('?demo=1')
+  await page.goto('?demo=1&screen=grid')
   await page.getByRole('button', { name: 'Load the demo household' }).click()
   await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
 }
 
-test('the welcome screen offers three ways to start, and the wizard can go back to it', async ({ page }) => {
+test('the welcome screen offers three ways to start, and the first setup screen can go back to it', async ({ page }) => {
   await page.goto('/')
   for (const name of ['Start on this device', 'Sign in', 'I have an invite', 'Look at the demo first', 'Import a file']) {
     await expect(page.getByRole('button', { name, exact: true })).toBeVisible()
@@ -33,15 +33,38 @@ test('the welcome screen offers three ways to start, and the wizard can go back 
 
 test('the plan ends in a December and "Add <year>" appends a calendar year on every screen', async ({ page }) => {
   await loadDemo(page)
-  // November: next year is already planned, so the button offers the year after
+  // the Grid is for the months ahead: it starts at the current month, the two before it are one button away
+  await expect(page.getByText('Nov 2026 – Dec 2027')).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Oct 2026/ })).toHaveCount(0)
+  const earlier = page.getByRole('button', { name: 'Earlier months (2)' })
+  await expect(earlier).toHaveAttribute('aria-pressed', 'false')
+  await earlier.click()
+  await expect(earlier).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByText(/Sept? 2026 – Dec 2027/)).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Sept? 2026, closed/ })).toBeVisible()
+  // it stays as it was left on this device, and goes back with a second press
+  await page.reload()
+  await expect(page.getByRole('button', { name: /^Sept? 2026, closed/ })).toBeVisible()
+  await earlier.click()
+  await expect(page.getByText('Nov 2026 – Dec 2027')).toBeVisible()
+  // a month's header opens that month on the Statement
+  await page.getByRole('button', { name: 'Dec 2026', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Open in the Statement' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Statement' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: 'December 2026' })).toBeVisible()
+  // coming back to the Statement later starts at the current month again
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Grid' }).click()
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
+  await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Grid' }).click()
+  // November: next year is already planned, so the button offers the year after
   await page.getByRole('button', { name: 'Add 2028' }).click()
   await expect(page.getByText(/– Dec 2028/)).toBeVisible()
   await expect(page.getByRole('button', { name: 'Dec 2028', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Add 2029' })).toBeVisible()
 
-  // the Month view shares the range: at its last month Next gives way to the same action
-  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Month' }).click()
+  // the Statement shares the range: at its last month Next gives way to the same action
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
   const next = page.getByRole('button', { name: 'Next month' })
   const add = page.getByRole('button', { name: 'Add 2029' })
   for (let i = 0; i < 40 && !(await add.isVisible()); i++) await next.click()
@@ -49,15 +72,19 @@ test('the plan ends in a December and "Add <year>" appends a calendar year on ev
   await expect(page.getByRole('heading', { name: 'December 2028' })).toBeVisible()
 })
 
-test('a pool account below zero is shown in the expense hue', async ({ page }) => {
+test('a virtual account that was asked for more than it held stops at zero, in the expense hue, and says why', async ({ page }) => {
   await loadDemo(page)
-  const travel = page.getByRole('row', { name: /^Pool account · Travel/ })
+  const travel = page.getByRole('row', { name: /^Virtual account · Travel/ })
   await expect(travel).toBeVisible()
-  await expect(travel.locator('td.text-expense').first()).toBeVisible()
-  await expect(travel.locator('td.text-expense').first()).toHaveText(/^-€/)
+  const short = travel.locator('td.text-expense').first()
+  await expect(short).toHaveText('€0.00')
+  await expect(short).toHaveAttribute('title', /^Short by €.* more came out of it than it held/)
+  await expect(travel.getByText(/^-€/)).toHaveCount(0)
 })
 
 test('a row in another currency: the typed amount, the household value beneath, one rate per month', async ({ page }) => {
+  // the rate service cannot be reached at first: the new currency has no rate until one is typed
+  await page.route('https://api.frankfurter.dev/**', (r) => r.abort())
   await loadDemo(page)
   await page.getByRole('button', { name: 'Row menu for Other income' }).click()
   await page.getByRole('menuitem', { name: 'Currency…' }).click()
@@ -110,15 +137,46 @@ test('a row in another currency: the typed amount, the household value beneath, 
   await expect(novRow.getByText('manual', { exact: true })).toHaveCount(0)
 })
 
-test('a foreign-currency account shows its household-currency value beneath', async ({ page }) => {
+test('a currency that comes into use gets its rates by itself', async ({ page }) => {
+  const asked: string[] = []
+  await page.route('https://api.frankfurter.dev/**', (r) => {
+    asked.push(r.request().url())
+    return r.fulfill({ json: { rates: { '2026-10-01': { USD: 1.1 }, '2026-11-02': { USD: 1.25 } } } })
+  })
   await loadDemo(page)
   await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Household' }).click()
   await page.getByRole('button', { name: 'Add account' }).click()
   const dlg = page.getByRole('dialog')
   await dlg.getByLabel('Name', { exact: true }).fill('Broker')
   await dlg.getByLabel('Type').selectOption('investment')
-  await dlg.getByLabel('Currency').fill('USD')
-  await dlg.getByLabel('Opening balance').fill('10000')
+  await dlg.getByRole('button', { name: /^More options/ }).click()
+  await dlg.getByLabel('Currency').selectOption('USD')
+  await dlg.getByLabel(/^Holds at the start of/).fill('10000')
+  await dlg.getByLabel('Growth per year (%)').fill('0')
+  await dlg.getByRole('button', { name: 'Save' }).click()
+  await expect(dlg).toBeHidden()
+  // nobody pressed "Fetch ECB rates": the rates are there, and the account is worth its amount in euros
+  await expect(page.getByLabel('1 EUR in USD for Nov 2026')).toHaveValue('1.25')
+  await expect(page.getByRole('row', { name: /^Nov 2026/ }).getByText('ECB', { exact: true })).toBeVisible()
+  expect(asked).toHaveLength(1)
+  expect(asked[0]).toContain('base=EUR&symbols=USD')
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
+  await expect(page.getByText(/No USD→EUR rate/)).toHaveCount(0)
+  await expect(page.getByRole('region', { name: 'Assets' }).locator('[data-line^="acc:"]').filter({ hasText: 'Broker' })).toContainText('€8,000.00')
+})
+
+test('a foreign-currency account shows its household-currency value beneath', async ({ page }) => {
+  // the rate service cannot be reached: the rate is typed by hand
+  await page.route('https://api.frankfurter.dev/**', (r) => r.abort())
+  await loadDemo(page)
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Household' }).click()
+  await page.getByRole('button', { name: 'Add account' }).click()
+  const dlg = page.getByRole('dialog')
+  await dlg.getByLabel('Name', { exact: true }).fill('Broker')
+  await dlg.getByLabel('Type').selectOption('investment')
+  await dlg.getByRole('button', { name: /^More options/ }).click()
+  await dlg.getByLabel('Currency').selectOption('USD')
+  await dlg.getByLabel(/^Holds at the start of/).fill('10000')
   await dlg.getByLabel('Growth per year (%)').fill('0')
   await dlg.getByRole('button', { name: 'Save' }).click()
   await expect(dlg).toBeHidden()
@@ -131,8 +189,9 @@ test('a foreign-currency account shows its household-currency value beneath', as
   await expect(page.getByRole('rowheader', { name: 'Broker · in EUR' })).toBeVisible()
   await expect(page.getByRole('row', { name: /^Broker · in EUR/ })).toContainText('€8,000.00')
 
-  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Month' }).click()
-  await expect(page.getByText(/≈ €8,000\.00/)).toBeVisible()
+  // the Statement counts it in the household currency
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
+  await expect(page.getByRole('region', { name: 'Assets' }).locator('[data-line^="acc:"]').filter({ hasText: 'Broker' })).toContainText('€8,000.00')
 })
 
 test('an expense deducted from an income: the tag, the net line and the editor block', async ({ page }) => {
@@ -157,12 +216,12 @@ test('an expense deducted from an income: the tag, the net line and the editor b
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog')).toBeHidden()
 
-  // the menu now names the income; the Month view carries the net line
+  // the menu now names the income; the Statement carries the net beside the salary
   await page.getByRole('button', { name: 'Row menu for Health' }).click()
   await expect(page.getByRole('menuitem', { name: 'Deducted from Sam – Salary…' })).toBeVisible()
   await page.keyboard.press('Escape')
-  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Month' }).click()
-  await expect(page.getByText(/net €4/).first()).toBeVisible()
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
+  await expect(page.getByRole('region', { name: 'Money in' }).getByText('net €4,170.00')).toBeVisible()
 })
 
 test('a row can follow a share of another row', async ({ page }) => {
@@ -180,25 +239,36 @@ test('a row can follow a share of another row', async ({ page }) => {
   await expect(row).toContainText('€127.50')
 })
 
-test('"Belongs to" gives a row to one adult, and Who pays what routes it to them', async ({ page }) => {
+test('"Belongs to" gives a row to one adult, and Per person under the Statement counts it as theirs', async ({ page }) => {
   await loadDemo(page)
-  // an income row also offers the split check
+  const statement = async () => page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
+  const perPerson = page.getByTestId('per-person')
+  const ownSpending = perPerson.getByRole('row', { name: /^Own spending/ })
+  await statement()
+  await expect(perPerson.getByRole('heading', { name: 'Per person' })).toBeVisible()
+  await expect(perPerson.getByRole('columnheader')).toHaveText(['Sam', 'Alex'])
+  await expect(perPerson.getByRole('row', { name: /^Income/ })).toContainText('€4,200.00')
+  await expect(ownSpending).toContainText('€110.00')
+  await expect(ownSpending).not.toContainText('€810.00')
+
+  // who a row is for is all the dialog asks, for an income row too
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Grid' }).click()
   await page.getByRole('button', { name: 'Row menu for Other income' }).click()
   await page.getByRole('menuitem', { name: 'Belongs to…' }).click()
-  await expect(page.getByRole('dialog').getByRole('checkbox', { name: 'Counts for the split' })).toBeVisible()
+  const dlg = page.getByRole('dialog')
+  await expect(dlg.getByLabel('This row is for', { exact: true })).toBeVisible()
+  await expect(dlg.getByRole('checkbox')).toHaveCount(0)
   await page.keyboard.press('Escape')
-  await expect(page.getByRole('dialog')).toBeHidden()
+  await expect(dlg).toBeHidden()
 
   await page.getByRole('button', { name: 'Row menu for Groceries' }).click()
   await page.getByRole('menuitem', { name: 'Belongs to…' }).click()
-  const dlg = page.getByRole('dialog')
-  await expect(dlg.getByRole('checkbox', { name: 'Counts for the split' })).toHaveCount(0)
   await dlg.getByLabel('This row is for', { exact: true }).selectOption({ label: 'Sam' })
   await dlg.getByRole('button', { name: 'Save' }).click()
   await expect(dlg).toBeHidden()
 
-  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Household' }).click()
-  await page.getByLabel('How you share money', { exact: true }).selectOption('proportional')
-  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Moves' }).click()
-  await expect(page.getByRole('row', { name: /^Groceries/ })).toContainText('own')
+  // the groceries are Sam's own spending now; nothing splits them between the adults
+  await statement()
+  await expect(ownSpending).toContainText('€810.00')
+  await expect(page.getByText('Who pays what')).toHaveCount(0)
 })

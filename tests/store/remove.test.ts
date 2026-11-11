@@ -96,7 +96,7 @@ describe('remove', () => {
     expect((await tables()).rows.find((r) => r.id === rent)?.archivedMonth).toBeNull()
   })
 
-  it('deleting an account clears the plain rows and schedules that named it; pool accounts block; archiving stops the balance and takes its pool accounts along', async () => {
+  it('deleting an account clears the plain rows and schedules that named it; virtual accounts block; archiving stops the balance and takes its virtual accounts along', async () => {
     const { store, tables, engine } = await demo()
     let t = await tables()
     const main = idOf(t, 'accounts', 'Main account')
@@ -115,7 +115,7 @@ describe('remove', () => {
     t = await tables()
     expect(t.accounts.find((a) => a.id === savings)?.archivedMonth).toBe(TODAY)
     expect(t.pools.filter((p) => p.accountId === savings).map((p) => p.archivedMonth)).toEqual([TODAY, TODAY])
-    expect(t.rows.find((r) => r.name === 'Travel pool')?.archivedMonth).toBe(TODAY)
+    expect(t.rows.find((r) => r.name === 'To Travel')?.archivedMonth).toBe(TODAY)
     expect(t.rows.find((r) => r.name === 'Travel')?.defaultFundedBy).toBe('savings')
     // October's pool spending keeps its source, November's moves to savings
     const travelId = idOf(t, 'pools', 'Travel')
@@ -131,10 +131,10 @@ describe('remove', () => {
     await restoreAccount(store, savings)
     t = await tables()
     expect(t.accounts.find((a) => a.id === savings)?.archivedMonth).toBeNull()
-    expect(t.pools.find((p) => p.id === travelId)?.archivedMonth).toBe(TODAY) // pool accounts stay put until restored themselves
+    expect(t.pools.find((p) => p.id === travelId)?.archivedMonth).toBe(TODAY) // virtual accounts stay put until restored themselves
   })
 
-  it('deleting a fresh pool account removes the row that fills it and moves its spending to savings', async () => {
+  it('deleting a fresh virtual account removes the row that fills it and moves its spending to savings', async () => {
     const { store, tables } = await demo()
     let t = await tables()
     const gifts = await addPool(store, { name: 'Gifts', accountId: idOf(t, 'accounts', 'Savings'), monthlyAllocation: 5000, fromMonth: TODAY, createSpendRow: true })

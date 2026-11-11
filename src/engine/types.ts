@@ -40,6 +40,12 @@ export interface CellResult {
   missingRate: boolean
   /** The base-currency value used a projected (drifted) rate. */
   rateProjected: boolean
+  /**
+   * A category's estimate row only: what was typed for the whole category, in the row's currency and in the base
+   * currency. `value` and `valueBase` are what its other rows have not explained yet.
+   */
+  estimate?: Money
+  estimateBase?: Money
   cell: Cell | null
 }
 
@@ -55,7 +61,6 @@ export interface MonthTotals {
   allocationsByPool: Record<string, Money>
   toInvestment: Money
   pocket: Money
-  pocketTotal: Money
   debt: Money
   buffer: Money
   /** Positive = into savings, negative = drawn from savings. */
@@ -65,6 +70,16 @@ export interface MonthTotals {
   fromSavingsDerived: Money
   expensesTotal: Money
   transfersTotal: Money
+  /** The part of `income` that was taken out of your own accounts by hand (savings, investments): money in, not earned. */
+  fromAccounts: Money
+  /** Income minus what is deducted from it, without money taken out of accounts: what a share of income counts. */
+  takeHome: Money
+  /** The same per person or thing the income rows belong to (entity id → amount); a shared income is in nobody's. */
+  takeHomeBy: Record<string, Money>
+  /** What the month had left for the shares of what is left: after spending, typed amounts, shares of income and the buffer; never below zero. */
+  leftForShares: Money
+  /** The rest of the month as worked out for the rest row (negative = drawn back); null when nothing takes the rest this month. */
+  rest: Money | null
 }
 
 export interface AccountMonthResult {
@@ -96,9 +111,12 @@ export interface AccountSeries {
 }
 
 export interface PoolMonthResult {
+  /** Never below zero: a virtual account that is asked for more than it holds stops at nothing. */
   balance: Money
   allocation: Money
   spend: Money
+  /** What the month took beyond what the virtual account held; it came out of the unassigned part of its savings account. */
+  short: Money
 }
 
 export interface PoolSeries {
@@ -111,6 +129,33 @@ export interface RowTotals {
   shareOfIncome: number
 }
 
+export interface MainAccountMonth {
+  /** Balance when the month began, in the base currency. */
+  start: Money
+  /** What the month left in the account: the cash buffer or the leftover. Negative when the month overran. */
+  kept: Money
+  /** Bought on an itemized card this month: spent on paper, the cash is still here. */
+  cardBought: Money
+  /** Paid to an itemized card this month. */
+  cardPaid: Money
+  /** What the plan works out for the end of the month: start + kept + bought on the card − paid to it. */
+  computed: Money
+  /** Every current account open this month has a real balance: `balance` is their sum, not `computed`. */
+  entered: boolean
+  /** With `entered`: the real balances together minus `computed`. Zero otherwise. */
+  adjustment: Money
+  balance: Money
+}
+
+/** The current, joint and cash accounts together, as one calculated balance (see `mainAccount.ts`). */
+export interface MainAccountSeries {
+  /** The current, joint and cash accounts counted, in their own order. */
+  accountIds: string[]
+  /** An opening balance in another currency had no rate and was taken 1:1. */
+  missingRate: boolean
+  months: Record<MonthKey, MainAccountMonth>
+}
+
 export interface EngineOutput {
   months: MonthKey[]
   /** Visible rows in display order. */
@@ -121,10 +166,17 @@ export interface EngineOutput {
   pools: Record<string, PoolSeries>
   rowTotals: Record<string, RowTotals>
   incomeTotal: Money
-  /** Tracked assets minus tracked debts, in the base currency. */
+  /**
+   * What stays in the main account (the current, joint and cash accounts together), worked out from the household's
+   * first month on. Null only when there is no household or no month.
+   */
+  main: MainAccountSeries | null
+  /** Tracked assets and the main account's calculated balance, minus tracked debts, in the base currency. */
   netWorth: Record<MonthKey, Money>
   /** Rows whose months are filled by recurring items instead of carry-forward. */
   recurringRowIds: string[]
+  /** The savings account that spending "from savings" comes out of; null without a savings account. */
+  primarySavingsId: string | null
   warnings: string[]
 }
 

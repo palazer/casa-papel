@@ -1,4 +1,4 @@
-import type { AccountType, EntityKind, GoalKind, RowKind, Section } from './schema'
+import type { AccountType, EntityKind, GoalKind, RowKind, RowRule, Section } from './schema'
 
 /** A suggested row. `{name}` in the title is replaced with the entity's name. */
 export interface RowTemplate {
@@ -13,14 +13,13 @@ export interface RowTemplate {
   scope?: 'entity' | 'shared'
   /** Tag the row with the entity so per-entity views can find it. */
   tag?: boolean
-  inShareBasis?: boolean
-  /** Pocket money row sharing the household pocket total. */
+  /** An adult's pocket money: a line of its own, with an amount or a rule. */
   pocket?: boolean
   /** Needs a destination account of this type. */
   account?: 'savings' | 'investment' | 'loan'
   /** Creates a pool with an allocation row; the row itself is the pool-funded spend. */
   pool?: boolean
-  /** Pre-ticked in the wizard. */
+  /** One of the usual rows: the Statement suggests it straight away, the others wait behind "More suggestions". */
   recommended?: boolean
   /** The usual expense category the row belongs to, by name, when the household has it. */
   category?: string
@@ -38,19 +37,19 @@ export const HOUSEHOLD_TEMPLATES: RowTemplate[] = [
   { key: 'h.gym', title: 'Gym & sports', description: 'Memberships and sports.', section: 'expense', category: 'Personal' },
   { key: 'h.insurance', title: 'Insurance & tax', description: 'Liability and household insurance, taxes not tied to a car or home.', section: 'expense', defaultStatus: 'committed', recommended: true, category: 'Living' },
   { key: 'h.other', title: 'Other', description: 'Whatever fits nowhere else. Treated as an estimate.', section: 'expense', recommended: true },
-  { key: 'h.poolTravel', title: 'Travel', description: 'Pool account: set aside a monthly amount in savings, spend it when you travel.', section: 'expense', pool: true, recommended: true, category: 'Fun' },
-  { key: 'h.poolClothing', title: 'Clothing', description: 'Pool account: a monthly amount set aside for clothes.', section: 'expense', pool: true, category: 'Fun' },
-  { key: 'h.poolFun', title: 'Entertainment & dining out', description: 'Pool account: a monthly amount set aside for going out.', section: 'expense', pool: true, category: 'Fun' },
+  { key: 'h.poolTravel', title: 'Travel', description: 'Virtual account: set aside a monthly amount in savings, spend it when you travel.', section: 'expense', pool: true, recommended: true, category: 'Fun' },
+  { key: 'h.poolClothing', title: 'Clothing', description: 'Virtual account: a monthly amount set aside for clothes.', section: 'expense', pool: true, category: 'Fun' },
+  { key: 'h.poolFun', title: 'Entertainment & dining out', description: 'Virtual account: a monthly amount set aside for going out.', section: 'expense', pool: true, category: 'Fun' },
   { key: 'h.toSavings', title: 'To savings', description: 'What is left at month end moves to savings. Filled in automatically unless your month-end rule says you decide it.', section: 'transfer', kind: 'to-savings', defaultStatus: 'committed', account: 'savings', recommended: true },
   { key: 'h.toInvestments', title: 'To investments', description: 'A fixed monthly deposit into an investment account.', section: 'transfer', kind: 'to-investment', defaultStatus: 'committed', account: 'investment' },
 ]
 
 export const ENTITY_TEMPLATES: Record<EntityKind, RowTemplate[]> = {
   adult: [
-    { key: 'a.salary', title: '{name} – Salary', description: 'Net salary after tax. Counted as certain.', section: 'income', kind: 'salary', defaultStatus: 'committed', scope: 'entity', inShareBasis: true, recommended: true },
+    { key: 'a.salary', title: '{name} – Salary', description: 'Net salary after tax. Counted as certain.', section: 'income', kind: 'salary', defaultStatus: 'committed', scope: 'entity', recommended: true },
     { key: 'a.extra', title: '{name} – Extra income', description: 'Bonuses, freelance work, side income.', section: 'income', scope: 'entity' },
     { key: 'a.personal', title: '{name} – Personal', description: 'Own spending the household pays for, like a phone contract or a membership.', section: 'expense', scope: 'entity', recommended: true, category: 'Personal' },
-    { key: 'a.pocket', title: '{name} – Pocket', description: 'This adult\'s share of the pocket money total. Computed, not typed.', section: 'transfer', kind: 'pocket-money', defaultStatus: 'committed', scope: 'entity', pocket: true, recommended: true },
+    { key: 'a.pocket', title: '{name} – Pocket', description: 'Money this adult spends freely each month: an amount you type, or a percentage once the line has a rule.', section: 'transfer', kind: 'pocket-money', defaultStatus: 'committed', scope: 'entity', pocket: true, recommended: true },
   ],
   child: [
     { key: 'c.benefit', title: '{name} – Child benefit', description: 'State child benefit or allowance.', section: 'income', defaultStatus: 'committed', scope: 'entity', tag: true, recommended: true },
@@ -97,7 +96,7 @@ export const ENTITY_KIND_LABEL: Record<EntityKind, string> = {
 
 export const ENTITY_KIND_HELP: Record<EntityKind, string> = {
   adult: 'Someone with their own income or personal spending.',
-  child: 'Child benefit, childcare and long-term savings rows. "Paid by" says whose income carries the costs when contributions are split.',
+  child: 'Child benefit, childcare and long-term savings rows.',
   pet: 'Food, vet, insurance and tax rows.',
   vehicle: 'Insurance, fuel, loan or lease, maintenance rows.',
   property: 'The place you live, rented or owned, or another property. Rent or mortgage, utilities, internet and insurance rows.',
@@ -111,17 +110,36 @@ export const SECTION_INFO: Record<Section, { label: string; blurb: string }> = {
   transfer: { label: 'Moving money', blurb: 'From one of your accounts to another, or to a person\'s pocket. Not spending, so it is never counted as an expense.' },
 }
 
-export const GOAL_KIND_INFO: Array<{ value: GoalKind; label: string; help: string }> = [
-  { value: 'account-balance', label: 'Grow an account to an amount', help: 'A savings, investment or other asset reaches a balance. Compared in the account\'s own currency.' },
-  { value: 'pool-balance', label: 'Fill a pool account', help: 'The pool account holds the amount: monthly set-asides minus what comes out of it.' },
-  { value: 'pay-off', label: 'Pay off a card or loan', help: 'Done when nothing is owed. Progress counts down from what was owed when you set the goal.' },
-  { value: 'net-worth', label: 'Reach a net worth', help: 'Tracked assets minus tracked debts, in your base currency; the number shown in Moves.' },
+/**
+ * What a goal is for, as the app asks it: fill an account or a virtual account to an amount, or pay a debt down to one.
+ * Net worth is the third, set only from the Statement's Net worth line. The stored kinds stay as they were: "fill" is
+ * `account-balance` or `pool-balance` by what it watches, "pay-down" is `pay-off`.
+ */
+export type GoalFamily = 'fill' | 'pay-down' | 'net-worth'
+export const goalFamilyOf = (kind: GoalKind): GoalFamily => (kind === 'pay-off' ? 'pay-down' : kind === 'net-worth' ? 'net-worth' : 'fill')
+
+export const GOAL_KIND_INFO: Array<{ value: GoalFamily; label: string; help: string }> = [
+  { value: 'fill', label: 'Fill an account', help: 'A savings, investment or other asset account, or a virtual account, reaches an amount. An account is compared in its own currency.' },
+  { value: 'pay-down', label: 'Pay down a debt', help: 'A card or loan comes down to an amount, zero unless you type another. Progress counts down from what was owed when you set the goal.' },
+  { value: 'net-worth', label: 'Reach a net worth', help: 'Everything you have, what stays in the main account included, minus what you owe, in your base currency. Set it from the "Net worth" line on the Statement.' },
+]
+
+/**
+ * How the transfer into an account, or an adult's pocket money, is worked out each month: the rule dialog's choices,
+ * one sentence each. An account is offered all but the adult's own income; pocket money all but the rest.
+ */
+export const RULE_KIND_INFO: Array<{ value: RowRule; label: string; help: string }> = [
+  { value: 'fixed', label: 'A fixed amount', help: 'The same amount every month until you change it.' },
+  { value: 'share-of-income', label: 'A percentage of income', help: 'A share of the month\'s take-home income: what comes in, minus what is deducted from it. Money taken out of investments does not count.' },
+  { value: 'share-of-own-income', label: 'A percentage of their own income', help: 'Pocket money only: a share of what the adult it is for takes home, the income lines that belong to them minus what is deducted from those. An income the household shares counts for nobody.' },
+  { value: 'share-of-rest', label: 'A percentage of what is left', help: 'A share of what the month has left after spending, fixed amounts, percentages of income and the cash kept in the account. Nothing in a month that overruns.' },
+  { value: 'rest', label: 'The rest', help: 'Everything that is left after all of that. One account can take the rest, and the same account fills the gap in a month that overruns.' },
 ]
 
 export const ACCOUNT_TYPE_INFO: Array<{ value: AccountType; label: string; help: string }> = [
-  { value: 'checking', label: 'Current account', help: 'Where salary lands and bills leave. Day-to-day money; its balance is not tracked.' },
+  { value: 'checking', label: 'Current account', help: 'Where salary lands and bills leave. Day-to-day money; its balance is worked out, and you can type what the bank says.' },
   { value: 'joint', label: 'Joint account', help: 'A shared account partners pay into for shared bills. Pick this when a fixed amount moves there every month.' },
-  { value: 'savings', label: 'Savings', help: 'Where the month\'s leftover goes. The balance is tracked month by month, and pool accounts live inside it.' },
+  { value: 'savings', label: 'Savings', help: 'Where the month\'s leftover goes. The balance is tracked month by month, and virtual accounts live inside it.' },
   { value: 'investment', label: 'Investments', help: 'Broker, fund or pension account. Deposits and value are tracked.' },
   { value: 'credit-card', label: 'Credit card', help: 'Spend now, pay later. The open balance is tracked.' },
   { value: 'loan', label: 'Loan', help: 'Money you owe. Payments bring the outstanding amount down.' },

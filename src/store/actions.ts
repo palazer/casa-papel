@@ -1,8 +1,8 @@
 import { generateKeyBetween } from 'fractional-indexing'
 import { computeEngine, cellKey, sortRows, type EngineOutput } from '@/engine'
 import {
-  ACCOUNT_TYPE_INFO, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RowSchema, addMonths, cardIsItemized, compareMonths, monthKey, monthOfDate, monthRange, newId, parseMonth, poolIdOf,
-  type Account, type Cell, type CellInput, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Pool, type Row, type RowKind, type Tables,
+  ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RowSchema, addMonths, canCarryRule, canTakeRest, cardIsItemized, compareMonths, isOldPocketShare, isShareRule, monthKey, monthOfDate, monthRange, newId, parseMonth, poolIdOf, resolveRules, sharePercent,
+  type Account, type Category, type Cell, type CellInput, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Pool, type Row, type RowKind, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
 import { planEnd } from './months'
@@ -47,12 +47,19 @@ const putCell = (cell: CellInput): Mutation => ({ op: 'put', table: 'cells', rec
 function freezeNext(tables: Tables, engine: EngineOutput, rowId: string, month: MonthKey): Mutation[] {
   // a scheduled row never carries forward, so there is nothing to freeze (and a value cell there would post a phantom amount)
   if (engine.recurringRowIds.includes(rowId)) return []
+  // a row a rule works out fills its own months: holding the next one would take that month away from the rule
+  const row = tables.rows.find((r) => r.id === rowId)
+  const household = tables.household.find((h) => !h.deletedAt)
+  if (row && household && (resolveRules(engine.rows, household.closingRule).byRow.has(rowId) || isOldPocketShare(row))) return []
   const next = addMonths(month, 1)
   const nextCell = cellOf(tables, rowId, next)
   const current = engine.cells[cellKey(rowId, month)]
-  if (!current || current.source === 'empty') return []
+  if (!current) return []
   if (nextCell && nextCell.mode !== 'inherit') return []
-  return [putCell({ rowId, month: next, mode: 'value', value: current.value, items: [], note: null, currencyOverride: null, updatedAt: now() })]
+  // A row that had no amount yet goes back to none after this month: without the zero the new amount would carry on.
+  // A category's estimate carries what was typed, not what its rows have left of it.
+  const held = current.source === 'empty' ? 0 : current.estimate ?? current.value
+  return [putCell({ rowId, month: next, mode: 'value', value: held, items: [], note: null, currencyOverride: null, updatedAt: now() })]
 }
 
 export async function setCellValue(store: Store, rowId: string, month: MonthKey, value: Money, scope: EditScope): Promise<void> {
@@ -116,7 +123,7 @@ function groupRows(tables: Tables, r: Pick<Row, 'section' | 'categoryId'>): Row[
 }
 
 /** The put for a new row at the end of its group, or right after `afterRowId`; the caller commits. */
-function newRowMutation(tables: Tables, input: Partial<Row> & { name: string; section: Row['section'] }, afterRowId?: string): { row: Row; mutation: Mutation } {
+export function newRowMutation(tables: Tables, input: Partial<Row> & { name: string; section: Row['section'] }, afterRowId?: string): { row: Row; mutation: Mutation } {
   const after = afterRowId ? tables.rows.find((r) => r.id === afterRowId && !r.deletedAt) : undefined
   const categoryId = input.categoryId !== undefined ? input.categoryId : after?.categoryId ?? null
   if (categoryId && groupKey(tables, { section: input.section, categoryId }) === null) throw new Error('That category is not in this section.')
@@ -142,13 +149,16 @@ export async function addRow(store: Store, input: Partial<Row> & { name: string;
   return row
 }
 
-/** What a new row under Transfers does; `plain` just moves money between your accounts, `card-payment` pays a card whose purchases are already expense rows. */
-export type TransferRowKind = 'plain' | 'to-savings' | 'to-investment' | 'pool-allocation' | 'pocket-money' | 'card-payment'
+/**
+ * What a new row under Transfers does; `plain` just moves money between your accounts, `card-payment` pays a card whose
+ * purchases are already expense rows, `from-savings` and `from-investment` take money out of an account into the month.
+ */
+export type TransferRowKind = 'plain' | 'to-savings' | 'to-investment' | 'pool-allocation' | 'pocket-money' | 'card-payment' | 'from-savings' | 'from-investment'
 /** What a new row under Expenses does: a normal expense, or a payment that brings a loan or card down. */
 export type ExpenseRowKind = 'plain' | 'pay-off'
 
 /**
- * What a new row can point at: live, unarchived accounts and pool accounts, live adults, and whether the savings plug
+ * What a new row can point at: live, unarchived accounts and virtual accounts, live adults, and whether the savings plug
  * already has its row. The grid's "Add row" and `addRowOfKind` both read this, so what is offered is what is accepted.
  */
 export function rowTargets(tables: Tables, household: Household | undefined) {
@@ -162,10 +172,11 @@ export function rowTargets(tables: Tables, household: Household | undefined) {
     payoff: accounts.filter((a) => a.type === 'loan' || (a.type === 'credit-card' && !cardIsItemized(a))),
     /** cards whose purchases are expense rows: their payment is a transfer, so it is offered under Transfers */
     cardsItemized: accounts.filter(cardIsItemized),
-    /** pool accounts whose row was deleted, so they can be filled again */
+    /** virtual accounts whose row was deleted, so they can be filled again */
     orphanPools: live(tables.pools).filter((p) => !p.allocationRowId || !rows.some((r) => r.id === p.allocationRowId)),
     adults: live(tables.entities).filter((e) => e.kind === 'adult'),
-    plugTaken: household?.closingRule === 'savings-plug' && rows.some((r) => r.kind === 'to-savings'),
+    /** the rest of the month already has its row: a further "to savings" row gets a fixed amount of its own */
+    plugTaken: !!household && resolveRules(sortRows(rows, tables.categories), household.closingRule).restRowId !== null,
   }
 }
 
@@ -180,14 +191,14 @@ export interface RowOfKindInput {
 }
 
 /**
- * "Add row" under Transfers and Expenses. A deposit row needs its account, a pool row the pool account it fills (one
+ * "Add row" under Transfers and Expenses. A deposit row needs its account, a pool row the virtual account it fills (one
  * that lost its row), pocket money the adult it is for, a payment row the loan or card it brings down; everything is
  * checked here so the grid can say what is missing.
  */
 export async function addRowOfKind(store: Store, input: RowOfKindInput): Promise<Row> {
   const tables = await loadTables(store)
   const targets = rowTargets(tables, tables.household.find((h) => !h.deletedAt))
-  const transferOnly: string[] = ['to-savings', 'to-investment', 'pool-allocation', 'pocket-money', 'card-payment']
+  const transferOnly: string[] = ['to-savings', 'to-investment', 'pool-allocation', 'pocket-money', 'card-payment', 'from-savings', 'from-investment']
   if ((input.section === 'expense' && transferOnly.includes(input.kind)) || (input.section === 'transfer' && input.kind === 'pay-off')) {
     throw new Error('That kind of row does not belong in this section.')
   }
@@ -207,10 +218,11 @@ export async function addRowOfKind(store: Store, input: RowOfKindInput): Promise
     if (acc.archivedMonth) throw new Error(`"${acc.name}" is archived.`)
     if (!targets.cardsItemized.some((a) => a.id === acc.id)) throw new Error(`"${acc.name}" records only its payment, as spending: add it under Expenses with "Pays off a loan or card".`)
     base.accountId = acc.id
-  } else if (input.kind === 'to-savings' || input.kind === 'to-investment') {
-    if (input.kind === 'to-savings' && targets.plugTaken) throw new Error('The month-end rule already fills a "to savings" row; a second one would stay at zero.')
+  } else if (input.kind === 'to-savings' || input.kind === 'to-investment' || input.kind === 'from-savings' || input.kind === 'from-investment') {
     const acc = checkAccountForRow(tables, { kind: input.kind, name: input.name }, input.accountId ?? null)
     if (acc) base.accountId = acc.id
+    // beside the row that takes the rest, a further savings row is typed: said outright, or it would read as idle
+    if (input.kind === 'to-savings' && targets.plugTaken) base.rule = 'fixed'
   } else if (input.kind === 'pocket-money') {
     const adult = targets.adults.find((e) => e.id === input.adultId)
     if (!adult) throw new Error('Pick the adult the pocket money is for.')
@@ -219,7 +231,7 @@ export async function addRowOfKind(store: Store, input: RowOfKindInput): Promise
   let pool: Pool | undefined
   if (input.kind === 'pool-allocation') {
     const found = tables.pools.find((p) => p.id === input.poolId && !p.deletedAt)
-    if (!found) throw new Error('Pick the pool account this row fills.')
+    if (!found) throw new Error('Pick the virtual account this row fills.')
     if (found.archivedMonth) throw new Error(`"${found.name}" is archived.`)
     if (!targets.orphanPools.some((p) => p.id === found.id)) throw new Error(`"${found.name}" is already filled by another row.`)
     base.accountId = found.accountId
@@ -230,6 +242,105 @@ export async function addRowOfKind(store: Store, input: RowOfKindInput): Promise
   if (pool) mutations.push({ op: 'put', table: 'pools', record: PoolSchema.parse({ ...pool, allocationRowId: row.id, updatedAt: now() }) })
   await store.commit(mutations)
   return row
+}
+
+// ---------- category estimates ----------
+
+/** The row that carries a category's estimate; the Grid shows it by this name. */
+export const estimateRowName = (category: Pick<Category, 'name'>): string => `${category.name} – Not broken down yet`
+
+/** A category's estimate row, archived or not; there is one per category at most. */
+export const estimateRowOf = (tables: Tables, categoryId: string): Row | undefined =>
+  tables.rows.find((r) => !r.deletedAt && r.kind === 'category-estimate' && r.categoryId === categoryId)
+
+/**
+ * The puts that give an expense category its estimate from `month`: the estimate row on first use (at the end of the
+ * category, back from the archive if it was there) and its amount for the month. `this-month` holds the following
+ * month at what it was before, 0 for a category that had none. `previous` is the estimate the month showed until now.
+ * Pure; the caller commits, so a new category and its estimate can be one step.
+ */
+export function categoryEstimateMutations(tables: Tables, category: Category, month: MonthKey, amount: Money, scope: EditScope, previous: Money = 0): { row: Row; mutations: Mutation[] } {
+  if (category.section !== 'expense') throw new Error('Only an expense category can have an estimate.')
+  if (!Number.isFinite(amount) || amount < 0) throw new Error('An estimate cannot be below zero.')
+  const mutations: Mutation[] = []
+  let row = estimateRowOf(tables, category.id)
+  if (!row) {
+    const made = newRowMutation(tables, { name: estimateRowName(category), section: 'expense', kind: 'category-estimate', categoryId: category.id })
+    row = made.row
+    mutations.push(made.mutation)
+  } else if (row.archivedMonth) {
+    row = RowSchema.parse({ ...row, archivedMonth: null, updatedAt: now() })
+    mutations.push({ op: 'put', table: 'rows', record: row })
+  }
+  const existing = cellOf(tables, row.id, month)
+  mutations.push(putCell({ rowId: row.id, month, mode: 'value', value: amount, items: [], note: existing?.note ?? null, currencyOverride: null, markedDone: existing?.markedDone, updatedAt: now() }))
+  if (scope === 'this-month') {
+    const next = addMonths(month, 1)
+    const nextCell = cellOf(tables, row.id, next)
+    if (!nextCell || nextCell.mode === 'inherit') mutations.push(putCell({ rowId: row.id, month: next, mode: 'value', value: previous, items: [], note: nextCell?.note ?? null, currencyOverride: null, updatedAt: now() }))
+  }
+  return { row, mutations }
+}
+
+/**
+ * What an expense category is expected to come to in a month, typed before its rows are known. The category's rows
+ * are taken off it and the rest counts as "Not broken down yet"; once they add up to more, they are the category.
+ * 0 takes the estimate away from this month on (or for this month only). One commit.
+ */
+export async function setCategoryEstimate(store: Store, categoryId: string, month: MonthKey, amount: Money, scope: EditScope = 'from-now-on'): Promise<Row> {
+  const { tables, engine } = await engineUpTo(store, month)
+  assertOpen(tables, month)
+  const category = tables.categories.find((c) => c.id === categoryId && !c.deletedAt)
+  if (!category) throw new Error('That category no longer exists.')
+  const known = estimateRowOf(tables, categoryId)
+  const previous = known ? engine.cells[cellKey(known.id, month)]?.estimate ?? 0 : 0
+  const { row, mutations } = categoryEstimateMutations(tables, category, month, amount, scope, previous)
+  await store.commit(mutations)
+  return row
+}
+
+/** The row a card's unrecorded spending is booked on: named after the card and paid from it. */
+export const unrecordedRowName = (card: Pick<Account, 'name'>): string => `${card.name} – Not recorded`
+
+/**
+ * Pin what is really owed on a card and, when that is more than the plan expects, book the difference as that month's
+ * spending on the card, so the month's expenses and the debt agree. Only for a card whose purchases are expense rows:
+ * on any other card the payment is the recorded spending, and booking purchases as well would count them twice.
+ * The difference lands as a done item "Not recorded" on the card's own "<card> – Not recorded" row (made on first use);
+ * the following month is held at zero so the amount does not carry forward. One commit, so one undo takes it all back.
+ * Returns what was booked, 0 when the real balance is not above the expected one.
+ */
+export async function setCardBalanceBooked(store: Store, accountId: string, month: MonthKey, actualBalance: Money): Promise<Money> {
+  const { tables, engine, household } = await engineUpTo(store, month)
+  assertOpen(tables, month)
+  const card = tables.accounts.find((a) => a.id === accountId && !a.deletedAt)
+  if (!card || !cardIsItemized(card)) throw new Error('Only a card whose purchases are expense rows can count a difference as spending.')
+  const expected = engine.accounts[card.id]?.months[month]?.computed
+  if (expected == null) throw new Error(`"${card.name}" has no balance in ${month}.`)
+  const extra = actualBalance - expected
+  const mutations: Mutation[] = []
+  if (extra > 0) {
+    const name = unrecordedRowName(card)
+    let row = tables.rows.find((r) => !r.deletedAt && !r.archivedMonth && r.section === 'expense' && r.kind === 'plain' && r.accountId === card.id && r.name === name)
+    if (!row) {
+      const made = newRowMutation(tables, { name, section: 'expense', categoryId: null, accountId: card.id, currency: card.currency === household.baseCurrency ? null : card.currency, defaultStatus: 'committed' })
+      row = made.row
+      mutations.push(made.mutation)
+    }
+    const existing = cellOf(tables, row.id, month)
+    const kept: CellItem[] = existing?.mode === 'items' ? [...existing.items]
+      : existing?.mode === 'value' && existing.value ? [{ id: newId(), label: '', amount: existing.value, status: row.defaultStatus, fundedBy: row.defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }]
+      : []
+    const booked: CellItem = { id: newId(), label: 'Not recorded', amount: extra, status: 'done', fundedBy: 'cash', date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }
+    mutations.push(putCell({ rowId: row.id, month, mode: 'items', value: null, items: [...kept, booked], note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, updatedAt: now() }))
+    const next = addMonths(month, 1)
+    const nextCell = cellOf(tables, row.id, next)
+    if (!nextCell || nextCell.mode === 'inherit') mutations.push(putCell({ rowId: row.id, month: next, mode: 'value', value: 0, items: [], note: nextCell?.note ?? null, currencyOverride: nextCell?.currencyOverride ?? null, updatedAt: now() }))
+  }
+  const known = tables.accountMonths.find((a) => a.accountId === accountId && a.month === month)
+  mutations.push({ op: 'put', table: 'accountMonths', record: AccountMonthSchema.parse({ ...known, accountId, month, actualBalance, updatedAt: now() }) })
+  await store.commit(mutations)
+  return Math.max(0, extra)
 }
 
 export async function updateRow(store: Store, rowId: string, patch: Partial<Omit<Row, 'id' | 'createdAt'>>): Promise<void> {
@@ -311,7 +422,7 @@ export async function quickCreateHousehold(store: Store, input: QuickHousehold):
     openingBalance: 0, openingMonth: input.startMonth, tracked: true,
   })
   const starters: Array<Partial<Row> & { name: string; section: Row['section'] }> = [
-    { name: 'Salary', section: 'income', kind: 'salary', defaultStatus: 'committed', inShareBasis: true },
+    { name: 'Salary', section: 'income', kind: 'salary', defaultStatus: 'committed' },
     { name: 'Other income', section: 'income' },
     { name: 'Rent', section: 'expense', defaultStatus: 'committed' },
     { name: 'Groceries', section: 'expense' },
@@ -385,81 +496,26 @@ export async function setDerivedDone(store: Store, rowId: string, month: MonthKe
   })])
 }
 
-export interface PaidInput {
-  amount: Money
-  status: ItemStatus
-  date: string | null
-  note: string | null
-}
-
-const itemSig = (items: CellItem[]) =>
-  JSON.stringify(items.map((i) => [i.id, i.label, i.amount, i.status, i.fundedBy, i.date, i.note, i.recurringItemId, i.kind, i.skipped, i.pinned ?? false]))
-
-/**
- * The Month view's "Paid…" sheet: record what actually moved for one line this month. The target is the given item,
- * the cell's single live item, or a plain amount turned into one unlabelled item. Only this month changes: when the
- * amount differs from what the month showed, the next month is frozen at the old amount (never for scheduled rows,
- * which do not carry forward), and a scheduled item with a new amount is pinned so the schedule leaves it alone.
- */
-export async function markPaid(store: Store, rowId: string, month: MonthKey, itemId: string | null, input: PaidInput): Promise<void> {
-  const { tables, engine, household } = await engineUpTo(store, month)
-  assertOpen(tables, month)
-  const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
-  if (!row) throw new Error('Row not found')
-  const why = derivedRowReason(row, household.closingRule)
-  if (why) throw new Error(`${why} Tick it instead.`)
-  if (row.followsRowId) throw new Error(`"${row.name}" follows another row. Tick it instead.`)
-  const current = engine.cells[cellKey(rowId, month)]
-  if (!current || current.source === 'archived') throw new Error(`"${row.name}" is archived in ${month}.`)
-  const existing = cellOf(tables, rowId, month)
-  let items: CellItem[] = existing?.mode === 'items' ? [...existing.items] : []
-  let target: CellItem | undefined
-  if (itemId) {
-    target = items.find((i) => i.id === itemId)
-    if (!target) throw new Error('That item is gone.')
-  } else {
-    const live = items.filter((i) => !i.skipped)
-    if (live.length > 1) throw new Error('This cell has several items. Pick one.')
-    target = live[0]
-    if (!target) {
-      target = { id: newId(), label: '', amount: current.value, status: row.defaultStatus, fundedBy: row.defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }
-      items.push(target)
-    }
-  }
-  const shown = target.kind === 'carry' ? (current.items.find((i) => i.id === target!.id)?.effectiveAmount ?? 0) : target.amount
-  const changed = shown !== input.amount
-  const paid: CellItem = {
-    ...target, kind: 'normal', amount: input.amount, status: input.status, date: input.date, note: input.note, skipped: false,
-    pinned: target.recurringItemId ? target.pinned || changed : target.pinned,
-  }
-  items = items.map((i) => (i.id === paid.id ? paid : i))
-  if (existing?.mode === 'items' && itemSig(items) === itemSig(existing.items)) return
-  const mutations: Mutation[] = changed && current.source !== 'empty' ? freezeNext(tables, engine, rowId, month) : []
-  mutations.push(putCell({ rowId, month, mode: 'items', value: null, items, note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, markedDone: existing?.markedDone ?? false, updatedAt: now() }))
-  await store.commit(mutations)
-}
-
 // ---------- monthly defaults with a scope ----------
 
 export type MonthlyDefaultScope = 'from-now-on' | 'this-month' | 'all-open'
 
 /**
- * Change the pocket money total or the cash buffer. Closed months are never touched.
+ * Change the cash buffer (the cash kept in the account at month end). Closed months are never touched.
  * - 'this-month': an override for that month only; the default stays
  * - 'from-now-on': earlier open months are frozen at what they show now, the default changes
  * - 'all-open': every open month follows the new default (overrides dropped)
  */
-export async function setMonthlyDefault(store: Store, key: 'pocketTotal' | 'cashBuffer', value: Money, scope: MonthlyDefaultScope, month: MonthKey): Promise<void> {
+export async function setMonthlyDefault(store: Store, value: Money, scope: MonthlyDefaultScope, month: MonthKey): Promise<void> {
   const tables = await loadTables(store)
   const household = tables.household.find((h) => !h.deletedAt)
   if (!household) throw new Error('No household yet')
-  const overrideKey = key === 'pocketTotal' ? 'pocketTotalOverride' : 'cashBufferOverride'
   const states = new Map(tables.monthStates.map((s) => [s.month, s]))
   const ts = now()
   const mutations: Mutation[] = []
   const putState = (m: MonthKey, override: Money | null) => {
     const prev = states.get(m)
-    mutations.push({ op: 'put', table: 'monthStates', record: MonthStateSchema.parse({ month: m, closed: false, closedAt: null, ...prev, [overrideKey]: override, updatedAt: ts }) })
+    mutations.push({ op: 'put', table: 'monthStates', record: MonthStateSchema.parse({ month: m, closed: false, closedAt: null, ...prev, cashBufferOverride: override, updatedAt: ts }) })
   }
   if (scope === 'this-month') {
     if (states.get(month)?.closed) throw new Error('Month is closed')
@@ -468,15 +524,15 @@ export async function setMonthlyDefault(store: Store, key: 'pocketTotal' | 'cash
     if (scope === 'from-now-on' && compareMonths(month, household.startMonth) > 0) {
       for (const m of monthRange(household.startMonth, addMonths(month, -1))) {
         const s = states.get(m)
-        if (s?.closed || s?.[overrideKey] != null) continue
-        putState(m, household[key])
+        if (s?.closed || s?.cashBufferOverride != null) continue
+        putState(m, household.cashBuffer)
       }
     }
     for (const s of tables.monthStates) {
-      if (s.closed || s[overrideKey] == null) continue
+      if (s.closed || s.cashBufferOverride == null) continue
       if (scope === 'all-open' || compareMonths(s.month, month) >= 0) putState(s.month, null)
     }
-    mutations.push({ op: 'put', table: 'household', record: HouseholdSchema.parse({ ...household, [key]: value, updatedAt: ts }) })
+    mutations.push({ op: 'put', table: 'household', record: HouseholdSchema.parse({ ...household, cashBuffer: value, updatedAt: ts }) })
   }
   await store.commit(mutations)
 }
@@ -487,7 +543,7 @@ export type RowSourceScope = { from: MonthKey } | 'all-months'
 
 /**
  * Change where a row's single amounts come out of. With `{ from }`, every earlier month that showed
- * an amount is pinned to the old source (as one unlabelled item), so past savings and pool balances stay put.
+ * an amount is pinned to the old source (as one unlabelled item), so past savings and virtual account balances stay put.
  */
 export async function setRowFundedBy(store: Store, rowId: string, fundedBy: FundedBy, scope: RowSourceScope): Promise<void> {
   const tables = await loadTables(store)
@@ -497,10 +553,10 @@ export async function setRowFundedBy(store: Store, rowId: string, fundedBy: Fund
   await store.commit(planRowFundedBy(tables, row, fundedBy, scope, now()))
 }
 
-/** The mutations behind `setRowFundedBy`; archiving a pool account uses them too. */
+/** The mutations behind `setRowFundedBy`; archiving a virtual account uses them too. */
 export function planRowFundedBy(tables: Tables, row: Row, fundedBy: FundedBy, scope: RowSourceScope, ts: number): Mutation[] {
   const poolId = poolIdOf(fundedBy)
-  if (poolId && !tables.pools.some((p) => p.id === poolId && !p.deletedAt)) throw new Error('That pool account no longer exists.')
+  if (poolId && !tables.pools.some((p) => p.id === poolId && !p.deletedAt)) throw new Error('That virtual account no longer exists.')
   const mutations: Mutation[] = []
   if (scope !== 'all-months' && fundedBy !== row.defaultFundedBy) {
     const household = tables.household.find((h) => !h.deletedAt)
@@ -528,8 +584,16 @@ export function planRowFundedBy(tables: Tables, row: Row, fundedBy: FundedBy, sc
 
 /** Why a row has no amount of its own to mirror or replace, or null when it is an ordinary row. */
 export function derivedRowReason(row: Row, closingRule: Household['closingRule']): string | null {
-  if (row.kind === 'to-savings' && closingRule === 'savings-plug') return `"${row.name}" is worked out by the app from the rest of the month.`
-  if (row.kind === 'pocket-money' && row.pocketMode === 'share-of-pocket-total') return `"${row.name}" is a share of the pocket total.`
+  if (row.kind === 'category-estimate') return `"${row.name}" is what is left of its category's estimate.`
+  const rule = row.rule ?? null
+  if (canCarryRule(row) && isShareRule(rule)) {
+    return `"${row.name}" is worked out by its rule: ${sharePercent(row.ruleShare ?? 0)} of ${rule === 'share-of-income' ? 'income' : rule === 'share-of-own-income' ? 'their own income' : 'what is left'}.`
+  }
+  // the row that takes the rest (a transfer to any account), and under the first-savings-row default the idle ones
+  // beside it; a savings row with a fixed amount is typed like any other
+  const takesRest = closingRule === 'savings-plug' && ((canTakeRest(row) && rule === 'rest') || (row.kind === 'to-savings' && rule !== 'fixed'))
+  if (takesRest) return `"${row.name}" is worked out by the app from the rest of the month.`
+  if (isOldPocketShare(row)) return `"${row.name}" is a share of the pocket money total the household had before. Give it an amount or a rule of its own: row menu, "Rule…".`
   return null
 }
 
@@ -566,26 +630,23 @@ function scopePatch(row: Row, scope: string): Pick<Row, 'scope' | 'entityTags'> 
 }
 
 /**
- * Who a row belongs to: 'shared' or a person or thing. Income rows can also join or leave the share basis. An income row
- * takes the rows deducted from it along, since a tax on one person's salary is that person's.
+ * Who a row belongs to: 'shared' or a person or thing. An income row takes the rows deducted from it along, since a
+ * tax on one person's salary is that person's.
  */
-export async function setRowScope(store: Store, rowId: string, scope: string, inShareBasis?: boolean): Promise<void> {
+export async function setRowScope(store: Store, rowId: string, scope: string): Promise<void> {
   const tables = await loadTables(store)
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
   if (!row) throw new Error('Row not found')
   if (scope !== 'shared' && !tables.entities.some((e) => e.id === scope && !e.deletedAt)) throw new Error('That person or thing no longer exists.')
-  if (inShareBasis != null && row.section !== 'income') throw new Error('Only income rows can count for the split.')
   const ts = now()
-  // a shared income has no adult to count for, so the flag goes with the scope
-  const basis = scope === 'shared' ? false : (inShareBasis ?? row.inShareBasis)
-  const mutations: Mutation[] = [{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, ...scopePatch(row, scope), inShareBasis: basis, updatedAt: ts }) }]
+  const mutations: Mutation[] = [{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, ...scopePatch(row, scope), updatedAt: ts }) }]
   if (row.section === 'income') {
     for (const d of tables.rows) if (!d.deletedAt && d.deductedFromRowId === row.id) mutations.push({ op: 'put', table: 'rows', record: RowSchema.parse({ ...d, ...scopePatch(d, scope), updatedAt: ts }) })
   }
   await store.commit(mutations)
 }
 
-/** Take a spending row out of an income row (tax, a pension contribution): the income's net is what the shares count. `null` undoes it. */
+/** Take a spending row out of an income row (tax, a pension contribution): the income's net is what its owner takes home. `null` undoes it. */
 export async function setRowDeductedFrom(store: Store, rowId: string, incomeRowId: string | null): Promise<void> {
   const tables = await loadTables(store)
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
@@ -604,7 +665,7 @@ export async function setRowDeductedFrom(store: Store, rowId: string, incomeRowI
 }
 
 const ACCOUNT_TYPE_FOR_KIND: Partial<Record<RowKind, Account['type']>> = {
-  'to-savings': 'savings', 'to-investment': 'investment', 'from-investment': 'investment', 'debt-payment': 'loan', 'card-payment': 'credit-card',
+  'to-savings': 'savings', 'to-investment': 'investment', 'from-investment': 'investment', 'from-savings': 'savings', 'debt-payment': 'loan', 'card-payment': 'credit-card',
 }
 
 /** The account type a row of this kind must point at, or null when any account (or none) will do. */

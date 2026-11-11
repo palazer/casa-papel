@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
 async function loadDemo(page: Page) {
-  await page.goto('?demo=1')
+  await page.goto('?demo=1&screen=grid')
   await page.getByRole('button', { name: 'Load the demo household' }).click()
   await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
 }
@@ -9,84 +9,213 @@ async function loadDemo(page: Page) {
 test.describe('wave 1b', () => {
   test.use({ viewport: { width: 1400, height: 900 } })
 
-  test('setup wizard creates a household with people, things, accounts and suggested rows', async ({ page }) => {
+  test('a new household is set up on the Statement: the facts first, then suggestions, accounts and the rest, with the strip keeping count', async ({ page }) => {
     await page.goto('/')
     await page.getByRole('button', { name: 'Start on this device' }).click()
+
+    // the first screen: the format, the first month, the people and things. Nothing about accounts or how money is shared
+    await expect(page.getByRole('heading', { name: 'Set up your household' })).toBeVisible()
     await page.getByLabel('Household name').fill('Testers')
-    await page.getByRole('button', { name: 'Next' }).click()
     await page.getByLabel('Adult 1 name').fill('Ana')
+    await page.getByLabel('Adult 2 name').fill('ana')
+    await expect(page.getByRole('alert')).toContainText('"Ana" is used more than once')
+    await expect(page.getByRole('button', { name: 'Open the Statement' })).toBeDisabled()
     await page.getByLabel('Adult 2 name').fill('Ben')
     await page.getByRole('button', { name: 'Add child' }).click()
     await page.getByLabel('Child name').fill('Cal')
-    await page.getByLabel('Paid by').selectOption({ label: 'Paid by Ben' })
-    await page.getByRole('button', { name: 'Next' }).click()
-    await page.getByRole('button', { name: 'Add pet' }).click()
-    await page.getByLabel('Name').fill('Rex')
-    await page.getByRole('button', { name: 'Next' }).click()
-    await page.getByLabel('Opening balance').nth(1).fill('5000')
-    // an account in another currency: the opening balance is typed in it
-    await page.getByRole('button', { name: 'Add account' }).click()
-    await page.getByLabel('Account 3 name').fill('Broker')
-    await page.getByLabel('Account type').nth(2).selectOption('investment')
-    await page.getByLabel('Account currency').nth(2).selectOption('USD')
-    await expect(page.getByLabel('Opening balance').nth(2)).toHaveAttribute('placeholder', 'Opening USD')
-    await page.getByLabel('Opening balance').nth(2).fill('1000')
-    // a child's own investment account
-    await page.getByRole('button', { name: 'Add account' }).click()
-    await page.getByLabel('Account 4 name').fill('Cal fund')
-    await page.getByLabel('Account type').nth(3).selectOption('investment')
-    await page.getByLabel('Account 4 belongs to').selectOption({ label: 'Cal · child' })
-    await page.getByRole('button', { name: 'Next' }).click()
-    // rows: one subject at a time, grouped by money in / spending / moving money
-    await expect(page.getByRole('heading', { name: 'Rows for the household' })).toBeVisible()
-    await expect(page.getByRole('group', { name: /^Money in/ })).toBeVisible()
-    await expect(page.getByRole('group', { name: /^Spending/ })).toBeVisible()
-    // one deposit row per investment account, each with its own amount; typed amounts land in the first month
-    await expect(page.getByRole('checkbox', { name: /^To Broker/ })).toBeChecked()
-    await expect(page.getByRole('checkbox', { name: /^To Cal fund/ })).toBeChecked()
-    await page.getByLabel('To Broker per month').fill('200')
-    await page.getByLabel('Groceries per month').fill('600')
-    await page.getByLabel('Your own row name').fill('Garden')
-    await page.getByRole('button', { name: 'Add row' }).click()
-    await page.screenshot({ path: 'e2e/output/wizard-rows.png', fullPage: true })
-    // subject tabs jump straight to a person or thing; Next still walks them in order
-    await page.getByRole('tab', { name: /^Rex/ }).click()
-    await expect(page.getByRole('heading', { name: 'Rows for Rex' })).toBeVisible()
-    await page.getByRole('tab', { name: /^Ana/ }).click()
-    await expect(page.getByRole('heading', { name: 'Rows for Ana' })).toBeVisible()
-    await page.getByRole('button', { name: 'Next' }).click()
-    await expect(page.getByRole('heading', { name: 'Rows for Ben' })).toBeVisible()
-    await page.getByRole('button', { name: 'Next' }).click()
-    await expect(page.getByRole('heading', { name: 'Rows for Cal' })).toBeVisible()
-    // a child's long-term savings row goes into the child's own account by default
-    await page.getByRole('checkbox', { name: /^Cal – Long-term savings/ }).check()
-    await expect(page.getByLabel('Cal – Long-term savings account').locator('option:checked')).toHaveText('Cal fund')
-    await page.getByLabel('Cal – Long-term savings per month').fill('50')
-    await page.getByRole('button', { name: 'Next' }).click()
-    await expect(page.getByRole('heading', { name: 'Rows for Rex' })).toBeVisible()
-    await page.getByRole('button', { name: 'Next' }).click()
-    // the last step previews what will be created
-    await expect(page.getByText('from November 2026')).toBeVisible()
-    await expect(page.getByText('Cal fund · Investments · Cal')).toBeVisible()
-    await expect(page.getByText('€600.00 per month')).toBeVisible()
-    await expect(page.getByText('€200.00 per month')).toBeVisible()
-    await expect(page.getByText('Cal – Long-term savings → Cal fund')).toBeVisible()
-    await page.screenshot({ path: 'e2e/output/wizard-finish.png', fullPage: true })
-    await page.getByRole('button', { name: 'Create household' }).click()
+    await page.getByRole('button', { name: 'Add home' }).click()
+    await page.getByLabel('Home name').fill('The flat')
+    await expect(page.getByTestId('start-summary')).toHaveText('Makes Ana, Ben, Cal, The flat and the usual expense categories. Nothing else yet.')
+    await expect(page.getByLabel('Month-end rule')).toHaveCount(0)
+    await expect(page.getByLabel('How you share money')).toHaveCount(0)
+    await page.screenshot({ path: 'e2e/output/setup-start.png', fullPage: true })
+    await page.getByRole('button', { name: 'Open the Statement' }).click()
+
+    // the Statement opens on the first month: empty, balanced, the strip with everything still to do
+    await expect(page.getByRole('heading', { level: 1, name: 'Statement' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
+    const strip = page.getByTestId('setup-strip')
+    const step = (name: string) => strip.getByRole('button', { name: new RegExp(`^${name}`) })
+    const group = (name: string) => page.getByRole('group', { name: `Suggestions for ${name}` })
+    const moneyOut = page.getByRole('region', { name: 'Money out' })
+    const assets = page.getByRole('region', { name: 'Assets' })
+    const claims = page.getByRole('region', { name: 'Debts and net worth' })
+    const dlg = page.getByRole('dialog')
+    for (const name of ['Income', 'Accounts', 'Expenses', 'Where the rest goes', 'Goals']) await expect(step(name)).toHaveAttribute('data-done', 'false')
+    await expect(strip).toContainText('You are filling in November 2026, the first month.')
+    await expect(strip).toContainText('Start with what comes in')
+    await expect(page.getByRole('button', { name: 'Suggestions', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByTestId('total-in')).toHaveText('Total in€0.00')
+    await expect(page.getByTestId('total-out')).toHaveText('Total out€0.00')
+    await page.screenshot({ path: 'e2e/output/setup-statement-empty.png', fullPage: true })
+
+    // income: the step goes to its part with the cursor in the first amount; Enter adds the row
+    const income = group('Income')
+    await expect(income.locator('[data-suggestion]')).toHaveText([/^Ana – Salary/, /^Ben – Salary/, /^Cal – Child benefit/, /^Other income/])
+    await step('Income').click()
+    await expect(income.getByLabel('Amount per month for Ana – Salary')).toBeFocused()
+    await income.getByLabel('Amount per month for Ana – Salary').fill('3000')
+    await income.getByLabel('Amount per month for Ana – Salary').press('Enter')
+    await income.getByLabel('Amount per month for Ben – Salary').fill('2500')
+    await income.getByRole('button', { name: 'Add Ben – Salary' }).click()
+    await expect(page.getByTestId('total-in')).toHaveText('Total in€5,500.00')
+    await expect(step('Income')).toHaveAttribute('data-done', 'true')
+    await expect(strip).toContainText('Next, the accounts')
+    // not for us: it waits behind "More suggestions" with the two rarer ones
+    await income.getByRole('button', { name: 'Dismiss Other income' }).click()
+    await expect(income.getByRole('button', { name: 'More suggestions (3)' })).toBeVisible()
+    // nothing takes the rest yet, so the month shows what is left over
+    await expect(moneyOut.locator('[data-line]').filter({ hasText: 'Leftover' })).toContainText('€5,500.00')
+
+    // accounts: the usual two are offered under Assets
+    const offered = page.getByTestId('account-suggestions')
+    await expect(offered.locator('[data-suggestion]')).toHaveText([/^Main account/, /^Savings/])
+    await offered.getByRole('button', { name: 'Add Main account' }).click()
+    await expect(dlg.getByLabel('Name', { exact: true })).toHaveValue('Main account')
+    await expect(dlg.getByLabel('Type')).toHaveValue('checking')
+    await dlg.getByLabel('Holds at the start of November 2026 (EUR)').fill('500')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(step('Accounts')).toHaveAttribute('data-done', 'true')
+    await expect(offered.locator('[data-suggestion]')).toHaveText([/^Savings/])
+
+    // where the rest goes: without a savings account the step asks for one, and the new account is offered the rest
+    await step('Where the rest goes').click()
+    await expect(dlg.getByRole('heading', { name: 'New account' })).toBeVisible()
+    await expect(dlg.getByLabel('Name', { exact: true })).toHaveValue('Savings')
+    await expect(dlg.getByLabel('Type')).toHaveValue('savings')
+    await dlg.getByLabel('Holds at the start of November 2026 (EUR)').fill('9000')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg.getByRole('heading', { name: 'How much goes to Savings?' })).toBeVisible()
+    await expect(dlg.getByRole('radio', { name: 'The rest' })).toBeChecked()
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(step('Where the rest goes')).toHaveAttribute('data-done', 'true')
+    await expect(moneyOut.getByRole('button', { name: 'To Savings: €5,500.00' })).toBeVisible()
+    await expect(assets.locator('[data-line^="acc:"]').filter({ hasText: 'Savings' })).toContainText('€14,500.00')
+    await expect(page.getByTestId('account-suggestions')).toHaveCount(0)
+
+    // a card, asked in plain words what is recorded for it
+    await claims.getByRole('button', { name: 'Add a card or loan' }).click()
+    await dlg.getByLabel('Name', { exact: true }).fill('Visa')
+    await expect(dlg.getByLabel('Type')).toHaveValue('credit-card')
+    await dlg.getByRole('radio', { name: 'Only what I pay to it' }).click()
+    await expect(dlg).toContainText('Only the payment is a row')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(claims.locator('[data-line^="acc:"]').filter({ hasText: 'Visa' })).toBeVisible()
+
+    // expenses: each category offers its usual rows; the rest follows every amount
+    const housing = group('Housing')
+    await expect(housing.locator('[data-suggestion]')).toHaveText([/^The flat – Rent or mortgage/, /^The flat – Utilities/])
+    await housing.getByLabel('Amount per month for The flat – Rent or mortgage').fill('1400')
+    await housing.getByLabel('Amount per month for The flat – Rent or mortgage').press('Enter')
+    await expect(moneyOut.getByRole('button', { name: /^The flat – Rent or mortgage: €1,400\.00/ })).toBeVisible()
+    await expect(step('Expenses')).toHaveAttribute('data-done', 'true')
+    await expect(moneyOut.getByRole('button', { name: 'To Savings: €4,100.00' })).toBeVisible()
+    // one that comes with its virtual account: the amount is what is set aside each month
+    const fun = group('Fun')
+    await fun.getByLabel('Set aside per month for Travel').fill('200')
+    await fun.getByLabel('Set aside per month for Travel').press('Enter')
+    await expect(assets.locator('[data-line^="pool:"]').filter({ hasText: 'Travel' })).toContainText('€200.00')
+    await expect(moneyOut.getByRole('button', { name: 'To Savings: €3,900.00' })).toBeVisible()
+    // pocket money is a line per adult with an amount of its own
+    const general = group('Expenses')
+    await general.getByLabel('Amount per month for Ana – Pocket').fill('300')
+    await general.getByLabel('Amount per month for Ana – Pocket').press('Enter')
+    await expect(moneyOut.getByRole('button', { name: /^Ana – Pocket: €300\.00/ })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: 'To Savings: €3,600.00' })).toBeVisible()
+    await expect(page.getByTestId('total-in')).toHaveText('Total in€5,500.00')
+    await expect(page.getByTestId('total-out')).toHaveText('Total out€5,500.00')
+    await expect(strip).toContainText('Everything a month needs is there.')
+    await page.screenshot({ path: 'e2e/output/setup-statement.png', fullPage: true })
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.screenshot({ path: 'e2e/output/setup-statement-phone.png', fullPage: true })
+    await page.setViewportSize({ width: 1400, height: 900 })
+
+    // while setting up, deleting is one click: the row goes, a line says so and offers the way back
+    const menu = page.getByRole('menu')
+    const gone = page.getByRole('status').filter({ hasText: 'Deleted' })
+    await moneyOut.getByRole('button', { name: 'Row menu for Ana – Pocket' }).click()
+    await expect(menu.getByRole('menuitem', { name: 'Archive or delete…' })).toHaveCount(0)
+    await menu.getByRole('menuitem', { name: 'Delete', exact: true }).click()
+    await expect(gone).toContainText('Deleted "Ana – Pocket".')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(moneyOut.getByRole('button', { name: /^Ana – Pocket: / })).toHaveCount(0)
+    await expect(moneyOut.getByRole('button', { name: 'To Savings: €3,900.00' })).toBeVisible()
+    // what a suggestion made is offered again once it is deleted
+    await expect(general.locator('[data-suggestion]').first()).toContainText('Ana – Pocket')
+    await page.screenshot({ path: 'e2e/output/setup-deleted.png' })
+    // on a phone the message sits above the bottom tabs
+    await page.setViewportSize({ width: 390, height: 844 })
+    await expect(gone).toBeInViewport({ ratio: 1 })
+    await page.screenshot({ path: 'e2e/output/setup-deleted-phone.png' })
+    await page.setViewportSize({ width: 1400, height: 900 })
+    await gone.getByRole('button', { name: 'Undo' }).click()
+    await expect(moneyOut.getByRole('button', { name: /^Ana – Pocket: €300\.00/ })).toBeVisible()
+    await expect(gone).toHaveCount(0)
+    // a category with nothing in it goes the same way; one that has rows asks first and says they are kept
+    await moneyOut.getByRole('button', { name: 'Category menu for Transport' }).click()
+    await menu.getByRole('menuitem', { name: 'Delete', exact: true }).click()
+    await expect(gone).toContainText('Deleted "Transport".')
+    await expect(moneyOut.getByRole('button', { name: 'Transport', exact: true })).toHaveCount(0)
+    await moneyOut.getByRole('button', { name: 'Category menu for Housing' }).click()
+    await menu.getByRole('menuitem', { name: 'Delete', exact: true }).click()
+    await expect(dlg.getByRole('heading', { name: 'Category "Housing"' })).toBeVisible()
+    await expect(dlg).toContainText('keeps its place without a category')
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+    // an account nothing points at is deleted from its dialog in one click; one that is in use says what stands in the way
+    await claims.getByRole('button', { name: 'Edit Visa' }).click()
+    await expect(dlg.getByRole('button', { name: 'Archive or delete…' })).toHaveCount(0)
+    await dlg.getByRole('button', { name: 'Delete', exact: true }).click()
+    await expect(gone).toContainText('Deleted "Visa".')
+    await expect(claims.locator('[data-line^="acc:"]')).toHaveCount(0)
+    await assets.getByRole('button', { name: 'Edit Savings' }).click()
+    await dlg.getByRole('button', { name: 'Delete', exact: true }).click()
+    await expect(dlg.getByRole('heading', { name: 'Account "Savings"' })).toBeVisible()
+    await expect(dlg).toContainText('Resolve these first')
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+
+    // pocket money added without an amount asks straight away how much: an amount or a percentage, never the rest
+    await general.getByRole('button', { name: 'Add Ben – Pocket' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Ben – Pocket · November 2026' })).toBeVisible()
+    await expect(dlg.getByRole('radio', { name: 'A fixed amount' })).toBeChecked()
+    await expect(dlg.getByRole('radio', { name: 'The rest' })).toHaveCount(0)
+    await dlg.getByRole('radio', { name: 'A percentage of Ben\'s income' }).click()
+    await dlg.getByLabel('Percentage of Ben\'s income').fill('10')
+    await expect(dlg.getByTestId('rule-preview')).toContainText('10% of €2,500.00, Ben\'s take-home income')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(moneyOut.getByRole('button', { name: 'Ben – Pocket: €250.00' })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: 'Rule for Ben – Pocket: 10% of their own income' })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: 'To Savings: €3,350.00' })).toBeVisible()
+    await page.screenshot({ path: 'e2e/output/setup-pocket-rule.png' })
+
+    // "Done" puts the strip and the suggestions away; the month stays where it was
+    await strip.getByRole('button', { name: 'Done', exact: true }).click()
+    await expect(strip).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Suggestions', exact: true })).toHaveAttribute('aria-pressed', 'false')
+    await expect(page.getByTestId('suggestions')).toHaveCount(0)
+    await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
+    // from now on removing is the controlled way: archive from a month, or delete, in the dialog
+    await moneyOut.getByRole('button', { name: 'Row menu for Ana – Pocket' }).click()
+    await expect(menu.getByRole('menuitem', { name: 'Delete', exact: true })).toHaveCount(0)
+    await menu.getByRole('menuitem', { name: 'Archive or delete…' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Row "Ana – Pocket"' })).toBeVisible()
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+
+    // the Grid shows the same household: the amounts start in the first month and the rest has its row
+    await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Grid' }).click()
     await expect(page.getByText(/^Testers ·/)).toBeVisible()
-    await expect(page.getByText('Ana – Pocket', { exact: true })).toBeVisible()
-    await expect(page.getByText('To savings', { exact: true })).toBeVisible()
-    // the USD account carries its household-currency line
-    await expect(page.getByRole('rowheader', { name: 'Broker · in EUR' })).toBeVisible()
-    // the amounts typed in the wizard are the first month's values
-    await expect(page.getByRole('button', { name: /^To Broker Nov 2026: -?€200\.00/ })).toBeVisible()
-    await expect(page.getByRole('button', { name: /^Groceries Nov 2026: -?€600\.00/ })).toBeVisible()
-    await expect(page.getByRole('button', { name: /^Cal – Long-term savings Nov 2026: -?€50\.00/ })).toBeVisible()
-    for (const name of ['Ana – Salary', 'Ben – Salary', 'Cal – Child benefit', 'Rex – Food & supplies', 'Groceries', 'Travel', 'Garden']) {
-      await expect(page.getByRole('button', { name: new RegExp(`^${name} Nov 2026`) })).toBeVisible()
-    }
+    await expect(page.getByRole('rowheader', { name: /^To Savings/ })).toContainText('= the rest')
+    await expect(page.getByRole('button', { name: /^Ana – Salary Nov 2026: €3,000\.00/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^The flat – Rent or mortgage Nov 2026: -?€1,400\.00/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^To Travel Nov 2026: -?€200\.00/ })).toBeVisible()
+    // neither the month-end rule nor how money is shared is a setting any more; the rule on a line is the one place
     await page.getByRole('link', { name: 'Household' }).click()
-    await expect(page.getByLabel('Who pays for Cal').locator('option:checked')).toHaveText('Paid by Ben')
+    await expect(page.getByLabel(/^Cash kept in the account at month end/)).toBeVisible()
+    await expect(page.getByLabel('Month-end rule')).toHaveCount(0)
+    await expect(page.getByLabel('How you share money')).toHaveCount(0)
     await page.getByRole('link', { name: 'Data' }).click()
     await page.getByLabel('Type WIPE to confirm').fill('WIPE')
     await page.getByRole('button', { name: 'Wipe this device' }).click()
@@ -94,6 +223,7 @@ test.describe('wave 1b', () => {
 
   test('recurring items post into due months only and can be ticked paid', async ({ page }) => {
     await loadDemo(page)
+    await page.getByRole('button', { name: 'Earlier months (2)' }).click()
     // demo car insurance is quarterly from January: October yes, November no
     await expect(page.getByRole('button', { name: /^The car – Insurance Oct 2026/ })).toContainText('210')
     await expect(page.getByRole('button', { name: /^The car – Insurance Nov 2026: empty/ })).toBeVisible()
@@ -132,11 +262,14 @@ test.describe('wave 1b', () => {
     await expect(page.getByRole('button', { name: /^Water Dec 2026: empty/ })).toBeVisible()
     await expect(page.getByRole('button', { name: /^Water Feb 2027/ })).toContainText('90')
 
-    await page.getByRole('link', { name: 'Moves' }).click()
-    await expect(page.getByText('Payments due')).toBeVisible()
-    await page.getByLabel('Rent paid').click()
-    await expect(page.getByLabel('Rent paid')).toBeChecked()
-    await page.screenshot({ path: 'e2e/output/moves.png', fullPage: true })
+    // a schedule's posting is ticked on the Statement like any other line; the schedule then shows the month as paid
+    await page.getByRole('link', { name: 'Statement' }).click()
+    await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
+    await page.getByRole('region', { name: 'Money out' }).getByRole('button', { name: 'Housing', exact: true }).click()
+    const rentDone = page.getByRole('checkbox', { name: 'The flat – Rent done' })
+    await expect(rentDone).not.toBeChecked()
+    await rentDone.click()
+    await expect(rentDone).toBeChecked()
     await page.getByRole('link', { name: 'Household' }).click()
     await expect(page.getByLabel('Rent paid in Nov 2026')).toBeChecked()
     await page.getByRole('link', { name: 'Grid' }).click()
@@ -149,6 +282,7 @@ test.describe('recurring from the grid', () => {
 
   test('change for one month or from now on, skip a month, end a schedule', async ({ page }) => {
     await loadDemo(page)
+    await page.getByRole('button', { name: 'Earlier months (2)' }).click()
     const rent = (m: string) => page.getByRole('button', { name: new RegExp(`^The flat – Rent ${m}`) })
 
     // amount change from November on: October keeps the old amount

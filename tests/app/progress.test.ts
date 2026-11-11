@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { computeEngine } from '@/engine'
 import { CellSchema } from '@/model'
-import { monthProgress, progressText } from '@/features/month/progress'
+import { monthProgress, nearestMonth, progressText } from '@/features/statement/progress'
 import { T0, cellItems, cellValue, closedMonth, household, row, tables } from '../engine/helpers'
 
 const month = '2026-01'
@@ -50,5 +50,18 @@ describe('month progress', () => {
     expect(progressText(p, false, 'EUR', 'en-IE')).toBe('All 5 done')
     expect(progressText(p, true, 'EUR', 'en-IE')).toBe('Closed · all done')
     expect(progressText({ lines: 0, done: 0, total: 0, toPay: 0, toComeIn: 0 }, false, 'EUR', 'en-IE')).toBe('Nothing in this month yet')
+  })
+})
+
+describe('the month a screen opens on', () => {
+  const plan = ['2026-03', '2026-04', '2026-05']
+  it('is the month asked for when the plan has it', () => {
+    expect(nearestMonth(plan, '2026-04')).toBe('2026-04')
+  })
+  it('is the first month when today lies before the plan, and the last when it lies after', () => {
+    expect(nearestMonth(plan, '2026-01')).toBe('2026-03')
+    expect(nearestMonth(plan, '2025-12')).toBe('2026-03')
+    expect(nearestMonth(plan, '2026-09')).toBe('2026-05')
+    expect(nearestMonth(plan, '2027-01')).toBe('2026-05')
   })
 })

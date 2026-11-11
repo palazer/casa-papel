@@ -76,7 +76,7 @@ export function GuideScreen() {
   const topics = useMemo(() => hits.map((h) => h.topic), [hits])
   const searching = words.length > 0
 
-  // the address's hash names a topic (`#guide-marks` from the legend, `#guide-pools` from the contents): scroll to it on
+  // the address's hash names a topic (`#guide-marks` from the legend, `#guide-virtual-accounts` from the contents): scroll to it on
   // arrival and when it changes; `screenHref` drops a `#guide-…` hash when another screen opens
   useEffect(() => {
     const jump = () => {

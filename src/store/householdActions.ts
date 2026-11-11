@@ -2,9 +2,10 @@ import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing'
 import { buildDefaultCategoryMutations } from './categoryActions'
 import {
   AccountMonthSchema, AccountSchema, CellSchema, EntitySchema, HouseholdSchema, PoolSchema, RowSchema,
-  ENTITY_TEMPLATES, HOUSEHOLD_TEMPLATES, monthOfDate, newId, poolRef, templateTitle,
+  ENTITY_TEMPLATES, HOUSEHOLD_TEMPLATES, monthOfDate, newId, poolRef, poolRowName, templateTitle,
   type Account, type Entity, type EntityKind, type Household, type MonthKey, type Pool, type Row, type RowTemplate, type Tables,
 } from '@/model'
+import { currentAccountsIn } from '@/engine'
 import type { Mutation, Store } from './store'
 import { loadTables } from './actions'
 
@@ -12,11 +13,11 @@ const now = () => Date.now()
 
 // ---------- entities ----------
 
-export async function addEntity(store: Store, input: { kind: EntityKind; name: string; paidBy?: string | null; attributes?: Record<string, string> }): Promise<Entity> {
+export async function addEntity(store: Store, input: { kind: EntityKind; name: string; attributes?: Record<string, string> }): Promise<Entity> {
   const tables = await loadTables(store)
   const last = tables.entities.filter((e) => !e.deletedAt).map((e) => e.order).sort().at(-1) ?? null
   const ts = now()
-  const entity = EntitySchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, order: generateKeyBetween(last, null), attributes: {}, paidBy: null, ...input })
+  const entity = EntitySchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, order: generateKeyBetween(last, null), attributes: {}, ...input })
   await store.commit([{ op: 'put', table: 'entities', record: entity }])
   return entity
 }
@@ -57,27 +58,49 @@ export async function setAccountActual(store: Store, accountId: string, month: M
   await store.commit([{ op: 'put', table: 'accountMonths', record: AccountMonthSchema.parse({ ...existing, accountId, month, actualBalance, updatedAt: now() }) }])
 }
 
+/**
+ * The real balances of the current accounts at the end of a month, in each account's own currency: a number for every
+ * current account that exists in that month, or null to go back to the calculated amount. All of them or none, because
+ * the plan only knows what the current accounts hold together. One undoable step.
+ */
+export async function setCurrentBalances(store: Store, month: MonthKey, balances: Record<string, number> | null): Promise<void> {
+  const tables = await loadTables(store)
+  if (tables.monthStates.find((s) => s.month === month)?.closed) throw new Error(`${month} is closed. Reopen it to change a balance.`)
+  const open = currentAccountsIn(tables.accounts, month)
+  if (open.length === 0) throw new Error(`There is no current account in ${month}.`)
+  if (balances && open.some((a) => !Number.isFinite(balances[a.id]))) throw new Error('Fill in every account, or leave them all empty to use the calculated amount.')
+  const mutations: Mutation[] = []
+  for (const acc of open) {
+    const existing = tables.accountMonths.find((a) => a.accountId === acc.id && a.month === month)
+    const actualBalance = balances ? balances[acc.id] : null
+    if ((existing?.actualBalance ?? null) === actualBalance) continue
+    mutations.push({ op: 'put', table: 'accountMonths', record: AccountMonthSchema.parse({ ...existing, accountId: acc.id, month, actualBalance, updatedAt: now() }) })
+  }
+  if (mutations.length) await store.commit(mutations)
+}
+
 // ---------- templates ----------
 
 interface TemplateContext {
   tables: Tables
   household: Household
   entity?: Entity
-  adultCount: number
 }
 
-/** What the setup wizard adds to a template: the account it points at (instead of the first of its type) and a first amount. */
+/** What the caller adds to a template: the account it points at (instead of the first of its type) and a first amount. */
 export interface TemplateOptions {
   destination?: Account | null
-  /** Written into the household's start month; the engine carries it forward. */
+  /** Written into `month`; the engine carries it forward. */
   amount?: number | null
+  /** The month the first amount starts in; the household's first month when left out. */
+  month?: MonthKey
 }
 
-/** The first amount of a row from the wizard: one value cell in the start month, carried forward from there. */
+/** The first amount of a suggested row: one value cell in the month it starts, carried forward from there. */
 const startAmount = (rowId: string, month: MonthKey, value: number, ts: number): Mutation =>
   ({ op: 'put', table: 'cells', record: CellSchema.parse({ rowId, month, mode: 'value', value, items: [], updatedAt: ts }) })
 
-/** Build the rows (and pools) a template produces. Pure; used by the wizard and the household screen. */
+/** Build the rows (and pools) a template produces. Pure; used by setup, the Statement's suggestions and the household screen. */
 export function buildTemplateMutations(t: RowTemplate, ctx: TemplateContext, order: string, accounts: Account[], opts: TemplateOptions = {}): { mutations: Mutation[]; row: Row } {
   const ts = now()
   const name = templateTitle(t, ctx.entity?.name)
@@ -92,7 +115,7 @@ export function buildTemplateMutations(t: RowTemplate, ctx: TemplateContext, ord
     if (savings) {
       const pool: Pool = PoolSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, name, accountId: savings.id, openingBalance: 0, order })
       const alloc = RowSchema.parse({
-        id: newId(), createdAt: ts, updatedAt: ts, name: `${name} pool`, section: 'transfer', kind: 'pool-allocation',
+        id: newId(), createdAt: ts, updatedAt: ts, name: poolRowName(name), section: 'transfer', kind: 'pool-allocation',
         accountId: savings.id, defaultStatus: 'committed', order: `${order}p`,
       })
       pool.allocationRowId = alloc.id
@@ -106,19 +129,19 @@ export function buildTemplateMutations(t: RowTemplate, ctx: TemplateContext, ord
     defaultStatus: t.defaultStatus ?? 'projected',
     scope: t.scope === 'entity' && ctx.entity ? ctx.entity.id : 'shared',
     entityTags: ctx.entity && (t.tag || t.scope === 'entity') ? [ctx.entity.id] : [],
-    inShareBasis: t.inShareBasis ?? false,
     accountId: destination?.id ?? null,
     defaultFundedBy,
     categoryId: t.category ? ctx.tables.categories?.find((c) => !c.deletedAt && c.section === t.section && c.name === t.category)?.id ?? null : null,
-    pocketMode: t.pocket ? 'share-of-pocket-total' : null,
-    pocketShare: t.pocket ? 1 / Math.max(1, ctx.adultCount) : null,
+    // pocket money is a line of its own: an amount that is typed, or a rule set later
+    pocketMode: t.pocket ? 'fixed' : null,
+    templateKey: t.key,
     order,
   })
   mutations.push({ op: 'put', table: 'rows', record: row })
-  // automatic rows (the savings plug, pocket money) take no amount
-  const automatic = t.pocket || (t.kind === 'to-savings' && ctx.household.closingRule === 'savings-plug')
-  // a pool template's amount is what is set aside each month, so it goes on the "<name> pool" transfer row
-  if (opts.amount != null && opts.amount > 0 && !automatic) mutations.push(startAmount(allocationRowId ?? row.id, ctx.household.startMonth, opts.amount, ts))
+  // the row that takes the rest of the month takes no amount
+  const automatic = t.kind === 'to-savings' && ctx.household.closingRule === 'savings-plug'
+  // a pool template's amount is what is set aside each month, so it goes on the "To <name>" transfer row
+  if (opts.amount != null && opts.amount > 0 && !automatic) mutations.push(startAmount(allocationRowId ?? row.id, opts.month ?? ctx.household.startMonth, opts.amount, ts))
   return { mutations, row }
 }
 
@@ -131,15 +154,14 @@ export async function applyTemplates(store: Store, keys: string[], entityId?: st
   const chosen = all.filter((t) => keys.includes(t.key))
   const last = tables.rows.filter((r) => !r.deletedAt).map((r) => r.order).sort().at(-1) ?? null
   const orders = generateNKeysBetween(last, null, chosen.length)
-  const adultCount = tables.entities.filter((e) => e.kind === 'adult' && !e.deletedAt).length
   const mutations: Mutation[] = []
-  chosen.forEach((t, i) => mutations.push(...buildTemplateMutations(t, { tables, household, entity, adultCount }, orders[i], tables.accounts).mutations))
+  chosen.forEach((t, i) => mutations.push(...buildTemplateMutations(t, { tables, household, entity }, orders[i], tables.accounts).mutations))
   if (mutations.length) await store.commit(mutations)
 }
 
-// ---------- setup wizard ----------
+// ---------- setup ----------
 
-/** A template the wizard chose, with the account it points at (an index into `accounts`) and a first monthly amount. */
+/** A template chosen at setup, with the account it points at (an index into `accounts`) and a first monthly amount. */
 export interface TemplateChoice {
   key: string
   accountIndex?: number | null
@@ -149,7 +171,7 @@ export interface TemplateChoice {
 export interface SetupInput {
   household: Pick<Household, 'name' | 'baseCurrency' | 'locale' | 'startMonth'> & Partial<Household>
   adults: Array<{ name: string }>
-  dependents: Array<{ kind: Exclude<EntityKind, 'adult'>; name: string; paidByIndex?: number | null }>
+  dependents: Array<{ kind: Exclude<EntityKind, 'adult'>; name: string }>
   /** `ownerIndex` points into the entities (adults first, then dependents); null or absent = the household's. */
   accounts: Array<Pick<Account, 'name' | 'type'> & Partial<Account> & { ownerIndex?: number | null }>
   /** household template keys, or choices with an account and an amount */
@@ -174,8 +196,7 @@ export function buildSetupMutations(input: SetupInput): { mutations: Mutation[];
   )
   const dependents: Entity[] = input.dependents.map((d, i) =>
     EntitySchema.parse({
-      id: newId(), createdAt: ts, updatedAt: ts, kind: d.kind, name: d.name.trim() || d.kind,
-      paidBy: d.paidByIndex != null ? adults[d.paidByIndex]?.id ?? null : null, order: entityOrders[input.adults.length + i],
+      id: newId(), createdAt: ts, updatedAt: ts, kind: d.kind, name: d.name.trim() || d.kind, order: entityOrders[input.adults.length + i],
     }),
   )
   const entities = [...adults, ...dependents]
@@ -195,7 +216,7 @@ export function buildSetupMutations(input: SetupInput): { mutations: Mutation[];
   const { mutations: categoryMutations, categories } = buildDefaultCategoryMutations([], ts)
   mutations.push(...categoryMutations)
   const tables = { household: [household], entities, accounts, categories } as unknown as Tables
-  const ctxBase = { tables, household, adultCount: adults.length }
+  const ctxBase = { tables, household }
   const choice = (c: string | TemplateChoice): TemplateChoice => (typeof c === 'string' ? { key: c } : c)
   type Planned =
     | { kind: 'template'; t: RowTemplate; entity?: Entity; c: TemplateChoice }
@@ -226,7 +247,6 @@ export function buildSetupMutations(input: SetupInput): { mutations: Mutation[];
   const orders = generateNKeysBetween(null, null, plan.length)
   plan.forEach((p, i) => {
     if (p.kind === 'template') {
-      if (p.t.pocket && household.moneyMode !== 'pooled') return
       const destination = p.c.accountIndex != null ? accounts[p.c.accountIndex] ?? null : null
       mutations.push(...buildTemplateMutations(p.t, { ...ctxBase, entity: p.entity }, orders[i], accounts, { destination, amount: p.c.amount }).mutations)
       return
@@ -258,7 +278,7 @@ export async function createHouseholdFromSetup(store: Store, input: SetupInput):
 
 export interface PoolInput {
   name: string
-  /** Savings account that holds the pool account. */
+  /** Savings account that holds the virtual account. */
   accountId: string
   openingBalance?: number
   /** Monthly amount set aside, written into the allocation row from `fromMonth` on. */
@@ -277,7 +297,7 @@ export async function addPool(store: Store, input: PoolInput): Promise<Pool> {
   const [allocOrder, spendOrder] = generateNKeysBetween(lastRow, null, 2)
   const pool: Pool = PoolSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, name: input.name.trim(), accountId: input.accountId, openingBalance: input.openingBalance ?? 0, order: generateKeyBetween(lastPool, null) })
   const alloc = RowSchema.parse({
-    id: newId(), createdAt: ts, updatedAt: ts, name: `${pool.name} pool`, section: 'transfer', kind: 'pool-allocation',
+    id: newId(), createdAt: ts, updatedAt: ts, name: poolRowName(pool.name), section: 'transfer', kind: 'pool-allocation',
     accountId: input.accountId, defaultStatus: 'committed', order: allocOrder,
   })
   pool.allocationRowId = alloc.id
@@ -296,6 +316,6 @@ export async function addPool(store: Store, input: PoolInput): Promise<Pool> {
 export async function updatePool(store: Store, id: string, patch: Partial<Pick<Pool, 'name' | 'accountId' | 'openingBalance'>>): Promise<void> {
   const tables = await loadTables(store)
   const p = tables.pools.find((x) => x.id === id)
-  if (!p) throw new Error('Pool not found')
+  if (!p) throw new Error('Virtual account not found')
   await store.commit([{ op: 'put', table: 'pools', record: PoolSchema.parse({ ...p, ...patch, updatedAt: now() }) }])
 }

@@ -25,12 +25,19 @@ describe('addRowOfKind under Transfers', () => {
     expect(out.accounts[fund.id].months['2026-02'].capital).toBe(200000)
   })
 
-  it('under the savings plug a second "to savings" row is refused; a pool account that lost its row can be filled again', async () => {
+  it('beside the row that takes the rest a second "to savings" row is typed and counts; a virtual account that lost its row can be filled again', async () => {
     const { store, savings } = await fresh()
-    await expect(addRowOfKind(store, { section: 'transfer', name: 'More savings', categoryId: null, kind: 'to-savings', accountId: savings.id })).rejects.toThrow(/would stay at zero/)
+    const rainy = await addAccount(store, { name: 'Rainy day', type: 'savings', currency: 'EUR', openingMonth: '2026-01' })
+    const more = await addRowOfKind(store, { section: 'transfer', name: 'To Rainy day', categoryId: null, kind: 'to-savings', accountId: rainy.id })
+    expect(more).toMatchObject({ kind: 'to-savings', accountId: rainy.id, rule: 'fixed' })
+    await setCellValue(store, more.id, '2026-01', 20000, 'from-now-on')
+    const two = computeEngine({ tables: await loadTables(store), months })
+    expect(two.accounts[rainy.id].months['2026-02'].balance).toBe(40000)
+    // nothing comes in, so the rest account pays for it
+    expect(two.accounts[savings.id].months['2026-02'].balance).toBe(-40000)
     const pool = await addPool(store, { name: 'Travel', accountId: savings.id, openingBalance: 0 })
     await expect(addRowOfKind(store, { section: 'transfer', name: 'Travel again', categoryId: null, kind: 'pool-allocation', poolId: pool.id })).rejects.toThrow(/already filled/)
-    await expect(addRowOfKind(store, { section: 'transfer', name: 'Travel again', categoryId: null, kind: 'pool-allocation', poolId: newId() })).rejects.toThrow(/Pick the pool account/)
+    await expect(addRowOfKind(store, { section: 'transfer', name: 'Travel again', categoryId: null, kind: 'pool-allocation', poolId: newId() })).rejects.toThrow(/Pick the virtual account/)
     let t = await loadTables(store)
     await store.commit(planRemoval(t, { kind: 'row', id: pool.allocationRowId! }, Date.now()))
     const row = await addRowOfKind(store, { section: 'transfer', name: 'Travel again', categoryId: null, kind: 'pool-allocation', poolId: pool.id })
@@ -40,6 +47,24 @@ describe('addRowOfKind under Transfers', () => {
     await setCellValue(store, row.id, '2026-01', 5000, 'from-now-on')
     const out = computeEngine({ tables: await loadTables(store), months })
     expect(out.pools[pool.id].months['2026-02'].balance).toBe(10000)
+  })
+
+  it('a row can take money out of a savings or an investment account into the month', async () => {
+    const { store, savings } = await fresh()
+    const fund = await addAccount(store, { name: 'Fund', type: 'investment', currency: 'EUR', openingMonth: '2026-01', openingBalance: 500000 })
+    await expect(addRowOfKind(store, { section: 'transfer', name: 'From Savings', categoryId: null, kind: 'from-savings', accountId: fund.id })).rejects.toThrow(/is of type Investments/)
+    await expect(addRowOfKind(store, { section: 'expense', name: 'From Savings', categoryId: null, kind: 'from-savings', accountId: savings.id })).rejects.toThrow(/does not belong in this section/)
+    const fromSavings = await addRowOfKind(store, { section: 'transfer', name: 'From Savings', categoryId: null, kind: 'from-savings', accountId: savings.id })
+    const fromFund = await addRowOfKind(store, { section: 'transfer', name: 'From Fund', categoryId: null, kind: 'from-investment', accountId: fund.id })
+    expect(fromSavings).toMatchObject({ section: 'transfer', kind: 'from-savings', accountId: savings.id, defaultStatus: 'committed' })
+    await setCellValue(store, fromSavings.id, '2026-02', 30000, 'this-month')
+    await setCellValue(store, fromFund.id, '2026-02', 20000, 'this-month')
+    const out = computeEngine({ tables: await loadTables(store), months })
+    expect(out.totals['2026-02']).toMatchObject({ income: 50000, fromAccounts: 50000, takeHome: 0 })
+    expect(out.accounts[fund.id].months['2026-02'].outflow).toBe(20000)
+    // 500 came into the month and went on to savings as the rest, 300 of it out of the same account
+    expect(out.accounts[savings.id].months['2026-02']).toMatchObject({ inflow: 50000, outflow: 30000, balance: 20000 })
+    expect(out.totals['2026-03'].fromAccounts).toBe(0)
   })
 
   it('pocket money is a fixed amount kept by one adult; a plain row is just a transfer', async () => {
