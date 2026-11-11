@@ -9,6 +9,8 @@ import { cn } from '@/lib/utils'
 import { formatAmount, formatMonth, formatPercent } from '@/app/format'
 import { balanceHelp, type HelpKey } from '@/app/help'
 import { HUES, SECTION_HUE, type Hue } from '@/app/hues'
+import { readPref, writePref } from '@/app/prefs'
+import { handMonth, useScreen } from '@/app/screens'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { cellKey, groupRowsByCategory, type EngineOutput } from '@/engine'
@@ -31,8 +33,12 @@ export function GridScreen() {
   const store = useStore()
   const tables = useTables()
   const household = activeHousehold(tables)
-  const months = useMemo(() => (household && tables ? defaultMonths(household, tables) : []), [household, tables])
-  const engine = useEngine(tables, months)
+  /** Every month of the plan: the engine counts them all, whichever the table shows. */
+  const allMonths = useMemo(() => (household && tables ? defaultMonths(household, tables) : []), [household, tables])
+  const engine = useEngine(tables, allMonths)
+  const { go } = useScreen()
+  /** The Grid is for the months ahead: it starts at the current month, and the months before it are one button away. */
+  const [showEarlier, setShowEarlier] = useState(() => readPref('grid.earlier', false))
   const [collapsed, setCollapsed] = useState<Set<Section>>(() => new Set())
   const [selected, setSelected] = useState<{ rowId: string; month: MonthKey } | null>(null)
   const [balanceSel, setBalanceSel] = useState<{ accountId: string; month: MonthKey } | null>(null)
@@ -43,6 +49,14 @@ export function GridScreen() {
   if (!tables || !household || !engine) return null
   const { locale, baseCurrency: ccy, displayExpensesNegative: neg } = household
   const today = monthOfDate()
+  // the current month, or the nearest month the plan has when today lies outside it
+  const firstShown = today < allMonths[0] ? allMonths[0] : today > allMonths[allMonths.length - 1] ? allMonths[allMonths.length - 1] : today
+  const earlier = allMonths.filter((m) => m < firstShown).length
+  const months = showEarlier ? allMonths : allMonths.slice(earlier)
+  const toggleEarlier = () => {
+    writePref('grid.earlier', !showEarlier)
+    setShowEarlier(!showEarlier)
+  }
 
   const rowsBySection = (s: Section) => engine.rows.filter((r) => r.section === s && !(r.archivedMonth && r.archivedMonth <= months[0]))
   let editableIndex = 0
@@ -124,8 +138,13 @@ export function GridScreen() {
   return (
     <div className="space-y-4">
       <PageHeader title="Grid" subline={`${household.name} · ${formatMonth(months[0], locale)} – ${formatMonth(months[months.length - 1], locale)}`}>
+        {earlier > 0 && (
+          <Button size="xs" variant={showEarlier ? 'default' : 'outline'} aria-pressed={showEarlier} title={showEarlier ? 'Start at the current month again' : 'Show the months before the current one'} onClick={toggleEarlier}>
+            Earlier months ({earlier})
+          </Button>
+        )}
         <Button size="xs" variant="outline" onClick={() => act(() => addPlanYear(store))}>Add {parseMonth(months[months.length - 1]).year + 1}</Button>
-        <span className="text-muted-foreground">Click a cell to edit · arrows move · Enter opens · click a month name to close or reopen it</span>
+        <span className="text-muted-foreground">Click a cell to edit · arrows move · Enter opens · click a month name to open it in the Statement, or to close or reopen it</span>
         <MarksLegend neg={neg} />
         {engine.warnings.length > 0 && <p role="alert" className="basis-full text-amber-700 dark:text-amber-400">{engine.warnings.join(' · ')}</p>}
         {error && (
@@ -162,6 +181,7 @@ export function GridScreen() {
                           </DropdownMenuLabel>
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => { handMonth(m); go('statement') }}>Open in the Statement</DropdownMenuItem>
                         {t?.closed ? (
                           <DropdownMenuItem onClick={() => act(() => reopenMonth(store, m))}>Reopen month</DropdownMenuItem>
                         ) : (
@@ -246,7 +266,7 @@ export function GridScreen() {
                 warn: (m) => (p.months[m]?.short ? `Short by ${formatAmount(p.months[m].short, ccy, locale)}: more came out of it than it held. Top it up on the Statement.` : null),
               })
             })}
-            {accountSeries.length > 0 && derivedRow('Net worth', 'in', (m) => (accountSeries.some((s) => s.months[m]) ? engine.netWorth[m] ?? 0 : null), { strong: true, hue: HUES.worth, band: true, help: 'derived.netWorth' })}
+            {(accountSeries.length > 0 || (engine.main?.accountIds.length ?? 0) > 0) && derivedRow('Net worth', 'in', (m) => (engine.netWorth[m] != null && (engine.main?.months[m] || accountSeries.some((s) => s.months[m])) ? engine.netWorth[m] : null), { strong: true, hue: HUES.worth, band: true, help: 'derived.netWorth' })}
           </tbody>
         </table>
       </div>

@@ -8,6 +8,7 @@ test.describe('archive or delete', () => {
     await page.goto('?demo=1')
     await page.getByRole('button', { name: 'Load the demo household' }).click()
     await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
+    await page.getByRole('button', { name: 'Earlier months (2)' }).click()
     const dlg = page.getByRole('dialog')
 
     // Other income has no closed history: the dialog says what goes, Delete removes it, Undo brings it back

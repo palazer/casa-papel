@@ -105,6 +105,7 @@ test.describe('automatic rows on the desktop', () => {
   test('ticking To savings in Moves puts the green dot on the grid', async ({ page }) => {
     await page.goto('?demo=1')
     await page.getByRole('button', { name: 'Load the demo household' }).click()
+    await page.getByRole('button', { name: 'Earlier months (2)' }).click()
     const toSavings = page.getByRole('row').filter({ has: page.getByRole('rowheader', { name: /^To savings/ }) })
     // the closed September already counts as done; November gets its dot from the tick ("Not done yet" also contains "done", hence exact)
     const dots = toSavings.getByRole('img', { name: 'Done', exact: true })

@@ -222,6 +222,7 @@ test.describe('wave 1b', () => {
 
   test('recurring items post into due months only and can be ticked paid', async ({ page }) => {
     await loadDemo(page)
+    await page.getByRole('button', { name: 'Earlier months (2)' }).click()
     // demo car insurance is quarterly from January: October yes, November no
     await expect(page.getByRole('button', { name: /^The car – Insurance Oct 2026/ })).toContainText('210')
     await expect(page.getByRole('button', { name: /^The car – Insurance Nov 2026: empty/ })).toBeVisible()
@@ -277,6 +278,7 @@ test.describe('recurring from the grid', () => {
 
   test('change for one month or from now on, skip a month, end a schedule', async ({ page }) => {
     await loadDemo(page)
+    await page.getByRole('button', { name: 'Earlier months (2)' }).click()
     const rent = (m: string) => page.getByRole('button', { name: new RegExp(`^The flat – Rent ${m}`) })
 
     // amount change from November on: October keeps the old amount

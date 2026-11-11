@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { doneness, type DoneState } from '@/app/display'
 import { formatMonth } from '@/app/format'
 import { useStore } from '@/app/store'
+import { clearHandedMonth, handedOverMonth } from '@/app/screens'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { useStoreVersion } from '@/app/useStoreVersion'
 import { buildStatement, cellKey, type GoalProgress, type StatementLine } from '@/engine'
@@ -53,7 +54,9 @@ export function StatementScreen() {
   const months = useMemo(() => (household && tables ? defaultMonths(household, tables) : []), [household, tables])
   const engine = useEngine(tables, months)
   /** The month someone picked. Until then: today's month, or the first month while the household is being set up. */
-  const [picked, setMonth] = useState<MonthKey | null>(null)
+  const [picked, setMonth] = useState<MonthKey | null>(() => handedOverMonth() as MonthKey | null)
+  // a month handed over by the Grid ("Open in the Statement") is for this visit only
+  useEffect(() => clearHandedMonth(), [])
   /** Lines someone opened or closed; the rest follow their own default. */
   const [openLines, setOpenLines] = useState<Record<string, boolean>>({})
   const [editorRow, setEditorRow] = useState<string | null>(null)

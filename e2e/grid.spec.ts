@@ -12,6 +12,8 @@ test.describe('grid', () => {
   test('edit a cell, itemize, close and reopen a month', async ({ page }) => {
     await loadDemo(page)
     await page.screenshot({ path: 'e2e/output/grid.png' })
+    // the months before the current one are needed here: September is the closed month, October the one that keeps its amount
+    await page.getByRole('button', { name: 'Earlier months (2)' }).click()
 
     // Utilities carry 210 forward from September (Rent is recurring-driven now); change November onwards to 250
     const utilNov = page.getByRole('button', { name: /^The flat – Utilities Nov 2026/ })

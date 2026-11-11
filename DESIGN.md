@@ -181,6 +181,13 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   total and the share of income), the row menu (`…`) at the right, revealed on hover of the `group` row.
 - Month columns `min-w-24`; today's header on `bg-muted` with the month in `font-semibold`; cells `px-1.5 py-0.5` (about
   22 px rows), amounts right-aligned, the done dot in the top-right corner. An empty cell shows a faint `·`.
+- The Grid is the planning view, so its columns start at the current month (the plan's first or last month when today
+  lies outside the plan). The months before it are one press away: `Earlier months (n)` in the toolbar, an `xs` toggle
+  with `aria-pressed` (`outline` at rest, `default`, the lime, while pressed, §1), shown only when there are earlier
+  months and kept per device (`grid.earlier`). Hiding columns hides nothing from the sums: the engine counts every
+  month, and the Σ line stays the all-time total.
+- A month header is a menu button: the month's totals, then `Open in the Statement` (the Statement opens on that month,
+  for that visit only: `handMonth` in `src/app/screens.ts`), then `Close month` or `Reopen month`.
 - A cell in another currency is two lines: the typed amount over a `text-[10px] leading-3` muted `≈ €3,120` in the household
   currency at that month's rate (the cell button becomes `flex-col items-end`; the certainty styling stays on the amount
   line; the `aria-label` says `, about €3,120`). The label keeps the currency code, a follower's too. A foreign account's

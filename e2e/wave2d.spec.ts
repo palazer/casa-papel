@@ -33,8 +33,31 @@ test('the welcome screen offers three ways to start, and the first setup screen 
 
 test('the plan ends in a December and "Add <year>" appends a calendar year on every screen', async ({ page }) => {
   await loadDemo(page)
-  // November: next year is already planned, so the button offers the year after
+  // the Grid is for the months ahead: it starts at the current month, the two before it are one button away
+  await expect(page.getByText('Nov 2026 – Dec 2027')).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Oct 2026/ })).toHaveCount(0)
+  const earlier = page.getByRole('button', { name: 'Earlier months (2)' })
+  await expect(earlier).toHaveAttribute('aria-pressed', 'false')
+  await earlier.click()
+  await expect(earlier).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByText(/Sept? 2026 – Dec 2027/)).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Sept? 2026, closed/ })).toBeVisible()
+  // it stays as it was left on this device, and goes back with a second press
+  await page.reload()
+  await expect(page.getByRole('button', { name: /^Sept? 2026, closed/ })).toBeVisible()
+  await earlier.click()
+  await expect(page.getByText('Nov 2026 – Dec 2027')).toBeVisible()
+  // a month's header opens that month on the Statement
+  await page.getByRole('button', { name: 'Dec 2026', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Open in the Statement' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Statement' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: 'December 2026' })).toBeVisible()
+  // coming back to the Statement later starts at the current month again
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Grid' }).click()
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
+  await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Grid' }).click()
+  // November: next year is already planned, so the button offers the year after
   await page.getByRole('button', { name: 'Add 2028' }).click()
   await expect(page.getByText(/– Dec 2028/)).toBeVisible()
   await expect(page.getByRole('button', { name: 'Dec 2028', exact: true })).toBeVisible()

@@ -11,6 +11,8 @@ test.describe('done dots', () => {
 
   test('this month shows a dot per cell; itemized cells go from partly to all done', async ({ page }) => {
     await loadDemo(page)
+    // the Grid starts at the current month; the closed September is one button away
+    await page.getByRole('button', { name: 'Earlier months (2)' }).click()
     const rent = page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })
     await expect(rent.getByRole('img', { name: 'Not done yet' })).toBeVisible()
     // a closed month is done, so it carries the green dot; future months carry none

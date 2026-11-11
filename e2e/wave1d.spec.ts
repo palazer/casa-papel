@@ -39,6 +39,7 @@ test.describe('wave 1d', () => {
     await rule.getByLabel('Amount per month in EUR').fill('750')
     await rule.getByRole('button', { name: 'Save' }).click()
     await expect(rule).toBeHidden()
+    await page.getByRole('button', { name: 'Earlier months (2)' }).click()
     const samPocket = page.getByRole('row', { name: /^Sam – Pocket/ })
     await expect(samPocket).toContainText('€500.00')
     await expect(samPocket).toContainText('€750.00')

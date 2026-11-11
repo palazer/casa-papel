@@ -92,5 +92,14 @@ export function rememberScreen(s: Screen, hash?: string): void {
   window.history.replaceState(null, '', screenHref(s, hash))
 }
 
+/**
+ * A month one screen hands to the Statement ("Open in the Statement" in the Grid). The Statement opens on it and
+ * clears it once it is on screen, so a later visit starts on the current month again.
+ */
+let handedMonth: string | null = null
+export const handMonth = (month: string): void => { handedMonth = month }
+export const handedOverMonth = (): string | null => handedMonth
+export const clearHandedMonth = (): void => { handedMonth = null }
+
 export const ScreenContext = createContext<{ screen: Screen; go: (s: Screen, hash?: string) => void }>({ screen: 'grid', go: () => undefined })
 export const useScreen = () => useContext(ScreenContext)
