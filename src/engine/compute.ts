@@ -1,5 +1,5 @@
 import {
-  cardIsItemized, compareMonths, fromMinor, isTakenFromAccount, monthRange, poolIdOf, resolveRules, scaleMoney, toMinor,
+  cardIsItemized, compareMonths, fromMinor, isOldPocketShare, isShareRule, isTakenFromAccount, monthRange, poolIdOf, resolveRules, scaleMoney, toMinor,
   type Account, type Category, type Cell, type Money, type MonthKey, type Row, type RuleState, type Section,
 } from '@/model'
 import { buildFxIndex, convertMoney } from './fx'
@@ -103,6 +103,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
   const accounts = tables.accounts.filter((a) => !a.deletedAt)
   const accountsById = new Map(accounts.map((a) => [a.id, a]))
   const pools = tables.pools.filter((p) => !p.deletedAt)
+  const adultIds = new Set(tables.entities.filter((e) => !e.deletedAt && e.kind === 'adult').map((e) => e.id))
   const poolByAllocationRow = new Map(pools.filter((p) => p.allocationRowId).map((p) => [p.allocationRowId as string, p]))
   const rows = sortRows(tables.rows.filter((r) => !r.deletedAt), tables.categories)
   const rowsById = new Map(rows.map((r) => [r.id, r]))
@@ -131,7 +132,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
   // ---------- pass 1: user rows ----------
   for (const row of pass1Order) {
     const rule = rules.byRow.get(row.id)
-    const derivedPocket = row.kind === 'pocket-money' && row.pocketMode === 'share-of-pocket-total'
+    // pocket money from before pocket rows had rules: a share of the household's pocket total, until the row gets a rule
+    const derivedPocket = isOldPocketShare(row)
     const follows = row.followsRowId && !rule ? row.followsRowId : null
     if (follows && !rowsById.has(follows)) warnings.push(`"${row.name}" follows a row that no longer exists.`)
     const rowCells = cellsByRow.get(row.id)
@@ -155,7 +157,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
       // a share stops with its row.
       const byRule = rule != null
         && !(rule.typedCounts && cell != null && cell.mode !== 'inherit')
-        && !(archived && (rule.kind === 'share-of-income' || rule.kind === 'share-of-rest'))
+        && !(archived && isShareRule(rule.kind))
 
       if (byRule) {
         source = 'derived'
@@ -301,7 +303,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
       month: m, closed: isClosed(m), income: 0, cashExpense: 0, savingsFunded: 0, poolFunded: 0, poolFundedByPool: {},
       allocations: 0, allocationsByPool: {}, toInvestment: 0, pocket: 0, pocketTotal: pocketTotalFor(m), debt: 0,
       buffer: bufferFor(m), toSavings: 0, leftover: 0, fromSavingsDerived: 0, expensesTotal: 0, transfersTotal: 0,
-      fromAccounts: 0, takeHome: 0, leftForShares: 0, rest: null,
+      fromAccounts: 0, takeHome: 0, takeHomeBy: {}, leftForShares: 0, rest: null,
     }
     /** Every "to savings" amount except the rest: typed ones here, shares below. */
     let userToSavings = 0
@@ -318,6 +320,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
       if (row.section === 'income') {
         t.income += v
         t.takeHome += c.netBase
+        if (row.scope !== 'shared') t.takeHomeBy[row.scope] = (t.takeHomeBy[row.scope] ?? 0) + c.netBase
         continue
       }
       switch (row.kind) {
@@ -370,13 +373,21 @@ export function computeEngine(input: EngineInput): EngineOutput {
       e.c.netBase = amount
       if (e.row.kind === 'to-savings') userToSavings += amount
       else if (e.row.kind === 'to-investment') t.toInvestment += amount
+      else if (e.row.kind === 'pocket-money') t.pocket += amount
       else if (e.row.kind === 'pool-allocation') {
         t.allocations += amount
         const pool = poolByAllocationRow.get(e.row.id)
         if (pool) t.allocationsByPool[pool.id] = (t.allocationsByPool[pool.id] ?? 0) + amount
       }
     }
-    for (const e of open) if (e.rule.kind === 'share-of-income') fill(e, Math.max(0, scaleMoney(t.takeHome, e.rule.share)))
+    for (const e of open) {
+      if (e.rule.kind === 'share-of-income') fill(e, Math.max(0, scaleMoney(t.takeHome, e.rule.share)))
+      else if (e.rule.kind === 'share-of-own-income') {
+        // pocket money as a share of what its adult brings home; a row that belongs to no adult has nothing to take it of
+        if (!adultIds.has(e.row.scope)) warnOnce(`own-income|${e.row.id}`, `"${e.row.name}" takes a percentage of its adult's own income, but it does not belong to an adult.`)
+        fill(e, Math.max(0, scaleMoney(adultIds.has(e.row.scope) ? t.takeHomeBy[e.row.scope] ?? 0 : 0, e.rule.share)))
+      }
+    }
     const restCell = open.find((e) => e.rule.kind === 'rest')
     // The rest is taken this month when its row is open for it. A savings-plug household without any row for it still
     // works the rest out (the Statement shows it without a home); a typed month on the rest row means no rest then.

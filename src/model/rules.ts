@@ -1,18 +1,19 @@
 import type { Account, Household, Row } from './schema'
 
 /**
- * Rules: how the transfer that feeds an account is worked out each month. One reading of the stored fields for the
- * engine, the store and the screens, so they never disagree about which row takes the rest.
+ * Rules: how the transfer that feeds an account, or an adult's pocket money, is worked out each month. One reading of
+ * the stored fields for the engine, the store and the screens, so they never disagree about which row takes the rest.
  *
- *   typed            the amount is typed and carries forward (`rule` 'fixed', or no rule on a row that is not the rest)
- *   share-of-income  a share of the month's take-home income
- *   share-of-rest    a share of what the month has left after spending, typed amounts, income shares and the buffer
+ *   typed                the amount is typed and carries forward (`rule` 'fixed', or no rule on a row that is not the rest)
+ *   share-of-income      a share of the month's take-home income
+ *   share-of-own-income  pocket money only: a share of the take-home income of the adult the row belongs to
+ *   share-of-rest        a share of what the month has left after spending, typed amounts, income shares and the buffer
  *   rest             what is left after all of that; one row, and only under the savings-plug rule. In a month that
  *                    overruns the same row takes the difference back
  *   idle             a "to savings" row without a rule beside the rest row: stays at zero, as it always did
  */
 export interface RuleState {
-  kind: 'share-of-income' | 'share-of-rest' | 'rest' | 'idle'
+  kind: 'share-of-income' | 'share-of-own-income' | 'share-of-rest' | 'rest' | 'idle'
   /** The fraction for a share rule; 0 otherwise. */
   share: number
   /**
@@ -33,9 +34,23 @@ export interface Rules {
 /** Money taken out of an account into the month by hand: it counts as money in, never as income to take a share of. */
 export const isTakenFromAccount = (row: Pick<Row, 'kind'>): boolean => row.kind === 'from-investment' || row.kind === 'from-savings'
 
-/** Rows that can carry a rule: the transfer to a savings account, an investment account or a pool account. */
-export const canCarryRule = (row: Pick<Row, 'section' | 'kind'>): boolean =>
+/** Rows that can take the rest of the month: the transfer to a savings account, an investment account or a pool account. */
+export const canTakeRest = (row: Pick<Row, 'section' | 'kind'>): boolean =>
   row.section !== 'income' && (row.kind === 'to-savings' || row.kind === 'to-investment' || row.kind === 'pool-allocation')
+
+/** An adult's pocket money: it can carry a rule, but never takes the rest. */
+export const isPocketRow = (row: Pick<Row, 'section' | 'kind'>): boolean => row.section !== 'income' && row.kind === 'pocket-money'
+
+/** Rows that can carry a rule: the transfers that can take the rest, and pocket money. */
+export const canCarryRule = (row: Pick<Row, 'section' | 'kind'>): boolean => canTakeRest(row) || isPocketRow(row)
+
+/** The rules that take a percentage: the app works the amount out every month. */
+export const isShareRule = (kind: string | null | undefined): kind is 'share-of-income' | 'share-of-own-income' | 'share-of-rest' =>
+  kind === 'share-of-income' || kind === 'share-of-own-income' || kind === 'share-of-rest'
+
+/** Pocket money worked out the old way, as a share of the household's pocket total, until the row gets a rule of its own. */
+export const isOldPocketShare = (row: Pick<Row, 'kind' | 'pocketMode' | 'rule'>): boolean =>
+  row.kind === 'pocket-money' && row.pocketMode === 'share-of-pocket-total' && (row.rule ?? null) === null
 
 /** The live, unarchived rows that move money into a savings or an investment account; none for any other account. */
 export function rowsFeeding(rows: Row[], account: Pick<Account, 'id' | 'type'>): Row[] {
@@ -59,7 +74,7 @@ export function resolveRules(rows: Row[], closingRule: Household['closingRule'])
     const rule = row.rule ?? null
     const carries = canCarryRule(row)
     // any transfer that feeds an account can be chosen for the rest; the first one chosen takes it
-    if (plug && carries && rule === 'rest') {
+    if (plug && canTakeRest(row) && rule === 'rest') {
       if (!rest) rest = row
       else warnings.push(`"${rest.name}" and "${row.name}" are both set to take the rest; "${rest.name}" takes it.`)
       continue
@@ -69,7 +84,9 @@ export function resolveRules(rows: Row[], closingRule: Household['closingRule'])
       continue
     }
     if (!carries) continue
-    if (rule === 'share-of-income' || rule === 'share-of-rest') byRow.set(row.id, { kind: rule, share: row.ruleShare ?? 0, typedCounts: true })
+    // a share of an adult's own income is pocket money's alone
+    if (rule === 'share-of-own-income' && !isPocketRow(row)) continue
+    if (isShareRule(rule)) byRow.set(row.id, { kind: rule, share: row.ruleShare ?? 0, typedCounts: true })
   }
   const idle: RuleState = { kind: 'idle', share: 0, typedCounts: false }
   if (rest) {

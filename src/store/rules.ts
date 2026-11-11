@@ -1,16 +1,21 @@
 import { cellKey, computeEngine, sortRows, type EngineOutput } from '@/engine'
 import {
-  CellSchema, HouseholdSchema, PoolSchema, RowSchema, addMonths, canCarryRule, compareMonths, monthRange, newId, resolveRules, rowsFeeding, sharePercent,
+  CellSchema, HouseholdSchema, PoolSchema, RowSchema, addMonths, canCarryRule, canTakeRest, compareMonths, isOldPocketShare, isPocketRow, monthRange, newId,
+  resolveRules, rowsFeeding, sharePercent,
   type Cell, type CellItem, type Money, type MonthKey, type Pool, type Row, type RuleState, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
 import { loadTables, newRowMutation } from './actions'
 import { applyMutations } from './impact'
 
-/** What the rule dialog can choose for the transfer that feeds an account. */
+/**
+ * What the rule dialog can choose for the transfer that feeds an account, or for an adult's pocket money. Pocket money
+ * never takes the rest; only pocket money can be a share of its adult's own income.
+ */
 export type RuleChoice =
   | { kind: 'fixed'; amount: Money }
   | { kind: 'share-of-income'; share: number }
+  | { kind: 'share-of-own-income'; share: number }
   | { kind: 'share-of-rest'; share: number }
   | { kind: 'rest' }
 
@@ -87,7 +92,13 @@ export function ruleMutations(tables: Tables, target: RuleTarget, choice: RuleCh
     working = applyMutations(tables, made.mutations)
   }
   const row = found
-  if (!canCarryRule(row)) throw new Error(`"${row.name}" cannot have a rule: only the transfer to a savings account, an investment account or a pool account can.`)
+  if (!canCarryRule(row)) throw new Error(`"${row.name}" cannot have a rule: only pocket money and the transfer to a savings account, an investment account or a pool account can.`)
+  if (choice.kind === 'rest' && !canTakeRest(row)) throw new Error('Pocket money cannot take the rest of the month. Give it an amount or a percentage.')
+  if (choice.kind === 'share-of-own-income') {
+    if (!isPocketRow(row)) throw new Error(`Only pocket money can be a percentage of an adult's own income; "${row.name}" is not pocket money.`)
+    const adult = tables.entities.find((e) => e.id === row.scope && !e.deletedAt && e.kind === 'adult')
+    if (!adult) throw new Error(`"${row.name}" does not belong to an adult. Say who it is for first: row menu, "Belongs to…".`)
+  }
 
   const liveRows = sortRows(working.rows.filter((r) => !r.deletedAt), working.categories)
   const before = resolveRules(liveRows, household.closingRule)
@@ -114,8 +125,9 @@ export function ruleMutations(tables: Tables, target: RuleTarget, choice: RuleCh
    */
   const rework = (r: Row, was: RuleState | undefined, then: 'rule' | { amount: Money }): void => {
     const stored = new Map(working.cells.filter((c) => c.rowId === r.id).map((c) => [c.month, c]))
-    // a typed row that stays typed keeps its earlier months by itself: nothing before `from` reads the new amount
-    const staysTyped = !was && !r.followsRowId && then !== 'rule'
+    // a typed row that stays typed keeps its earlier months by itself: nothing before `from` reads the new amount.
+    // Pocket money that was a share of the pocket total is not typed: its months are written down like a rule's.
+    const staysTyped = !was && !r.followsRowId && !isOldPocketShare(r) && then !== 'rule'
     if (!staysTyped && engine) {
       for (const m of months) {
         const c = engine.cells[cellKey(r.id, m)]
@@ -143,8 +155,10 @@ export function ruleMutations(tables: Tables, target: RuleTarget, choice: RuleCh
 
   rework(row, before.byRow.get(row.id), choice.kind === 'fixed' ? { amount: choice.amount } : 'rule')
   rowPatches.set(row.id, {
-    rule: choice.kind, ruleShare: choice.kind === 'share-of-income' || choice.kind === 'share-of-rest' ? choice.share : null,
+    rule: choice.kind, ruleShare: 'share' in choice ? choice.share : null,
     followsRowId: null, followShare: null,
+    // pocket money with a rule of its own no longer reads the household's pocket total
+    ...(isPocketRow(row) ? { pocketMode: 'fixed' as const, pocketShare: null } : {}),
   })
 
   let closingRule = household.closingRule
@@ -161,7 +175,7 @@ export function ruleMutations(tables: Tables, target: RuleTarget, choice: RuleCh
       // someone once set to take the rest would take it again
       for (const r of liveRows) {
         if (r.id === row.id) continue
-        if ((r.kind === 'to-savings' && (r.rule ?? null) === null) || (canCarryRule(r) && r.rule === 'rest')) rowPatches.set(r.id, { rule: 'fixed', ruleShare: null })
+        if ((r.kind === 'to-savings' && (r.rule ?? null) === null) || (canTakeRest(r) && r.rule === 'rest')) rowPatches.set(r.id, { rule: 'fixed', ruleShare: null })
       }
     }
   } else if (wasRest) {

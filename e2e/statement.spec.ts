@@ -131,10 +131,13 @@ test.describe('working the month in the Statement', () => {
     await childcare.click()
     await expect(childcare).toBeChecked()
 
-    // an automatic row can be ticked as moved but not typed over
+    // an automatic row can be ticked as moved but not typed over: pressing it opens its rule, not the cell editor
     await moneyOut.getByRole('button', { name: 'Pocket money', exact: true }).click()
-    await expect(moneyOut.getByRole('button', { name: /^Sam – Pocket:/ })).toHaveCount(0)
     await expect(page.getByRole('checkbox', { name: 'Sam – Pocket done' })).toBeVisible()
+    await moneyOut.getByRole('button', { name: /^Sam – Pocket:/ }).click()
+    await expect(page.getByRole('dialog').getByRole('heading', { name: 'How much goes to Sam – Pocket?' })).toBeVisible()
+    await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click()
+    await expect(page.getByRole('dialog')).toBeHidden()
 
     // an itemized row opens to its items, each with a tick of its own
     await moneyOut.getByRole('button', { name: 'Living', exact: true }).click()

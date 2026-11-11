@@ -24,7 +24,7 @@ export type StatementLineKind = 'group' | 'category' | 'row' | 'item' | 'source'
 /** The rule behind a transfer line, and behind the account or pool account that transfer feeds. */
 export interface StatementRule {
   /** `idle`: a savings row that gets nothing because another takes the rest. `none`: no row feeds the account yet. */
-  kind: 'fixed' | 'share-of-income' | 'share-of-rest' | 'rest' | 'idle' | 'none'
+  kind: 'fixed' | 'share-of-income' | 'share-of-own-income' | 'share-of-rest' | 'rest' | 'idle' | 'none'
   /** The fraction of a share rule. */
   share?: number
   /** The row the rule sits on; absent for `none`. */

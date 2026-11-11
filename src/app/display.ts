@@ -57,6 +57,7 @@ export function doneLabel(d: { done: number; total: number; state: DoneState }):
 export function ruleText(rule: Pick<StatementRule, 'kind' | 'share'>, locale: string): string {
   switch (rule.kind) {
     case 'share-of-income': return `${formatShare(rule.share ?? 0, locale)} of income`
+    case 'share-of-own-income': return `${formatShare(rule.share ?? 0, locale)} of their own income`
     case 'share-of-rest': return `${formatShare(rule.share ?? 0, locale)} of what is left`
     case 'rest': return 'the rest'
     case 'idle': return 'nothing, another account takes the rest'

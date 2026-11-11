@@ -8,7 +8,7 @@ import { FUNDED_BY_PATTERN } from './fundedBy'
 z.config({ jitless: true })
 
 /** Bump when the shape of stored data changes; add a migration in migrations.ts. */
-export const SCHEMA_VERSION = 8
+export const SCHEMA_VERSION = 9
 
 // ---------- primitives ----------
 export const IdSchema = z.string().regex(ID_PATTERN, 'expected ULID')
@@ -144,11 +144,12 @@ export const RowKindSchema = z.enum([
 ])
 
 /**
- * How the transfer that feeds a savings account, an investment account or a pool account is worked out each month:
- * a typed amount that carries forward, a share of the month's take-home income, a share of what the month has left,
- * or the rest of the month (one savings row). `model/rules.ts` reads it for the engine, the store and the screens.
+ * How the transfer that feeds a savings account, an investment account or a pool account, or an adult's pocket money,
+ * is worked out each month: a typed amount that carries forward, a share of the month's take-home income, a share of
+ * what the month has left, or the rest of the month (one row, never pocket money). Pocket money can also be a share
+ * of its adult's own take-home income. `model/rules.ts` reads it for the engine, the store and the screens.
  */
-export const RowRuleSchema = z.enum(['fixed', 'share-of-income', 'share-of-rest', 'rest'])
+export const RowRuleSchema = z.enum(['fixed', 'share-of-income', 'share-of-own-income', 'share-of-rest', 'rest'])
 
 export const RowSchema = BaseRecord.extend({
   name: z.string().min(1),

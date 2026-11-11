@@ -75,6 +75,8 @@ export interface MonthTotals {
   fromAccounts: Money
   /** Income minus what is deducted from it, without money taken out of accounts: what a share of income counts. */
   takeHome: Money
+  /** The same per person or thing the income rows belong to (entity id → amount); a shared income is in nobody's. */
+  takeHomeBy: Record<string, Money>
   /** What the month had left for the shares of what is left: after spending, typed amounts, shares of income and the buffer; never below zero. */
   leftForShares: Money
   /** The rest of the month as worked out for the rest row (negative = drawn back); null when nothing takes the rest this month. */

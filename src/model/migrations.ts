@@ -31,6 +31,9 @@ const STEPS: Record<number, Step> = {
   // `Row.templateKey` (the suggestion a row came from). All fill in from their defaults; the version keeps an older
   // app from dropping them when it writes a record back.
   7: (raw) => raw,
+  // 8 → 9: the rule 'share-of-own-income' (pocket money as a share of its adult's own income), and pocket money rows
+  // that carry a rule at all. Nothing to rewrite; the version keeps an older app from reading a rule it does not know.
+  8: (raw) => raw,
 }
 
 export function migrateExport(raw: unknown): unknown {
