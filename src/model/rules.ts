@@ -34,7 +34,7 @@ export interface Rules {
 /** Money taken out of an account into the month by hand: it counts as money in, never as income to take a share of. */
 export const isTakenFromAccount = (row: Pick<Row, 'kind'>): boolean => row.kind === 'from-investment' || row.kind === 'from-savings'
 
-/** Rows that can take the rest of the month: the transfer to a savings account, an investment account or a pool account. */
+/** Rows that can take the rest of the month: the transfer to a savings account, an investment account or a virtual account. */
 export const canTakeRest = (row: Pick<Row, 'section' | 'kind'>): boolean =>
   row.section !== 'income' && (row.kind === 'to-savings' || row.kind === 'to-investment' || row.kind === 'pool-allocation')
 

@@ -68,7 +68,7 @@ describe('goals', () => {
     const under = computeGoals({ ...t, goals: [{ ...g, target: 6000_00 }] }, out, '2026-03')[0]
     expect(under).toMatchObject({ status: 'reached', progress: 1, reachedMonth: '2026-01' })
   })
-  it('pool account and net worth goals read the pool series and the net worth', () => {
+  it('virtual account and net worth goals read the pool series and the net worth', () => {
     const savings = account({ name: 'Savings', type: 'savings', openingBalance: 1000_00 })
     const travel = pool({ name: 'Travel', accountId: savings.id, openingBalance: 600_00 })
     const alloc = row({ name: 'Travel pool', section: 'transfer', kind: 'pool-allocation', accountId: savings.id })
@@ -99,7 +99,7 @@ describe('goals', () => {
     expect(u.status).toBe('broken')
     expect(u.problem).toMatch(/not tracked/)
     const p = computeGoals({ ...t, goals: [goal({ name: 'z', kind: 'pool-balance', poolId: newId(), target: 1 })] }, out, '2026-01')[0]
-    expect(p.problem).toMatch(/pool account/)
+    expect(p.problem).toMatch(/virtual account/)
     expect(computeGoals({ ...t, goals: [{ ...goal({ name: 'd', kind: 'net-worth', target: 1 }), deletedAt: T0 }] }, out, '2026-01')).toEqual([])
   })
 })

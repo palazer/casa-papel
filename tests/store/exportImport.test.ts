@@ -97,7 +97,7 @@ describe('export / import', () => {
     expect(() => parseExportFile({ format: 'casa-papel', schemaVersion: 99 })).toThrow(/newer/)
   })
 
-  it('brings a schema 2 file up to date: cells and pool accounts get their new fields', () => {
+  it('brings a schema 2 file up to date: cells and virtual accounts get their new fields', () => {
     const row = makeRow('Rent')
     const pool = { id: newId(), createdAt: t0, updatedAt: t0, deletedAt: null, name: 'Travel', accountId: newId(), allocationRowId: null, openingBalance: 0, order: 'a0' }
     const cell = { rowId: row.id, month: '2026-11', mode: 'value', value: 193500, items: [], note: null, currencyOverride: null, updatedAt: t0 }

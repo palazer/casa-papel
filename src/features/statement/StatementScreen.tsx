@@ -72,14 +72,14 @@ export function StatementScreen() {
   const [currentBalance, setCurrentBalance] = useState(false)
   /** The expense category whose estimate is being typed. */
   const [estimateFor, setEstimateFor] = useState<string | null>(null)
-  /** The transfer, account or pool account whose rule is being set. */
+  /** The transfer, account or virtual account whose rule is being set. */
   const [ruleFor, setRuleFor] = useState<RuleTarget | null>(null)
   /** For an account added a moment ago: the choice its rule dialog opens on. */
   const [ruleStart, setRuleStart] = useState<RuleChoice['kind'] | undefined>(undefined)
   /** An account being added from the lower half: where it was asked from says which types are on offer. */
   const [accountNew, setAccountNew] = useState<{ name?: string; type?: AccountType; types: AccountType[] } | null>(null)
   const [poolNew, setPoolNew] = useState(false)
-  /** An account or a pool account opened from the "…" on its line. */
+  /** An account or a virtual account opened from the "…" on its line. */
   const [accountEdit, setAccountEdit] = useState<string | null>(null)
   const [poolEdit, setPoolEdit] = useState<string | null>(null)
   /** What "Archive or delete…" in one of those dialogs was pressed for. */
@@ -89,7 +89,7 @@ export function StatementScreen() {
   const version = useStoreVersion(store)
   /** "Suggestions" in the toolbar, once it was pressed; until then they show while the household is being set up. */
   const [suggest, setSuggest] = useState<boolean | null>(null)
-  /** The pool account being topped up. */
+  /** The virtual account being topped up. */
   const [topUpFor, setTopUpFor] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -99,14 +99,14 @@ export function StatementScreen() {
   const idx = Math.max(0, months.indexOf(month) === -1 ? months.length - 1 : months.indexOf(month))
   const m = months[idx]
   const statement = useMemo(() => (tables && engine && m ? buildStatement(tables, engine, m) : null), [tables, engine, m])
-  /** What each pool account is short by in the month shown. */
+  /** What each virtual account is short by in the month shown. */
   const shortNow = useMemo(() => {
     const out: Record<string, number> = {}
     if (engine && m) for (const [id, s] of Object.entries(engine.pools)) out[id] = s.months[m]?.short ?? 0
     return out
   }, [engine, m])
   const closedNow = statement?.closed ?? true
-  // A pool account that becomes short while this month is on screen (an expense was just typed, a set-aside lowered)
+  // A virtual account that becomes short while this month is on screen (an expense was just typed, a set-aside lowered)
   // gets its top-up offered straight away. One that was short already when the month came into view only shows its tag.
   const seenShort = useRef<{ month: MonthKey | undefined; short: Record<string, number> }>({ month: undefined, short: {} })
   useEffect(() => {
@@ -212,7 +212,7 @@ export function StatementScreen() {
     setRuleStart(account.type === 'savings' && !restTaken ? 'rest' : undefined)
     setRuleFor({ accountId: account.id })
   }
-  /** The rule sits on a row; an account or a pool account that no row feeds yet gets one when the rule is saved. */
+  /** The rule sits on a row; an account or a virtual account that no row feeds yet gets one when the rule is saved. */
   function onRule(line: StatementLine) {
     if (line.rule?.rowId) setRuleFor({ rowId: line.rule.rowId })
     else if (line.poolId) setRuleFor({ poolId: line.poolId })
@@ -247,7 +247,7 @@ export function StatementScreen() {
     return null
   }
 
-  /** A goal starts on the line it was asked from: a pool account, an account to grow, a debt to clear, or net worth. */
+  /** A goal starts on the line it was asked from: a virtual account, an account to grow, a debt to clear, or net worth. */
   function onGoal(line: StatementLine, g?: GoalProgress) {
     if (g) return setGoalEdit({ goal: g.goal })
     if (line.poolId) return setGoalEdit({ goal: null, preset: { kind: 'pool-balance', poolId: line.poolId } })
@@ -258,7 +258,7 @@ export function StatementScreen() {
   /** A one-click delete went through: say what is gone, with the way back, until something else changes. */
   const onDeleted = (name: string) => setDeleted({ name, version: store.getVersion() })
   /**
-   * Removing from an account's or a pool account's dialog. While the household is being set up it is one click, unless
+   * Removing from an account's or a virtual account's dialog. While the household is being set up it is one click, unless
    * more than the thing itself would change; then, and always afterwards, the remove dialog asks.
    */
   function removeFrom(target: RemovalTarget) {
@@ -277,7 +277,7 @@ export function StatementScreen() {
   const editButton = (label: string, onClick: () => void) => (
     <Button variant="ghost" size="icon" className={LINE_MENU} aria-label={`Edit ${label}`} title="Edit" onClick={onClick}><MoreHorizontal /></Button>
   )
-  /** The "…" after any other line's name: a category's menu, or the way into an account's or a pool account's dialog. */
+  /** The "…" after any other line's name: a category's menu, or the way into an account's or a virtual account's dialog. */
   function lineMenu(line: StatementLine): ReactNode {
     if (statement!.closed) return null
     if (line.kind === 'category' && line.id.startsWith('cat:')) {
@@ -327,7 +327,7 @@ export function StatementScreen() {
     <>
       {showing && <AccountSuggestionLines suggestions={accountSuggestions(tables)} onAdd={(s) => setAccountNew({ name: s.name, type: s.type, types: ASSET_TYPES })} onError={setError} />}
       <Button variant="ghost" size="sm" className={ADD} onClick={() => setAccountNew({ types: ASSET_TYPES })}><Plus /> Add account</Button>
-      {savingsAccounts.length > 0 && <Button variant="ghost" size="sm" className={ADD} onClick={() => setPoolNew(true)}><Plus /> Add pool account</Button>}
+      {savingsAccounts.length > 0 && <Button variant="ghost" size="sm" className={ADD} onClick={() => setPoolNew(true)}><Plus /> Add virtual account</Button>}
     </>
   )
   // the account a rule is asked for may have been saved a moment ago: wait until it is on the page

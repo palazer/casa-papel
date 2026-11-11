@@ -145,13 +145,13 @@ export const RowKindSchema = z.enum([
   // An expense category's estimate: its cells hold what the whole category is expected to come to, and the engine
   // counts only what the category's other rows have not explained yet ("Not broken down yet"). One per category.
   'category-estimate',
-  // Money taken out of a savings account into the month by hand: to fill a gap, or to top up a pool account. The
+  // Money taken out of a savings account into the month by hand: to fill a gap, or to top up a virtual account. The
   // counterpart of 'from-investment'; both count as money in and lower the account they come from.
   'from-savings',
 ])
 
 /**
- * How the transfer that feeds a savings account, an investment account or a pool account, or an adult's pocket money,
+ * How the transfer that feeds a savings account, an investment account or a virtual account, or an adult's pocket money,
  * is worked out each month: a typed amount that carries forward, a share of the month's take-home income, a share of
  * what the month has left, or the rest of the month (one row, never pocket money). Pocket money can also be a share
  * of its adult's own take-home income. `model/rules.ts` reads it for the engine, the store and the screens.
@@ -253,7 +253,7 @@ export const RecurringItemSchema = BaseRecord.extend({
 // ---------- pools, fx, months ----------
 export const PoolSchema = BaseRecord.extend({
   name: z.string().min(1),
-  /** Savings account that holds this pool account. */
+  /** Savings account that holds this virtual account. */
   accountId: IdSchema,
   allocationRowId: IdSchema.nullable().default(null),
   openingBalance: MoneySchema.default(0),
@@ -285,13 +285,13 @@ export const MonthStateSchema = z.object({
 // ---------- goals ----------
 export const GoalKindSchema = z.enum(['account-balance', 'pool-balance', 'pay-off', 'net-worth'])
 
-/** A finish line: fill an account or pool account to an amount, pay a debt down to one, or reach a net worth. */
+/** A finish line: fill an account or virtual account to an amount, pay a debt down to one, or reach a net worth. */
 export const GoalSchema = BaseRecord.extend({
   name: z.string().min(1),
   kind: GoalKindSchema,
   /** account-balance and pay-off: the account watched. */
   accountId: IdSchema.nullable().default(null),
-  /** pool-balance: the pool account watched. */
+  /** pool-balance: the virtual account watched. */
   poolId: IdSchema.nullable().default(null),
   /** Minor units in the account's currency (account kinds) or the base currency (pool, net worth). Pay-off: what the debt comes down to, 0 to clear it. */
   target: MoneySchema.default(0),

@@ -82,8 +82,8 @@ export function RowSourceDialog({ row, tables, household, onClose }: Base) {
             />
             <p className="text-xs text-muted-foreground">
               {scope === 'from-month'
-                ? `Earlier months stay as they are (${oldLabel}), so past savings and pool balances do not move.`
-                : 'Earlier months change too: the savings balance and pool accounts are worked out again from the start.'}
+                ? `Earlier months stay as they are (${oldLabel}), so past savings and virtual account balances do not move.`
+                : 'Earlier months change too: the savings balance and virtual accounts are worked out again from the start.'}
             </p>
           </fieldset>
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}

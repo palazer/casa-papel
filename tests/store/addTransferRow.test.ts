@@ -25,7 +25,7 @@ describe('addRowOfKind under Transfers', () => {
     expect(out.accounts[fund.id].months['2026-02'].capital).toBe(200000)
   })
 
-  it('beside the row that takes the rest a second "to savings" row is typed and counts; a pool account that lost its row can be filled again', async () => {
+  it('beside the row that takes the rest a second "to savings" row is typed and counts; a virtual account that lost its row can be filled again', async () => {
     const { store, savings } = await fresh()
     const rainy = await addAccount(store, { name: 'Rainy day', type: 'savings', currency: 'EUR', openingMonth: '2026-01' })
     const more = await addRowOfKind(store, { section: 'transfer', name: 'To Rainy day', categoryId: null, kind: 'to-savings', accountId: rainy.id })
@@ -37,7 +37,7 @@ describe('addRowOfKind under Transfers', () => {
     expect(two.accounts[savings.id].months['2026-02'].balance).toBe(-40000)
     const pool = await addPool(store, { name: 'Travel', accountId: savings.id, openingBalance: 0 })
     await expect(addRowOfKind(store, { section: 'transfer', name: 'Travel again', categoryId: null, kind: 'pool-allocation', poolId: pool.id })).rejects.toThrow(/already filled/)
-    await expect(addRowOfKind(store, { section: 'transfer', name: 'Travel again', categoryId: null, kind: 'pool-allocation', poolId: newId() })).rejects.toThrow(/Pick the pool account/)
+    await expect(addRowOfKind(store, { section: 'transfer', name: 'Travel again', categoryId: null, kind: 'pool-allocation', poolId: newId() })).rejects.toThrow(/Pick the virtual account/)
     let t = await loadTables(store)
     await store.commit(planRemoval(t, { kind: 'row', id: pool.allocationRowId! }, Date.now()))
     const row = await addRowOfKind(store, { section: 'transfer', name: 'Travel again', categoryId: null, kind: 'pool-allocation', poolId: pool.id })

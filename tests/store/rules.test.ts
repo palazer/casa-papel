@@ -175,7 +175,7 @@ describe('setRule', () => {
     expect(now.totals['2026-02'].leftover).toBe(0)
   })
 
-  it('makes the row for an account or a pool account that has none', async () => {
+  it('makes the row for an account or a virtual account that has none', async () => {
     const { store, savings, broker, toBroker } = await fresh()
     const pool = await addPool(store, { name: 'Travel', accountId: savings.id, openingBalance: 0 })
     await store.commit(planRemoval(await loadTables(store), { kind: 'row', id: pool.allocationRowId! }, Date.now()))

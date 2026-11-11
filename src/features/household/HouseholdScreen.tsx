@@ -31,7 +31,7 @@ const LOCALES = ['en-IE', 'en-GB', 'en-US', 'de-DE', 'de-AT', 'tr-TR', 'fr-FR', 
 const ACCOUNT_TYPES = ACCOUNT_TYPE_INFO
 const KINDS: EntityKind[] = ['adult', 'child', 'pet', 'vehicle', 'property', 'company', 'other']
 
-/** The household's settings and its parts: people & things, accounts, pool accounts, currency rates, schedules. A reading page: air islands. */
+/** The household's settings and its parts: people & things, accounts, virtual accounts, currency rates, schedules. A reading page: air islands. */
 export function HouseholdScreen() {
   const store = useStore()
   const tables = useTables()

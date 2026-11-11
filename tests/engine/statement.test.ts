@@ -134,10 +134,10 @@ describe('the Statement, the month', () => {
     expect(expenses.amount).toBe(335700 + 100000)
   })
 
-  it('shows spending from a pool account on both sides', () => {
+  it('shows spending from a virtual account on both sides', () => {
     const { s } = statementFor(buildDemoTables(), '2026-10', monthRange('2026-09', '2026-12'))
     const sources = topLine(s, 'in', 'sources')!
-    expect(sources).toMatchObject({ label: 'From savings and pool accounts', amount: 48000 })
+    expect(sources).toMatchObject({ label: 'From savings and virtual accounts', amount: 48000 })
     expect(sources.children.map((c) => [c.kind, c.label, c.amount])).toEqual([['source', 'Travel', 48000]])
     expect(sources.children[0].children.map((c) => [c.kind, c.label])).toEqual([['note', 'Travel']])
     expect(find(s, 'cat:expense:' + sources.children[0].children[0].rowId)).toBeUndefined()

@@ -1,6 +1,6 @@
 /**
  * Goals: a finish line the household chose, read against numbers the engine already computes.
- * No new maths: a goal watches an account balance, a pool account, a debt or the net worth.
+ * No new maths: a goal watches an account balance, a virtual account, a debt or the net worth.
  */
 import { addMonths, compareMonths, type Goal, type Money, type MonthKey, type Tables } from '@/model'
 import type { EngineOutput } from './types'
@@ -31,8 +31,8 @@ function reader(goal: Goal, tables: Tables, out: EngineOutput, month: MonthKey):
   if (goal.kind === 'pool-balance') {
     const pool = goal.poolId ? tables.pools.find((p) => p.id === goal.poolId && !p.deletedAt) : undefined
     const series = goal.poolId ? out.pools[goal.poolId] : undefined
-    if (!pool || !series) return { read: () => null, currency: base, problem: 'The pool account this goal watched is gone. Edit the goal and pick another.', opening: 0, openingMonth: null }
-    if (pool.archivedMonth && compareMonths(pool.archivedMonth, month) <= 0) return { read: () => null, currency: base, problem: `The pool account "${pool.name}" is archived. Restore it under Household or edit the goal.`, opening: pool.openingBalance, openingMonth: null }
+    if (!pool || !series) return { read: () => null, currency: base, problem: 'The virtual account this goal watched is gone. Edit the goal and pick another.', opening: 0, openingMonth: null }
+    if (pool.archivedMonth && compareMonths(pool.archivedMonth, month) <= 0) return { read: () => null, currency: base, problem: `The virtual account "${pool.name}" is archived. Restore it under Household or edit the goal.`, opening: pool.openingBalance, openingMonth: null }
     return { read: (m) => series.months[m]?.balance ?? null, currency: base, problem: null, opening: pool.openingBalance, openingMonth: null }
   }
   const acc = goal.accountId ? tables.accounts.find((a) => a.id === goal.accountId && !a.deletedAt) : undefined

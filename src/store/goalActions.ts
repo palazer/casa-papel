@@ -31,7 +31,7 @@ function normalize(tables: Tables, g: { kind: GoalKind; accountId: string | null
       if (!(g.target >= 0)) throw new Error('A debt cannot be brought down to less than zero.')
       return { accountId: acc.id, poolId: null, target: g.target }
     case 'pool-balance':
-      if (!g.poolId || !tables.pools.some((p) => p.id === g.poolId && !p.deletedAt)) throw new Error('Pick a pool account.')
+      if (!g.poolId || !tables.pools.some((p) => p.id === g.poolId && !p.deletedAt)) throw new Error('Pick a virtual account.')
       positive()
       return { accountId: null, poolId: g.poolId, target: g.target }
     default:

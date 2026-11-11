@@ -278,7 +278,7 @@ export async function createHouseholdFromSetup(store: Store, input: SetupInput):
 
 export interface PoolInput {
   name: string
-  /** Savings account that holds the pool account. */
+  /** Savings account that holds the virtual account. */
   accountId: string
   openingBalance?: number
   /** Monthly amount set aside, written into the allocation row from `fromMonth` on. */
@@ -316,6 +316,6 @@ export async function addPool(store: Store, input: PoolInput): Promise<Pool> {
 export async function updatePool(store: Store, id: string, patch: Partial<Pick<Pool, 'name' | 'accountId' | 'openingBalance'>>): Promise<void> {
   const tables = await loadTables(store)
   const p = tables.pools.find((x) => x.id === id)
-  if (!p) throw new Error('Pool not found')
+  if (!p) throw new Error('Virtual account not found')
   await store.commit([{ op: 'put', table: 'pools', record: PoolSchema.parse({ ...p, ...patch, updatedAt: now() }) }])
 }

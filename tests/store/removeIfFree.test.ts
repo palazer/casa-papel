@@ -44,7 +44,7 @@ describe('the cheap delete of a household that is being set up', () => {
     expect((await live(store)).categories).toContain('Housing')
   })
 
-  it('deletes an account nothing points at; rows that use it, a pool account in it or a goal on it go to the dialog', async () => {
+  it('deletes an account nothing points at; rows that use it, a virtual account in it or a goal on it go to the dialog', async () => {
     const store = await fresh()
     const spare = await addAccount(store, { name: 'Spare', type: 'savings', currency: 'EUR', openingMonth: '2026-09', openingBalance: 100_00 })
     expect(await removeIfFree(store, { kind: 'account', id: spare.id })).toBe('Spare')
@@ -60,7 +60,7 @@ describe('the cheap delete of a household that is being set up', () => {
     // and that row is more than itself: the account would stop receiving the rest
     const toSavings = (await loadTables(store)).rows.find((r) => r.name === 'To Savings')!
     expect(await removeIfFree(store, { kind: 'row', id: toSavings.id })).toBeNull()
-    // a pool account whose spending row would lose its source
+    // a virtual account whose spending row would lose its source
     await addSuggestion(store, 'household:h.poolTravel', { amount: 50_00 })
     const pool = (await loadTables(store)).pools[0]
     expect(await removeIfFree(store, { kind: 'pool', id: pool.id })).toBeNull()

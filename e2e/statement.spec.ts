@@ -42,7 +42,7 @@ test.describe('the Statement', () => {
     const position = page.getByRole('region', { name: 'Debts and net worth' })
     await expect(position.locator('[data-line="net-worth"]')).toContainText('€23,018.00')
     await expect(position.locator('[data-line="free"]')).toContainText('€21,968.00')
-    // pool accounts sit under the savings account that holds them
+    // virtual accounts sit under the savings account that holds them
     const assetsSide = page.getByRole('region', { name: 'Assets' })
     await expect(assetsSide.getByText('Travel', { exact: true })).toBeVisible()
     await expect(assetsSide.getByText('Not set aside')).toBeVisible()
@@ -88,11 +88,11 @@ test.describe('the Statement', () => {
     await expect(total(page, 'in')).toHaveText('Total in€7,255.00')
   })
 
-  test('spending from a pool account shows on both sides', async ({ page }) => {
+  test('spending from a virtual account shows on both sides', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'October 2026')
     const moneyIn = page.getByRole('region', { name: 'Money in' })
-    await expect(moneyIn.locator('[data-line="sources"]')).toContainText('From savings and pool accounts')
+    await expect(moneyIn.locator('[data-line="sources"]')).toContainText('From savings and virtual accounts')
     await expect(moneyIn.locator('[data-line="sources"]')).toContainText('€480.00')
     const totalIn = (await total(page, 'in').innerText()).replace(/^Total in\s*/, '')
     const totalOut = (await total(page, 'out').innerText()).replace(/^Total out\s*/, '')
@@ -374,7 +374,7 @@ test.describe('working the month in the Statement', () => {
     await expect(dlg.getByLabel('Bring it down to (EUR)')).toHaveValue('0')
     await dlg.getByRole('button', { name: 'Cancel' }).click()
 
-    // a pool account: the line says what the goal watches, so only the name, the amount and the month are asked
+    // a virtual account: the line says what the goal watches, so only the name, the amount and the month are asked
     await assets.getByRole('button', { name: 'Set a goal for Travel' }).click()
     await expect(dlg.getByRole('heading', { name: 'Goal for Travel' })).toBeVisible()
     await expect(dlg.getByRole('radiogroup', { name: 'Kind' })).toHaveCount(0)
@@ -517,7 +517,7 @@ test.describe('working the month in the Statement', () => {
     await expect(dlg.getByLabel('Percentage of income')).toHaveValue('10')
     await dlg.getByRole('button', { name: 'Cancel' }).click()
 
-    // from the account: the Travel pool account takes a fifth of what is left
+    // from the account: the Travel virtual account takes a fifth of what is left
     await assets.getByRole('button', { name: 'Rule for Travel: a fixed amount' }).click()
     await expect(dlg.getByRole('heading', { name: 'How much goes to Travel?' })).toBeVisible()
     await dlg.getByRole('radio', { name: 'A percentage of what is left' }).click()
@@ -606,7 +606,7 @@ test.describe('working the month in the Statement', () => {
     await expect(moneyOut.getByRole('button', { name: 'Sam – Pocket: €500.00' })).toBeVisible()
   })
 
-  test('accounts, pool accounts, cards and loans are added in the lower half; a new savings account is asked how much goes to it', async ({ page }) => {
+  test('accounts, virtual accounts, cards and loans are added in the lower half; a new savings account is asked how much goes to it', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'November 2026')
     const moneyOut = page.getByRole('region', { name: 'Money out' })
@@ -639,9 +639,9 @@ test.describe('working the month in the Statement', () => {
     await expect(moneyOut.getByRole('button', { name: 'To Rainy day: €50.00' })).toBeVisible()
     await expect(assets.getByRole('button', { name: 'Rule for Rainy day: a fixed amount' })).toBeVisible()
 
-    // a pool account inside it, set aside from the month on screen
-    await assets.getByRole('button', { name: 'Add pool account' }).click()
-    await expect(dlg.getByRole('heading', { name: 'New pool account' })).toBeVisible()
+    // a virtual account inside it, set aside from the month on screen
+    await assets.getByRole('button', { name: 'Add virtual account' }).click()
+    await expect(dlg.getByRole('heading', { name: 'New virtual account' })).toBeVisible()
     await dlg.getByLabel('Name').fill('Gifts')
     await dlg.getByLabel('Held in').selectOption({ label: 'Rainy day' })
     await expect(dlg.getByLabel('Set aside each month (EUR)')).toHaveAttribute('placeholder', 'optional, from Nov 2026 on')
@@ -738,7 +738,7 @@ test.describe('working the month in the Statement', () => {
     await expect(page.getByTestId('suggestions')).toHaveCount(0)
   })
 
-  test('rows, categories, accounts and pool accounts are changed and removed from their line', async ({ page }) => {
+  test('rows, categories, accounts and virtual accounts are changed and removed from their line', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'November 2026')
     const moneyOut = page.getByRole('region', { name: 'Money out' })
@@ -792,7 +792,7 @@ test.describe('working the month in the Statement', () => {
     await page.getByRole('button', { name: 'Undo' }).click()
     await expect(moneyOut.getByRole('button', { name: 'Home', exact: true })).toBeVisible()
 
-    // an account and a pool account open their dialog, which removes at its foot
+    // an account and a virtual account open their dialog, which removes at its foot
     await assets.getByRole('button', { name: 'Edit Index fund' }).click()
     await expect(dlg.getByRole('heading', { name: 'Edit account' })).toBeVisible()
     await expect(dlg.getByLabel('Name', { exact: true })).toHaveValue('Index fund')
@@ -800,7 +800,7 @@ test.describe('working the month in the Statement', () => {
     await expect(dlg.getByRole('heading', { name: 'Account "Index fund"' })).toBeVisible()
     await dlg.getByRole('button', { name: 'Cancel' }).click()
     await assets.getByRole('button', { name: 'Edit Travel' }).click()
-    await expect(dlg.getByRole('heading', { name: 'Edit pool account' })).toBeVisible()
+    await expect(dlg.getByRole('heading', { name: 'Edit virtual account' })).toBeVisible()
     await dlg.getByRole('button', { name: 'Cancel' }).click()
     // the calculated line stands for the current accounts, so it lists them
     await assets.getByRole('button', { name: 'Edit a current account' }).click()
@@ -818,7 +818,7 @@ test.describe('working the month in the Statement', () => {
     await expect(page.getByRole('button', { name: /^Edit / })).toHaveCount(0)
   })
 
-  test('money taken from an account by hand has its own section; what expenses took from savings and pool accounts is marked calculated', async ({ page }) => {
+  test('money taken from an account by hand has its own section; what expenses took from savings and virtual accounts is marked calculated', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'November 2026')
     const moneyIn = page.getByRole('region', { name: 'Money in' })
@@ -858,7 +858,7 @@ test.describe('working the month in the Statement', () => {
     await expect(moneyOut.getByLabel('What the new transfer row does').locator('option[value="from-savings"]')).toHaveCount(0)
   })
 
-  test('a pool account that runs short stops at zero and offers a top-up that leaves a record', async ({ page }) => {
+  test('a virtual account that runs short stops at zero and offers a top-up that leaves a record', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'November 2026')
     const moneyIn = page.getByRole('region', { name: 'Money in' })
@@ -870,14 +870,14 @@ test.describe('working the month in the Statement', () => {
     const poolLine = assets.locator('[data-line^="pool:"]').filter({ hasText: 'Clothing' })
     await expect(poolLine).toContainText('€270.00')
 
-    // €3,000 of clothing out of a pool account that holds €450 this month
+    // €3,000 of clothing out of a virtual account that holds €450 this month
     await page.getByRole('button', { name: 'Expand all' }).click()
     await moneyOut.getByRole('button', { name: /^Clothing: €180\.00/ }).click()
     // the row holds one item this month, the winter coat
     await dlg.getByLabel('Item amount').fill('3000')
     await dlg.getByRole('button', { name: 'Save' }).click()
 
-    // the top-up is offered straight away; "Not now" keeps the expense and leaves the pool account short
+    // the top-up is offered straight away; "Not now" keeps the expense and leaves the virtual account short
     await expect(dlg.getByRole('heading', { name: 'Clothing is short in November 2026' })).toBeVisible()
     await expect(dlg).toContainText('€3,000.00 comes out of Clothing this month and it holds €450.00: €2,550.00 is missing.')
     await dlg.getByRole('button', { name: 'Not now' }).click()

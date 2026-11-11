@@ -23,7 +23,7 @@ interface Props {
 const INCOME = 'income'
 
 /**
- * A pool account was asked for more than it holds (DESIGN.md §8): say by how much, and offer to top it up with a
+ * A virtual account was asked for more than it holds (DESIGN.md §8): say by how much, and offer to top it up with a
  * record. The source is the unassigned part of its own savings account unless another is picked; the lines the month
  * will then show come from running the save on a copy.
  */
@@ -36,14 +36,14 @@ export function TopUpDialog({ tables, engine, household, poolId, month, onClose 
   const money = (v: number) => formatAmount(v, ccy, locale)
   const monthName = formatMonth(month, locale, 'long')
 
-  /** Savings and investment accounts that hold something this month, the pool account's own savings account first. */
+  /** Savings and investment accounts that hold something this month, the virtual account's own savings account first. */
   const sources = useMemo(() => {
     const live = tables.accounts.filter((a) => !a.deletedAt && !a.archivedMonth && (a.type === 'savings' || a.type === 'investment'))
     const own = live.find((a) => a.id === pool?.accountId)
     const set = (accountId: string) => tables.pools.filter((p) => !p.deletedAt && p.accountId === accountId).reduce((sum, p) => sum + (engine.pools[p.id]?.months[month]?.balance ?? 0), 0)
     return [...(own ? [own] : []), ...live.filter((a) => a.id !== own?.id)].map((a) => {
       const balance = engine.accounts[a.id]?.months[month]?.balanceBase
-      // what is free in a savings account is what its pool accounts have not set aside
+      // what is free in a savings account is what its virtual accounts have not set aside
       const free = balance == null ? null : a.type === 'savings' ? balance - set(a.id) : balance
       return { id: a.id, label: a.type === 'savings' ? `${a.name}, not set aside` : a.name, name: a.name, free }
     })
@@ -54,7 +54,7 @@ export function TopUpDialog({ tables, engine, household, poolId, month, onClose 
 
   const amount = text.trim() === '' ? null : parseAmount(text, ccy, locale)
   const chosen = sources.find((s) => s.id === sourceId)
-  /** The top-up tried on a copy: what the two rows and the pool account would then show, or why it cannot be saved. */
+  /** The top-up tried on a copy: what the two rows and the virtual account would then show, or why it cannot be saved. */
   const preview = useMemo(() => {
     if (amount == null) return null
     try {

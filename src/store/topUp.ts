@@ -14,9 +14,9 @@ import { applyMutations } from './impact'
 export type TopUpSource = { kind: 'account'; accountId: string } | { kind: 'income' }
 
 /**
- * Top a pool account up for one month, with a record of where the money came from. Two one-off items, this month only:
+ * Top a virtual account up for one month, with a record of where the money came from. Two one-off items, this month only:
  * "Top-up for <pool>" on the row that takes money out of the source account (made on first use), and "Top-up from
- * <account>" on the pool account's own set-aside row. The month takes the money in and sets it aside again, so the
+ * <account>" on the virtual account's own set-aside row. The month takes the money in and sets it aside again, so the
  * rest is untouched; from the month's income only the second is written, and the rest shrinks. Pure; the caller
  * commits, and the dialog runs it on a copy to show what the month will hold.
  */
@@ -25,7 +25,7 @@ export function topUpMutations(tables: Tables, poolId: string, month: MonthKey, 
   if (!household) throw new Error('No household yet')
   const base = household.baseCurrency
   const pool = tables.pools.find((p) => p.id === poolId && !p.deletedAt)
-  if (!pool) throw new Error('That pool account no longer exists.')
+  if (!pool) throw new Error('That virtual account no longer exists.')
   if (pool.archivedMonth && compareMonths(pool.archivedMonth, month) <= 0) throw new Error(`"${pool.name}" is archived in ${month}.`)
   if (!Number.isFinite(amount) || !(amount > 0)) throw new Error('The top-up must be more than zero.')
   if (compareMonths(month, household.startMonth) < 0) throw new Error(`The household starts in ${household.startMonth}.`)
@@ -38,7 +38,7 @@ export function topUpMutations(tables: Tables, poolId: string, month: MonthKey, 
     working = applyMutations(working, made)
   }
 
-  // the pool account's own set-aside row; one that lost its row gets a new one
+  // the virtual account's own set-aside row; one that lost its row gets a new one
   let setAside = working.rows.find((r) => r.id === pool.allocationRowId && !r.deletedAt)
   if (!setAside) {
     const made = newRowMutation(working, { name: `${pool.name} pool`, section: 'transfer', kind: 'pool-allocation', accountId: pool.accountId, defaultStatus: 'committed', rule: 'fixed' })
@@ -57,7 +57,7 @@ export function topUpMutations(tables: Tables, poolId: string, month: MonthKey, 
     if (acc.type !== 'savings' && acc.type !== 'investment') throw new Error(`A top-up comes from a savings or an investment account, and "${acc.name}" is neither.`)
     const kind = acc.type === 'savings' ? 'from-savings' : 'from-investment'
     sourceName = acc.name
-    // the row that takes money out of that account, kept in the household currency like the pool account itself
+    // the row that takes money out of that account, kept in the household currency like the virtual account itself
     from = working.rows.find((r) => !r.deletedAt && !r.archivedMonth && r.kind === kind && r.accountId === acc.id && (r.currency ?? base) === base)
     if (!from) {
       const made = newRowMutation(working, { name: `From ${acc.name}`, section: 'transfer', kind, accountId: acc.id, defaultStatus: 'committed' })
@@ -100,7 +100,7 @@ export function topUpMutations(tables: Tables, poolId: string, month: MonthKey, 
   return mutations
 }
 
-/** Top a pool account up for one month; one undoable step. */
+/** Top a virtual account up for one month; one undoable step. */
 export async function topUpPool(store: Store, poolId: string, month: MonthKey, source: TopUpSource, amount: Money): Promise<void> {
   await store.commit(topUpMutations(await loadTables(store), poolId, month, source, amount))
 }

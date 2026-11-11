@@ -40,7 +40,7 @@ describe('suggestions for setting up on the Statement', () => {
     // transfers into savings and investments come from the account's rule, never from a suggestion
     expect(titles(all)).not.toContain('To savings')
     expect(titles(all)).not.toContain('To investments')
-    // a pool account lives in a savings account
+    // a virtual account lives in a savings account
     expect(all.find((s) => s.title === 'Travel')).toMatchObject({ pool: true, needs: 'savings', usual: true })
     expect(accountSuggestions(t).map((a) => [a.name, a.type])).toEqual([['Main account', 'checking'], ['Savings', 'savings']])
   })
@@ -99,7 +99,7 @@ describe('suggestions for setting up on the Statement', () => {
     expect(accountSuggestions(t).map((a) => a.name)).toEqual(['Savings'])
   })
 
-  it('a suggestion that needs an account waits for it; a pool one makes its pool account; a pocket line is typed', async () => {
+  it('a suggestion that needs an account waits for it; a pool one makes its virtual account; a pocket line is typed', async () => {
     const store = await fresh()
     await expect(addSuggestion(store, 'household:h.poolTravel', { amount: 200_00 })).rejects.toThrow(/needs a savings account/)
     const savings = await addAccount(store, { name: 'Savings', type: 'savings', currency: 'EUR', openingMonth: '2026-09', openingBalance: 9000_00 })
@@ -111,7 +111,7 @@ describe('suggestions for setting up on the Statement', () => {
     expect(t.pools).toHaveLength(1)
     expect(t.pools[0]).toMatchObject({ name: 'Travel', accountId: savings.id })
     expect(travel.defaultFundedBy).toBe(`pool:${t.pools[0].id}`)
-    // the amount is what is set aside each month, so it sits on the pool account's own row
+    // the amount is what is set aside each month, so it sits on the virtual account's own row
     const out = computeEngine({ tables: t, months: monthRange('2026-09', '2026-10') })
     expect(out.cells[cellKey(t.pools[0].allocationRowId!, '2026-10')].value).toBe(200_00)
     expect(out.cells[cellKey(travel.id, '2026-10')].value).toBe(0)

@@ -25,7 +25,7 @@ describe('schemas', () => {
     expect(poolIdOf(row.defaultFundedBy)).toBe(pool)
     expect(() => RowSchema.parse({ id: newId(), createdAt: now, updatedAt: now, name: 'x', section: 'expense', defaultFundedBy: 'pool:nope' })).toThrow()
   })
-  it('fills in the v3 fields: a cell is not marked done, a pool account is not archived', () => {
+  it('fills in the v3 fields: a cell is not marked done, a virtual account is not archived', () => {
     expect(CellSchema.parse({ rowId: newId(), month: '2026-11', updatedAt: now }).markedDone).toBe(false)
     expect(PoolSchema.parse({ id: newId(), createdAt: now, updatedAt: now, name: 'Travel', accountId: newId() }).archivedMonth).toBeNull()
   })

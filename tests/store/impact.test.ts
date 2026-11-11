@@ -30,7 +30,7 @@ describe('describeRemoval', () => {
     expect(describeRemoval(t, { kind: 'row', id: idOf(t, 'rows', 'Other income') }, { ...OPTS, archiveFrom: '2027-01' }).archiveChanges[0]).toBe('Hidden from Jan 2027 on; its amounts in 12 later months no longer count')
   })
 
-  it('a row names its schedules, its followers and the pool account it fills', () => {
+  it('a row names its schedules, its followers and the virtual account it fills', () => {
     const t = buildDemoTables()
     const rent = idOf(t, 'rows', 'The flat – Rent')
     t.rows.push(RowSchema.parse({ id: newId(), createdAt: T0, updatedAt: T0, name: 'Rent mirror', section: 'transfer', followsRowId: rent, order: 'z0' }))
@@ -41,7 +41,7 @@ describe('describeRemoval', () => {
     expect(d.archiveChanges).toContain('"Rent mirror" stops following it and keeps the last amount as its own from Nov 2026')
 
     const alloc = describeRemoval(t, { kind: 'row', id: idOf(t, 'rows', 'Travel pool') }, OPTS)
-    expect(alloc.changes).toEqual(['The pool account "Travel" is no longer filled each month'])
+    expect(alloc.changes).toEqual(['The virtual account "Travel" is no longer filled each month'])
     const plug = describeRemoval(t, { kind: 'row', id: idOf(t, 'rows', 'To savings') }, OPTS)
     expect(plug.changes).toEqual(['"Savings" no longer receives the month\'s leftover'])
   })
@@ -62,16 +62,16 @@ describe('describeRemoval', () => {
     expect(unlinked(planArchive(t, { kind: 'row', id: other }, '2026-11', T0, OPTS))).toBeUndefined()
   })
 
-  it('accounts: typed rows and pool accounts block, plain rows and schedules are consequences, a tracked balance in a closed month is history', () => {
+  it('accounts: typed rows and virtual accounts block, plain rows and schedules are consequences, a tracked balance in a closed month is history', () => {
     const t = buildDemoTables()
     const savings = describeRemoval(t, { kind: 'account', id: idOf(t, 'accounts', 'Savings') }, OPTS)
-    expect(savings.blockers.map((b) => b.text)).toEqual(['"To savings" sends money to it', 'The pool account "Travel" is held in it', 'The pool account "Clothing" is held in it'])
-    expect(savings.blockers[1].where).toMatch(/Pool accounts/)
+    expect(savings.blockers.map((b) => b.text)).toEqual(['"To savings" sends money to it', 'The virtual account "Travel" is held in it', 'The virtual account "Clothing" is held in it'])
+    expect(savings.blockers[1].where).toMatch(/Virtual accounts/)
     expect(savings).toMatchObject({ kindLabel: 'Account', closedHistory: 'Sept 2026', canDelete: false, canArchive: true })
     expect(savings.archiveChanges).toEqual([
       'Its balance stops at Oct 2026; from Nov 2026 it is hidden and no longer counts towards net worth',
       '"To savings" keeps moving money, but the balance is no longer tracked from Nov 2026',
-      'Its pool accounts "Travel" and "Clothing" are archived with it from Nov 2026',
+      'Its virtual accounts "Travel" and "Clothing" are archived with it from Nov 2026',
     ])
 
     const main = describeRemoval(t, { kind: 'account', id: idOf(t, 'accounts', 'Main account') }, OPTS)
@@ -83,17 +83,17 @@ describe('describeRemoval', () => {
     expect(main.archiveChanges[0]).toBe('Hidden from Nov 2026 on; rows that name it keep working')
   })
 
-  it('pool accounts: closed allocations make them archive-only; archiving moves spending to savings from that month', () => {
+  it('virtual accounts: closed allocations make them archive-only; archiving moves spending to savings from that month', () => {
     const t = buildDemoTables()
     const travel = describeRemoval(t, { kind: 'pool', id: idOf(t, 'pools', 'Travel') }, OPTS)
-    expect(travel).toMatchObject({ kindLabel: 'Pool account', closedHistory: 'Sept 2026', canDelete: false, canArchive: true })
+    expect(travel).toMatchObject({ kindLabel: 'Virtual account', closedHistory: 'Sept 2026', canDelete: false, canArchive: true })
     expect(travel.loses[0]).toMatch(/^Its balance \(Sept 2026 – /)
     expect(travel.loses[1]).toMatch(/^The row "Travel pool" that fills it, with its amounts in \d+ months$/)
     expect(travel.changes).toEqual(['"Travel" comes out of the savings balance instead', 'Spending that came out of it in 1 month counts as spent from the savings balance'])
     expect(travel.archiveChanges).toEqual([
       'Its balance stops at Oct 2026',
       '"Travel pool" is archived from Nov 2026; nothing more is set aside',
-      'From Nov 2026, "Travel" comes out of the savings balance; earlier months keep the pool account as their source',
+      'From Nov 2026, "Travel" comes out of the savings balance; earlier months keep the virtual account as their source',
     ])
   })
 

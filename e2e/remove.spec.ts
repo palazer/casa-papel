@@ -53,14 +53,14 @@ test.describe('archive or delete', () => {
     await expect(page.getByRole('button', { name: /^Groceries Nov 2026/ })).toBeVisible()
   })
 
-  test('an account: a pool account inside it blocks the delete; a schedule goes from the list', async ({ page }) => {
+  test('an account: a virtual account inside it blocks the delete; a schedule goes from the list', async ({ page }) => {
     await page.goto('?demo=1&screen=grid')
     await page.getByRole('button', { name: 'Load the demo household' }).click()
     await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
     await page.getByRole('link', { name: 'Household' }).click()
     const dlg = page.getByRole('dialog')
 
-    // a new savings account opened this month (so no closed history) holding a new pool account
+    // a new savings account opened this month (so no closed history) holding a new virtual account
     await page.getByRole('button', { name: 'Add account' }).click()
     await dlg.getByLabel('Name').fill('Holiday')
     await dlg.getByLabel('Type').selectOption({ label: 'Savings' })
@@ -69,7 +69,7 @@ test.describe('archive or delete', () => {
     await expect(dlg.getByLabel('Holds at the start of November 2026 (EUR)')).toBeVisible()
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-    await page.getByRole('button', { name: 'Add pool account' }).click()
+    await page.getByRole('button', { name: 'Add virtual account' }).click()
     await dlg.getByLabel('Name').fill('Gifts')
     await dlg.getByLabel('Held in').selectOption({ label: 'Holiday' })
     await dlg.getByRole('button', { name: 'Save' }).click()
@@ -82,16 +82,16 @@ test.describe('archive or delete', () => {
     await dlg.getByRole('button', { name: 'Archive or delete…' }).click()
     await expect(dlg.getByRole('heading', { name: 'Account "Holiday"' })).toBeVisible()
     await expect(dlg.getByText('Resolve these first')).toBeVisible()
-    await expect(dlg.getByText(/The pool account "Gifts" is held in it/)).toBeVisible()
+    await expect(dlg.getByText(/The virtual account "Gifts" is held in it/)).toBeVisible()
     await expect(dlg.getByRole('button', { name: 'Delete', exact: true })).toBeDisabled()
     await page.screenshot({ path: 'e2e/output/remove-blocked.png' })
     await dlg.getByRole('button', { name: 'Cancel' }).click()
     await expect(dlg).toBeHidden()
 
-    // the pool account can go (nothing has moved through it yet); then the account can too
+    // the virtual account can go (nothing has moved through it yet); then the account can too
     await gifts.getByRole('button', { name: 'Edit' }).click()
     await dlg.getByRole('button', { name: 'Archive or delete…' }).click()
-    await expect(dlg.getByRole('heading', { name: 'Pool account "Gifts"' })).toBeVisible()
+    await expect(dlg.getByRole('heading', { name: 'Virtual account "Gifts"' })).toBeVisible()
     await expect(dlg.getByText('The row "Gifts pool" that fills it')).toBeVisible()
     await dlg.getByRole('button', { name: 'Delete', exact: true }).click()
     await expect(dlg).toBeHidden()

@@ -27,8 +27,8 @@ export function PoolsCard({ household, tables, engine, onError }: { household: H
   const act = (fn: () => Promise<unknown>) => void fn().catch((e) => onError(e instanceof Error ? e.message : 'Action failed'))
   return (
     <Island
-      air tone={HUES.pool} title="Pool accounts"
-      description={'A pool account is money set aside inside a savings account for one purpose: a monthly amount goes in for travel, clothes or gifts, and spending that "comes out of" it draws it down without touching the month\'s leftover.'}
+      air tone={HUES.pool} title="Virtual accounts"
+      description={'A virtual account is money set aside inside a savings account for one purpose: a monthly amount goes in for travel, clothes or gifts, and spending that "comes out of" it draws it down without touching the month\'s leftover.'}
     >
       <div className="space-y-3">
         {pools.length > 0 && (
@@ -63,9 +63,9 @@ export function PoolsCard({ household, tables, engine, onError }: { household: H
           </div>
         )}
         {savings.length === 0 ? (
-          <p className="text-muted-foreground">Add a savings account first; pool accounts live inside one.</p>
+          <p className="text-muted-foreground">Add a savings account first; virtual accounts live inside one.</p>
         ) : (
-          <Button variant="outline" size="xs" onClick={() => setEditing('new')}>Add pool account</Button>
+          <Button variant="outline" size="xs" onClick={() => setEditing('new')}>Add virtual account</Button>
         )}
         {editing && (
           <PoolDialog
@@ -80,15 +80,15 @@ export function PoolsCard({ household, tables, engine, onError }: { household: H
 }
 
 /**
- * A pool account: its name, the savings account that holds it, what is already in it, and for a new one what is set
+ * A virtual account: its name, the savings account that holds it, what is already in it, and for a new one what is set
  * aside each month. The Statement opens it too, with the month on screen as the month the set-aside starts in.
  */
 export function PoolDialog({ pool, savings, baseCurrency, locale, fromMonth, onClose, onError, onRemove, onSaved, removeLabel = 'Archive or delete…' }: {
   pool: Pool | null; savings: Account[]; baseCurrency: string; locale: string
-  /** A new pool account: the month its monthly amount starts in; this month when left out. */
+  /** A new virtual account: the month its monthly amount starts in; this month when left out. */
   fromMonth?: MonthKey
   onClose: () => void; onError: (m: string) => void; onRemove?: () => void
-  /** A new pool account was saved. */
+  /** A new virtual account was saved. */
   onSaved?: (pool: Pool) => void
   /** What the remove button says: "Delete" where removing is one click. */
   removeLabel?: string
@@ -114,8 +114,8 @@ export function PoolDialog({ pool, savings, baseCurrency, locale, fromMonth, onC
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>{pool ? 'Edit pool account' : 'New pool account'}</DialogTitle>
-          <DialogDescription>{pool ? 'The monthly amount lives in the pool account\'s row in the grid.' : 'Creates a transfer row that fills the pool account each month and, if you like, a spending row that draws from it.'}</DialogDescription>
+          <DialogTitle>{pool ? 'Edit virtual account' : 'New virtual account'}</DialogTitle>
+          <DialogDescription>{pool ? 'The monthly amount lives in the virtual account\'s row in the grid.' : 'Creates a transfer row that fills the virtual account each month and, if you like, a spending row that draws from it.'}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-3">
           <div className="space-y-1.5"><Label htmlFor="pool-name">Name</Label><Input id="pool-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Gifts" /></div>
@@ -124,7 +124,7 @@ export function PoolDialog({ pool, savings, baseCurrency, locale, fromMonth, onC
           {!pool && (
             <>
               <div className="space-y-1.5"><Label htmlFor="pool-monthly">Set aside each month ({baseCurrency})</Label><Input id="pool-monthly" inputMode="decimal" value={monthly} onChange={(e) => setMonthly(e.target.value)} placeholder={fromMonth ? `optional, from ${formatMonth(fromMonth, locale)} on` : 'optional, from this month on'} /></div>
-              <Check label={`Also add a spending row "${name.trim() || 'Pool account'}" that comes out of it`} checked={spendRow} onChange={(e) => setSpendRow(e.target.checked)} />
+              <Check label={`Also add a spending row "${name.trim() || 'Virtual account'}" that comes out of it`} checked={spendRow} onChange={(e) => setSpendRow(e.target.checked)} />
             </>
           )}
         </div>

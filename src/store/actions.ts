@@ -154,7 +154,7 @@ export type TransferRowKind = 'plain' | 'to-savings' | 'to-investment' | 'pool-a
 export type ExpenseRowKind = 'plain' | 'pay-off'
 
 /**
- * What a new row can point at: live, unarchived accounts and pool accounts, live adults, and whether the savings plug
+ * What a new row can point at: live, unarchived accounts and virtual accounts, live adults, and whether the savings plug
  * already has its row. The grid's "Add row" and `addRowOfKind` both read this, so what is offered is what is accepted.
  */
 export function rowTargets(tables: Tables, household: Household | undefined) {
@@ -168,7 +168,7 @@ export function rowTargets(tables: Tables, household: Household | undefined) {
     payoff: accounts.filter((a) => a.type === 'loan' || (a.type === 'credit-card' && !cardIsItemized(a))),
     /** cards whose purchases are expense rows: their payment is a transfer, so it is offered under Transfers */
     cardsItemized: accounts.filter(cardIsItemized),
-    /** pool accounts whose row was deleted, so they can be filled again */
+    /** virtual accounts whose row was deleted, so they can be filled again */
     orphanPools: live(tables.pools).filter((p) => !p.allocationRowId || !rows.some((r) => r.id === p.allocationRowId)),
     adults: live(tables.entities).filter((e) => e.kind === 'adult'),
     /** the rest of the month already has its row: a further "to savings" row gets a fixed amount of its own */
@@ -187,7 +187,7 @@ export interface RowOfKindInput {
 }
 
 /**
- * "Add row" under Transfers and Expenses. A deposit row needs its account, a pool row the pool account it fills (one
+ * "Add row" under Transfers and Expenses. A deposit row needs its account, a pool row the virtual account it fills (one
  * that lost its row), pocket money the adult it is for, a payment row the loan or card it brings down; everything is
  * checked here so the grid can say what is missing.
  */
@@ -227,7 +227,7 @@ export async function addRowOfKind(store: Store, input: RowOfKindInput): Promise
   let pool: Pool | undefined
   if (input.kind === 'pool-allocation') {
     const found = tables.pools.find((p) => p.id === input.poolId && !p.deletedAt)
-    if (!found) throw new Error('Pick the pool account this row fills.')
+    if (!found) throw new Error('Pick the virtual account this row fills.')
     if (found.archivedMonth) throw new Error(`"${found.name}" is archived.`)
     if (!targets.orphanPools.some((p) => p.id === found.id)) throw new Error(`"${found.name}" is already filled by another row.`)
     base.accountId = found.accountId
@@ -541,7 +541,7 @@ export type RowSourceScope = { from: MonthKey } | 'all-months'
 
 /**
  * Change where a row's single amounts come out of. With `{ from }`, every earlier month that showed
- * an amount is pinned to the old source (as one unlabelled item), so past savings and pool balances stay put.
+ * an amount is pinned to the old source (as one unlabelled item), so past savings and virtual account balances stay put.
  */
 export async function setRowFundedBy(store: Store, rowId: string, fundedBy: FundedBy, scope: RowSourceScope): Promise<void> {
   const tables = await loadTables(store)
@@ -551,10 +551,10 @@ export async function setRowFundedBy(store: Store, rowId: string, fundedBy: Fund
   await store.commit(planRowFundedBy(tables, row, fundedBy, scope, now()))
 }
 
-/** The mutations behind `setRowFundedBy`; archiving a pool account uses them too. */
+/** The mutations behind `setRowFundedBy`; archiving a virtual account uses them too. */
 export function planRowFundedBy(tables: Tables, row: Row, fundedBy: FundedBy, scope: RowSourceScope, ts: number): Mutation[] {
   const poolId = poolIdOf(fundedBy)
-  if (poolId && !tables.pools.some((p) => p.id === poolId && !p.deletedAt)) throw new Error('That pool account no longer exists.')
+  if (poolId && !tables.pools.some((p) => p.id === poolId && !p.deletedAt)) throw new Error('That virtual account no longer exists.')
   const mutations: Mutation[] = []
   if (scope !== 'all-months' && fundedBy !== row.defaultFundedBy) {
     const household = tables.household.find((h) => !h.deletedAt)

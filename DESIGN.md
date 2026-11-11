@@ -93,7 +93,7 @@ Statement frame  full width, space-y-4: the progress line, then dense islands, o
 - **Guide** (`src/features/guide/GuideScreen.tsx`, words in `src/app/guide.ts`, no React there so a translation can
   follow): a reading page that opens without a household. Its header's toolbar holds one control, a `type="search"`
   Input "Search the guide" (`h-7 w-64`, full width under 768 px, Escape clears) and, while searching, a `role="status"`
-  line (`4 topics match "pool"`, `1 topic matches "lisbon"`, `Nothing matches "xyz". Try another word.`). The body is the
+  line (`4 topics match "virtual"`, `1 topic matches "lisbon"`, `Nothing matches "xyz". Try another word.`). The body is the
   reading frame: the lead island "What Casa Papel is" (three paragraphs, `xs` "Try the demo" hidden in the sandbox,
   ghost "Open on GitHub"), a "Topics" island whose `<nav aria-label="Topics">` is a two-column grid of links to
   `#guide-<key>` (title over summary), then one air island per topic (`id="guide-<key>"`, the title as the heading, the
@@ -124,7 +124,7 @@ air      h3  flex items-end gap-4 border-b px-4 pt-2 text-sm font-medium leading
          body px-4 pb-4 pt-3
 ```
 
-- `tone={HUES.x}` colours the title in a kind-of-money hue: Income / Expenses / Transfers lists, Accounts (worth), Pool
+- `tone={HUES.x}` colours the title in a kind-of-money hue: Income / Expenses / Transfers lists, Accounts (worth), Virtual
   accounts (pool), Schedules and Transfers to make (transfer), Payments due (expense). Mixed panels stay ink. Goals keep
   an ink title; their gold lives in the bars.
 - `description` is the one sentence that explains the panel (Casa Papel explains every option inline). `right` holds a
@@ -152,7 +152,7 @@ Truncation idiom: a `min-w-0` parent, `truncate` on the name, `shrink-0` on sibl
 
 - **Kinds of money** (tokens, §1): section titles and total-row labels in the hue; total rows on their `tint`; spending
   amounts in the expense hue when "show expenses as negative" is on; money taken back out of savings in `--draw`. Numbers
-  otherwise stay ink, so the grid never becomes a heat map. A balance below zero (an overdrawn pool account, savings in the
+  otherwise stay ink, so the grid never becomes a heat map. A balance below zero (an overdrawn virtual account, savings in the
   red, negative net worth) is in the expense hue whatever the negatives setting: it is a warning, not spending.
 - **Certainty**: an estimate sits on a light yellow shade (`--estimate`, yellow-200, `bg-estimate`; `ESTIMATE_SHADE`
   and `statusClass.projected` in `src/app/display.ts`), on every screen: the amount in a rounded pill of the shade,
@@ -200,9 +200,9 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   (`data-testid="deductions"`, each `−€…`, then a Net line) above the error line.
 - "Add row" at a section's foot is inline (`src/features/grid/AddRowInline.tsx`): a name and, when the section has any,
   a category. Under Transfers it also asks what the row does (moves money between your accounts, goes into a savings
-  account, deposits into an investment account, fills a pool account that lost its row, pocket money for an adult, pays
+  account, deposits into an investment account, fills a virtual account that lost its row, pocket money for an adult, pays
   off a card whose purchases are expense rows), with a second select for the target and one muted sentence under the controls for the chosen kind. A choice without a
-  possible target is left out (a second "to savings" under the savings plug, a pool row when every pool account has one)
+  possible target is left out (a second "to savings" under the savings plug, a row that fills a virtual account when each already has one)
   or the sentence says what to add first and Add is disabled. Under Expenses the same select offers "A normal expense" or
   "Pays off a loan or card" with the loans and the cards whose payment is the recorded spending as targets (the
   account's type picks the row kind). A card whose purchases are expense rows gets "Pays off a credit card" under
@@ -244,13 +244,13 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   its name in small caps and closes with its total in `font-semibold` over a hairline. Lines are `min-h-11 text-sm`
   on phones and `md:min-h-7 md:text-xs`, separated by `divide-border/60`, amounts in a fixed right-aligned column:
   a **group** (Income, Taken from accounts, Expenses, Set aside, pay off, Debts, Net worth) is a heading in its hue
-  on the hue's `tint` with its lines always under it; a **category**, an account that holds pool accounts and an itemized row open as an
+  on the hue's `tint` with its lines always under it; a **category**, an account that holds virtual accounts and an itemized row open as an
   accordion (a chevron button with `aria-expanded`, each level 20 px further in, items on `bg-muted/20` with the
   `Repeat` icon when scheduled); a category's amount is the sum of its rows. Tags follow the name and wrap under it
   when there is no room: a zinc chip with the currency code and the original amount in muted `text-[11px]` for a
   line in another currency (the amount column is always the household currency), a rose `no rate` chip, `net €…`
   on an income with deductions, and a zinc chip for what the line is (`automatic`, `calculated`,
-  `counted when bought` on a card payment that is shown muted and left out of the sum). Pool accounts sit by name
+  `counted when bought` on a card payment that is shown muted and left out of the sum). Virtual accounts sit by name
   under the savings account that holds them, with `Not set aside` for the rest of it; the right side sums them in
   one `Set aside` line. A line a goal watches carries the goal mark: a 12 px `Target` icon in the goal hue and the
   percentage in muted `text-[11px]`, the income hue once reached, a rose `late` chip when late; opening the line
@@ -276,19 +276,19 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   sideways inside the island.
   **Money in from your own accounts** has two sections that must not be mixed up. `Taken from accounts` is typed:
   rows that move money out of a savings or an investment account into the month, always shown (a faint `·` while
-  empty) with `Add row` at its foot offering only those two kinds. `From savings and pool accounts` is worked out
+  empty) with `Add row` at its foot offering only those two kinds. `From savings and virtual accounts` is worked out
   from the expenses that come straight out of them: its heading carries the `calculated` chip and an (i), and each
   line names the expenses it paid for in muted `text-[11px]` (`for Weekend trip, Flights`, cut with an ellipsis,
   the full list in the title).
-  **A pool account that is short.** A pool account never shows less than zero. In a month that takes more out of it
+  **A virtual account that is short.** A virtual account never shows less than zero. In a month that takes more out of it
   than it holds, its line in the lower half carries a rose `short €2,730.00` chip and an `xs outline` button `Top
-  up…` (named `Top up <pool account>`), and its line under "From savings and pool accounts" says `€2,730.00 more
-  than it held, taken from <savings account>` in muted `text-[11px]` with the same button. When a pool account
+  up…` (named `Top up <virtual account>`), and its line under "From savings and virtual accounts" says `€2,730.00 more
+  than it held, taken from <savings account>` in muted `text-[11px]` with the same button. When a virtual account
   becomes short while its month is on screen, the top-up dialog opens by itself; one that was short already only
   shows the chip. The Grid shows the balance at zero in the expense hue with the reason in the
   title. A row whose month is a single labelled item that no schedule posted (a top-up, a one-off purchase)
   shows the label after its name in muted `text-[11px]`.
-  **The rule symbol.** A transfer that feeds a savings account, an investment account or a pool account, and that
+  **The rule symbol.** A transfer that feeds a savings account, an investment account or a virtual account, and that
   account in the lower half, say how the amount is worked out with one small symbol after the name, never a word
   tag: `ArrowDownToLine` (14 px) for the rest, the percentage in `text-[11px] tabular-nums` for a share of income
   (`10%`), the percentage followed by a 12 px `ArrowDownToLine` for a share of what is left (`20% ↓`), `Equal` for
@@ -309,7 +309,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   opened category ends with `Add row to <category>` with that category already chosen. A category is a line from
   the moment it exists, its amount a faint `·` until it has a row, so its first row is added inside it. A new row
   opens its category and, in an open month, the cell editor for its first amount. In the lower half a line that can
-  have a goal (an account, a pool account, a debt, Net worth) shows a 20 px ghost `Target` button after its name on
+  have a goal (an account, a virtual account, a debt, Net worth) shows a 20 px ghost `Target` button after its name on
   hover or focus, always where the pointer is a finger, named `Set a goal for <line>`; it opens the goal dialog with
   what the goal watches settled, so the dialog asks for the amount only. A goal's detail carries an `xs ghost` `Edit`. An account's balance
   is a button named `<account> balance: <amount>` (`, entered` once it is) that opens the Grid's `BalanceDialog`.
@@ -320,17 +320,17 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   lines) gain `Not in the plan`, so they still add up. The month after is `calculated` again, from the real number.
   **Accounts are added in the lower half too**, in the same ghost `+` buttons as rows: the foot of the Assets side
   holds `Add account` (current, joint, savings, investments, other asset, cash) and, once a savings account exists,
-  `Add pool account`; `Add a card or loan` sits at the foot of the Debts group, and at the foot of that side while
+  `Add virtual account`; `Add a card or loan` sits at the foot of the Debts group, and at the foot of that side while
   nothing is owed. A new savings or investment account opens the rule dialog as soon as it is saved, on `The rest`
-  for a savings account while nothing takes the rest yet; a new pool account asks for its monthly amount in its own
+  for a savings account while nothing takes the rest yet; a new virtual account asks for its monthly amount in its own
   dialog, counting from the month on screen.
   **Changing and removing.** What is added on the Statement is changed and removed there too. In an open month a
-  row, a category, an account and a pool account carry a `…` after their name and tags: a 20 px ghost icon button
+  row, a category, an account and a virtual account carry a `…` after their name and tags: a 20 px ghost icon button
   (`LINE_MENU`: shown while the line is hovered or the control has the focus, always and finger-sized where the
   pointer is a finger), 20 px so the line keeps its height. On a row it is the Grid's own `RowMenu` (`Row menu for
   <row>`), unchanged. On a category it is `CategoryMenu` (`Category menu for <category>`): `Rename…` (a small dialog
   whose error stays beside the field), `Move up`, `Move down`, and removing; its rows are kept. On an account or a
-  pool account it is named `Edit <name>` and opens the account or pool account dialog, which removes at its foot
+  virtual account it is named `Edit <name>` and opens the account or virtual account dialog, which removes at its foot
   (how removing behaves, and when it is one click, is in §8);
   the calculated line for the current accounts opens the one account behind it, or lists them (`Edit a current
   account`) when there are several. So that a line can hold these beside its own action, every row line that opens
@@ -387,7 +387,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   percentage of income", "A percentage of what is left", "The rest"; for pocket money "A percentage of <Adult>'s
   income" in place of the rest), set in the rule dialog and nowhere else. There is no household-wide pocket money
   total: each adult's line has its own amount or rule; money
-  set aside is a **pool account**, never an envelope.
+  set aside is a **virtual account**, never an envelope.
 - Rates are always spelled with both codes in the orientation whose number is ≥ 1 (`1 EUR = 1.08 USD`, `1 USD = 48.58 TRY`;
   `readableRate` in `src/features/household/fxDisplay.ts`); the rates table's columns read `1 EUR in USD` and store
   `base/foreign`. The cell editor's rate line (`src/features/grid/RateLine.tsx`) sits under an amount in another currency:
@@ -453,12 +453,12 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   never `The rest`; the first read-only line then names whose income (`10% of €4,200.00, Sam's take-home income`).
   A pocket line that still is a share of the pocket money total from before says so in the description; saving
   gives it its own rule from the chosen month on.
-- The top-up dialog (`src/features/statement/TopUpDialog.tsx`), titled `<pool account> is short in <month>`: one
-  sentence with what comes out, what it holds and what is missing; "Top it up from" as a `Segmented` (the pool
+- The top-up dialog (`src/features/statement/TopUpDialog.tsx`), titled `<virtual account> is short in <month>`: one
+  sentence with what comes out, what it holds and what is missing; "Top it up from" as a `Segmented` (the virtual
   account's own savings account first, as `<account>, not set aside · <free amount>`, then the other savings and
   investment accounts with their balance, then `This month's income`) with a sentence for the chosen source; the
   amount, pre-filled with what is missing; and under `<month> will then show` the lines the save will leave (`Money
-  in · From <account>`, `Money out · <pool account> pool, this month`, the pool account's balance), worked out on a
+  in · From <account>`, `Money out · <virtual account> pool, this month`, the virtual account's balance), worked out on a
   copy. Footer: a ghost `Not now` on the left, `Top up` on the right. `Not now` changes nothing.
 - The account dialog (`src/features/household/HouseholdAccountDialog.tsx`), one for the Household screen and the
   Statement. The short form asks what every account needs: `Name`, `Type` with the type's sentence under it, and
@@ -471,19 +471,19 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   account is (Assets, Debts, a suggestion), the type list holds only the types that belong there. Errors show in the
   dialog. Footer: a ghost `Archive or delete…` on the left when editing, Cancel, Save.
 - The goal dialog (`src/features/goals/GoalDialog.tsx`). A goal has two kinds: `Fill an account` (an account or a
-  pool account reaches an amount) and `Pay down a debt` (a card or loan comes down to an amount, zero unless another
+  virtual account reaches an amount) and `Pay down a debt` (a card or loan comes down to an amount, zero unless another
   is typed); net worth is a third, set only from its own line. Opened from a line of the Statement it is titled
   `Goal for <line>`, says in one sentence what it does (`Fills Travel to an amount.`) and asks only for the name
   (pre-filled with the line's name), the amount, the target month and notes. Editing (`Edit goal`) asks the same:
   what a goal watches does not change, a different thing is a new goal. Every goal starts on a line today; opened
   without one (`New goal`, no screen does) the dialog asks first for "Kind" as a `Segmented` of the two, with the chosen kind's sentence under it, and "Tracks" as one select
-  (accounts and pool accounts in two option groups for filling, cards and loans for paying down). The amount is
+  (accounts and virtual accounts in two option groups for filling, cards and loans for paying down). The amount is
   labelled `Target (<CCY>)`, and `Bring it down to (<CCY>)` for a debt, with the sentence that zero means nothing
   is owed. Footer: a ghost `Delete…` on the left when editing, Cancel, Save.
 - Dialogs are shadcn `Dialog`; the confirm step lives inside the dialog, never behind it. Errors appear beside the field
   that caused them, `role="alert"`.
 - Removing anything goes through one `RemoveDialog` (`src/features/remove/RemoveDialog.tsx`), reached from a row's
-  menu ("Archive or delete…"), the People & things list, the account, pool account and goal dialogs' footers
+  menu ("Archive or delete…"), the People & things list, the account, virtual account and goal dialogs' footers
   ("Archive or delete…", "Delete…"), the schedules list, the cell editor's "All occurrences" and the Categories card.
   Title `<Kind> "<name>"`, then an Archive section (a `MonthField` "Archive from" with an (i), what changes from that
   month, "Earlier months stay exactly as they are") and a Delete section ("Deleting removes", "Also changes", a note,
@@ -493,9 +493,9 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   the only choice), `Delete` (`destructive`, disabled with blockers). The words and the write come from the same scan
   (`describeRemoval` and `planRemoval`/`planArchive` in `src/store/impact.ts`), so they cannot disagree, and every
   removal is one undoable commit ("You can undo this right after"). Archived things are listed with Restore under
-  Household: Archived rows, and an Archived line in Accounts, Pool accounts and People & things.
+  Household: Archived rows, and an Archived line in Accounts, Virtual accounts and People & things.
 - **Cheap while setting up.** While a household is being set up (`Household.setupOpen`, the strip of §7), removing
-  is one click: the entry in the row menu, the category menu and the account and pool account dialogs opened from
+  is one click: the entry in the row menu, the category menu and the account and virtual account dialogs opened from
   the Statement reads `Delete` instead of `Archive or delete…` / `Remove…` and deletes at once, with no dialog
   (`removeIfFree` in `src/store/remove.ts`). It does so only when nothing but the thing itself goes: when rows would
   change, something stands in the way, a goal watches it, or a closed month holds its amounts, the remove dialog
@@ -514,7 +514,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   automatic and following rows, stat labels, the cell editor's "Applies to", "How sure", "Comes out of", its rate line and its deductions block, a row's currency, who a row belongs to, what it is deducted from and its share of a followed row, the `in EUR` balance line, the Statement's progress line, its two halves, its Set aside group, its main account line, Net worth, Free and "Per person", the
   household settings, "Track the balance", the Archived list, Goals and the schedules' status column.
 - Every text lives in `src/app/help.ts`: `HELP[key] = { title, text }`, keys `area.name`, titles up to 40 characters,
-  texts two or three plain sentences up to 360 characters in the app's own words (pool accounts, people & things,
+  texts two or three plain sentences up to 360 characters in the app's own words (virtual accounts, people & things,
   schedules, automatic). `balanceHelp(type)` picks the balance text for an account. Texts that belong to a model enum
   (section blurbs, account types, entity kinds, goal kinds, the rules) stay in `src/model/templates.ts`.
 - `MarksLegend` ("What the colours and marks mean", an `xs outline` button in the Statement and Grid toolbars) is the legend:
@@ -529,7 +529,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 - An action that failed shows a `role="alert"` line in `text-destructive` in the page header's toolbar or beside the
   control; an engine warning is `text-amber-700`. Data-screen outcomes use the `Alert` block. Nothing floats, with
   one exception: the Statement's `Deleted "<name>". Undo` after a one-click delete (§8).
-- Empty states are one muted sentence that says what to do (`Nothing to transfer.`, `Add a savings account first; pool
+- Empty states are one muted sentence that says what to do (`Nothing to transfer.`, `Add a savings account first; virtual
   accounts live inside one.`).
 - The welcome screen reports an import or the account dialog's outcome in a `role="status"` line under its header, and an
   import that could not be read in a `role="alert"` line there.

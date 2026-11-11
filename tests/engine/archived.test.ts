@@ -5,7 +5,7 @@ import { T0, account, cellItems, cellValue, household, pool, row, tables } from 
 
 const months = monthRange('2026-01', '2026-06')
 
-describe('archived accounts and pool accounts', () => {
+describe('archived accounts and virtual accounts', () => {
   const h = household()
   const savings = account({ name: 'Savings', type: 'savings', openingBalance: 100000, archivedMonth: '2026-04' })
   const fund = account({ name: 'Fund', type: 'investment', openingBalance: 50000, investment: { projectionMode: 'fixed-rate', annualRate: 0, depositTiming: 'start', depositFxMode: 'monthly-rate', fixedRate: null } })
@@ -40,7 +40,7 @@ describe('archived accounts and pool accounts', () => {
     const after = computeGoals(withGoals, out, '2026-05')
     expect(after.map((g) => [g.status, g.problem])).toEqual([
       ['broken', '"Savings" is archived. Restore it under Household or edit the goal.'],
-      ['broken', 'The pool account "Travel" is archived. Restore it under Household or edit the goal.'],
+      ['broken', 'The virtual account "Travel" is archived. Restore it under Household or edit the goal.'],
     ])
   })
 })

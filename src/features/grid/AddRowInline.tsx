@@ -17,9 +17,9 @@ interface Kind {
   section: 'expense' | 'transfer'
   label: string
   text: string
-  /** The accounts, pool accounts or adults the row can point at; null when it points at nothing. */
+  /** The accounts, virtual accounts or adults the row can point at; null when it points at nothing. */
   targets: ((t: Targets) => Target[]) | null
-  targetLabel: 'Account' | 'Pool account' | 'Adult'
+  targetLabel: 'Account' | 'Virtual account' | 'Adult'
   /** Which field of the store's input the target fills. */
   field: 'accountId' | 'poolId' | 'adultId'
   /** What to add first when there is no target. */
@@ -35,9 +35,9 @@ const KINDS: Kind[] = [
   { key: 'plain', section: 'transfer', label: 'Moves money between your accounts', text: 'An amount you type each month. It is not spending, so it never counts as an expense.', targets: null, targetLabel: 'Account', field: 'accountId', empty: () => '' },
   { key: 'to-savings', section: 'transfer', label: 'Goes into a savings account', text: 'An amount you type; that savings balance under Balances rises with it. Its rule can make it a percentage instead.', targets: (t) => t.savings, targetLabel: 'Account', field: 'accountId', empty: () => 'Add a savings account under Household first.' },
   { key: 'to-investment', section: 'transfer', label: 'Deposits into an investment account', text: 'The account\'s value, deposited total and return under Balances follow this row.', targets: (t) => t.investments, targetLabel: 'Account', field: 'accountId', empty: () => 'Add an investment account under Household first.' },
-  { key: 'pool-allocation', section: 'transfer', label: 'Fills a pool account', text: 'For a pool account that lost its row: the amount lands in the pool account every month.', targets: (t) => t.orphanPools, targetLabel: 'Pool account', field: 'poolId', empty: () => '', offered: (t) => t.orphanPools.length > 0 },
+  { key: 'pool-allocation', section: 'transfer', label: 'Fills a virtual account', text: 'For a virtual account that lost its row: the amount lands in the virtual account every month.', targets: (t) => t.orphanPools, targetLabel: 'Virtual account', field: 'poolId', empty: () => '', offered: (t) => t.orphanPools.length > 0 },
   { key: 'pocket-money', section: 'transfer', label: 'Pocket money for an adult', text: 'Money that adult spends freely each month: an amount you type, or a percentage through its rule.', targets: (t) => t.adults, targetLabel: 'Adult', field: 'adultId', empty: () => 'Add an adult under Household first.' },
-  { key: 'from-savings', section: 'transfer', label: 'Taken from a savings account', text: 'Money you move out of that savings account into the month, to fill a gap or to top up a pool account. Its balance falls by the amount, and the month has that much more.', targets: (t) => t.savings, targetLabel: 'Account', field: 'accountId', empty: () => 'Add a savings account under Household first.' },
+  { key: 'from-savings', section: 'transfer', label: 'Taken from a savings account', text: 'Money you move out of that savings account into the month, to fill a gap or to top up a virtual account. Its balance falls by the amount, and the month has that much more.', targets: (t) => t.savings, targetLabel: 'Account', field: 'accountId', empty: () => 'Add a savings account under Household first.' },
   { key: 'from-investment', section: 'transfer', label: 'Taken from an investment account', text: 'Money you take out of that investment account into the month. Its value falls by the amount, and the month has that much more.', targets: (t) => t.investments, targetLabel: 'Account', field: 'accountId', empty: () => 'Add an investment account under Household first.' },
   { key: 'card-payment', section: 'transfer', label: 'Pays off a credit card', text: 'For a card whose purchases are expense rows: the payment only moves money, and what is owed on the card falls by it.', targets: (t) => t.cardsItemized, targetLabel: 'Account', field: 'accountId', empty: () => '', offered: (t) => t.cardsItemized.length > 0 },
   { key: 'plain', section: 'expense', label: 'A normal expense', text: 'Spending you type each month, as one amount or a list of items.', targets: null, targetLabel: 'Account', field: 'accountId', empty: () => '' },

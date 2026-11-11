@@ -19,10 +19,10 @@ export type RuleChoice =
   | { kind: 'share-of-rest'; share: number }
   | { kind: 'rest' }
 
-/** What a rule is set on: a row, or the account or pool account a row feeds (the row is made when there is none). */
+/** What a rule is set on: a row, or the account or virtual account a row feeds (the row is made when there is none). */
 export type RuleTarget = { rowId: string } | { accountId: string } | { poolId: string }
 
-/** The row a rule on `target` sits on, or null when the account or pool account has no row yet. */
+/** The row a rule on `target` sits on, or null when the account or virtual account has no row yet. */
 export function ruleRowOf(tables: Tables, target: RuleTarget): Row | null {
   if ('rowId' in target) {
     const row = tables.rows.find((r) => r.id === target.rowId && !r.deletedAt)
@@ -31,7 +31,7 @@ export function ruleRowOf(tables: Tables, target: RuleTarget): Row | null {
   }
   if ('poolId' in target) {
     const pool = tables.pools.find((p) => p.id === target.poolId && !p.deletedAt)
-    if (!pool) throw new Error('That pool account no longer exists.')
+    if (!pool) throw new Error('That virtual account no longer exists.')
     if (pool.archivedMonth) throw new Error(`"${pool.name}" is archived.`)
     return tables.rows.find((r) => !r.deletedAt && r.id === pool.allocationRowId) ?? null
   }
@@ -44,7 +44,7 @@ export function ruleRowOf(tables: Tables, target: RuleTarget): Row | null {
   return feeding[0] ?? null
 }
 
-/** The transfer row for an account or pool account that has none, named the way setup names them. */
+/** The transfer row for an account or virtual account that has none, named the way setup names them. */
 function makeRuleRow(tables: Tables, target: { accountId: string } | { poolId: string }, ts: number): { row: Row; mutations: Mutation[] } {
   if ('poolId' in target) {
     const pool = tables.pools.find((p) => p.id === target.poolId) as Pool
@@ -92,7 +92,7 @@ export function ruleMutations(tables: Tables, target: RuleTarget, choice: RuleCh
     working = applyMutations(tables, made.mutations)
   }
   const row = found
-  if (!canCarryRule(row)) throw new Error(`"${row.name}" cannot have a rule: only pocket money and the transfer to a savings account, an investment account or a pool account can.`)
+  if (!canCarryRule(row)) throw new Error(`"${row.name}" cannot have a rule: only pocket money and the transfer to a savings account, an investment account or a virtual account can.`)
   if (choice.kind === 'rest' && !canTakeRest(row)) throw new Error('Pocket money cannot take the rest of the month. Give it an amount or a percentage.')
   if (choice.kind === 'share-of-own-income') {
     if (!isPocketRow(row)) throw new Error(`Only pocket money can be a percentage of an adult's own income; "${row.name}" is not pocket money.`)

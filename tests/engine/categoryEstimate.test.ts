@@ -77,7 +77,7 @@ describe('a category\'s estimate', () => {
       tables: { ...t, accounts: [savings], pools: [repairs], fxRates: [fx('USD/EUR', '2026-01', 0.9)], rows: [...t.rows, plumber, roof], cells: [...t.cells, cellValue(plumber.id, '2026-01', 100_00), cellValue(roof.id, '2026-01', 50_00)] },
       months: ['2026-01'],
     })
-    // 1,450 − 1,100 − 90 − 90 (100 USD) − 50 from the pool account
+    // 1,450 − 1,100 − 90 − 90 (100 USD) − 50 from the virtual account
     expect(out.cells[cellKey(estimate.id, '2026-01')].value).toBe(120_00)
     expect(out.totals['2026-01']).toMatchObject({ cashExpense: 1100_00 + 90_00 + 90_00 + 120_00, poolFunded: 50_00, expensesTotal: 1450_00 })
   })

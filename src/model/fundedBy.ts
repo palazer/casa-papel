@@ -4,7 +4,7 @@ import type { Id } from './ids'
  * Where the cash for an expense item comes from.
  * - 'cash'     the month's income (enters the plug)
  * - 'savings'  taken from the savings account (bypasses the plug)
- * - 'pool:<id>' taken from a pool account (bypasses the plug, draws the pool)
+ * - 'pool:<id>' taken from a virtual account (bypasses the plug, draws the pool)
  */
 export type FundedBy = 'cash' | 'savings' | `pool:${string}`
 

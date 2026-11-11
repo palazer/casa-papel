@@ -37,9 +37,9 @@ export const HOUSEHOLD_TEMPLATES: RowTemplate[] = [
   { key: 'h.gym', title: 'Gym & sports', description: 'Memberships and sports.', section: 'expense', category: 'Personal' },
   { key: 'h.insurance', title: 'Insurance & tax', description: 'Liability and household insurance, taxes not tied to a car or home.', section: 'expense', defaultStatus: 'committed', recommended: true, category: 'Living' },
   { key: 'h.other', title: 'Other', description: 'Whatever fits nowhere else. Treated as an estimate.', section: 'expense', recommended: true },
-  { key: 'h.poolTravel', title: 'Travel', description: 'Pool account: set aside a monthly amount in savings, spend it when you travel.', section: 'expense', pool: true, recommended: true, category: 'Fun' },
-  { key: 'h.poolClothing', title: 'Clothing', description: 'Pool account: a monthly amount set aside for clothes.', section: 'expense', pool: true, category: 'Fun' },
-  { key: 'h.poolFun', title: 'Entertainment & dining out', description: 'Pool account: a monthly amount set aside for going out.', section: 'expense', pool: true, category: 'Fun' },
+  { key: 'h.poolTravel', title: 'Travel', description: 'Virtual account: set aside a monthly amount in savings, spend it when you travel.', section: 'expense', pool: true, recommended: true, category: 'Fun' },
+  { key: 'h.poolClothing', title: 'Clothing', description: 'Virtual account: a monthly amount set aside for clothes.', section: 'expense', pool: true, category: 'Fun' },
+  { key: 'h.poolFun', title: 'Entertainment & dining out', description: 'Virtual account: a monthly amount set aside for going out.', section: 'expense', pool: true, category: 'Fun' },
   { key: 'h.toSavings', title: 'To savings', description: 'What is left at month end moves to savings. Filled in automatically unless your month-end rule says you decide it.', section: 'transfer', kind: 'to-savings', defaultStatus: 'committed', account: 'savings', recommended: true },
   { key: 'h.toInvestments', title: 'To investments', description: 'A fixed monthly deposit into an investment account.', section: 'transfer', kind: 'to-investment', defaultStatus: 'committed', account: 'investment' },
 ]
@@ -111,7 +111,7 @@ export const SECTION_INFO: Record<Section, { label: string; blurb: string }> = {
 }
 
 /**
- * What a goal is for, as the app asks it: fill an account or a pool account to an amount, or pay a debt down to one.
+ * What a goal is for, as the app asks it: fill an account or a virtual account to an amount, or pay a debt down to one.
  * Net worth is the third, set only from the Statement's Net worth line. The stored kinds stay as they were: "fill" is
  * `account-balance` or `pool-balance` by what it watches, "pay-down" is `pay-off`.
  */
@@ -119,7 +119,7 @@ export type GoalFamily = 'fill' | 'pay-down' | 'net-worth'
 export const goalFamilyOf = (kind: GoalKind): GoalFamily => (kind === 'pay-off' ? 'pay-down' : kind === 'net-worth' ? 'net-worth' : 'fill')
 
 export const GOAL_KIND_INFO: Array<{ value: GoalFamily; label: string; help: string }> = [
-  { value: 'fill', label: 'Fill an account', help: 'A savings, investment or other asset account, or a pool account, reaches an amount. An account is compared in its own currency.' },
+  { value: 'fill', label: 'Fill an account', help: 'A savings, investment or other asset account, or a virtual account, reaches an amount. An account is compared in its own currency.' },
   { value: 'pay-down', label: 'Pay down a debt', help: 'A card or loan comes down to an amount, zero unless you type another. Progress counts down from what was owed when you set the goal.' },
   { value: 'net-worth', label: 'Reach a net worth', help: 'Everything you have, what stays in the main account included, minus what you owe, in your base currency. Set it from the "Net worth" line on the Statement.' },
 ]
@@ -139,7 +139,7 @@ export const RULE_KIND_INFO: Array<{ value: RowRule; label: string; help: string
 export const ACCOUNT_TYPE_INFO: Array<{ value: AccountType; label: string; help: string }> = [
   { value: 'checking', label: 'Current account', help: 'Where salary lands and bills leave. Day-to-day money; its balance is worked out, and you can type what the bank says.' },
   { value: 'joint', label: 'Joint account', help: 'A shared account partners pay into for shared bills. Pick this when a fixed amount moves there every month.' },
-  { value: 'savings', label: 'Savings', help: 'Where the month\'s leftover goes. The balance is tracked month by month, and pool accounts live inside it.' },
+  { value: 'savings', label: 'Savings', help: 'Where the month\'s leftover goes. The balance is tracked month by month, and virtual accounts live inside it.' },
   { value: 'investment', label: 'Investments', help: 'Broker, fund or pension account. Deposits and value are tracked.' },
   { value: 'credit-card', label: 'Credit card', help: 'Spend now, pay later. The open balance is tracked.' },
   { value: 'loan', label: 'Loan', help: 'Money you owe. Payments bring the outstanding amount down.' },

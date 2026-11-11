@@ -407,7 +407,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
       t.rest = rest
       t.leftover = t.buffer
       if (restCell && restCell.row.kind !== 'to-savings') {
-        // the rest goes to an investment or a pool account: it joins that row's own sum, also when it is negative
+        // the rest goes to an investment or a virtual account: it joins that row's own sum, also when it is negative
         fill(restCell, rest)
         t.toSavings = userToSavings
       } else {
@@ -434,11 +434,11 @@ export function computeEngine(input: EngineInput): EngineOutput {
     const series: PoolSeries = { poolId: pool.id, months: {} }
     let bal = pool.openingBalance
     for (const m of months) {
-      // an archived pool account's series stops at its archive month; net worth and later months no longer see it
+      // an archived virtual account's series stops at its archive month; net worth and later months no longer see it
       if (pool.archivedMonth && compareMonths(m, pool.archivedMonth) >= 0) break
       const allocation = totals[m].allocationsByPool[pool.id] ?? 0
       const spend = totals[m].poolFundedByPool[pool.id] ?? 0
-      // A pool account never holds less than nothing. What is taken beyond what it holds comes out of the unassigned
+      // A virtual account never holds less than nothing. What is taken beyond what it holds comes out of the unassigned
       // part of its savings account: that account's balance already falls by the whole amount, so only the split
       // inside it changes. `short` names the month's shortfall until a top-up covers it.
       const after: Money = bal + allocation - spend

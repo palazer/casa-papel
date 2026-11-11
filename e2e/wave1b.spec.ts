@@ -113,7 +113,7 @@ test.describe('wave 1b', () => {
     await expect(moneyOut.getByRole('button', { name: /^The flat – Rent or mortgage: €1,400\.00/ })).toBeVisible()
     await expect(step('Expenses')).toHaveAttribute('data-done', 'true')
     await expect(moneyOut.getByRole('button', { name: 'To Savings: €4,100.00' })).toBeVisible()
-    // one that comes with its pool account: the amount is what is set aside each month
+    // one that comes with its virtual account: the amount is what is set aside each month
     const fun = group('Fun')
     await fun.getByLabel('Set aside per month for Travel').fill('200')
     await fun.getByLabel('Set aside per month for Travel').press('Enter')

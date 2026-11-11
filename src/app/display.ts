@@ -14,7 +14,7 @@ export function flowOf(row: Row): Flow {
 export type Tone = 'in' | 'out' | 'draw' | 'neutral'
 
 /** Text and tone for an amount given its direction and the household's sign preference. Money coming in, and every
- *  balance, reads `in`; a balance below zero (an overdrawn pool account, savings in the red) is a warning and takes the
+ *  balance, reads `in`; a balance below zero (an overdrawn virtual account, savings in the red) is a warning and takes the
  *  expense hue whatever the negatives setting. */
 export function amountDisplay(minor: Money, flow: Flow, currency: string, locale: string, negatives: boolean, compact = false): { text: string; tone: Tone } {
   if (flow === 'in') return { text: formatAmount(minor, currency, locale, { compact }), tone: minor < 0 ? 'out' : 'in' }

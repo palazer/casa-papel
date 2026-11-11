@@ -182,7 +182,7 @@ describe('rules: how a transfer is worked out', () => {
     expectBalanced(short, out)
   })
 
-  it('gives the rest to a pool account, which pays back in a month that overruns', () => {
+  it('gives the rest to a virtual account, which pays back in a month that overruns', () => {
     const base = world({ rows: () => ({ toSavings: { rule: 'fixed' }, toRainy: { rule: 'fixed', ruleShare: null }, toBroker: { rule: 'fixed', ruleShare: null } }) })
     const travel = pool({ name: 'Travel', accountId: base.savings.id, order: 'a0' })
     const alloc = row({ name: 'Travel pool', section: 'transfer', kind: 'pool-allocation', accountId: base.savings.id, order: 'a3', rule: 'rest' })
@@ -195,7 +195,7 @@ describe('rules: how a transfer is worked out', () => {
     expect(out.pools[travel.id].months['2026-01'].balance).toBe(240000)
     expect(value(out, alloc, '2026-02')).toBe(-90000)
     expect(out.pools[travel.id].months['2026-02'].balance).toBe(150000)
-    // the pool account lives in the savings account, which moves with it
+    // the virtual account lives in the savings account, which moves with it
     expect(out.accounts[base.savings.id].months['2026-02'].balance).toBe(150000)
     const s = buildStatement(t, out, '2026-02')!
     expect(s.flow.left.lines.find((l) => l.id === 'cover')!.children).toMatchObject([{ rowId: alloc.id, label: 'From Travel', amount: 90000, balancing: true }])
@@ -235,7 +235,7 @@ describe('rules: how a transfer is worked out', () => {
     expectBalanced(typed, out)
   })
 
-  it('feeds a pool account from a share and an investment account in another currency at the month\'s rate', () => {
+  it('feeds a virtual account from a share and an investment account in another currency at the month\'s rate', () => {
     const base = world()
     const travel = pool({ name: 'Travel', accountId: base.savings.id, order: 'a0' })
     const alloc = row({ name: 'Travel pool', section: 'transfer', kind: 'pool-allocation', accountId: base.savings.id, order: 'a3', rule: 'share-of-income', ruleShare: 0.05 })

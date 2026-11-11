@@ -40,7 +40,7 @@ export function GoalDialog({ household, tables, goal, preset, onClose, onRemove 
   const store = useStore()
   const { locale, baseCurrency } = household
   const given = goal ?? preset ?? null
-  // archived accounts and pool accounts are offered only while this goal still watches one
+  // archived accounts and virtual accounts are offered only while this goal still watches one
   const accounts = tables.accounts.filter((a) => !a.deletedAt && (!a.archivedMonth || a.id === goal?.accountId))
   const pools = tables.pools.filter((p) => !p.deletedAt && (!p.archivedMonth || p.id === goal?.poolId))
   const nameOf = (thing: string): string | undefined =>
@@ -118,11 +118,11 @@ export function GoalDialog({ household, tables, goal, preset, onClose, onRemove 
                   {family === 'fill' ? (
                     <>
                       {fillAccounts.length > 0 && <optgroup label="Accounts">{fillAccounts.map((a) => <option key={a.id} value={`acc:${a.id}`}>{a.name}{a.tracked ? '' : ' (not tracked)'}</option>)}</optgroup>}
-                      {pools.length > 0 && <optgroup label="Pool accounts">{pools.map((p) => <option key={p.id} value={`pool:${p.id}`}>{p.name}</option>)}</optgroup>}
+                      {pools.length > 0 && <optgroup label="Virtual accounts">{pools.map((p) => <option key={p.id} value={`pool:${p.id}`}>{p.name}</option>)}</optgroup>}
                     </>
                   ) : debts.map((a) => <option key={a.id} value={`acc:${a.id}`}>{a.name}{a.tracked ? '' : ' (not tracked)'}</option>)}
                 </NativeSelect>
-                {noChoice && <p className="text-xs text-muted-foreground">{family === 'pay-down' ? 'Add a credit card or loan account first.' : 'Add a savings, investment or other asset account, or a pool account, first.'}</p>}
+                {noChoice && <p className="text-xs text-muted-foreground">{family === 'pay-down' ? 'Add a credit card or loan account first.' : 'Add a savings, investment or other asset account, or a virtual account, first.'}</p>}
               </div>
             </>
           )}

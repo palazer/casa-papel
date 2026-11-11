@@ -29,7 +29,7 @@ export interface RowSuggestion {
   dismissed: boolean
   /** The type of account it needs and the household does not have yet; it cannot be added until one exists. */
   needs: 'savings' | 'investment' | 'loan' | null
-  /** It makes a pool account too: the amount typed with it is what is set aside each month. */
+  /** It makes a virtual account too: the amount typed with it is what is set aside each month. */
   pool: boolean
 }
 
@@ -102,7 +102,7 @@ export function accountSuggestions(tables: Tables): AccountSuggestion[] {
   const accounts = tables.accounts.filter((a) => !a.deletedAt)
   const all: AccountSuggestion[] = []
   if (!accounts.some((a) => a.type === 'checking' || a.type === 'joint')) all.push({ id: 'account:checking', name: 'Main account', type: 'checking', description: 'The current account your income lands in and your bills leave from.' })
-  if (!accounts.some((a) => a.type === 'savings')) all.push({ id: 'account:savings', name: 'Savings', type: 'savings', description: 'Where the rest of the month can go. Pool accounts live inside it.' })
+  if (!accounts.some((a) => a.type === 'savings')) all.push({ id: 'account:savings', name: 'Savings', type: 'savings', description: 'Where the rest of the month can go. Virtual accounts live inside it.' })
   return all.filter((s) => !dismissed.has(s.id))
 }
 

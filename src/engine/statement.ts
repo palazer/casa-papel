@@ -7,7 +7,7 @@
  *
  * The upper half is the main account's month. For both month-end rules the engine guarantees
  *   income = cashExpense + allocations + toInvestment + pocket + debt + toSavings + leftover
- * so with the spending paid from savings and pool accounts added to both sides, and a negative closing figure moved
+ * so with the spending paid from savings and virtual accounts added to both sides, and a negative closing figure moved
  * across (a short month takes from savings or from the account):
  *   in  = income + savingsFunded + poolFunded + max(0, −toSavings) + max(0, −leftover)
  *   out = spending + set aside and paid off + max(0, toSavings) + max(0, leftover)
@@ -21,7 +21,7 @@ import { cellKey, type AccountSeries, type CellResult, type CellStatus, type Eng
 export type StatementHue = 'income' | 'expense' | 'transfer' | 'worth' | 'pool'
 export type StatementLineKind = 'group' | 'category' | 'row' | 'item' | 'source' | 'account' | 'pool' | 'figure' | 'note'
 
-/** The rule behind a transfer line, and behind the account or pool account that transfer feeds. */
+/** The rule behind a transfer line, and behind the account or virtual account that transfer feeds. */
 export interface StatementRule {
   /** `idle`: a savings row that gets nothing because another takes the rest. `none`: no row feeds the account yet. */
   kind: 'fixed' | 'share-of-income' | 'share-of-own-income' | 'share-of-rest' | 'rest' | 'idle' | 'none'
@@ -70,9 +70,9 @@ export interface StatementLine {
   memo?: boolean
   /** A short lowercase tag beside the name: `automatic`, `the rest`, `calculated`. */
   chip?: string
-  /** A line of "From savings and pool accounts": the expenses it paid for, by name. */
+  /** A line of "From savings and virtual accounts": the expenses it paid for, by name. */
   paidFor?: string[]
-  /** A pool account that was asked for more than it held this month: by how much, on its own line and on the line of what it paid. */
+  /** A virtual account that was asked for more than it held this month: by how much, on its own line and on the line of what it paid. */
   short?: Money
   /** With `short`: the savings account whose unassigned part covered it. */
   shortFrom?: string
@@ -164,13 +164,13 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
     const state = rules.byRow.get(row.id)
     return { kind: state?.kind ?? 'fixed', share: state && state.share > 0 ? state.share : undefined, rowId: row.id }
   }
-  /** An account or pool account shows the rule of the one row that feeds it; fed by several, it shows none of its own. */
+  /** An account or virtual account shows the rule of the one row that feeds it; fed by several, it shows none of its own. */
   const ruleOfRows = (feeding: Row[]): StatementRule | undefined =>
     feeding.length === 0 ? { kind: 'none' } : feeding.length === 1 ? ruleOf(feeding[0]) : undefined
   const accounts = tables.accounts.filter((a) => !a.deletedAt).sort(byOrder)
   const accountsById = new Map(accounts.map((a) => [a.id, a]))
   const poolsById = new Map(tables.pools.filter((p) => !p.deletedAt).map((p) => [p.id, p]))
-  /** What a transfer feeds, by name: its pool account, else its account, else the row itself. */
+  /** What a transfer feeds, by name: its virtual account, else its account, else the row itself. */
   const fedBy = (row: Row): string =>
     tables.pools.find((p) => !p.deletedAt && p.allocationRowId === row.id)?.name ?? (row.accountId ? accountsById.get(row.accountId)?.name : undefined) ?? row.name
   const warnings: string[] = []
@@ -283,7 +283,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
         moved.push(rowLine(row, c, v))
         break
       case 'set-aside': {
-        // the rest on an investment or a pool account closes the month; in a month that overruns it comes back from there
+        // the rest on an investment or a virtual account closes the month; in a month that overruns it comes back from there
         const over: Partial<StatementLine> = rules.byRow.get(row.id)?.kind === 'rest' && c.source === 'derived' ? { balancing: true } : {}
         if (v < 0) cover.push(rowLine(row, c, -v, { ...over, label: `From ${fedBy(row)}` }))
         else setAside.push(rowLine(row, c, v, over))
@@ -324,14 +324,14 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
     setAside.push({ id: 'leftover', kind: 'figure', label: 'Leftover', amount: t.leftover, children: [], balancing: true, automatic: true })
   }
 
-  // what expenses took straight out of savings and pool accounts: each line names the expenses it paid for
+  // what expenses took straight out of savings and virtual accounts: each line names the expenses it paid for
   const paidFor = (list: StatementLine[]): string[] => [...new Set(list.map((l) => l.label))]
   const sources: StatementLine[] = []
   if (fromSavings.length) sources.push({ id: 'src:savings', kind: 'source', label: 'Savings', amount: sum(fromSavings), children: fromSavings, paidFor: paidFor(fromSavings) })
   for (const [pid, list] of fromPool) {
     const pool = poolsById.get(pid)
     const short = engine.pools[pid]?.months[month]?.short ?? 0
-    const line: StatementLine = { id: `src:${pid}`, kind: 'source', label: pool?.name ?? 'A removed pool account', amount: sum(list), children: list, poolId: pid, paidFor: paidFor(list) }
+    const line: StatementLine = { id: `src:${pid}`, kind: 'source', label: pool?.name ?? 'A removed virtual account', amount: sum(list), children: list, poolId: pid, paidFor: paidFor(list) }
     // it paid more than it held: the difference came out of the unassigned part of its savings account
     if (short > 0) Object.assign(line, { short, shortFrom: pool ? accountsById.get(pool.accountId)?.name : undefined })
     sources.push(line)
@@ -340,7 +340,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   const inLines: StatementLine[] = [group('income', 'Income', 'income', categorised('income', income))]
   // always there: it is where money is taken out of savings or investments by hand, so its first row is added in it
   inLines.push({ ...group('from-accounts', 'Taken from accounts', 'worth', fromAccounts), empty: fromAccounts.length === 0 || undefined })
-  if (sources.length) inLines.push({ ...group('sources', 'From savings and pool accounts', 'pool', sources), calculated: true, chip: 'calculated' })
+  if (sources.length) inLines.push({ ...group('sources', 'From savings and virtual accounts', 'pool', sources), calculated: true, chip: 'calculated' })
   if (cover.length) inLines.push(group('cover', 'To cover the month', 'transfer', cover))
 
   const spending = categorised('expense', expense, estimates)

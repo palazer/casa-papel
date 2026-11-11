@@ -16,7 +16,7 @@ import { useSave } from '@/features/grid/RowDialogs'
 interface Props {
   tables: Tables
   household: Household
-  /** The row, or the account or pool account whose transfer gets the rule. */
+  /** The row, or the account or virtual account whose transfer gets the rule. */
   target: RuleTarget
   /** The month the dialog was opened from: the rule counts from there unless another month is picked. */
   month: MonthKey

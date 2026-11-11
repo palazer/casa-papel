@@ -189,7 +189,7 @@ export async function changeRecurringFrom(store: Store, id: string, month: Month
   return targetId
 }
 
-/** The mutations behind `changeRecurringFrom`; archiving a pool account uses them to move its schedules to savings. */
+/** The mutations behind `changeRecurringFrom`; archiving a virtual account uses them to move its schedules to savings. */
 export function planChangeRecurringFrom(tables: Tables, item: RecurringItem, month: MonthKey, patch: Partial<Pick<RecurringItem, 'amount' | 'fundedBy' | 'name'>>, ts: number): { mutations: Mutation[]; targetId: string } {
   const mutations: Mutation[] = []
   let targetId = item.id

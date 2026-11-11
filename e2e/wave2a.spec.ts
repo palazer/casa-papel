@@ -19,7 +19,7 @@ test.describe('wave 2a', () => {
     const claims = page.getByRole('region', { name: 'Debts and net worth' })
     const dlg = page.getByRole('dialog')
 
-    // a pool account goal with a target month; validation stays inside the dialog
+    // a virtual account goal with a target month; validation stays inside the dialog
     await assets.getByRole('button', { name: 'Set a goal for Travel' }).click()
     await expect(dlg.getByRole('heading', { name: 'Goal for Travel' })).toBeVisible()
     await expect(dlg.getByText('Fills Travel to an amount.')).toBeVisible()

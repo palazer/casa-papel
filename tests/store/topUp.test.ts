@@ -7,7 +7,7 @@ const months = monthRange('2026-01', '2026-04')
 const walk = (lines: StatementLine[]): StatementLine[] => lines.flatMap((l) => [l, ...walk(l.children)])
 
 /**
- * Salary 4,000 a month; Savings takes the rest. The Clothing pool account gets 100 a month and its expense row takes
+ * Salary 4,000 a month; Savings takes the rest. The Clothing virtual account gets 100 a month and its expense row takes
  * 500 in February: it then holds 200 and is 300 short.
  */
 async function fresh() {
@@ -27,21 +27,21 @@ async function fresh() {
 const engineOf = async (store: Store): Promise<EngineOutput> => computeEngine({ tables: await loadTables(store), months })
 const value = (out: EngineOutput, rowId: string, m: MonthKey) => out.cells[cellKey(rowId, m)].value
 
-describe('a pool account that is short', () => {
+describe('a virtual account that is short', () => {
   it('stops at zero; its savings account still falls by everything that came out', async () => {
     const { store, pool, savings } = await fresh()
     const out = await engineOf(store)
     expect(months.map((m) => out.pools[pool.id].months[m])).toMatchObject([
       { balance: 10000, short: 0 }, { balance: 0, short: 30000, spend: 50000 }, { balance: 10000, short: 0 }, { balance: 20000, short: 0 },
     ])
-    // Savings: the rest of each month (3,900) plus the 100 set aside, minus what came out of the pool account
+    // Savings: the rest of each month (3,900) plus the 100 set aside, minus what came out of the virtual account
     expect(out.accounts[savings.id].months['2026-02'].balance).toBe(400000 + 400000 - 50000)
     const t = await loadTables(store)
     const s = buildStatement(t, out, '2026-02')!
     const lines = walk([...s.flow.left.lines, ...s.position.left.lines])
     expect(lines.find((l) => l.id === `pool:${pool.id}`)).toMatchObject({ amount: 0, short: 30000, shortFrom: 'Savings' })
     expect(lines.find((l) => l.id === `src:${pool.id}`)).toMatchObject({ amount: 50000, short: 30000, shortFrom: 'Savings', paidFor: ['Clothing'] })
-    // the unassigned part of Savings is what paid: it holds everything the pool account does not
+    // the unassigned part of Savings is what paid: it holds everything the virtual account does not
     expect(lines.find((l) => l.id === `free:${savings.id}`)?.amount).toBe(750000)
     expect(s.flow.difference).toBe(0)
     expect(s.position.difference).toBe(0)

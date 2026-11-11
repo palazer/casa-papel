@@ -23,7 +23,7 @@ test.describe('help', () => {
     await page.getByRole('button', { name: 'What the colours and marks mean' }).click()
     const legend = page.getByRole('dialog')
     await expect(legend.getByText('Kinds of money')).toBeVisible()
-    await expect(legend.getByText('Pool accounts', { exact: true })).toBeVisible()
+    await expect(legend.getByText('Virtual accounts', { exact: true })).toBeVisible()
     await expect(legend.getByText('Done: the money has moved')).toBeVisible()
     await page.waitForTimeout(250) // let the fade-in finish so the screenshot shows the popover opaque
     await page.screenshot({ path: 'e2e/output/help-legend.png' })

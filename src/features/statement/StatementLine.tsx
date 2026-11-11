@@ -41,13 +41,13 @@ export interface LineContext {
   onCurrentBalance?: () => void
   /** Set or change a category's estimate; "Not broken down yet" opens it too. */
   onEstimate?: (categoryId: string) => void
-  /** Open the rule dialog for a transfer line, or for the account or pool account it feeds. Leave out to show the rule without the button. */
+  /** Open the rule dialog for a transfer line, or for the account or virtual account it feeds. Leave out to show the rule without the button. */
   onRule?: (line: Line) => void
-  /** Top up a pool account that is short this month. */
+  /** Top up a virtual account that is short this month. */
   onTopUp?: (poolId: string) => void
   /** The "…" after a row's name: the Grid's row menu (rename, category, archive or delete, …). */
   rowMenu?: (rowId: string) => ReactNode
-  /** The "…" after any other line's name: a category's menu, or the way into an account's or pool account's dialog. */
+  /** The "…" after any other line's name: a category's menu, or the way into an account's or virtual account's dialog. */
   menu?: (line: Line) => ReactNode
 }
 

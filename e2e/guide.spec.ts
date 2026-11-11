@@ -28,9 +28,9 @@ test.describe('guide', () => {
     await page.screenshot({ path: 'e2e/output/guide.png' })
 
     // the contents jump to a topic
-    await contents.getByRole('link', { name: /^Pool accounts/ }).click()
-    await expect(page.locator('#guide-pools')).toBeInViewport()
-    await expect(page.locator('#guide-pools').getByRole('heading', { name: 'Pool accounts', exact: true })).toBeVisible()
+    await contents.getByRole('link', { name: /^Virtual accounts/ }).click()
+    await expect(page.locator('#guide-virtual-accounts')).toBeInViewport()
+    await expect(page.locator('#guide-virtual-accounts').getByRole('heading', { name: 'Virtual accounts', exact: true })).toBeVisible()
 
     // search: every typed word must appear somewhere in a topic, including its (i) texts; matches are marked
     const search = page.getByLabel('Search the guide')
@@ -38,18 +38,18 @@ test.describe('guide', () => {
     await search.fill('lisbon')
     await expect(page.getByRole('status')).toHaveText('1 topic matches "lisbon"')
     await expect(results.getByRole('link')).toHaveCount(1)
-    await expect(results.getByRole('link').first()).toContainText('Pool accounts')
+    await expect(results.getByRole('link').first()).toContainText('Virtual accounts')
     await expect(results.locator('mark').first()).toHaveText('Lisbon')
-    await expect(page.getByRole('heading', { name: 'Pool accounts', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Virtual accounts', exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Income', exact: true })).toHaveCount(0)
     await expect(contents).toHaveCount(0)
     await search.fill('honest')
     await expect(page.getByRole('status')).toHaveText('1 topic matches "honest"')
     await expect(page.getByRole('heading', { name: 'Debts & cards', exact: true })).toBeVisible()
-    await search.fill('pool')
-    await expect(page.getByRole('status')).toHaveText(/^\d+ topics match "pool"$/)
-    // the best result first: the topic with "pool" in its title; a click on a result jumps to its topic
-    await expect(results.getByRole('link').first()).toContainText('Pool accounts')
+    await search.fill('virtual')
+    await expect(page.getByRole('status')).toHaveText(/^\d+ topics match "virtual"$/)
+    // the best result first: the topic with "virtual" in its title; a click on a result jumps to its topic
+    await expect(results.getByRole('link').first()).toContainText('Virtual accounts')
     await results.getByRole('link').last().click()
     const lastKey = await results.getByRole('link').last().getAttribute('href')
     await expect(page.locator(lastKey!)).toBeInViewport()
@@ -61,9 +61,9 @@ test.describe('guide', () => {
     await expect(contents).toBeVisible()
 
     // a topic's button opens the screen it is about
-    await page.locator('#guide-pools').getByRole('button', { name: 'Open Household' }).click()
+    await page.locator('#guide-virtual-accounts').getByRole('button', { name: 'Open Household' }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Household' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Pool accounts', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Virtual accounts', exact: true })).toBeVisible()
     await rail.getByRole('link', { name: 'Guide' }).click()
     await page.locator('#guide-statement').getByRole('button', { name: 'Open Statement' }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Statement' })).toBeVisible()
@@ -110,7 +110,7 @@ test.describe('guide on a phone', () => {
     const results = page.getByRole('navigation', { name: 'Results' })
     const top = await results.boundingBox()
     expect(top && top.y).toBeLessThan(400)
-    await expect(results.getByRole('link').first()).toContainText('Pool accounts')
+    await expect(results.getByRole('link').first()).toContainText('Virtual accounts')
     await page.screenshot({ path: 'e2e/output/guide-phone.png', fullPage: true })
   })
 })

@@ -72,9 +72,9 @@ test('the plan ends in a December and "Add <year>" appends a calendar year on ev
   await expect(page.getByRole('heading', { name: 'December 2028' })).toBeVisible()
 })
 
-test('a pool account that was asked for more than it held stops at zero, in the expense hue, and says why', async ({ page }) => {
+test('a virtual account that was asked for more than it held stops at zero, in the expense hue, and says why', async ({ page }) => {
   await loadDemo(page)
-  const travel = page.getByRole('row', { name: /^Pool account · Travel/ })
+  const travel = page.getByRole('row', { name: /^Virtual account · Travel/ })
   await expect(travel).toBeVisible()
   const short = travel.locator('td.text-expense').first()
   await expect(short).toHaveText('€0.00')
