@@ -212,10 +212,12 @@ export function StatementScreen() {
     ? <SuggestionLines suggestions={suggestions.get(line.id) ?? []} label={line.label} month={m} currency={household!.baseCurrency} locale={household!.locale} onAdded={onSuggested} onError={setError} />
     : null)
   /**
-   * A new savings or investment account is asked straight away how much goes to it. While nothing takes the rest of
-   * the month yet, a savings account is offered it.
+   * A new account that came with its row (a loan or card with its payment) opens that row for the amount. A new
+   * savings or investment account is asked straight away how much goes to it; while nothing takes the rest of the
+   * month yet, a savings account is offered it.
    */
-  function onAccountSaved(account: Account) {
+  function onAccountSaved(account: Account, row?: Row) {
+    if (row) return onAdded(row)
     if (statement!.closed || (account.type !== 'savings' && account.type !== 'investment')) return
     const restTaken = resolveRules(engine!.rows, household!.closingRule).restRowId !== null
     askRule({ accountId: account.id }, account.type === 'savings' && !restTaken ? 'rest' : undefined)
@@ -430,6 +432,7 @@ export function StatementScreen() {
       {accountEditing && (
         <HouseholdAccountDialog
           key={accountEditing.id} account={accountEditing} entities={tables.entities} baseCurrency={ccy} locale={locale} startMonth={household.startMonth}
+          rows={tables.rows} onRowAdded={onAdded}
           onClose={() => setAccountEdit(null)} removeLabel={settingUp ? 'Delete' : undefined}
           onRemove={() => { setAccountEdit(null); removeFrom({ kind: 'account', id: accountEditing.id }) }}
         />

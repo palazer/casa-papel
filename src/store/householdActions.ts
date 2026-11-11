@@ -7,7 +7,7 @@ import {
 } from '@/model'
 import { currentAccountsIn } from '@/engine'
 import type { Mutation, Store } from './store'
-import { loadTables } from './actions'
+import { loadTables, payOffKind, rowOfKindMutations } from './actions'
 
 const now = () => Date.now()
 
@@ -33,14 +33,57 @@ export async function updateEntity(store: Store, id: string, patch: Partial<Omit
 
 export type AccountInput = Pick<Account, 'name' | 'type' | 'currency' | 'openingMonth'> & Partial<Account>
 
-export async function addAccount(store: Store, input: AccountInput): Promise<Account> {
-  const tables = await loadTables(store)
+/** A new account at the end of the list; the caller commits it. */
+function newAccount(tables: Tables, input: AccountInput): Account {
   const last = tables.accounts.filter((a) => !a.deletedAt).map((a) => a.order).sort().at(-1) ?? null
   const ts = now()
   const tracked = input.tracked ?? ['savings', 'investment', 'credit-card', 'loan', 'other-asset'].includes(input.type)
-  const account = AccountSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, order: generateKeyBetween(last, null), openingBalance: 0, ...input, tracked })
+  return AccountSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, order: generateKeyBetween(last, null), openingBalance: 0, ...input, tracked })
+}
+
+export async function addAccount(store: Store, input: AccountInput): Promise<Account> {
+  const account = newAccount(await loadTables(store), input)
   await store.commit([{ op: 'put', table: 'accounts', record: account }])
   return account
+}
+
+/**
+ * The row a new account comes with: money going into it, money taken out of it, or the payment that brings a loan or
+ * a card down. Without a name the row is called after the account; a category is kept only in the section it belongs to.
+ */
+export interface AccountRowInput {
+  kind: 'to-savings' | 'to-investment' | 'from-savings' | 'from-investment' | 'pay-off'
+  name?: string
+  categoryId?: string | null
+}
+
+/** An account and the row linked to it, in one step: one undo takes both away. */
+export async function addAccountWithRow(store: Store, input: AccountInput, rowInput: AccountRowInput): Promise<{ account: Account; row: Row }> {
+  const tables = await loadTables(store)
+  const account = newAccount(tables, input)
+  const place = rowInput.kind === 'pay-off' ? payOffKind(account) : { section: 'transfer' as const, kind: rowInput.kind }
+  const category = rowInput.categoryId ? tables.categories.find((c) => c.id === rowInput.categoryId && !c.deletedAt) : undefined
+  const { row, mutations } = rowOfKindMutations(
+    { ...tables, accounts: [...tables.accounts, account] },
+    { ...place, name: rowInput.name ?? '', categoryId: category?.section === place.section ? category.id : null, accountId: account.id },
+  )
+  await store.commit([{ op: 'put', table: 'accounts', record: account }, ...mutations])
+  return { account, row }
+}
+
+/** The live rows that pay a loan or a card off. */
+export function payOffRowsOf(rows: Row[], accountId: string): Row[] {
+  return rows.filter((r) => !r.deletedAt && !r.archivedMonth && r.accountId === accountId && (r.kind === 'debt-payment' || r.kind === 'card-payment'))
+}
+
+/** The row that pays a loan or a card off, called after it: for an account that was added without one. */
+export async function addPayOffRow(store: Store, accountId: string): Promise<Row> {
+  const tables = await loadTables(store)
+  const account = tables.accounts.find((a) => a.id === accountId && !a.deletedAt)
+  if (!account || (account.type !== 'loan' && account.type !== 'credit-card')) throw new Error('Only a loan or a card has a row that pays it off.')
+  const { row, mutations } = rowOfKindMutations(tables, { ...payOffKind(account), name: '', categoryId: null, accountId })
+  await store.commit(mutations)
+  return row
 }
 
 export async function updateAccount(store: Store, id: string, patch: Partial<Omit<Account, 'id' | 'createdAt'>>): Promise<void> {

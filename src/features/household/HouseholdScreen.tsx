@@ -266,7 +266,7 @@ function AccountsCard({ household, tables, accounts: allAccounts, entities, engi
         <Button variant="outline" size="xs" onClick={() => setEditing('new')}>Add account</Button>
         {editing && (
           <HouseholdAccountDialog
-            account={editing === 'new' ? null : editing} entities={entities} baseCurrency={baseCurrency} locale={locale} startMonth={household.startMonth}
+            account={editing === 'new' ? null : editing} entities={entities} baseCurrency={baseCurrency} locale={locale} startMonth={household.startMonth} rows={tables.rows}
             onClose={() => setEditing(null)} onRemove={editing !== 'new' ? () => { setRemoving(editing); setEditing(null) } : undefined}
           />
         )}

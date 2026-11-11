@@ -12,8 +12,8 @@ import { Segmented } from '@/components/Segmented'
 import { currencyChoices, currencyLabel } from '@/app/currencies'
 import { amountToInput, formatMonth, parseAmount } from '@/app/format'
 import { useStore } from '@/app/store'
-import { ACCOUNT_TYPE_INFO, type Account, type AccountType, type Entity } from '@/model'
-import { addAccount, updateAccount } from '@/store'
+import { ACCOUNT_TYPE_INFO, type Account, type AccountType, type Entity, type Row } from '@/model'
+import { addAccount, addAccountWithRow, addPayOffRow, payOffRowsOf, rowNameFor, updateAccount, type AccountRowInput } from '@/store'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -22,11 +22,20 @@ interface Props {
   baseCurrency: string
   locale: string
   startMonth: string
-  /** A new account that starts from a suggestion or from its place on the Statement: a name, a type, the types on offer. */
-  preset?: { name?: string; type?: AccountType; types?: AccountType[] }
+  /**
+   * A new account that starts from a suggestion or from its place on the Statement: a name, a type, the types on offer.
+   * `payOff: false` leaves out the row that pays a loan or card off, where that row comes another way.
+   */
+  preset?: { name?: string; type?: AccountType; types?: AccountType[]; payOff?: boolean }
+  /** The household's rows, so the form of a loan or card can say which row pays it off; left out, it says nothing. */
+  rows?: Row[]
+  /** A new account asked for from the row form: the row that is made with it, in the same step. */
+  withRow?: AccountRowInput
   onClose: () => void
-  /** A new account was saved. */
-  onSaved?: (account: Account) => void
+  /** A new account was saved, with the row that was made alongside it when there is one. */
+  onSaved?: (account: Account, row?: Row) => void
+  /** The row that pays the loan or card off was added from the form of an account that had none. */
+  onRowAdded?: (row: Row) => void
   onRemove?: () => void
   /** What the remove button says: "Delete" where removing is one click, "Archive or delete…" where it opens the dialog. */
   removeLabel?: string
@@ -50,7 +59,7 @@ const balanceWord = (type: AccountType) => (type === 'credit-card' || type === '
  * what is owed on it, when it starts; a card also asks what is recorded for it. The rest (currency, owner, opening
  * month, tracking, how an investment grows) keeps its usual default behind "More options", which is open when editing.
  */
-export function HouseholdAccountDialog({ account, entities, baseCurrency, locale, startMonth, preset, onClose, onSaved, onRemove, removeLabel = 'Archive or delete…' }: Props) {
+export function HouseholdAccountDialog({ account, entities, baseCurrency, locale, startMonth, preset, rows, withRow, onClose, onSaved, onRowAdded, onRemove, removeLabel = 'Archive or delete…' }: Props) {
   const store = useStore()
   const types = ACCOUNT_TYPE_INFO.filter((t) => account || !preset?.types || preset.types.includes(t.value))
   const [name, setName] = useState(account?.name ?? preset?.name ?? '')
@@ -68,6 +77,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
   const [fixedRate, setFixedRate] = useState(inv0?.fixedRate ? String(inv0.fixedRate) : '')
   const [cardMode, setCardMode] = useState<CardMode>(account?.card?.cardMode ?? 'itemized')
   const [more, setMore] = useState(!!account)
+  const [payOff, setPayOff] = useState(preset?.payOff ?? true)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const adults = entities.filter((e) => e.kind === 'adult' && !e.deletedAt)
@@ -77,6 +87,28 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
   const ccy = currency.toUpperCase()
   const foreign = ccy !== baseCurrency && ccy.length === 3
   const info = ACCOUNT_TYPE_INFO.find((t) => t.value === type)
+  const debt = type === 'loan' || type === 'credit-card'
+  // a new loan or card comes with the row that pays it off unless the box is unticked; the row form brings its own row
+  const offersRow = !account && !withRow && debt && preset?.payOff !== false
+  const rowInput: AccountRowInput | null = account ? null : withRow ?? (offersRow && payOff ? { kind: 'pay-off' } : null)
+  const rowName = rowInput ? rowInput.name?.trim() || (name.trim() ? rowNameFor(rowInput.kind, name.trim()) : null) : null
+  // a saved loan or card says which row pays it off, and offers one while none does
+  const paidBy = account && rows && type === account.type && debt ? payOffRowsOf(rows, account.id) : null
+
+  async function addRow() {
+    if (!account || busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      const row = await addPayOffRow(store, account.id)
+      onRowAdded?.(row)
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not add the row.')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   async function save() {
     const openingBalance = opening.trim() ? parseAmount(opening, ccy, locale) : 0
@@ -97,6 +129,9 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
     try {
       if (account) {
         await updateAccount(store, account.id, patch)
+      } else if (rowInput) {
+        const made = await addAccountWithRow(store, patch, rowInput)
+        onSaved?.(made.account, made.row)
       } else {
         const made = await addAccount(store, patch)
         onSaved?.(made)
@@ -133,6 +168,33 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
               <Segmented label="What do you record for this card?" value={cardMode} onChange={(v) => setCardMode(v as CardMode)} options={CARD_MODES} />
               <p className="text-xs text-muted-foreground">{CARD_HELP[cardMode]}</p>
             </fieldset>
+          )}
+          {offersRow && (
+            <div className="space-y-1 sm:col-span-2">
+              <Check label="Add the row that pays it off" checked={payOff} onChange={(e) => setPayOff(e.target.checked)} />
+              <p className="pl-6 text-xs text-muted-foreground" data-testid="acc-row">
+                {payOff
+                  ? <>{rowName ? `"${rowName}"` : 'Named after the account'}. Each payment brings down what is owed.</>
+                  : 'No row yet. One can be added later from this form.'}
+              </p>
+            </div>
+          )}
+          {withRow && (
+            <p className="text-xs text-muted-foreground sm:col-span-2" data-testid="acc-row">
+              Saving also adds the row {rowName ? `"${rowName}"` : 'named after the account'}, linked to this account.
+            </p>
+          )}
+          {paidBy && (
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:col-span-2" data-testid="acc-paid-by">
+              {paidBy.length > 0
+                ? <p>Paid off by {paidBy.map((r) => `"${r.name}"`).join(', ')}.</p>
+                : (
+                  <>
+                    <p>No row pays this off yet.</p>
+                    <Button size="xs" variant="outline" disabled={busy} onClick={() => void addRow()}>Add the row that pays it off</Button>
+                  </>
+                )}
+            </div>
           )}
           <div className="sm:col-span-2">
             <button

@@ -777,10 +777,40 @@ test.describe('working the month in the Statement', () => {
     await dlg.getByLabel('Type').selectOption('loan')
     await expect(dlg.getByRole('radiogroup', { name: 'What do you record for this card?' })).toHaveCount(0)
     await dlg.getByLabel('Owed at the start of September 2026 (EUR)').fill('5000')
+    // a loan comes with the row that pays it off, unless the box is unticked
+    await expect(dlg.getByRole('checkbox', { name: 'Add the row that pays it off' })).toBeChecked()
+    await expect(dlg.getByTestId('acc-row')).toHaveText('"Car loan – Payment". Each payment brings down what is owed.')
     await dlg.getByRole('button', { name: 'Save' }).click()
-    // a debt has no rule to ask for
+    // one Save made both, and the row asks for its amount
+    await expect(dlg.getByRole('heading', { name: 'Car loan – Payment · November 2026' })).toBeVisible()
+    await dlg.getByLabel('Amount in EUR').fill('250')
+    await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-    await expect(claims.locator('[data-line^="acc:"]').filter({ hasText: 'Car loan' })).toContainText('€5,000.00')
+    await expect(moneyOut.getByRole('button', { name: /^Car loan – Payment: €250\.00/ })).toBeVisible()
+    const carLoan = claims.locator('[data-line^="acc:"]').filter({ hasText: 'Car loan' })
+    await expect(carLoan).toContainText('€4,750.00')
+    // its form names the row that pays it off
+    await claims.getByRole('button', { name: 'Edit Car loan' }).click()
+    await expect(dlg.getByTestId('acc-paid-by')).toHaveText('Paid off by "Car loan – Payment".')
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+
+    // not mandatory: a card added without its row gets one later from its form
+    await claims.getByRole('button', { name: 'Add a card or loan' }).click()
+    await dlg.getByLabel('Name', { exact: true }).fill('Visa')
+    await dlg.getByRole('checkbox', { name: 'Add the row that pays it off' }).uncheck()
+    await expect(dlg.getByTestId('acc-row')).toHaveText('No row yet. One can be added later from this form.')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(moneyOut.getByRole('button', { name: /^Visa – Payment/ })).toHaveCount(0)
+    await claims.getByRole('button', { name: 'Edit Visa' }).click()
+    await expect(dlg.getByTestId('acc-paid-by')).toContainText('No row pays this off yet.')
+    await dlg.getByRole('button', { name: 'Add the row that pays it off' }).click()
+    // purchases on this card are expense rows, so its payment only moves money
+    await expect(dlg.getByRole('heading', { name: 'Visa – Payment · November 2026' })).toBeVisible()
+    await dlg.getByLabel('Amount in EUR').fill('100')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(moneyOut.locator('[data-line]').filter({ hasText: 'Visa – Payment' })).toContainText('counted when bought')
     const assetsTotal = (await total(page, 'assets').innerText()).replace(/^Total\s*/, '')
     expect(assetsTotal).toBe((await total(page, 'claims').innerText()).replace(/^Total\s*/, ''))
     await page.screenshot({ path: 'e2e/output/statement-accounts.png', fullPage: true })

@@ -513,6 +513,13 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   deposits count. It is closed for a new account and open when editing. Opened from a place that says what the
   account is (Assets, Debts, a suggestion), the type list holds only the types that belong there. Errors show in the
   dialog. Footer: a ghost `Archive or delete…` on the left when editing, Cancel, Save.
+  An account and the row that moves it are made together, never left to be matched up afterwards. A new loan or card
+  carries a ticked `Check`, `Add the row that pays it off`, with the row's name under it (`"Car loan – Payment". Each
+  payment brings down what is owed.`); one Save makes both in one step, one Undo takes both away, and on the
+  Statement the row's dialog opens next for the amount. Unticked, the form of the saved account says `No row pays
+  this off yet.` with an outline `xs` button `Add the row that pays it off`; once a row does, the same line reads
+  `Paid off by "<row>".`. Opened from the row form, the dialog says `Saving also adds the row "<name>", linked to
+  this account.` in place of the box.
 - The goal dialog (`src/features/goals/GoalDialog.tsx`). A goal has two kinds: `Fill an account` (an account or a
   virtual account reaches an amount) and `Pay down a debt` (a card or loan comes down to an amount, zero unless another
   is typed); net worth is a third, set only from its own line. Opened from a line of the Statement it is titled

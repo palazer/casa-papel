@@ -190,19 +190,37 @@ export interface RowOfKindInput {
   adultId?: string | null
 }
 
+/** What a row is called when no name was typed: after the account it fills, takes from or pays off. */
+export function rowNameFor(kind: RowOfKindInput['kind'], target: string): string {
+  if (kind === 'from-savings' || kind === 'from-investment') return `From ${target}`
+  if (kind === 'pay-off' || kind === 'card-payment') return `${target} – Payment`
+  return `To ${target}`
+}
+
 /**
- * "Add row" under Transfers and Expenses. A deposit row needs its account, a pool row the virtual account it fills (one
- * that lost its row), pocket money the adult it is for, a payment row the loan or card it brings down; everything is
- * checked here so the grid can say what is missing.
+ * Where the row that pays an account off lives: under Expenses for a loan and for a card that records only its payment,
+ * under Transfers for a card whose purchases are expense rows already.
  */
-export async function addRowOfKind(store: Store, input: RowOfKindInput): Promise<Row> {
-  const tables = await loadTables(store)
+export function payOffKind(account: Account): Pick<RowOfKindInput, 'section' | 'kind'> {
+  return cardIsItemized(account) ? { section: 'transfer', kind: 'card-payment' } : { section: 'expense', kind: 'pay-off' }
+}
+
+/**
+ * The puts for a new row under Transfers or Expenses. A deposit row needs its account, a pool row the virtual account
+ * it fills (one that lost its row), pocket money the adult it is for, a payment row the loan or card it brings down;
+ * everything is checked here so the form can say what is missing. A row that names an account, or a virtual account,
+ * may come without a name and is then called after it. Pure; the caller commits, so an account and its row can be one
+ * step.
+ */
+export function rowOfKindMutations(tables: Tables, input: RowOfKindInput): { row: Row; mutations: Mutation[] } {
   const targets = rowTargets(tables, tables.household.find((h) => !h.deletedAt))
   const transferOnly: string[] = ['to-savings', 'to-investment', 'pool-allocation', 'pocket-money', 'card-payment', 'from-savings', 'from-investment']
   if ((input.section === 'expense' && transferOnly.includes(input.kind)) || (input.section === 'transfer' && input.kind === 'pay-off')) {
     throw new Error('That kind of row does not belong in this section.')
   }
-  const base: Partial<Row> & { name: string; section: Row['section'] } = { name: input.name, section: input.section, categoryId: input.categoryId, kind: input.kind === 'pay-off' ? 'plain' : input.kind }
+  const typed = input.name.trim()
+  const base: Partial<Row> & { name: string; section: Row['section'] } = { name: typed, section: input.section, categoryId: input.categoryId, kind: input.kind === 'pay-off' ? 'plain' : input.kind }
+  const nameAfter = (target: string) => { if (!typed) base.name = rowNameFor(input.kind, target) }
   if (input.kind !== 'plain') base.defaultStatus = 'committed'
   if (input.kind === 'pay-off') {
     const acc = tables.accounts.find((a) => a.id === input.accountId && !a.deletedAt)
@@ -212,15 +230,20 @@ export async function addRowOfKind(store: Store, input: RowOfKindInput): Promise
     if (!targets.payoff.some((a) => a.id === acc.id)) throw new Error(`"${acc.name}" is not a loan or a credit card.`)
     base.kind = acc.type === 'loan' ? 'debt-payment' : 'card-payment'
     base.accountId = acc.id
+    nameAfter(acc.name)
   } else if (input.kind === 'card-payment') {
     const acc = tables.accounts.find((a) => a.id === input.accountId && !a.deletedAt)
     if (!acc) throw new Error('Pick the card this row pays off.')
     if (acc.archivedMonth) throw new Error(`"${acc.name}" is archived.`)
     if (!targets.cardsItemized.some((a) => a.id === acc.id)) throw new Error(`"${acc.name}" records only its payment, as spending: add it under Expenses with "Pays off a loan or card".`)
     base.accountId = acc.id
+    nameAfter(acc.name)
   } else if (input.kind === 'to-savings' || input.kind === 'to-investment' || input.kind === 'from-savings' || input.kind === 'from-investment') {
-    const acc = checkAccountForRow(tables, { kind: input.kind, name: input.name }, input.accountId ?? null)
-    if (acc) base.accountId = acc.id
+    const acc = checkAccountForRow(tables, { kind: input.kind, name: typed || 'The new row' }, input.accountId ?? null)
+    if (acc) {
+      base.accountId = acc.id
+      nameAfter(acc.name)
+    }
     // beside the row that takes the rest, a further savings row is typed: said outright, or it would read as idle
     if (input.kind === 'to-savings' && targets.plugTaken) base.rule = 'fixed'
   } else if (input.kind === 'pocket-money') {
@@ -235,11 +258,19 @@ export async function addRowOfKind(store: Store, input: RowOfKindInput): Promise
     if (found.archivedMonth) throw new Error(`"${found.name}" is archived.`)
     if (!targets.orphanPools.some((p) => p.id === found.id)) throw new Error(`"${found.name}" is already filled by another row.`)
     base.accountId = found.accountId
+    nameAfter(found.name)
     pool = found
   }
+  if (!base.name) throw new Error('Give the row a name.')
   const { row, mutation } = newRowMutation(tables, base)
   const mutations: Mutation[] = [mutation]
   if (pool) mutations.push({ op: 'put', table: 'pools', record: PoolSchema.parse({ ...pool, allocationRowId: row.id, updatedAt: now() }) })
+  return { row, mutations }
+}
+
+/** "Add row" under Transfers and Expenses: `rowOfKindMutations`, committed. */
+export async function addRowOfKind(store: Store, input: RowOfKindInput): Promise<Row> {
+  const { row, mutations } = rowOfKindMutations(await loadTables(store), input)
   await store.commit(mutations)
   return row
 }

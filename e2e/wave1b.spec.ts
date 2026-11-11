@@ -101,6 +101,8 @@ test.describe('wave 1b', () => {
     await expect(dlg.getByLabel('Type')).toHaveValue('credit-card')
     await dlg.getByRole('radio', { name: 'Only what I pay to it' }).click()
     await expect(dlg).toContainText('Only the payment is a row')
+    // the row that pays it off is offered with the card; this household adds it later
+    await dlg.getByRole('checkbox', { name: 'Add the row that pays it off' }).uncheck()
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
     await expect(claims.locator('[data-line^="acc:"]').filter({ hasText: 'Visa' })).toBeVisible()
