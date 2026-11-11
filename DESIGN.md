@@ -487,7 +487,11 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   investment accounts with their balance, then `This month's income`) with a sentence for the chosen source; the
   amount, pre-filled with what is missing; and under `<month> will then show` the lines the save will leave (`Money
   in · From <account>`, `Money out · To <virtual account>, this month`, the virtual account's balance), worked out on a
-  copy. Footer: a ghost `Not now` on the left, `Top up` on the right. `Not now` changes nothing.
+  copy. Footer: a ghost `Not now` on the left, `Top up` on the right. `Not now` changes nothing. When a rule works
+  out what the virtual account gets that month, a muted sentence under the source says what the top-up does to it:
+  the month keeps what the rule gave so far as a typed amount beside the top-up, and the rule goes on the month
+  after; for the account that takes the rest, that the month then keeps what is left over or short in the main
+  account. A change to how a month is worked out is said before it is saved, never found out afterwards.
 - The account dialog (`src/features/household/HouseholdAccountDialog.tsx`), one for the Household screen and the
   Statement. The short form asks what every account needs: `Name`, `Type` with the type's sentence under it, and
   one amount whose label says what it is and when: `Holds at the start of <Month> (<CCY>)`, `Owed at the start of

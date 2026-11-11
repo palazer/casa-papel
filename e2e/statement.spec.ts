@@ -923,6 +923,37 @@ test.describe('working the month in the Statement', () => {
     await expect(moneyOut.getByLabel('What the new transfer row does').locator('option[value="from-savings"]')).toHaveCount(0)
   })
 
+  test('a top-up on a virtual account whose amount a rule works out says that the month then keeps a typed amount', async ({ page }) => {
+    await openStatement(page)
+    await goToMonth(page, 'November 2026')
+    const moneyOut = page.getByRole('region', { name: 'Money out' })
+    const assets = page.getByRole('region', { name: 'Assets' })
+    const dlg = page.getByRole('dialog')
+    // Clothing gets 1% of income from November on
+    await assets.getByRole('button', { name: 'Rule for Clothing: a fixed amount' }).click()
+    await dlg.getByRole('radio', { name: 'A percentage of income' }).click()
+    await dlg.getByLabel('Percentage of income').fill('1')
+    await expect(dlg.getByTestId('rule-amount')).toHaveText('€74.05')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    // a coat that takes more than the virtual account then holds: the top-up is offered, and says what it does to the rule
+    await page.getByRole('button', { name: 'Expand all' }).click()
+    await moneyOut.getByRole('button', { name: /^Clothing: €180\.00/ }).click()
+    await dlg.getByLabel('Item amount').fill('3000')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Clothing is short in November 2026' })).toBeVisible()
+    await expect(dlg.getByTestId('top-up-rule')).toHaveText('What Clothing gets is worked out by its rule (1% of income). A top-up fixes it for November 2026 at what it is now, €74.05, plus the top-up; the rule goes on the month after.')
+    await expect(dlg).toHaveCSS('opacity', '1')
+    await page.screenshot({ path: 'e2e/output/statement-top-up-rule.png' })
+    await dlg.getByRole('button', { name: 'Top up' }).click()
+    await expect(dlg).toBeHidden()
+    // November holds what the rule gave plus the top-up; December follows the rule again
+    await expect(moneyOut.getByRole('button', { name: 'To Clothing: €2,650.00' })).toBeVisible()
+    await goToMonth(page, 'December 2026')
+    await expect(moneyOut.getByRole('button', { name: 'Rule for To Clothing: 1% of income' })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: /^To Clothing: €2,650\.00/ })).toHaveCount(0)
+  })
+
   test('a virtual account that runs short stops at zero and offers a top-up that leaves a record', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'November 2026')
@@ -962,6 +993,8 @@ test.describe('working the month in the Statement', () => {
     await expect(preview).toContainText('Money in · From Savings€2,550.00')
     await expect(preview).toContainText('Money out · To Clothing, this month€2,650.00')
     await expect(dlg.getByTestId('top-up-balance')).toHaveText('€0.00')
+    // a set-aside with a fixed amount has nothing to warn about
+    await expect(dlg.getByTestId('top-up-rule')).toHaveCount(0)
     await expect(dlg).toHaveCSS('opacity', '1')
     await page.screenshot({ path: 'e2e/output/statement-top-up-dialog.png' })
     await dlg.getByRole('button', { name: 'Top up' }).click()

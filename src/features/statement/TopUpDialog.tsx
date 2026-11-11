@@ -4,10 +4,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Segmented } from '@/components/Segmented'
+import { ruleText } from '@/app/display'
 import { amountToInput, formatAmount, formatMonth, parseAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import { cellKey, computeEngine, type EngineOutput } from '@/engine'
-import type { Household, MonthKey, Tables } from '@/model'
+import { resolveRules, type Household, type MonthKey, type Tables } from '@/model'
 import { applyMutations, topUpMutations, topUpPool, type TopUpSource } from '@/store'
 import { useSave } from '@/features/grid/RowDialogs'
 
@@ -48,6 +49,10 @@ export function TopUpDialog({ tables, engine, household, poolId, month, onClose 
       return { id: a.id, label: a.type === 'savings' ? `${a.name}, not set aside` : a.name, name: a.name, free }
     })
   }, [tables, engine, month, pool?.accountId])
+  // A set-aside that a rule works out this month stops following the rule once it is topped up: the month keeps what
+  // the rule gave so far, as a typed amount, with the top-up beside it. The dialog says so before anything is saved.
+  const setAsideCell = pool?.allocationRowId ? engine.cells[cellKey(pool.allocationRowId, month)] : undefined
+  const rule = pool?.allocationRowId && setAsideCell?.source === 'derived' ? resolveRules(engine.rows, household.closingRule).byRow.get(pool.allocationRowId) : undefined
   const [sourceId, setSourceId] = useState(sources[0]?.id ?? INCOME)
   const [text, setText] = useState(short > 0 ? amountToInput(short, ccy, locale) : '')
   const { error, busy, save } = useSave(onClose)
@@ -109,6 +114,13 @@ export function TopUpDialog({ tables, engine, household, poolId, month, onClose 
                 ? `More of this month's income is set aside for ${pool.name}, so the rest of the month shrinks by the amount. Nothing is taken from an account.`
                 : `The month takes the money out of ${chosen?.name ?? 'the account'} and sets it aside for ${pool.name}. Both show as a line, and the rest of the month stays as it is.`}
             </p>
+            {rule && setAsideCell && (
+              <p className="text-xs text-muted-foreground" data-testid="top-up-rule">
+                {rule.kind === 'rest'
+                  ? `${pool.name} takes the rest of the month. A top-up fixes what it gets in ${monthName} at what that is now, ${money(setAsideCell.valueBase)}, plus the top-up; from then on, what ${monthName} has left over or is short stays in the main account. The rest goes to ${pool.name} again the month after.`
+                  : `What ${pool.name} gets is worked out by its rule (${ruleText(rule, locale)}). A top-up fixes it for ${monthName} at what it is now, ${money(setAsideCell.valueBase)}, plus the top-up; the rule goes on the month after.`}
+              </p>
+            )}
           </fieldset>
           <div className="space-y-1.5">
             <Label htmlFor="top-up-amount">Amount in {ccy}</Label>

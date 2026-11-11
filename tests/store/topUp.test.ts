@@ -121,6 +121,34 @@ describe('a virtual account that is short', () => {
     expect(out.pools[pool.id].months['2026-02']).toMatchObject({ balance: 0, short: 0 })
   })
 
+  it('on the virtual account that takes the rest, the month keeps what the rest was and closes with a leftover from then on', async () => {
+    const { store, pool, savings, setAside, clothes } = await fresh()
+    await setRule(store, { poolId: pool.id }, { kind: 'rest' }, '2026-01')
+    await setCellValue(store, clothes.id, '2026-02', 900000, 'this-month')
+    let out = await engineOf(store)
+    // 4,000 a month all go to Clothing; February takes 9,000 out of the 8,000 it then holds
+    expect(out.totals['2026-02'].rest).toBe(400000)
+    expect(out.pools[pool.id].months['2026-02'].short).toBe(100000)
+    await topUpPool(store, pool.id, '2026-02', { kind: 'account', accountId: savings.id }, 100000)
+    out = await engineOf(store)
+    expect(out.cells[cellKey(setAside.id, '2026-02')]).toMatchObject({ value: 500000, source: 'items' })
+    expect(out.pools[pool.id].months['2026-02']).toMatchObject({ balance: 0, short: 0 })
+    // the month no longer takes the rest: it holds what the rest was, and both halves still agree
+    expect(out.totals['2026-02']).toMatchObject({ rest: null, leftover: 0 })
+    let s = buildStatement(await loadTables(store), out, '2026-02')!
+    expect([s.flow.difference, s.position.difference]).toEqual([0, 0])
+    // what changes in that month afterwards stays in the main account; the rest goes on the month after
+    const salary = (await loadTables(store)).rows.find((r) => r.name === 'Salary')!
+    await setCellValue(store, salary.id, '2026-02', 420000, 'this-month')
+    out = await engineOf(store)
+    expect(value(out, setAside.id, '2026-02')).toBe(500000)
+    expect(out.totals['2026-02']).toMatchObject({ rest: null, leftover: 20000 })
+    expect(out.cells[cellKey(setAside.id, '2026-03')].source).toBe('derived')
+    expect(out.totals['2026-03'].rest).toBe(400000)
+    s = buildStatement(await loadTables(store), out, '2026-02')!
+    expect([s.flow.difference, s.position.difference]).toEqual([0, 0])
+  })
+
   it('says what cannot be', async () => {
     const { store, pool, savings } = await fresh()
     const loan = await addAccount(store, { name: 'Car loan', type: 'loan', currency: 'EUR', openingMonth: '2026-01' })

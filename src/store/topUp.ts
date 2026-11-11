@@ -17,8 +17,10 @@ export type TopUpSource = { kind: 'account'; accountId: string } | { kind: 'inco
  * Top a virtual account up for one month, with a record of where the money came from. Two one-off items, this month only:
  * "Top-up for <virtual account>" on the row that takes money out of the source account (made on first use), and "Top-up from
  * <account>" on the virtual account's own set-aside row. The month takes the money in and sets it aside again, so the
- * rest is untouched; from the month's income only the second is written, and the rest shrinks. Pure; the caller
- * commits, and the dialog runs it on a copy to show what the month will hold.
+ * rest is untouched; from the month's income only the second is written, and the rest shrinks. A set-aside that a
+ * rule works out keeps what the rule gave so far as a typed amount beside the top-up, so that month stops following
+ * the rule (for the row that takes the rest: the month then closes with a leftover); the dialog says so beforehand.
+ * Pure; the caller commits, and the dialog runs it on a copy to show what the month will hold.
  */
 export function topUpMutations(tables: Tables, poolId: string, month: MonthKey, source: TopUpSource, amount: Money, ts: number = Date.now()): Mutation[] {
   const household = tables.household.find((h) => !h.deletedAt)
