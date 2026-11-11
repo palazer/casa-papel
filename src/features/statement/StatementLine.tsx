@@ -77,6 +77,8 @@ const ROW = 'flex min-h-11 items-center gap-1.5 pr-2 text-sm md:min-h-7 md:text-
 const LABEL = 'flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5 py-1'
 const CHEVRON_SLOT = 'flex w-3.5 shrink-0 items-center justify-center self-stretch'
 const TICK_SLOT = 'size-11 shrink-0 md:size-6'
+/** A control on a line whose own button covers the whole line: it stays above that button. */
+const ABOVE = 'relative z-10'
 
 export function changeText(change: number, ccy: string, locale: string): string {
   return change === 0 ? '·' : formatAmount(change, ccy, locale, { sign: 'exceptZero' })
@@ -195,8 +197,8 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
             {line.label}
           </button>
           {tags}
-          {line.rule && <RuleMark line={line} ctx={ctx} className="relative z-10" />}
-          {menu && <span className="relative z-10 inline-flex">{menu}</span>}
+          {line.rule && <RuleMark line={line} ctx={ctx} className={ABOVE} />}
+          {menu && <span className={cn(ABOVE, 'inline-flex')}>{menu}</span>}
         </span>
         {amount}
       </div>
@@ -232,10 +234,12 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
     )
   }
 
+  // A line that opens is pressed anywhere: its button is stretched over the whole line (as a row's is), and the other
+  // controls on it sit above that.
   const head = expandable ? (
     <button
       type="button" aria-expanded={open} aria-controls={listId} onClick={() => ctx.onToggle(line)}
-      className="flex min-w-0 max-w-full items-center gap-1.5 rounded text-left outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex min-w-0 max-w-full items-center gap-1.5 rounded text-left outline-none after:absolute after:inset-0 after:rounded focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring"
     >
       <ChevronRight className={cn('size-3.5 shrink-0 text-muted-foreground transition-transform', open && 'rotate-90')} aria-hidden />
       {name}
@@ -249,30 +253,30 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
 
   return (
     <li>
-      <div className={cn(ROW, pad, 'group/line', group && hue?.tint)} data-line={line.id}>
+      <div className={cn(ROW, pad, 'group/line', group && hue?.tint, expandable && 'relative hover:bg-muted/50')} data-line={line.id}>
         <div className={LABEL}>
           {head}
           {tags}
-          {line.rule && <RuleMark line={line} ctx={ctx} />}
+          {line.rule && <RuleMark line={line} ctx={ctx} className={ABOVE} />}
           {line.short != null && line.poolId && ctx.onTopUp && (
-            <Button size="xs" variant="outline" aria-label={`Top up ${line.label}`} onClick={() => ctx.onTopUp!(line.poolId!)}>Top up…</Button>
+            <Button size="xs" variant="outline" className={ABOVE} aria-label={`Top up ${line.label}`} onClick={() => ctx.onTopUp!(line.poolId!)}>Top up…</Button>
           )}
-          {tip && <InfoTip help={tip} />}
+          {tip && <InfoTip help={tip} className={ABOVE} />}
           {canGoal && !line.goals?.length && (
             <button
               type="button" aria-label={`Set a goal for ${line.label}`} title="Set a goal" onClick={() => ctx.onGoal!(line)}
-              className="inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 outline-none hover:bg-muted hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover/line:opacity-100 pointer-coarse:size-8 pointer-coarse:opacity-100"
+              className={cn(ABOVE, 'inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 outline-none hover:bg-muted hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover/line:opacity-100 pointer-coarse:size-8 pointer-coarse:opacity-100')}
             >
               <Target className="size-3.5" aria-hidden />
             </button>
           )}
-          {!ctx.closed && ctx.menu?.(line)}
+          {!ctx.closed && ctx.menu && <span className={cn(ABOVE, 'inline-flex empty:hidden')}>{ctx.menu(line)}</span>}
         </div>
         {ctx.withChange && <span className={cn(CHANGE_COL, 'text-muted-foreground', group && 'font-medium')}>{line.change != null ? changeText(line.change, ccy, locale) : ''}</span>}
         {(ctx.onBalance && line.accountId) || (ctx.onCurrentBalance && line.currentAccountIds?.length) ? (
           <button
             type="button" aria-label={`${line.label} balance: ${amountText}${line.entered ? ', entered' : ''}`} onClick={() => (line.accountId ? ctx.onBalance!(line.accountId) : ctx.onCurrentBalance!())}
-            className={cn(AMOUNT_COL, '-my-1 rounded py-1 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring', line.amount < 0 && 'text-expense', line.entered && 'underline decoration-dotted underline-offset-4')}
+            className={cn(AMOUNT_COL, ABOVE, '-my-1 rounded py-1 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring', line.amount < 0 && 'text-expense', line.entered && 'underline decoration-dotted underline-offset-4')}
           >
             {amountText}
           </button>

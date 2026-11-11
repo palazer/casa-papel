@@ -246,7 +246,10 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   a **group** (Income, Taken from accounts, Expenses, Set aside, pay off, Debts, Net worth) is a heading in its hue
   on the hue's `tint` with its lines always under it; a **category**, an account that holds virtual accounts and an itemized row open as an
   accordion (a chevron button with `aria-expanded`, each level 20 px further in, items on `bg-muted/20` with the
-  `Repeat` icon when scheduled); a category's amount is the sum of its rows. Tags follow the name and wrap under it
+  `Repeat` icon when scheduled); a category's amount is the sum of its rows. A category or an account that opens is
+  pressed anywhere on its line: its button (the chevron and the name) is stretched over the whole line, which turns
+  `bg-muted/50` under the pointer, and the line's other controls (the rule symbol, `Top up…`, the (i), the goal
+  target, the `…`, the balance) sit above it. Tags follow the name and wrap under it
   when there is no room: a zinc chip with the currency code and the original amount in muted `text-[11px]` for a
   line in another currency (the amount column is always the household currency), a rose `no rate` chip, `net €…`
   on an income with deductions, and a zinc chip for what the line is (`automatic`, `calculated`,

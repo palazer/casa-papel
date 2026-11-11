@@ -57,6 +57,13 @@ test.describe('the Statement', () => {
     await moneyOut.getByRole('button', { name: 'Items of Sam – Personal' }).click()
     await expect(moneyOut.getByText('Concert tickets')).toBeVisible()
     await expect(moneyOut.getByText('Books')).toBeVisible()
+    // a category opens and closes from anywhere on its line, not only from the arrow and the name
+    const personal = moneyOut.locator('[data-line^="cat:expense:"]').filter({ hasText: 'Personal' })
+    const box = (await personal.boundingBox())!
+    await personal.click({ position: { x: box.width - 30, y: box.height / 2 } })
+    await expect(moneyOut.getByText('Sam – Personal')).toHaveCount(0)
+    await personal.click({ position: { x: box.width / 2, y: box.height / 2 } })
+    await expect(moneyOut.getByText('Sam – Personal')).toBeVisible()
     // a closed month is locked: nothing to tick, no line opens the editor
     await expect(page.getByRole('checkbox')).toHaveCount(0)
     await expect(moneyOut.getByRole('button', { name: /^Alex – Personal:/ })).toHaveCount(0)
