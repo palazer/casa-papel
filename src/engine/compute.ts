@@ -585,7 +585,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
   // ---------- the main account, and net worth ----------
   // What stays in the current accounts is money the household has, so it counts: the Statement's lower half would
   // not balance without it, and every other screen shows the same figure.
-  const main = mainAccountSeries({ months, rows, cells, totals, accounts, fx, base })
+  const main = mainAccountSeries({ months, rows, cells, totals, accounts, actuals, fx, base })
   const netWorth: Record<MonthKey, Money> = {}
   for (const m of months) {
     let nw = main.months[m]?.balance ?? 0

@@ -15,6 +15,7 @@
  */
 import { addMonths, canCarryRule, cardIsItemized, isTakenFromAccount, resolveRules, rowsFeeding, type Account, type Money, type MonthKey, type Row, type Section, type Tables } from '@/model'
 import { computeGoals, type GoalProgress } from './goals'
+import { currentAccountsIn } from './mainAccount'
 import { cellKey, type AccountSeries, type CellResult, type CellStatus, type EngineOutput } from './types'
 
 export type StatementHue = 'income' | 'expense' | 'transfer' | 'worth' | 'pool'
@@ -55,6 +56,8 @@ export interface StatementLine {
   balancing?: boolean
   /** Derived from other figures, not a balance anyone entered. */
   calculated?: boolean
+  /** The line for what stays in the current accounts: the accounts open this month, whose real balances it takes. */
+  currentAccountIds?: string[]
   /** A real balance was entered for this month. */
   entered?: boolean
   /** How far the entered balance is from what the plan expected, in the base currency; left out when it is not. */
@@ -374,10 +377,18 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
     if (mm.kept !== 0) parts.push({ id: 'main:kept', kind: 'note', label: mm.kept < 0 ? 'Short this month' : 'Kept this month', amount: mm.kept, children: [] })
     if (mm.cardBought !== 0) parts.push({ id: 'main:bought', kind: 'note', label: 'Bought on the card, not yet paid', amount: mm.cardBought, children: [] })
     if (mm.cardPaid !== 0) parts.push({ id: 'main:paid', kind: 'note', label: 'Paid to the card', amount: -mm.cardPaid, children: [] })
-    assets.push({
+    // what the bank says beyond what the plan explains, so the parts still add up to the balance
+    if (mm.adjustment !== 0) parts.push({ id: 'main:adjustment', kind: 'note', label: 'Not in the plan', amount: mm.adjustment, children: [] })
+    const open = currentAccountsIn(accounts, month).map((a) => a.id)
+    const line: StatementLine = {
       id: 'main', kind: 'account', label: single?.name ?? (main.accountIds.length > 1 ? 'Current accounts' : 'Main account'), amount: mm.balance, change: mm.balance - mm.start,
-      children: parts, calculated: true, chip: 'calculated', missingRate: main.missingRate || undefined,
-    })
+      children: parts, missingRate: main.missingRate || undefined,
+    }
+    // worked out until the real balances are typed; then it reads like any other entered balance
+    if (mm.entered) Object.assign(line, { entered: true, adjustment: mm.adjustment !== 0 ? mm.adjustment : undefined })
+    else Object.assign(line, { calculated: true, chip: 'calculated' })
+    if (open.length) line.currentAccountIds = open
+    assets.push(line)
   }
 
   for (const acc of accounts) {

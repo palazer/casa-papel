@@ -7,14 +7,27 @@
  *
  * The card term is there because a card purchase counts as spent in the month it is made while the cash only leaves
  * when the bill is paid; until then the money waits in the account and the card shows the same amount as a debt.
- * It is a calculated figure, not a bank balance: nothing re-anchors it to a real one yet. The engine works it out
- * over its whole range (`EngineOutput.main`) and counts it in net worth.
+ * It is a calculated figure until someone says what the bank says: a month in which every current account open in it
+ * has a real balance (`AccountMonth.actualBalance`) takes their sum instead, and later months continue from it. One
+ * account alone cannot anchor the line, because the plan only knows what all of them hold together. The engine works
+ * the series out over its whole range (`EngineOutput.main`) and counts it in net worth.
  */
-import { cardIsItemized, compareMonths, type Account, type Money, type MonthKey, type Row } from '@/model'
+import { cardIsItemized, compareMonths, type Account, type AccountMonth, type Money, type MonthKey, type Row } from '@/model'
 import { convertMoney, type FxIndex } from './fx'
 import { cellKey, type CellResult, type MainAccountSeries, type MonthTotals } from './types'
 
 const CURRENT_TYPES: ReadonlySet<string> = new Set(['checking', 'joint', 'cash'])
+const byOrder = (a: Account, b: Account) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0)
+
+/**
+ * The current, joint and cash accounts that exist in a month, in their own order: opened by then, not archived yet.
+ * These are the accounts whose real balances are asked for, and all of them are needed for the month to count as entered.
+ */
+export function currentAccountsIn(accounts: Account[], month: MonthKey): Account[] {
+  return accounts
+    .filter((a) => !a.deletedAt && CURRENT_TYPES.has(a.type) && compareMonths(a.openingMonth, month) <= 0 && !(a.archivedMonth && compareMonths(month, a.archivedMonth) >= 0))
+    .sort(byOrder)
+}
 
 /**
  * The running balance over `months`, which must begin at the household's first month (or before it) for the balance
@@ -26,11 +39,13 @@ export function mainAccountSeries(input: {
   cells: Record<string, CellResult>
   totals: Record<MonthKey, MonthTotals>
   accounts: Account[]
+  /** Real balances by `<accountId>|<month>`. */
+  actuals: ReadonlyMap<string, AccountMonth>
   fx: FxIndex
   base: string
 }): MainAccountSeries {
-  const { months, rows, cells, totals, accounts, fx, base } = input
-  const current = accounts.filter((a) => CURRENT_TYPES.has(a.type)).sort((a, b) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0))
+  const { months, rows, cells, totals, accounts, actuals, fx, base } = input
+  const current = accounts.filter((a) => CURRENT_TYPES.has(a.type)).sort(byOrder)
   const itemizedCards = new Set(accounts.filter((a) => cardIsItemized(a)).map((a) => a.id))
   const cardRows = rows.filter((r) => r.accountId != null && itemizedCards.has(r.accountId))
 
@@ -56,8 +71,22 @@ export function mainAccountSeries(input: {
       if (row.kind === 'card-payment') cardPaid += c.valueBase
       else if (row.section === 'expense') cardBought += c.valueBase
     }
-    balance = start + kept + cardBought - cardPaid
-    series.months[m] = { start, kept, cardBought, cardPaid, balance }
+    const computed = start + kept + cardBought - cardPaid
+    // the real balances, when every account open this month has one
+    const open = currentAccountsIn(current, m)
+    let real: Money | null = open.length > 0 ? 0 : null
+    for (const acc of open) {
+      const typed = actuals.get(`${acc.id}|${m}`)?.actualBalance
+      if (typed == null) {
+        real = null
+        break
+      }
+      const conv = convertMoney(fx, typed, acc.currency, base, m)
+      if (conv.missingRate) series.missingRate = true
+      real = (real ?? 0) + conv.value
+    }
+    balance = real ?? computed
+    series.months[m] = { start, kept, cardBought, cardPaid, computed, entered: real != null, adjustment: real != null ? real - computed : 0, balance }
   }
   return series
 }

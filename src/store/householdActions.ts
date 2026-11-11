@@ -5,6 +5,7 @@ import {
   ENTITY_TEMPLATES, HOUSEHOLD_TEMPLATES, monthOfDate, newId, poolRef, templateTitle,
   type Account, type Entity, type EntityKind, type Household, type MonthKey, type Pool, type Row, type RowTemplate, type Tables,
 } from '@/model'
+import { currentAccountsIn } from '@/engine'
 import type { Mutation, Store } from './store'
 import { loadTables } from './actions'
 
@@ -55,6 +56,27 @@ export async function setAccountActual(store: Store, accountId: string, month: M
   const existing = tables.accountMonths.find((a) => a.accountId === accountId && a.month === month)
   if (actualBalance == null && (!existing || existing.actualBalance == null)) return
   await store.commit([{ op: 'put', table: 'accountMonths', record: AccountMonthSchema.parse({ ...existing, accountId, month, actualBalance, updatedAt: now() }) }])
+}
+
+/**
+ * The real balances of the current accounts at the end of a month, in each account's own currency: a number for every
+ * current account that exists in that month, or null to go back to the calculated amount. All of them or none, because
+ * the plan only knows what the current accounts hold together. One undoable step.
+ */
+export async function setCurrentBalances(store: Store, month: MonthKey, balances: Record<string, number> | null): Promise<void> {
+  const tables = await loadTables(store)
+  if (tables.monthStates.find((s) => s.month === month)?.closed) throw new Error(`${month} is closed. Reopen it to change a balance.`)
+  const open = currentAccountsIn(tables.accounts, month)
+  if (open.length === 0) throw new Error(`There is no current account in ${month}.`)
+  if (balances && open.some((a) => !Number.isFinite(balances[a.id]))) throw new Error('Fill in every account, or leave them all empty to use the calculated amount.')
+  const mutations: Mutation[] = []
+  for (const acc of open) {
+    const existing = tables.accountMonths.find((a) => a.accountId === acc.id && a.month === month)
+    const actualBalance = balances ? balances[acc.id] : null
+    if ((existing?.actualBalance ?? null) === actualBalance) continue
+    mutations.push({ op: 'put', table: 'accountMonths', record: AccountMonthSchema.parse({ ...existing, accountId: acc.id, month, actualBalance, updatedAt: now() }) })
+  }
+  if (mutations.length) await store.commit(mutations)
 }
 
 // ---------- templates ----------

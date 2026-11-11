@@ -138,6 +138,12 @@ export interface MainAccountMonth {
   cardBought: Money
   /** Paid to an itemized card this month. */
   cardPaid: Money
+  /** What the plan works out for the end of the month: start + kept + bought on the card − paid to it. */
+  computed: Money
+  /** Every current account open this month has a real balance: `balance` is their sum, not `computed`. */
+  entered: boolean
+  /** With `entered`: the real balances together minus `computed`. Zero otherwise. */
+  adjustment: Money
   balance: Money
 }
 
