@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Plus, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { parseAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import { InfoTip } from '@/components/InfoTip'
+import { AddLead } from './AddLead'
 import type { MonthKey, Row } from '@/model'
 import { addSuggestion, dismissSuggestion, type AccountSuggestion, type RowSuggestion } from '@/store'
 
@@ -27,7 +28,7 @@ const DISMISS = 'inline-flex size-6 shrink-0 items-center justify-center rounded
  * household does not have offers that account first (`onNeed`); once it is saved the suggestion takes its amount like
  * the others and links to the account by itself.
  */
-export function SuggestionLines({ suggestions, label, month, currency, locale, onAdded, onError, onNeed }: {
+export function SuggestionLines({ suggestions, label, month, currency, locale, onAdded, onError, onNeed, ticks }: {
   suggestions: RowSuggestion[]
   /** The part of the page they belong to ("Income", "Housing"), for the group's name. */
   label: string
@@ -39,18 +40,20 @@ export function SuggestionLines({ suggestions, label, month, currency, locale, o
   onError: (message: string) => void
   /** Open the form of the account a suggested row needs. */
   onNeed: (type: Need) => void
+  /** The lines above carry ticks, so the "+" stands in the tick's column; otherwise in the arrow's. */
+  ticks: boolean
 }) {
   if (suggestions.length === 0) return null
   return (
     <div className="basis-full space-y-1" role="group" aria-label={`Suggestions for ${label}`} data-testid="suggestions">
-      {suggestions.map((s) => <SuggestionLine key={s.id} suggestion={s} month={month} currency={currency} locale={locale} onAdded={onAdded} onError={onError} onNeed={onNeed} />)}
+      {suggestions.map((s) => <SuggestionLine key={s.id} suggestion={s} month={month} currency={currency} locale={locale} onAdded={onAdded} onError={onError} onNeed={onNeed} ticks={ticks} />)}
     </div>
   )
 }
 
-function SuggestionLine({ suggestion: s, month, currency, locale, onAdded, onError, onNeed }: {
+function SuggestionLine({ suggestion: s, month, currency, locale, onAdded, onError, onNeed, ticks }: {
   suggestion: RowSuggestion; month: MonthKey; currency: string; locale: string
-  onAdded: (row: Row, amount: number | null) => void; onError: (message: string) => void; onNeed: (type: Need) => void
+  onAdded: (row: Row, amount: number | null) => void; onError: (message: string) => void; onNeed: (type: Need) => void; ticks: boolean
 }) {
   const store = useStore()
   const [text, setText] = useState('')
@@ -67,8 +70,8 @@ function SuggestionLine({ suggestion: s, month, currency, locale, onAdded, onErr
 
   return (
     <div className={LINE} data-suggestion={s.id}>
-      <Plus className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-      <span className="min-w-0 truncate font-medium text-muted-foreground">{s.title}</span>
+      <AddLead ticks={ticks} />
+      <span className="min-w-0 truncate font-medium text-muted-foreground" data-lead="text">{s.title}</span>
       <InfoTip help="statement.suggestions" title={s.title} text={s.pool ? `${s.description} The amount is what you set aside each month.` : s.description} />
       {/* the field and its buttons stay together: on a narrow screen they move under the name as one */}
       <span className={CONTROLS}>
@@ -103,8 +106,8 @@ export function AccountSuggestionLines({ suggestions, onAdd, onError }: {
     <div className="basis-full space-y-1" role="group" aria-label="Suggested accounts" data-testid="account-suggestions">
       {suggestions.map((s) => (
         <div key={s.id} className={LINE} data-suggestion={s.id}>
-          <Plus className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-          <span className="min-w-0 truncate font-medium text-muted-foreground">{s.name}</span>
+          <AddLead ticks={false} />
+          <span className="min-w-0 truncate font-medium text-muted-foreground" data-lead="text">{s.name}</span>
           <InfoTip help="statement.suggestions" title={s.name} text={s.description} />
           <span className={CONTROLS}>
             <Button size="xs" variant="outline" aria-label={`Add ${s.name}`} onClick={() => onAdd(s)}>Add</Button>

@@ -332,6 +332,16 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   12 px `UserRound` (`10% 👤`). The Grid names
   the same rule after the row's name the way a follower names its row (`= 10% of income`, `= the rest`) and offers
   `Rule…` in the row menu, which opens the same dialog in the current month (a worked-out cell is not a button there).
+  **Add controls stand on the columns of the lines above them.** A line has columns before its name: the arrow's
+  slot (14 px), then, among rows of an open month, the tick's (24 px, 44 px below `md`), 6 px apart; they are
+  defined once, in `src/features/statement/lead.ts`, for the lines and for everything that is added under them. An
+  add control (a suggestion, `Add row`, `Add account`, `Add a card or loan`) starts with `AddLead`: a 14 px muted
+  `+` in the last of those columns, so the `+` sits under the ticks and the words under the names. Under a group
+  whose lines are categories (Expenses), and in the lower half, nothing is ticked: the `+` stands in the arrow's
+  column and the words under the category or account names. The button that carries a lead has no left padding of
+  its own (`LEAD_BUTTON`); an open `Add row` form takes a line of its own and starts on the names' column
+  (`LEAD_PAD`). Only the first control of a line carries the lead; `Add category`, `Set estimate` and `Add virtual
+  account` follow it as plain ghost buttons. Browser tests measure the columns, at 1440 px and at 390 px.
   **The link symbol.** Money that moves between a row of the month and an account of the lower half is one flow
   with two ends, and both ends say so: two chain rings (`Link2`, 14 px, muted, in a 20 px slot like the rule symbol,
   before it) on a row that fills, takes from or pays off an account, and on that account's or virtual account's

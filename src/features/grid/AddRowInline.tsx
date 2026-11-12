@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from 'react'
+import { useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -6,6 +6,7 @@ import { useStore } from '@/app/store'
 import type { Account, AccountType, Category, Household, MonthKey, Row, Section, Tables } from '@/model'
 import { addRow, addRowOfKind, payOffKind, rowNameFor, rowTargets, type AccountRowInput, type ExpenseRowKind, type TransferRowKind } from '@/store'
 import { NativeSelect } from '@/components/NativeSelect'
+import { cn } from '@/lib/utils'
 import { HouseholdAccountDialog } from '@/features/household/HouseholdAccountDialog'
 import { PoolDialog } from '@/features/household/PoolsCard'
 
@@ -86,14 +87,21 @@ const newValue = (n: New) => `new:${n.type}`
  * A row that names an account never dead-ends on a missing one: the list of accounts ends with "New loan…" (or the
  * type that fits), and Add then opens the account's form, which makes the account and the row in one step. Such a row
  * may also be left without a name; it is called after its account.
+ *
+ * On the Statement the control stands on the rows' own columns: `lead` takes the place of the button's "+" (it carries
+ * the columns a row has before its name), and `formClassName` starts the open form on the names' column.
  */
-export function AddRowInline({ section, categories, tables, household, onError, defaultCategoryId = '', label, onAdded, only, without, place, month }: {
+export function AddRowInline({ section, categories, tables, household, onError, defaultCategoryId = '', label, onAdded, only, without, place, month, lead, leadClassName, formClassName }: {
   section: Section; categories: Category[]; tables: Tables; household: Household; onError: (msg: string) => void
   defaultCategoryId?: string; label?: string; onAdded?: (row: Row) => void
   only?: Choice[]; without?: Choice[]
   place?: 'set-aside'
   /** The month a new virtual account's monthly amount starts in; this month when left out. */
   month?: MonthKey
+  lead?: ReactNode
+  /** The button's classes when it carries a `lead`: its gap, and no padding of its own before the lead. */
+  leadClassName?: string
+  formClassName?: string
 }) {
   const store = useStore()
   const [open, setOpen] = useState(false)
@@ -172,8 +180,8 @@ export function AddRowInline({ section, categories, tables, household, onError, 
 
   if (!open) {
     return (
-      <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setOpen(true)} aria-label={label ?? `Add ${section} row`}>
-        <Plus /> {label ?? 'Add row'}
+      <Button variant="ghost" size="sm" className={cn('text-muted-foreground', lead && leadClassName)} onClick={() => setOpen(true)} aria-label={label ?? `Add ${section} row`}>
+        {lead ?? <Plus />} <span data-lead={lead ? 'text' : undefined}>{label ?? 'Add row'}</span>
       </Button>
     )
   }
@@ -208,7 +216,7 @@ export function AddRowInline({ section, categories, tables, household, onError, 
     </NativeSelect>
   )
   return (
-    <div className="flex flex-wrap items-center gap-1">
+    <div className={cn('flex flex-wrap items-center gap-1', formClassName)} data-testid="add-row-form">
       {place === 'set-aside' ? (
         <>
           {/* the question comes first here: the answer decides which account the row is linked to */}

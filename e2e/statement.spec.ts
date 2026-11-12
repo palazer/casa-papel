@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 
 async function openStatement(page: Page) {
   await page.goto('?demo=1')
@@ -17,6 +17,10 @@ async function goToMonth(page: Page, name: string) {
 }
 
 const total = (page: Page, side: 'in' | 'out' | 'assets' | 'claims') => page.getByTestId(`total-${side}`)
+
+/** Where something starts, and where its middle is, across the page: for things that must share a column. */
+const leftOf = async (l: Locator) => (await l.boundingBox())!.x
+const middleOf = async (l: Locator) => { const b = (await l.boundingBox())!; return b.x + b.width / 2 }
 
 test.describe('the Statement', () => {
   test.use({ viewport: { width: 1440, height: 900 } })
@@ -816,7 +820,7 @@ test.describe('working the month in the Statement', () => {
     await page.screenshot({ path: 'e2e/output/statement-accounts.png', fullPage: true })
   })
 
-  test('suggested rows are offered where they will appear: one is added with its amount, one is dismissed and waits behind "More suggestions"', async ({ page }) => {
+  test('suggested rows are offered where they will appear: one is added with its amount, one is dismissed and leaves the page', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'November 2026')
     const moneyIn = page.getByRole('region', { name: 'Money in' })
@@ -846,6 +850,40 @@ test.describe('working the month in the Statement', () => {
     // the accounts every household has are there already
     await expect(page.getByTestId('account-suggestions')).toHaveCount(0)
     await page.screenshot({ path: 'e2e/output/statement-suggestions.png', fullPage: true })
+
+    // add controls stand on the rows' own columns: the "+" where a row's tick is, the words where its name is
+    const tick = moneyOut.getByRole('checkbox', { name: 'Public transport done' })
+    const name = moneyOut.getByRole('button', { name: /^Public transport:/ })
+    const suggested = transport.locator('[data-suggestion]').first()
+    const addRow = moneyOut.getByRole('button', { name: 'Add row to Transport' })
+    expect(await middleOf(suggested.locator('[data-lead="plus"]'))).toBeCloseTo(await middleOf(tick), 0)
+    expect(await leftOf(suggested.locator('[data-lead="text"]'))).toBeCloseTo(await leftOf(name), 0)
+    expect(await middleOf(addRow.locator('[data-lead="plus"]'))).toBeCloseTo(await middleOf(tick), 0)
+    expect(await leftOf(addRow.locator('[data-lead="text"]'))).toBeCloseTo(await leftOf(name), 0)
+    // the open form starts on the names' column too
+    await addRow.click()
+    expect(await leftOf(moneyOut.getByLabel('New expense row name'))).toBeCloseTo(await leftOf(name), 0)
+    await moneyOut.getByLabel('New expense row name').press('Escape')
+    // a group's own rows and its controls: Income
+    const salaryTick = moneyIn.getByRole('checkbox', { name: 'Sam – Salary done' })
+    const salary = moneyIn.getByRole('button', { name: /^Sam – Salary:/ })
+    const addIncome = moneyIn.getByRole('button', { name: 'Add income row' })
+    expect(await middleOf(addIncome.locator('[data-lead="plus"]'))).toBeCloseTo(await middleOf(salaryTick), 0)
+    expect(await leftOf(addIncome.locator('[data-lead="text"]'))).toBeCloseTo(await leftOf(salary), 0)
+    expect(await leftOf(group('Income').locator('[data-lead="text"]').first())).toBeCloseTo(await leftOf(salary), 0)
+    // under Expenses the lines are categories, which have an arrow and no tick: its controls keep to those columns
+    const housing = moneyOut.getByRole('button', { name: 'Housing', exact: true })
+    const addExpense = moneyOut.getByRole('button', { name: 'Add expense row' })
+    expect(await middleOf(addExpense.locator('[data-lead="plus"]'))).toBeCloseTo(await middleOf(housing.locator('svg')), 0)
+    expect(await leftOf(addExpense.locator('[data-lead="text"]'))).toBeCloseTo(await leftOf(housing.getByText('Housing', { exact: true })), 0)
+    expect(await leftOf(group('Expenses').locator('[data-lead="text"]').first())).toBeCloseTo(await leftOf(housing.getByText('Housing', { exact: true })), 0)
+    // the lower half has no ticks: the "+" stands in the arrow's column and the words under the account names
+    const assetsSide = page.getByRole('region', { name: 'Assets' })
+    const fundName = assetsSide.locator('[data-line^="acc:"]').filter({ hasText: 'Index fund' }).getByText('Index fund', { exact: true })
+    const addAccount = assetsSide.getByRole('button', { name: 'Add account' })
+    expect(await leftOf(addAccount.locator('[data-lead="text"]'))).toBeCloseTo(await leftOf(fundName), 0)
+    const cardName = page.getByRole('region', { name: 'Debts and net worth' }).locator('[data-line^="acc:"]').filter({ hasText: 'Credit card' }).getByText('Credit card', { exact: true })
+    expect(await leftOf(page.getByRole('button', { name: 'Add a card or loan' }).locator('[data-lead="text"]'))).toBeCloseTo(await leftOf(cardName), 0)
 
     // an amount that cannot be read stays on its line
     await transport.getByLabel('Amount per month for The car – Fuel & parking').fill('abc')
@@ -1417,6 +1455,13 @@ test.describe('the Statement on a phone', () => {
     await dlg.getByRole('button', { name: 'Cancel' }).tap()
     const payment = moneyOut.locator('[data-line]').filter({ hasText: 'Car loan – Payment' })
     await expect(payment).toBeVisible()
+
+    // on a phone the tick is finger-sized, and the add controls keep to its column and to the names'
+    const tick = moneyOut.getByRole('checkbox', { name: 'To investments done' })
+    const name = moneyOut.getByRole('button', { name: /^To investments:/ })
+    const addRow = moneyOut.getByRole('button', { name: 'Add transfer row' })
+    expect(await middleOf(addRow.locator('[data-lead="plus"]'))).toBeCloseTo(await middleOf(tick), 0)
+    expect(await leftOf(addRow.locator('[data-lead="text"]'))).toBeCloseTo(await leftOf(name), 0)
 
     // the link symbol is finger-sized, and a tap takes the page to the loan
     const link = moneyOut.getByRole('button', { name: 'Pays off Car loan: go there' })

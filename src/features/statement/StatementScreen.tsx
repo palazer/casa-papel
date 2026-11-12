@@ -37,6 +37,9 @@ import { StatementBand } from './StatementBand'
 import { AccountSuggestionLines, SuggestionLines } from './SuggestionLines'
 import { TopUpDialog } from './TopUpDialog'
 import { LINE_MENU, type LineContext } from './StatementLine'
+import { AddLead } from './AddLead'
+import { LEAD_BUTTON, LEAD_PAD } from './lead'
+import { cn } from '@/lib/utils'
 
 const walk = (lines: StatementLine[]): StatementLine[] => lines.flatMap((l) => [l, ...walk(l.children)])
 /** The ids of the lines a line sits under, outermost first; null when the line is not there. */
@@ -224,10 +227,16 @@ export function StatementScreen() {
     setOpenLines((s) => ({ ...s, [row.kind === 'pocket-money' ? 'pocket' : `cat:${row.section}:${row.categoryId ?? 'none'}`]: true }))
     if (isPocketRow(row) && !(amount != null && amount > 0) && !statement!.closed) setEditor({ rowId: row.id })
   }
+  /**
+   * Whether the lines an add control stands under carry ticks: the rows of an open month do. Under a group whose
+   * lines are categories nothing is ticked, so its controls stand on the categories' columns instead.
+   */
+  const tickedUnder = (line: StatementLine) => !statement!.closed && !line.children.some((c) => c.kind === 'category')
   const suggested = (line: StatementLine) => (showing && m
     ? (
       <SuggestionLines
         suggestions={suggestions.get(line.id) ?? []} label={line.label} month={m} currency={household!.baseCurrency} locale={household!.locale} onAdded={onSuggested} onError={setError}
+        ticks={tickedUnder(line)}
         // the account a suggested row needs is made first; the suggestion is the row, so the account brings none
         onNeed={(type) => setAccountNew({ type, types: [type], payOff: false })}
       />
@@ -276,26 +285,28 @@ export function StatementScreen() {
   }
   const categoriesOf = (section: Section) => tables!.categories.filter((c) => !c.deletedAt && c.section === section)
   // a payment row shows under "Set aside, pay off" whichever section it lives in, so that is where one is added
-  const addRow = (section: Section, over: Pick<ComponentProps<typeof AddRowInline>, 'label' | 'defaultCategoryId' | 'only' | 'place'> = {}) => (
+  const addRow = (line: StatementLine, section: Section, over: Pick<ComponentProps<typeof AddRowInline>, 'label' | 'defaultCategoryId' | 'only' | 'place'> = {}) => (
     <AddRowInline
       section={section} categories={categoriesOf(section)} tables={tables!} household={household!} onError={setError} onAdded={onAdded}
-      without={section === 'expense' ? ['pay-off'] : undefined} month={statement!.closed ? undefined : m} {...over}
+      without={section === 'expense' ? ['pay-off'] : undefined} month={statement!.closed ? undefined : m}
+      // on the columns of the lines above it: the "+" where their tick is (or their arrow), the words where their names are
+      lead={<AddLead ticks={tickedUnder(line)} />} leadClassName={LEAD_BUTTON} formClassName={cn('min-w-0 basis-full', LEAD_PAD[tickedUnder(line) ? 'ticks' : 'plain'])} {...over}
     />
   )
   /** Things are added where they will appear: at the foot of a group, and inside a category for a row of that category. */
   function footer(line: StatementLine): ReactNode {
-    if (line.id === 'income') return <>{suggested(line)}{addRow('income')}<AddCategoryInline section="income" onError={setError} /></>
-    if (line.id === 'expenses') return <>{suggested(line)}{addRow('expense')}<AddCategoryInline section="expense" onError={setError} estimate={statement!.closed ? undefined : { month: m, currency: ccy, locale }} /></>
+    if (line.id === 'income') return <>{suggested(line)}{addRow(line, 'income')}<AddCategoryInline section="income" onError={setError} /></>
+    if (line.id === 'expenses') return <>{suggested(line)}{addRow(line, 'expense')}<AddCategoryInline section="expense" onError={setError} estimate={statement!.closed ? undefined : { month: m, currency: ccy, locale }} /></>
     // what the row is for is asked first; money taken out of an account has a section of its own on the left
-    if (line.id === 'set-aside') return <>{suggested(line)}{addRow('transfer', { place: 'set-aside' })}</>
-    if (line.id === 'from-accounts') return addRow('transfer', { only: ['from-savings', 'from-investment'] })
+    if (line.id === 'set-aside') return <>{suggested(line)}{addRow(line, 'transfer', { place: 'set-aside' })}</>
+    if (line.id === 'from-accounts') return addRow(line, 'transfer', { only: ['from-savings', 'from-investment'] })
     if (line.kind === 'category' && line.id.startsWith('cat:')) {
       const [, section, categoryId] = line.id.split(':')
-      if (categoryId === 'none') return addRow(section as Section, { label: 'Add row without a category' })
+      if (categoryId === 'none') return addRow(line, section as Section, { label: 'Add row without a category' })
       return (
         <>
           {suggested(line)}
-          {addRow(section as Section, { label: `Add row to ${line.label}`, defaultCategoryId: categoryId })}
+          {addRow(line, section as Section, { label: `Add row to ${line.label}`, defaultCategoryId: categoryId })}
           {section === 'expense' && !statement!.closed && (
             <Button variant="ghost" size="sm" className="text-muted-foreground" aria-label={`${line.budget != null ? 'Change' : 'Set'} estimate for ${line.label}`} onClick={() => setEstimateFor(categoryId)}>
               {line.budget != null ? 'Change estimate' : 'Set estimate'}
@@ -374,7 +385,7 @@ export function StatementScreen() {
   const estimateRest = estimateLine?.children.find((l) => l.estimateFor != null)?.amount ?? 0
   // a card or a loan is added under Debts; while the household owes nothing, at the foot of that side
   const hasDebts = statement.position.right.lines.some((l) => l.id === 'debts')
-  const debtsFoot = <Button variant="ghost" size="sm" className={ADD} onClick={() => setAccountNew({ types: DEBT_TYPES })}><Plus /> Add a card or loan</Button>
+  const debtsFoot = <Button variant="ghost" size="sm" className={cn(ADD, LEAD_BUTTON)} onClick={() => setAccountNew({ types: DEBT_TYPES })}><AddLead ticks={false} /> <span data-lead="text">Add a card or loan</span></Button>
   const positionCtx: LineContext = { ...base, withChange: true, onGoal, onBalance: setBalanceFor, onCurrentBalance: () => setCurrentBalance(true), footer: (line) => (line.id === 'debts' ? debtsFoot : null), menu: lineMenu }
   const day = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${lastDayOfMonth(m)}T00:00:00Z`))
   const foldable = walk([...statement.flow.left.lines, ...statement.flow.right.lines, ...statement.position.left.lines, ...statement.position.right.lines])
@@ -386,7 +397,7 @@ export function StatementScreen() {
   const assetsFoot = (
     <>
       {showing && <AccountSuggestionLines suggestions={accountSuggestions(tables)} onAdd={(s) => setAccountNew({ name: s.name, type: s.type, types: ASSET_TYPES })} onError={setError} />}
-      <Button variant="ghost" size="sm" className={ADD} onClick={() => setAccountNew({ types: ASSET_TYPES })}><Plus /> Add account</Button>
+      <Button variant="ghost" size="sm" className={cn(ADD, LEAD_BUTTON)} onClick={() => setAccountNew({ types: ASSET_TYPES })}><AddLead ticks={false} /> <span data-lead="text">Add account</span></Button>
       {savingsAccounts.length > 0 && <Button variant="ghost" size="sm" className={ADD} onClick={() => setPoolNew(true)}><Plus /> Add virtual account</Button>}
     </>
   )

@@ -10,6 +10,7 @@ import { formatAmount, formatPercent, formatShare } from '@/app/format'
 import type { HelpKey } from '@/app/help'
 import { HUES, type Hue } from '@/app/hues'
 import type { GoalProgress, StatementHue, StatementLine as Line } from '@/engine'
+import { CHEVRON_SLOT, TICK_GAP, TICK_SLOT } from './lead'
 
 /** What every line of a side needs to draw itself. The working parts are optional: a side without them is read-only. */
 export interface LineContext {
@@ -79,10 +80,6 @@ export const LINE_MENU = 'size-5 opacity-0 group-hover/line:opacity-100 focus:op
 const ROW = 'flex min-h-11 items-center gap-1.5 pr-2 text-sm md:min-h-7 md:text-xs'
 /** The name with its tags: one line where there is room, the tags on a second line where there is not. */
 const LABEL = 'flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5 py-1'
-const CHEVRON_SLOT = 'flex w-3.5 shrink-0 items-center justify-center self-stretch'
-const TICK_SLOT = 'size-11 shrink-0 md:size-6'
-/** As wide as the tick, with no height of its own: the place a tick would take on a line that has none. */
-const TICK_GAP = 'w-11 shrink-0 md:w-6'
 /** A control on a line whose own button covers the whole line: it stays above that button. */
 const ABOVE = 'relative z-10'
 /** The line the page has just moved to from a link symbol (DESIGN.md §7): the focus ring's colour, never the lime. */
