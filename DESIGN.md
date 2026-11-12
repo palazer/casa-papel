@@ -382,25 +382,30 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   off otherwise, disabled in a closed month) shows the rows a household like this one usually has, where they will
   appear: above the add controls of Income, Expenses and Set aside, pay off, and inside the category a row belongs
   to. A category with a usual suggestion opens by itself. A suggestion is not a row, so it is drawn as an add
-  control, not as a line: a muted `+`, the row's name in muted medium weight, its one-sentence description in muted
-  `text-[11px]`, then a 28 px amount field (`per month`, named `Amount per month for <row>`), an `xs outline` `Add`
-  and a ghost `×` named `Dismiss <row>`. Enter in the field adds the row with that amount from the month on screen
-  on; `Add` with the field empty adds it without one; no dialog opens. An amount that cannot be read shows its error
-  under the line and disables `Add`. A suggestion that needs an account the household does not have shows an `xs
-  outline` button that makes it (`Add a loan…`, `Add a savings account…`, `Add an investment account…`) in place of
-  the field and the button; once the account is saved the suggestion takes its amount like the others and its row
-  links to the account by itself. Under the usual ones a dotted-underlined link
-  `More suggestions (n)` opens the rarer and the dismissed ones, which have no `×`. Each block is a group named
-  `Suggestions for <part>`. Under Assets the same line offers an account most households have (`Main account`,
-  `Savings`); its `Add` opens the account dialog with the name and type filled in.
+  control, not as a line: a muted `+`, the row's name in muted medium weight, an (i) that holds its one-sentence
+  description (the `InfoTip` titled with the row's name), then a 28 px amount field (`per month`, named `Amount per
+  month for <row>`), an `xs outline` `Add` and a ghost `×` named `Dismiss <row>`. The sentence is not printed on the
+  line: a new household sees dozens of these at once, and an overview stays readable only while each line is a name
+  and its controls (the rule of §8 holds for forms and dialogs, where the explanation stays in place). Enter in the
+  field adds the row with that amount from the month on screen on; `Add` with the field empty adds it without one;
+  no dialog opens. An amount that cannot be read shows its error under the line and disables `Add`. A suggestion
+  that needs an account the household does not have shows an `xs outline` button that makes it (`Add a loan…`,
+  `Add a savings account…`, `Add an investment account…`) in place of the field and the button; once the account is
+  saved the suggestion takes its amount like the others and its row links to the account by itself. Every
+  suggestion of a place is listed, the usual ones first; there is no "more" link. `×` takes a suggestion off the
+  page for good (the undo arrow brings it back, and `Add row` can still make that row by hand). Each block is a
+  group named `Suggestions for <part>`. Under Assets the same line offers an account most households have (`Main
+  account`, `Savings`), its description behind the same (i); its `Add` opens the account dialog with the name and
+  type filled in.
   **The setup strip.** While a household is new (`Household.setupOpen`), a dense island "Setting up" with an (i)
   sits between the toolbar and the month. It holds the parts of the page as pills in the order a household is
   filled: `Income`, `Accounts`, `Expenses`, `Where the rest goes`, `Goals (optional)`. A pill is a rounded-full
   outline button with a 14 px mark: an empty circle while its part is empty (the label in medium weight), a check in
   the income hue once it has something in it (the label muted). Pressing one goes to its part with the cursor in the
   first field; `Where the rest goes` opens the dialog of the row that takes the rest (for a savings account that has
-  none yet, the short rule dialog on `The rest`), or the account dialog while there is no savings account. Two muted sentences follow: what to do next (the first open step), and which month is being
-  filled. `Done` (`xs outline`, at the end of the title row) hides the strip for good and turns the suggestions
+  none yet, the short rule dialog on `The rest`), or the account dialog while there is no savings account. The strip
+  shows its pills and nothing else: what to do next (the first open step) and which month is being filled are the
+  words of its (i) (`Island`'s `helpText`). `Done` (`xs outline`, at the end of the title row) hides the strip for good and turns the suggestions
   off; the page works the same without it. The Statement opens on the household's first month while the strip shows.
   **Category estimates.** An expense category can carry an estimate: what it should come to in a month, typed before
   its rows are known. The category line then reads `estimate €1,450.00` in muted `text-[11px]` after its name, and

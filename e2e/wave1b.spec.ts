@@ -42,8 +42,17 @@ test.describe('wave 1b', () => {
     const claims = page.getByRole('region', { name: 'Debts and net worth' })
     const dlg = page.getByRole('dialog')
     for (const name of ['Income', 'Accounts', 'Expenses', 'Where the rest goes', 'Goals']) await expect(step(name)).toHaveAttribute('data-done', 'false')
-    await expect(strip).toContainText('You are filling in November 2026, the first month.')
-    await expect(strip).toContainText('Start with what comes in')
+    // the strip is its steps; what to do next and which month is being filled in are behind its (i)
+    const stripSays = async (text: string) => {
+      await strip.getByRole('button', { name: 'About Setting up' }).hover()
+      await expect(page.getByText(text)).toBeVisible()
+      await page.keyboard.press('Escape')
+      await page.mouse.move(0, 0)
+      await expect(page.getByText(text)).toBeHidden()
+    }
+    await expect(strip.locator('p')).toHaveCount(0)
+    await stripSays('Start with what comes in')
+    await stripSays('You are filling in November 2026, the first month.')
     await expect(page.getByRole('button', { name: 'Suggestions', exact: true })).toHaveAttribute('aria-pressed', 'true')
     await expect(page.getByTestId('total-in')).toHaveText('Total in€0.00')
     await expect(page.getByTestId('total-out')).toHaveText('Total out€0.00')
@@ -51,7 +60,8 @@ test.describe('wave 1b', () => {
 
     // income: the step goes to its part with the cursor in the first amount; Enter adds the row
     const income = group('Income')
-    await expect(income.locator('[data-suggestion]')).toHaveText([/^Ana – Salary/, /^Ben – Salary/, /^Cal – Child benefit/, /^Other income/])
+    await expect(income.locator('[data-suggestion]')).toHaveText([/^Ana – Salary/, /^Ben – Salary/, /^Cal – Child benefit/, /^Other income/, /^Ana – Extra income/, /^Ben – Extra income/])
+    await expect(page.getByRole('button', { name: /suggestions \(/ })).toHaveCount(0)
     await step('Income').click()
     await expect(income.getByLabel('Amount per month for Ana – Salary')).toBeFocused()
     await income.getByLabel('Amount per month for Ana – Salary').fill('3000')
@@ -60,10 +70,11 @@ test.describe('wave 1b', () => {
     await income.getByRole('button', { name: 'Add Ben – Salary' }).click()
     await expect(page.getByTestId('total-in')).toHaveText('Total in€5,500.00')
     await expect(step('Income')).toHaveAttribute('data-done', 'true')
-    await expect(strip).toContainText('Next, the accounts')
-    // not for us: it waits behind "More suggestions" with the two rarer ones
+    await stripSays('Next, the accounts')
+    // not for us: the line leaves the page, and the two rarer ones stay listed
     await income.getByRole('button', { name: 'Dismiss Other income' }).click()
-    await expect(income.getByRole('button', { name: 'More suggestions (3)' })).toBeVisible()
+    await expect(income.locator('[data-suggestion]')).toHaveCount(3)
+    await expect(income.locator('[data-suggestion]').filter({ hasText: 'Other income' })).toHaveCount(0)
     // nothing takes the rest yet, so the month shows what is left over
     await expect(moneyOut.locator('[data-line]').filter({ hasText: 'Leftover' })).toContainText('€5,500.00')
 
@@ -109,7 +120,9 @@ test.describe('wave 1b', () => {
 
     // expenses: each category offers its usual rows; the rest follows every amount
     const housing = group('Housing')
-    await expect(housing.locator('[data-suggestion]')).toHaveText([/^The flat – Rent or mortgage/, /^The flat – Utilities/])
+    await expect(housing.locator('[data-suggestion]')).toHaveCount(5)
+    await expect(housing.locator('[data-suggestion]').nth(0)).toHaveText(/^The flat – Rent or mortgage/)
+    await expect(housing.locator('[data-suggestion]').nth(1)).toHaveText(/^The flat – Utilities/)
     await housing.getByLabel('Amount per month for The flat – Rent or mortgage').fill('1400')
     await housing.getByLabel('Amount per month for The flat – Rent or mortgage').press('Enter')
     await expect(moneyOut.getByRole('button', { name: /^The flat – Rent or mortgage: €1,400\.00/ })).toBeVisible()
@@ -129,7 +142,7 @@ test.describe('wave 1b', () => {
     await expect(moneyOut.getByRole('button', { name: 'To Savings: €3,600.00' })).toBeVisible()
     await expect(page.getByTestId('total-in')).toHaveText('Total in€5,500.00')
     await expect(page.getByTestId('total-out')).toHaveText('Total out€5,500.00')
-    await expect(strip).toContainText('Everything a month needs is there.')
+    await stripSays('Everything a month needs is there.')
     await page.screenshot({ path: 'e2e/output/setup-statement.png', fullPage: true })
     await page.setViewportSize({ width: 390, height: 844 })
     await page.screenshot({ path: 'e2e/output/setup-statement-phone.png', fullPage: true })

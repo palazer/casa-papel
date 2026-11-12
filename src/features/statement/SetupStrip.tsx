@@ -4,7 +4,7 @@ import { Island } from '@/components/ui/island'
 import { cn } from '@/lib/utils'
 import type { SetupStep, SetupStepKey } from '@/store'
 
-/** What to do next, said once under the steps: the first step that is still open, in the order a household is filled. */
+/** What to do next, said behind the strip's (i): the first step that is still open, in the order a household is filled. */
 const NEXT: Record<SetupStepKey, string> = {
   income: 'Start with what comes in: under Income, type the monthly amount on a suggested line and press Enter, or use "Add row" for your own.',
   accounts: 'Next, the accounts: under Assets add each one with what it holds, and under Debts a card or a loan with what is owed.',
@@ -16,7 +16,8 @@ const NEXT: Record<SetupStepKey, string> = {
 /**
  * The setup strip (DESIGN.md §7): shown on the Statement while a household is new. It lists the parts of the page a
  * household fills, ticks each one once it has something in it, and jumps to a part when its step is pressed. It
- * changes nothing itself; "Done" hides it for good.
+ * changes nothing itself; "Done" hides it for good. The strip shows its steps and nothing else: what to do next, and
+ * which month is being filled in, are behind its (i).
  */
 export function SetupStrip({ steps, monthName, first, noSavings, onStep, onDone }: {
   steps: SetupStep[]
@@ -30,9 +31,11 @@ export function SetupStrip({ steps, monthName, first, noSavings, onStep, onDone 
   onDone: () => void
 }) {
   const next = steps.find((s) => !s.done && !s.optional)?.key ?? 'goals'
+  const hint = next === 'rest' && noSavings ? 'Last, where the rest of each month goes: add a savings account under Assets, and it is asked right away.' : NEXT[next]
   return (
     <Island
-      title="Setting up" help="statement.setup" aria-label="Setting up" data-testid="setup-strip" bodyClassName="space-y-1.5"
+      title="Setting up" help="statement.setup" aria-label="Setting up" data-testid="setup-strip"
+      helpText={`${hint} You are filling in ${monthName}${first ? ', the first month' : ''}. Amounts carry forward to the months after it.`}
       right={<Button size="xs" variant="outline" onClick={onDone}>Done</Button>}
     >
       <ol className="flex flex-wrap items-center gap-1">
@@ -52,10 +55,6 @@ export function SetupStrip({ steps, monthName, first, noSavings, onStep, onDone 
           </li>
         ))}
       </ol>
-      <p className="text-xs text-muted-foreground">
-        {next === 'rest' && noSavings ? 'Last, where the rest of each month goes: add a savings account under Assets, and it is asked right away.' : NEXT[next]}
-      </p>
-      <p className="text-xs text-muted-foreground">You are filling in {monthName}{first ? ', the first month' : ''}. Amounts carry forward to the months after it.</p>
     </Island>
   )
 }

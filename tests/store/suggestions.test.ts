@@ -3,7 +3,7 @@ import { cellKey, computeEngine } from '@/engine'
 import { monthRange, newId } from '@/model'
 import {
   CasaDb, Store, accountSuggestions, addAccount, addEntity, addGoal, addRow, addSuggestion, applyTemplates, closeMonth, createHouseholdFromSetup,
-  dismissSuggestion, loadTables, removeThing, rowSuggestions, setRule, setupSteps, suggestionId, updateRow,
+  dismissSuggestion, loadTables, removeThing, rowSuggestions, setRule, setupSteps, shownRowSuggestions, suggestionId, updateRow,
 } from '@/store'
 
 /** What the first screen makes: the household, its people and things, the usual categories. No accounts, no rows. */
@@ -85,13 +85,18 @@ describe('suggestions for setting up on the Statement', () => {
     expect(titles(rowSuggestions(await loadTables(store)))).toContain('Other')
   })
 
-  it('a dismissed suggestion waits behind "More suggestions" and can still be added', async () => {
+  it('a dismissed suggestion is left out of what the Statement lists, usual rows first, and can still be added', async () => {
     const store = await fresh()
     await dismissSuggestion(store, 'household:h.groceries')
     await dismissSuggestion(store, 'household:h.groceries')
     let t = await loadTables(store)
     expect(t.household[0].dismissedSuggestions).toEqual(['household:h.groceries'])
     expect(rowSuggestions(t).find((s) => s.title === 'Groceries')).toMatchObject({ usual: false, dismissed: true })
+    const shown = shownRowSuggestions(t)
+    expect(shown.some((s) => s.title === 'Groceries')).toBe(false)
+    expect(shown.length).toBe(rowSuggestions(t).length - 1)
+    // every usual row comes before the first rarer one
+    expect(shown.map((s) => s.usual).join('')).toMatch(/^(true)*(false)*$/)
     const row = await addSuggestion(store, 'household:h.groceries', { amount: 600_00 })
     expect(row.name).toBe('Groceries')
     await dismissSuggestion(store, 'account:checking')

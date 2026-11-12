@@ -830,14 +830,19 @@ test.describe('working the month in the Statement', () => {
     await toggle.click()
     await expect(toggle).toHaveAttribute('aria-pressed', 'true')
 
-    // a category with something usual to offer opens by itself; each line says what the row is for
+    // a category with something usual to offer opens by itself and lists everything it has, the usual rows first
     const transport = group('Transport')
-    await expect(transport.locator('[data-suggestion]')).toHaveText([/^The car – Fuel & parking/, /^Transport/])
-    await expect(transport).toContainText('Fuel or charging, parking, tolls.')
-    await expect(transport.getByRole('button', { name: 'More suggestions (2)' })).toBeVisible()
+    await expect(transport.locator('[data-suggestion]')).toHaveText([/^The car – Fuel & parking/, /^Transport/, /^The car – Tax & inspection/, /^The car – Maintenance/])
+    await expect(page.getByRole('button', { name: /suggestions \(/ })).toHaveCount(0)
+    // a line is its name, the amount and the buttons; what the row is for is behind its (i)
+    await expect(transport).not.toContainText('Fuel or charging, parking, tolls.')
+    await transport.getByRole('button', { name: 'About The car – Fuel & parking' }).hover()
+    await expect(page.getByText('Fuel or charging, parking, tolls.')).toBeVisible()
+    await page.keyboard.press('Escape')
+    await page.mouse.move(0, 0)
     // the demo already has its salaries, so Income only has the rarer ones to offer
-    await expect(group('Income').locator('[data-suggestion]')).toHaveCount(0)
-    await expect(moneyIn.getByRole('button', { name: 'More suggestions (2)' })).toBeVisible()
+    await expect(group('Income').locator('[data-suggestion]')).toHaveCount(2)
+    await expect(moneyIn.getByRole('button', { name: /^Dismiss / })).toHaveCount(2)
     // the accounts every household has are there already
     await expect(page.getByTestId('account-suggestions')).toHaveCount(0)
     await page.screenshot({ path: 'e2e/output/statement-suggestions.png', fullPage: true })
@@ -851,24 +856,23 @@ test.describe('working the month in the Statement', () => {
     await transport.getByLabel('Amount per month for The car – Fuel & parking').fill('90')
     await transport.getByLabel('Amount per month for The car – Fuel & parking').press('Enter')
     await expect(moneyOut.getByRole('button', { name: /^The car – Fuel & parking: €90\.00/ })).toBeVisible()
-    await expect(transport.locator('[data-suggestion]')).toHaveText([/^Transport/])
+    await expect(transport.locator('[data-suggestion]')).toHaveText([/^Transport/, /^The car – Tax & inspection/, /^The car – Maintenance/])
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await page.getByRole('button', { name: 'Next month' }).click()
     await expect(moneyOut.getByRole('button', { name: /^The car – Fuel & parking: €90\.00/ })).toBeVisible()
     await page.getByRole('button', { name: 'Previous month' }).click()
 
-    // "×": not for us. It waits behind "More suggestions" with the rarer ones, and can still be added from there
+    // "×": not for us. The line is gone from the page; the undo arrow brings it back
+    await expect(transport.getByRole('button', { name: /^Dismiss / })).toHaveCount(3)
     await transport.getByRole('button', { name: 'Dismiss Transport' }).click()
-    await expect(transport.locator('[data-suggestion]')).toHaveCount(0)
-    await transport.getByRole('button', { name: 'More suggestions (3)' }).click()
-    await expect(transport.locator('[data-suggestion]')).toHaveText([/^The car – Tax & inspection/, /^The car – Maintenance/, /^Transport/])
-    await expect(transport.getByRole('button', { name: /^Dismiss / })).toHaveCount(0)
+    await expect(transport.locator('[data-suggestion]')).toHaveText([/^The car – Tax & inspection/, /^The car – Maintenance/])
+    await page.getByRole('button', { name: 'Undo' }).click()
+    await expect(transport.locator('[data-suggestion]')).toHaveText([/^Transport/, /^The car – Tax & inspection/, /^The car – Maintenance/])
     await transport.getByRole('button', { name: 'Add Transport', exact: true }).click()
     await expect(moneyOut.getByRole('button', { name: /^Transport: / })).toBeVisible()
 
     // one that needs an account the household does not have offers that account first
     const setAside = group('Set aside, pay off')
-    await setAside.getByRole('button', { name: 'More suggestions (2)' }).click()
     const loan = setAside.locator('[data-suggestion$=":v.loan"]')
     await expect(loan.getByLabel(/^Amount per month/)).toHaveCount(0)
     await expect(loan.getByRole('button', { name: 'Add a loan for The car – Loan or lease' })).toHaveText('Add a loan…')
@@ -887,7 +891,6 @@ test.describe('working the month in the Statement', () => {
 
     // the loan is made from the suggestion that needs it: the suggestion is the row, so the loan's form offers none
     await toggle.click()
-    await setAside.getByRole('button', { name: /^More suggestions/ }).click()
     await loan.getByRole('button', { name: 'Add a loan for The car – Loan or lease' }).click()
     const dlg = page.getByRole('dialog')
     await expect(dlg.getByLabel('Type').locator('option')).toHaveText(['Loan'])

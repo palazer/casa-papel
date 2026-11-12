@@ -15,7 +15,7 @@ import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useE
 import { useStoreVersion } from '@/app/useStoreVersion'
 import { buildStatement, cellKey, currentAccountsIn, type GoalProgress, type StatementLine } from '@/engine'
 import { isPocketRow, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type MonthKey, type Row, type Section } from '@/model'
-import { accountSuggestions, addPayOffRow, addPlanYear, closeMonth, removeIfFree, reopenMonth, rowSuggestions, ruleRowOf, setCellDone, setDerivedDone, setItemStatus, setupSteps, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupStepKey } from '@/store'
+import { accountSuggestions, addPayOffRow, addPlanYear, closeMonth, removeIfFree, reopenMonth, ruleRowOf, setCellDone, setDerivedDone, setItemStatus, setupSteps, shownRowSuggestions, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupStepKey } from '@/store'
 import { GoalDialog } from '@/features/goals/GoalDialog'
 import { goalStatusLine } from '@/features/goals/goalText'
 import { AddRowInline } from '@/features/grid/AddRowInline'
@@ -133,7 +133,7 @@ export function StatementScreen() {
   const showing = (suggest ?? household?.setupOpen ?? false) && !closedNow
   const suggestions = useMemo(() => {
     const byPlace = new Map<string, RowSuggestion[]>()
-    if (tables) for (const s of rowSuggestions(tables)) byPlace.set(s.place, [...(byPlace.get(s.place) ?? []), s])
+    if (tables) for (const s of shownRowSuggestions(tables)) byPlace.set(s.place, [...(byPlace.get(s.place) ?? []), s])
     return byPlace
   }, [tables])
   /** A category that has something usual to offer opens by itself, so the offer is seen. */
@@ -199,7 +199,10 @@ export function StatementScreen() {
     if (!el) return
     const part = el.closest('li') ?? el
     part.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
-    part.querySelector<HTMLElement>('input, [data-testid="suggestions"] button, [data-testid^="foot-"] button')?.focus({ preventScroll: true })
+    // the first thing that takes an entry; an (i) explains and is never where the cursor should land
+    const act = 'button:not([aria-label^="About "])'
+    const first = part.querySelector<HTMLElement>('input') ?? part.querySelector<HTMLElement>(`[data-testid="suggestions"] ${act}, [data-testid^="foot-"] ${act}`)
+    first?.focus({ preventScroll: true })
   }
   function onStep(key: SetupStepKey) {
     if (key === 'income') return jump('[data-line="income"]')

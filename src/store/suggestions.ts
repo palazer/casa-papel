@@ -24,8 +24,9 @@ export interface RowSuggestion {
   section: Section
   /** The Statement line it sits under: `income`, `expenses`, `set-aside`, or a category as `cat:<section>:<id>`. */
   place: string
-  /** Shown straight away; the rarer ones and the dismissed ones sit behind "More suggestions". */
+  /** One of the rows most households have: listed first, and its category opens by itself so the offer is seen. */
   usual: boolean
+  /** The household said "not for us": the Statement no longer lists it. */
   dismissed: boolean
   /** The type of account it needs and the household does not have yet; it cannot be added until one exists. */
   needs: 'savings' | 'investment' | 'loan' | null
@@ -84,6 +85,12 @@ export function rowSuggestions(tables: Tables): RowSuggestion[] {
   for (const entity of live(tables.entities).sort(byOrder)) for (const t of ENTITY_TEMPLATES[entity.kind]) offer(t, entity)
   for (const t of HOUSEHOLD_TEMPLATES) offer(t, null)
   return out
+}
+
+/** What the Statement lists: every suggestion the household has not said no to, the usual ones first. */
+export function shownRowSuggestions(tables: Tables): RowSuggestion[] {
+  const open = rowSuggestions(tables).filter((s) => !s.dismissed)
+  return [...open.filter((s) => s.usual), ...open.filter((s) => !s.usual)]
 }
 
 /** An account most households have and this one does not yet: where the money lands, and where the rest can go. */
@@ -163,7 +170,7 @@ export async function addSuggestion(store: Store, id: string, opts: { amount?: M
   return row
 }
 
-/** "Not for us": the suggestion leaves the page and waits behind "More suggestions". */
+/** "Not for us": the suggestion leaves the page. Undo brings it back; the row can still be added by hand. */
 export async function dismissSuggestion(store: Store, id: string): Promise<void> {
   const household = (await loadTables(store)).household.find((h) => !h.deletedAt)
   if (!household) throw new Error('No household yet')
