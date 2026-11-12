@@ -399,7 +399,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   if (pocket.length) spending.push({ id: 'pocket', kind: 'category', label: 'Pocket money', amount: sum(pocket), children: pocket, estimate: anyEstimate(pocket) })
   const outLines: StatementLine[] = [group('expenses', 'Expenses', 'expense', spending)]
   if (moved.length) outLines.push(group('moved', 'Moved elsewhere', 'transfer', moved))
-  outLines.push(group('set-aside', 'Set aside, pay off', 'transfer', setAside))
+  outLines.push(group('set-aside', 'To savings, investments and debts', 'transfer', setAside))
 
   const moneyIn = side('in', 'Money in', inLines)
   const moneyOut = side('out', 'Money out', outLines)

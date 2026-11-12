@@ -910,7 +910,7 @@ test.describe('working the month in the Statement', () => {
     await expect(moneyOut.getByRole('button', { name: /^Transport: / })).toBeVisible()
 
     // one that needs an account the household does not have offers that account first
-    const setAside = group('Set aside, pay off')
+    const setAside = group('To savings, investments and debts')
     const loan = setAside.locator('[data-suggestion$=":v.loan"]')
     await expect(loan.getByLabel(/^Amount per month/)).toHaveCount(0)
     await expect(loan.getByRole('button', { name: 'Add a loan for The car – Loan or lease' })).toHaveText('Add a loan…')
@@ -1078,7 +1078,7 @@ test.describe('working the month in the Statement', () => {
     await expect(moneyOut.getByLabel('What is it for?').locator('option[value="from-savings"]')).toHaveCount(0)
   })
 
-  test('a row under "Set aside, pay off" says what it is for, and the place it goes to can be made with it', async ({ page }) => {
+  test('a row under "To savings, investments and debts" says what it is for, and the place it goes to can be made with it', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'November 2026')
     const moneyIn = page.getByRole('region', { name: 'Money in' })
@@ -1165,10 +1165,33 @@ test.describe('working the month in the Statement', () => {
     await expect(moneyOut.getByRole('button', { name: 'To Gifts: €20.00' })).toBeVisible()
     await expect(what).toHaveCount(0)
 
-    // payment rows are added here only: the Statement's expenses offer a normal expense and nothing to pick
-    await moneyOut.getByRole('button', { name: 'Add expense row' }).click()
-    await expect(moneyOut.getByLabel('What the new expense row does')).toHaveCount(0)
-    await moneyOut.getByLabel('New expense row name').press('Escape')
+    // a loan payment is looked for among the expenses, so a category offers it too and says where its line will show
+    await moneyOut.getByRole('button', { name: 'Transport', exact: true }).click()
+    await moneyOut.getByRole('button', { name: 'Add row to Transport' }).click()
+    await moneyOut.getByLabel('What the new expense row does').selectOption('pay-off')
+    await expect(moneyOut.getByLabel('Account for the new expense row').locator('option')).toHaveText(['Car loan · Loan', 'New loan…', 'New credit card…'])
+    await expect(text).toHaveText('It will show under "To savings, investments and debts": the money is not gone, it brings the debt down.')
+    await moneyOut.getByLabel('Account for the new expense row').selectOption({ label: 'New loan…' })
+    await expect(text).toHaveText('It will show under "To savings, investments and debts": the money is not gone, it brings the debt down. Add opens the form of the new loan.')
+    await page.screenshot({ path: 'e2e/output/statement-loan-from-category.png', fullPage: true })
+    await moneyOut.getByLabel('New expense row name').fill('Bike loan')
+    await moneyOut.getByLabel('New expense row name').press('Enter')
+    await dlg.getByLabel('Name', { exact: true }).fill('Bike')
+    await dlg.getByLabel('Owed at the start of September 2026 (EUR)').fill('900')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Bike loan · November 2026' })).toBeVisible()
+    await dlg.getByLabel('Amount in EUR').fill('75')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    // the row is not in Transport: the page shows where it landed, in the second group, and marks it for a moment
+    const landed = moneyOut.locator('[data-line]').filter({ hasText: 'Bike loan' })
+    await expect(landed).toHaveAttribute('data-marked', 'true')
+    await expect(landed).toBeInViewport()
+    await expect(landed).toContainText('€75.00')
+    await expect(moneyOut.getByRole('button', { name: 'Pays off Bike: go there' })).toBeVisible()
+    await page.screenshot({ path: 'e2e/output/statement-loan-landed.png', fullPage: true })
+    await expect(landed).not.toHaveAttribute('data-marked', 'true', { timeout: 4000 })
+    await expect(claims.locator('[data-line^="acc:"]').filter({ hasText: 'Bike' })).toContainText('€825.00')
 
     // money taken out of an account can make that account too
     await moneyIn.getByRole('button', { name: 'Add transfer row' }).click()
@@ -1430,7 +1453,7 @@ test.describe('the Statement on a phone', () => {
     await expect(dlg).toBeHidden()
   })
 
-  test('the row form under "Set aside, pay off" fits the screen, and makes a loan with its row', async ({ page }) => {
+  test('the row form under "To savings, investments and debts" fits the screen, and makes a loan with its row', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'November 2026')
     const moneyOut = page.getByRole('region', { name: 'Money out' })

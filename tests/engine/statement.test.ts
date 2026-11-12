@@ -128,7 +128,7 @@ describe('the Statement, the month', () => {
     // the section for money from the household's accounts is always there, empty until something comes out of one
     expect(topLine(s, 'in', 'from-accounts')).toMatchObject({ amount: 0, empty: true, children: [] })
     expect(s.flow.left.total).toBe(725500)
-    expect(s.flow.right.lines.map((l) => l.label)).toEqual(['Expenses', 'Set aside, pay off'])
+    expect(s.flow.right.lines.map((l) => l.label)).toEqual(['Expenses', 'To savings, investments and debts'])
     const expenses = topLine(s, 'out', 'expenses')!
     expect(expenses.children.map((c) => c.label)).toEqual(['Housing', 'Living', 'Transport', 'Family & pets', 'Fun', 'Personal', 'Pocket money'])
     expect(expenses.children.find((c) => c.label === 'Housing')).toMatchObject({ kind: 'category', amount: 186000 })
@@ -265,7 +265,7 @@ describe('the Statement, the month', () => {
     expect(topLine(s, 'in', 'from-accounts')!.children.map((c) => [c.kind, c.rowId, c.label, c.accountKind, c.ownName, c.chip])).toEqual([['row', sell.id, 'From Fund', 'investment account', 'Sell fund', undefined]])
     expect(all(s).find((l) => l.label === 'Salary')!.net).toBe(3000_00)
     expect(all(s).find((l) => l.label === 'Tax')).toMatchObject({ amount: 1000_00, automatic: true })
-    expect(s.flow.right.lines.map((l) => [l.label, l.amount])).toEqual([['Expenses', 1000_00], ['Moved elsewhere', 100_00], ['Set aside, pay off', 3400_00]])
+    expect(s.flow.right.lines.map((l) => [l.label, l.amount])).toEqual([['Expenses', 1000_00], ['Moved elsewhere', 100_00], ['To savings, investments and debts', 3400_00]])
     expectSound(t, months)
   })
 

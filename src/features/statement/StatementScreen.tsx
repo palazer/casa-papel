@@ -13,7 +13,7 @@ import { useStore } from '@/app/store'
 import { clearHandedMonth, handedOverMonth } from '@/app/screens'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { useStoreVersion } from '@/app/useStoreVersion'
-import { buildStatement, cellKey, currentAccountsIn, type GoalProgress, type StatementLine } from '@/engine'
+import { buildStatement, cellKey, currentAccountsIn, type GoalProgress, type Statement, type StatementLine } from '@/engine'
 import { isPocketRow, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type MonthKey, type Row, type Section } from '@/model'
 import { accountSuggestions, addPayOffRow, addPlanYear, closeMonth, removeIfFree, reopenMonth, ruleRowOf, setCellDone, setDerivedDone, setItemStatus, setupSteps, shownRowSuggestions, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupStepKey } from '@/store'
 import { GoalDialog } from '@/features/goals/GoalDialog'
@@ -42,6 +42,8 @@ import { LEAD_BUTTON, LEAD_PAD } from './lead'
 import { cn } from '@/lib/utils'
 
 const walk = (lines: StatementLine[]): StatementLine[] => lines.flatMap((l) => [l, ...walk(l.children)])
+/** Every top line of both halves, to look a line up in. */
+const linesOf = (s: Statement): StatementLine[] => [...s.flow.left.lines, ...s.flow.right.lines, ...s.position.left.lines, ...s.position.right.lines]
 /** The ids of the lines a line sits under, outermost first; null when the line is not there. */
 function pathTo(lines: StatementLine[], id: string, above: string[] = []): string[] | null {
   for (const l of lines) {
@@ -51,6 +53,34 @@ function pathTo(lines: StatementLine[], id: string, above: string[] = []): strin
   }
   return null
 }
+/**
+ * Bring lines of the Statement into view and mark them for two seconds: what hides them is opened and the page moves
+ * to the first of them, to the middle of the window. `gentle` is for a line the user did not ask to be taken to (a
+ * row that was just added): the page stays where it is when the line is in view already, and the keyboard stays too.
+ */
+function reveal(
+  ids: string[], all: StatementLine[],
+  to: { open: (ids: string[]) => void; mark: (ids: ReadonlySet<string> | null) => void; timer: { current: number | undefined } },
+  gentle = false,
+) {
+  const parents = ids.flatMap((id) => pathTo(all, id) ?? [])
+  if (parents.length) to.open(parents)
+  to.mark(new Set(ids))
+  window.clearTimeout(to.timer.current)
+  to.timer.current = window.setTimeout(() => to.mark(null), 2000)
+  // once the parents have opened
+  requestAnimationFrame(() => {
+    const el = document.querySelector<HTMLElement>(`[data-line="${CSS.escape(ids[0])}"]`)
+    if (!el) return
+    const box = el.getBoundingClientRect()
+    // the phone's tab bar covers the foot of the window
+    const inView = box.top >= 8 && box.bottom <= window.innerHeight - 80
+    if (!gentle || !inView) el.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+    if (!gentle) el.querySelector<HTMLElement>('button')?.focus({ preventScroll: true })
+  })
+}
+/** Said under "Add row" in an expense place when the row pays off a loan or card: its line shows in the second group. */
+const PAY_OFF_NOTE = 'It will show under "To savings, investments and debts": the money is not gone, it brings the debt down.'
 /** What "Add account" offers under Assets, and "Add a card or loan" under Debts. */
 const ASSET_TYPES: AccountType[] = ['checking', 'joint', 'savings', 'investment', 'other-asset', 'cash']
 const DEBT_TYPES: AccountType[] = ['credit-card', 'loan']
@@ -102,6 +132,8 @@ export function StatementScreen() {
   /** The lines a link symbol has just moved the page to, for the two seconds they stay marked. */
   const [marked, setMarked] = useState<ReadonlySet<string> | null>(null)
   const markTimer = useRef<number | undefined>(undefined)
+  /** A row that was just added, until the page has shown where it is. */
+  const landing = useRef<string | null>(null)
   useEffect(() => () => window.clearTimeout(markTimer.current), [])
   const version = useStoreVersion(store)
   /** "Suggestions" in the toolbar, once it was pressed; until then they show while the household is being set up. */
@@ -144,6 +176,17 @@ export function StatementScreen() {
   const isOpen = useCallback((line: StatementLine) => openLines[line.id] ?? ((line.open ?? false) || autoOpen.has(line.id)), [openLines, autoOpen])
   const onToggle = useCallback((line: StatementLine) => setOpenLines((s) => ({ ...s, [line.id]: !(s[line.id] ?? ((line.open ?? false) || autoOpen.has(line.id))) })), [autoOpen])
 
+  const openThese = useCallback((ids: string[]) => setOpenLines((s) => ({ ...s, ...Object.fromEntries(ids.map((id) => [id, true])) })), [])
+  // a row added a moment ago: once its dialog is closed and its line is on the page, the page shows where it landed
+  useEffect(() => {
+    const id = landing.current
+    if (!id || editor || !statement) return
+    const all = linesOf(statement)
+    if (!pathTo(all, id)) return
+    landing.current = null
+    reveal([id], all, { open: openThese, mark: setMarked, timer: markTimer }, true)
+  }, [editor, statement, openThese])
+
   if (!tables || !household || !engine || !statement) return null
   const { locale, baseCurrency: ccy, displayExpensesNegative: neg } = household
   const progress = monthProgress(engine.rows, engine.cells, m)
@@ -179,9 +222,14 @@ export function StatementScreen() {
     run.catch((e) => setError(e instanceof Error ? e.message : 'Action failed')).finally(() => setBusy(null))
   }
 
-  /** A new row opens its category and, in an open month, its dialog for the first amount (and, where it can carry one, its rule). */
+  /**
+   * A new row opens its category and, in an open month, its dialog for the first amount (and, where it can carry one,
+   * its rule). Once the dialog is closed the page shows where the row is: a loan payment added from a category lands
+   * in the second group, pocket money under its own heading.
+   */
   function onAdded(row: Row) {
     setOpenLines((s) => ({ ...s, [row.kind === 'pocket-money' ? 'pocket' : `cat:${row.section}:${row.categoryId ?? 'none'}`]: true }))
+    landing.current = row.id
     if (!statement!.closed) setEditor({ rowId: row.id })
   }
   /** How much goes to an account: the dialog of the row that fills it, or the short one while nothing does. */
@@ -259,19 +307,7 @@ export function StatementScreen() {
    */
   function goToLink(line: StatementLine) {
     const ids = line.link?.to ?? []
-    if (ids.length === 0) return
-    const all = [...statement!.flow.left.lines, ...statement!.flow.right.lines, ...statement!.position.left.lines, ...statement!.position.right.lines]
-    const parents = ids.flatMap((id) => pathTo(all, id) ?? [])
-    if (parents.length) setOpenLines((s) => ({ ...s, ...Object.fromEntries(parents.map((id) => [id, true])) }))
-    setMarked(new Set(ids))
-    window.clearTimeout(markTimer.current)
-    markTimer.current = window.setTimeout(() => setMarked(null), 2000)
-    // once the parents have opened
-    requestAnimationFrame(() => {
-      const el = document.querySelector<HTMLElement>(`[data-line="${CSS.escape(ids[0])}"]`)
-      el?.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
-      el?.querySelector<HTMLElement>('button')?.focus({ preventScroll: true })
-    })
+    if (ids.length) reveal(ids, linesOf(statement!), { open: openThese, mark: setMarked, timer: markTimer })
   }
   /** The open link on a loan or card: the row that pays it off is made, linked, and asks for its amount. */
   function addPayOff(line: StatementLine) {
@@ -284,11 +320,12 @@ export function StatementScreen() {
     else if (line.accountId) askRule({ accountId: line.accountId })
   }
   const categoriesOf = (section: Section) => tables!.categories.filter((c) => !c.deletedAt && c.section === section)
-  // a payment row shows under "Set aside, pay off" whichever section it lives in, so that is where one is added
+  // a loan payment is looked for among the expenses (the car loan under Transport), so it can be added from there;
+  // the form says where its line will show, and the page goes there once it is added
   const addRow = (line: StatementLine, section: Section, over: Pick<ComponentProps<typeof AddRowInline>, 'label' | 'defaultCategoryId' | 'only' | 'place'> = {}) => (
     <AddRowInline
       section={section} categories={categoriesOf(section)} tables={tables!} household={household!} onError={setError} onAdded={onAdded}
-      without={section === 'expense' ? ['pay-off'] : undefined} month={statement!.closed ? undefined : m}
+      month={statement!.closed ? undefined : m} payOffNote={PAY_OFF_NOTE}
       // on the columns of the lines above it: the "+" where their tick is (or their arrow), the words where their names are
       lead={<AddLead ticks={tickedUnder(line)} />} leadClassName={LEAD_BUTTON} formClassName={cn('min-w-0 basis-full', LEAD_PAD[tickedUnder(line) ? 'ticks' : 'plain'])} {...over}
     />

@@ -61,7 +61,7 @@ const K = {
 const KINDS: Kind[] = [K.moves, K.toSavings, K.toInvestment, K.pool, K.pocket, K.fromSavings, K.fromInvestment, K.cardPayment, K.expense, K.payOff]
 
 /**
- * The Statement's "Set aside, pay off": what such a row can be for, the places money is put first. Every card and loan
+ * The Statement's "To savings, investments and debts": what such a row can be for, the places money is put first. Every card and loan
  * is paid off from here, whichever section its row lives in, and a virtual account can be made on the spot once there
  * is a savings account to hold it.
  */
@@ -81,7 +81,7 @@ const newValue = (n: New) => `new:${n.type}`
  * the row does. The Statement also puts one inside each category: `defaultCategoryId` starts it there, `label` names
  * the button ("Add row to Housing"), and `onAdded` hands back the new row so the screen can open it. Where the place
  * says what the row does (the Statement's "From accounts"), `only` narrows the choices to those, and `without`
- * leaves out the ones that have a place of their own. `place="set-aside"` is the Statement's "Set aside, pay off":
+ * leaves out the ones that have a place of their own. `place="set-aside"` is the Statement's "To savings, investments and debts":
  * the form asks first what the row is for.
  *
  * A row that names an account never dead-ends on a missing one: the list of accounts ends with "New loan…" (or the
@@ -91,7 +91,7 @@ const newValue = (n: New) => `new:${n.type}`
  * On the Statement the control stands on the rows' own columns: `lead` takes the place of the button's "+" (it carries
  * the columns a row has before its name), and `formClassName` starts the open form on the names' column.
  */
-export function AddRowInline({ section, categories, tables, household, onError, defaultCategoryId = '', label, onAdded, only, without, place, month, lead, leadClassName, formClassName }: {
+export function AddRowInline({ section, categories, tables, household, onError, defaultCategoryId = '', label, onAdded, only, without, place, month, lead, leadClassName, formClassName, payOffNote }: {
   section: Section; categories: Category[]; tables: Tables; household: Household; onError: (msg: string) => void
   defaultCategoryId?: string; label?: string; onAdded?: (row: Row) => void
   only?: Choice[]; without?: Choice[]
@@ -102,6 +102,8 @@ export function AddRowInline({ section, categories, tables, household, onError, 
   /** The button's classes when it carries a `lead`: its gap, and no padding of its own before the lead. */
   leadClassName?: string
   formClassName?: string
+  /** Under Expenses on the Statement: where the line of a row that pays off a loan or card will show, and why. */
+  payOffNote?: string
 }) {
   const store = useStore()
   const [open, setOpen] = useState(false)
@@ -133,8 +135,11 @@ export function AddRowInline({ section, categories, tables, household, onError, 
   // a virtual account names its own row in its form
   const showName = creating?.type !== 'pool'
   const sameSection = !kind || kind.section === section
+  // a payment row added among the expenses shows elsewhere on the Statement: that is said in place of the usual sentence
+  const landsElsewhere = !!payOffNote && kind?.key === 'pay-off' && place !== 'set-aside'
   const text = !kind ? null : missing ?? (
-    creating?.type === 'pool' ? 'Add opens the form of the new virtual account. Saving it makes the virtual account and its row, "To <name>".'
+    landsElsewhere ? `${payOffNote}${creating ? ` Add opens the form of the new ${creating.thing}.` : ''}`
+    : creating?.type === 'pool' ? 'Add opens the form of the new virtual account. Saving it makes the virtual account and its row, "To <name>".'
     : creating ? `Add opens the form of the new ${creating.thing}. Saving it makes the ${creating.thing} and this row together.`
     : kind.text)
 
