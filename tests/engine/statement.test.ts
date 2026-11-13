@@ -526,12 +526,14 @@ describe('the Statement, a row on a schedule', () => {
       recurringItems: [schedule({ name: 'Car insurance', rowId: insurance.id, amount: 48000, cadence: { intervalMonths: 12, anchorMonth: 2 } })],
     }))
     const january = find(statementFor(t, '2026-01').s, insurance.id)!
-    expect(january).toMatchObject({ empty: true, scheduled: true, repeats: 'Every year (Feb)', nextDue: '2026-02' })
+    // nothing lands: the line is grey and shows what comes and when, and that amount is in no sum
+    expect(january).toMatchObject({ empty: true, amount: 0, scheduled: true, repeats: 'Every year (Feb)', nextDue: '2026-02', resting: true, upcoming: { amount: 48000, currency: 'EUR' }, children: [] })
     const february = find(statementFor(t, '2026-02').s, insurance.id)!
     expect(february).toMatchObject({ amount: 48000, scheduled: true, repeats: 'Every year (Feb)' })
     expect(february.empty).toBeFalsy()
-    expect(february.nextDue).toBeUndefined()
-    expect(find(statementFor(t, '2026-03').s, insurance.id)).toMatchObject({ empty: true, scheduled: true, nextDue: '2027-02' })
+    expect([february.nextDue, february.resting, february.upcoming]).toEqual([undefined, undefined, undefined])
+    expect(find(statementFor(t, '2026-03').s, insurance.id)).toMatchObject({ empty: true, scheduled: true, nextDue: '2027-02', resting: true })
+    expectSound(t, months)
     // a row whose amount simply carries on is not on a schedule
     const groceries = find(statementFor(t, '2026-02').s, plain.id)!
     expect(groceries.scheduled).toBeUndefined()
@@ -552,11 +554,39 @@ describe('the Statement, a row on a schedule', () => {
     const january = find(statementFor(t, '2026-01').s, insurances.id)!
     expect(january).toMatchObject({ amount: 4200, scheduled: true, repeats: '2 items repeat' })
     expect(january.children.map((c) => [c.label, c.scheduled, c.repeats])).toEqual([['Liability', true, 'Every month'], ['Legal', true, 'Every 3 months (Jan, Apr, Jul, Oct)']])
-    // one item lands in February: the row is one line again, and still on a schedule
-    expect(find(statementFor(t, '2026-02').s, insurances.id)).toMatchObject({ amount: 1200, scheduled: true, children: [] })
+    // one item lands in February: the other is listed under the row all the same, grey, with what it brings and when
+    const february = find(statementFor(t, '2026-02').s, insurances.id)!
+    expect(february).toMatchObject({ amount: 1200, scheduled: true })
+    expect(february.resting).toBeUndefined()
+    expect(february.children.map((c) => [c.label, c.amount, c.empty ?? false, c.resting ?? false, c.upcoming?.amount, c.nextDue])).toEqual([
+      ['Liability', 1200, false, false, undefined, undefined], ['Legal', 0, true, true, 3000, '2026-04'],
+    ])
+    // the grey line is no item of the month: nothing to tick, and it opens its row
+    expect(february.children[1]).toMatchObject({ kind: 'item', scheduled: true, repeats: 'Every 3 months (Jan, Apr, Jul, Oct)', rowId: insurances.id })
+    expect(february.children[1].itemId).toBeUndefined()
     expect(find(statementFor(t, '2026-01').s, old.id)).toMatchObject({ amount: 100, scheduled: true })
     const after = find(statementFor(t, '2026-02').s, old.id)!
     expect(after.scheduled).toBeUndefined()
     expect(after.nextDue).toBeUndefined()
+    expectSound(t, months)
+  })
+
+  it('a row with nothing this month and several schedules opens to them, and shows what the next month brings', () => {
+    const car = row({ name: 'Car', section: 'expense' })
+    const t = posted(tables({
+      household: [household()], rows: [car],
+      recurringItems: [
+        schedule({ name: 'Insurance', rowId: car.id, amount: 48000, cadence: { intervalMonths: 12, anchorMonth: 3 } }),
+        schedule({ name: 'Tax', rowId: car.id, amount: 9000, cadence: { intervalMonths: 12, anchorMonth: 3 } }),
+        schedule({ name: 'Inspection', rowId: car.id, amount: 12000, cadence: { intervalMonths: 12, anchorMonth: 2 } }),
+      ],
+    }))
+    const january = find(statementFor(t, '2026-01').s, car.id)!
+    expect(january).toMatchObject({ empty: true, resting: true, repeats: '3 items repeat', nextDue: '2026-02', upcoming: { amount: 12000 } })
+    expect(january.children.map((c) => [c.label, c.nextDue, c.upcoming?.amount])).toEqual([['Insurance', '2026-03', 48000], ['Tax', '2026-03', 9000], ['Inspection', '2026-02', 12000]])
+    // February brings one of them; March the other two, together
+    expect(find(statementFor(t, '2026-02').s, car.id)).toMatchObject({ amount: 12000 })
+    expect(find(statementFor(t, '2026-03').s, car.id)!.children.map((c) => [c.label, c.amount, c.resting ?? false])).toEqual([['Insurance', 48000, false], ['Tax', 9000, false], ['Inspection', 0, true]])
+    expectSound(t, months)
   })
 })

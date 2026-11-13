@@ -38,9 +38,12 @@ export function nextDue(item: CadenceLike & RangeLike, from: MonthKey): MonthKey
   return null
 }
 
-/** A row's schedules that still run in `month` or after it: neither removed nor ended before it. */
+/**
+ * A row's schedules that run in `month`: started by then, neither removed nor ended before it. A month before a
+ * schedule starts knows nothing of it, so the months that were there before it keep reading as they did.
+ */
 export function runningSchedules(items: RecurringItem[], rowId: string, month: MonthKey): RecurringItem[] {
-  return items.filter((r) => !r.deletedAt && r.rowId === rowId && !(r.endMonth && compareMonths(r.endMonth, month) < 0))
+  return items.filter((r) => !r.deletedAt && r.rowId === rowId && compareMonths(r.startMonth, month) <= 0 && !(r.endMonth && compareMonths(r.endMonth, month) < 0))
 }
 
 /** How a row repeats, in a few words: its one schedule's rhythm, or how many of its items repeat. */

@@ -364,12 +364,21 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   accounts without a row keep the faint `=` of the rule symbol, which adds theirs, so a line never carries two faint
   marks. A plain row has no link symbol, which is how an unconnected "Car loan" row is told from a payment row. The
   Grid does not draw the symbol.
-  **The repeat symbol.** `Repeat` (12 px, muted, an image named `Repeats: Yearly (Jan)`, the same words in its
-  `title`) marks what is on a schedule: an item a schedule posted, and every row that has a schedule which has not
-  ended (`runningSchedules`). The row carries it in every month, also in one where nothing lands; there the empty
-  line adds a muted `next Jan 2027` (`nextDue`), so it is not mistaken for a row nobody set up. A row with several
+  **The repeat symbol.** `Repeat` (12 px, muted, an image named `Repeats: Every year (Jan)`, the same words in
+  its `title`) marks what is on a schedule: an item a schedule posted, and every row that has a schedule which has
+  started and not ended (`runningSchedules`; a month before a schedule starts knows nothing of it). The row
+  carries it in every month from then on, also in one where nothing lands; there the empty line adds a muted
+  `next Jan 2027` (`nextDue`), so it is not mistaken for a row nobody set up. A row with several
   schedules says `3 items repeat`. A row whose amount simply carries on from month to month has no symbol: that is
   what every row does. The Grid draws the symbol beside the row's name, and the legend names it.
+  **Not this month.** What is on a schedule and does not land in the month on screen is still there, grey
+  (`resting`, `data-resting`: the name in `text-muted-foreground`, like a note), so a row reads the same in every
+  month. A row with nothing this month is one grey line; a schedule of a row that has other things this month is a
+  grey line under it, after the month's items (the row opens as soon as it has two lines of either kind). Each says
+  `next <month>` and, where the amount would be, what it brings then (`upcoming`), grey as well; that amount is in
+  no sum, the line's own amount stays zero and its name for screen readers is `<name>: empty, €60.00 next in Mar
+  2027`. A grey line has no tick, since nothing is to be done this month, and pressing it opens the row's dialog,
+  where the same schedule is listed.
   Things are added where they will appear: the foot of Income and Expenses holds the Grid's `AddRowInline` (`Add row`)
   and `AddCategoryInline` (`Add category`, a name and Enter), the foot of `To savings, investments and debts` holds `Add row`, and an
   opened category ends with `Add row to <category>` with that category already chosen. A category is a line from

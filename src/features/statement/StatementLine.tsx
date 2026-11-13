@@ -118,7 +118,8 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
   const open = group || (expandable && ctx.isOpen(line))
   const listId = `st-${line.id}`
   const hue = line.hue ? HUE[line.hue] : undefined
-  const quiet = line.kind === 'note' || line.memo || line.skipped
+  // grey: a note, what is left out of the sums, a skipped item, and what is on a schedule and does not land this month
+  const quiet = line.kind === 'note' || line.memo || line.skipped || !!line.resting
   const tip = TIP[line.id]
   const marked = !!ctx.marked?.has(line.id)
   // only a top line is asked: what is under it is locked with it
@@ -130,7 +131,9 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
   /** An item is named with its row, so every tick and button on the page has a name of its own. */
   const fullLabel = item && parent ? `${nameOf(parent)}: ${line.label}` : nameOf(line)
 
-  const amountText = line.empty ? '·' : formatAmount(line.amount, line.currency ?? ccy, locale)
+  // a scheduled line with nothing this month shows what it brings when it lands, in grey; it is in no sum
+  const upcomingText = line.empty && line.upcoming ? formatAmount(line.upcoming.amount, line.upcoming.currency, locale) : null
+  const amountText = line.empty ? upcomingText ?? '·' : formatAmount(line.amount, line.currency ?? ccy, locale)
   const shaded = !!line.estimate && !line.empty
   const amount = (
     <span
@@ -201,7 +204,8 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
     // what is left of a category's estimate is worked out, so the line opens the estimate it comes from
     const estimateOf = !ctx.closed && ctx.onEstimate ? line.estimateFor : undefined
     const busy = ctx.busy != null && (ctx.busy === line.id || ctx.busy === line.rowId || ctx.busy.startsWith(`${line.rowId}:`))
-    const said = `${fullLabel}: ${line.empty ? 'empty' : amountText}${shaded ? ', an estimate' : ''}`
+    const comes = upcomingText && line.nextDue ? `, ${upcomingText} next in ${formatMonth(line.nextDue, locale)}` : ''
+    const said = `${fullLabel}: ${line.empty ? `empty${comes}` : amountText}${shaded ? ', an estimate' : ''}`
     // a row carries its menu; what is left of an estimate is not a row of its own, and a closed month changes nothing
     const menu = !ctx.closed && line.kind === 'row' && line.rowId && line.estimateFor == null ? ctx.rowMenu?.(line.rowId) : null
     const press = estimateOf ? () => ctx.onEstimate!(estimateOf) : editable ? () => ctx.onEdit!(line.rowId!) : null
@@ -238,7 +242,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
     )
     return (
       <li inert={locked || undefined} className={cn(locked && LOCKED)}>
-        <div className={cn(ROW, pad, 'group/line', item && 'bg-muted/20', marked && MARKED)} data-line={line.id} data-marked={marked || undefined}>
+        <div className={cn(ROW, pad, 'group/line', item && 'bg-muted/20', marked && MARKED)} data-line={line.id} data-marked={marked || undefined} data-resting={line.resting || undefined}>
           {expandable ? (
             <button
               type="button" aria-label={`Items of ${nameOf(line)}`} aria-expanded={open} aria-controls={listId} onClick={() => ctx.onToggle(line)}

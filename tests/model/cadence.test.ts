@@ -45,9 +45,12 @@ describe('cadence', () => {
     const ended = item({ endMonth: '2026-03' })
     const gone = item({ deletedAt: 5 })
     const other = item({ rowId: r2 })
-    const all = [yearly, ended, gone, other]
+    const later = item({ startMonth: '2026-06' })
+    const all = [yearly, ended, gone, other, later]
     expect(runningSchedules(all, r1, '2026-03')).toEqual([yearly, ended])
     expect(runningSchedules(all, r1, '2026-04')).toEqual([yearly])
+    // a month before one starts knows nothing of it
+    expect(runningSchedules(all, r1, '2026-06')).toEqual([yearly, later])
     expect(repeatsText([yearly])).toBe('Every year (Jan)')
     expect(repeatsText([yearly, ended])).toBe('2 items repeat')
   })

@@ -1215,9 +1215,47 @@ test.describe('working the month in the Statement', () => {
     const insurance = line('The car – Insurance')
     await expect(insurance.getByRole('img', { name: 'Repeats: Every 3 months (Jan, Apr, Jul, Oct)' })).toBeVisible()
     await expect(insurance).toContainText('next Jan 2027')
+    // the line is grey and shows what it brings when it lands; that amount is in no sum
+    const colourOf = (l: Locator) => l.evaluate((el) => getComputedStyle(el).color)
+    await expect(insurance).toHaveAttribute('data-resting', 'true')
+    await expect(insurance).toContainText('€210.00')
+    const insuranceName = moneyOut.getByRole('button', { name: 'The car – Insurance: empty, €210.00 next in Jan 2027' })
+    expect(await colourOf(insuranceName)).toBe(await colourOf(insurance.getByText('next Jan 2027')))
+    expect(await colourOf(insuranceName)).not.toBe(await colourOf(moneyOut.getByRole('button', { name: /^Public transport:/ })))
+    await expect(line('Transport')).toContainText('€98.00')
     // a row whose amount simply carries on from month to month has no symbol
     await expect(line('Groceries').locator('[data-repeats]')).toHaveCount(0)
+
+    // one item of a row that lands in another month is listed under its row all the same, in every month
+    const dlg = page.getByRole('dialog')
+    await moneyOut.getByRole('button', { name: /^Subscriptions:/ }).click()
+    await dlg.getByRole('button', { name: 'Add item' }).click()
+    await dlg.getByLabel('Item label').last().fill('Annual pass')
+    await dlg.getByLabel('Item amount').last().fill('60')
+    await dlg.getByLabel('Repeats, Annual pass').selectOption({ label: 'Every year' })
+    await dlg.getByLabel('In which month, Annual pass').selectOption({ label: 'March' })
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    // the row's amount is what lands this month; it opens to the streaming it has and the pass that comes in March
+    await expect(moneyOut.getByRole('button', { name: /^Subscriptions:/ })).toHaveAccessibleName(/^Subscriptions: €18\.00/)
+    await moneyOut.getByRole('button', { name: 'Items of Subscriptions' }).click()
+    const pass = line('Annual pass')
+    await expect(pass).toHaveAttribute('data-resting', 'true')
+    await expect(pass.getByRole('img', { name: 'Repeats: Every year (Mar)' })).toBeVisible()
+    await expect(pass).toContainText('next Mar 2027')
+    await expect(pass).toContainText('€60.00')
+    // it is no item of this month: nothing to tick, grey like the "next" beside it, unlike the item that landed
+    await expect(pass.getByRole('checkbox')).toHaveCount(0)
+    const passName = moneyOut.getByRole('button', { name: 'Subscriptions: Annual pass: empty, €60.00 next in Mar 2027' })
+    expect(await colourOf(passName)).toBe(await colourOf(pass.getByText('next Mar 2027')))
+    expect(await colourOf(passName)).not.toBe(await colourOf(moneyOut.getByRole('button', { name: /^Subscriptions: Streaming:/ })))
+    await expect(line('Streaming')).not.toHaveAttribute('data-resting', 'true')
     await page.screenshot({ path: 'e2e/output/statement-repeats.png', fullPage: true })
+    // pressing it opens the row's dialog, where it is listed too
+    await passName.click()
+    await expect(dlg.getByTestId('elsewhere')).toContainText('Annual pass')
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+    await expect(dlg).toBeHidden()
 
     // in the month it lands the same row shows its amount and the symbol, and no "next"
     await goToMonth(page, 'January 2027')

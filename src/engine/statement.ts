@@ -13,7 +13,7 @@
  *   out = spending + set aside and paid off + max(0, toSavings) + max(0, leftover)
  * Rows are sorted into the same buckets the engine's totals use (compute.ts, pass 2), which is what keeps the cents.
  */
-import { addMonths, canCarryRule, cardIsItemized, describeCadence, isTakenFromAccount, nextDue, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type Row, type Section, type Tables } from '@/model'
+import { addMonths, canCarryRule, cardIsItemized, describeCadence, isTakenFromAccount, nextDue, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
 import { computeGoals, type GoalProgress } from './goals'
 import { currentAccountsIn, mainAccountLabel } from './mainAccount'
 import { cellKey, type AccountSeries, type CellResult, type CellStatus, type EngineOutput } from './types'
@@ -107,8 +107,12 @@ export interface StatementLine {
   scheduled?: boolean
   /** With `scheduled`: how it repeats, in a few words ("Yearly (Jan)", "3 items repeat"). */
   repeats?: string
-  /** A scheduled row with nothing this month: the next month something lands in it. */
+  /** A scheduled line with nothing this month: the next month something lands in it. */
   nextDue?: MonthKey
+  /** On a schedule and not landing this month: a row with nothing in it, or one of a row's schedules, listed all the same. Shown grey. */
+  resting?: boolean
+  /** With `resting`: what it brings in `nextDue`, shown grey where the amount would be. It counts in no sum: the line's amount stays zero. */
+  upcoming?: { amount: Money; currency: string }
   missingRate?: boolean
   /** The amount in the row's own currency, when that is not the base currency. */
   native?: { amount: Money; currency: string }
@@ -223,21 +227,33 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   function rowLine(row: Row, c: CellResult, amount: Money, over: Partial<StatementLine> = {}): StatementLine {
     const live = c.items.filter((i) => !i.skipped)
     const empty = c.source === 'empty' || (c.source === 'items' && live.length === 0)
-    const children: StatementLine[] = live.length > 1
-      ? c.items.map((it) => {
-          const schedule = it.recurringItemId ? schedulesById.get(it.recurringItemId) : undefined
-          return {
-            id: `${row.id}:${it.id}`, kind: 'item' as const, label: it.label || 'Amount', amount: it.effectiveAmount, currency: c.currency, children: [],
-            status: it.status, estimate: !it.skipped && it.status === 'projected', skipped: !!it.skipped, scheduled: it.recurringItemId != null,
-            repeats: schedule ? describeCadence(schedule, household!.locale) : undefined,
-            rowId: row.id, itemId: it.id,
-          }
-        })
-      : []
     // A row on a schedule says so in every month, also in one where nothing lands: there it names the next month
-    // something does, so an empty line is not mistaken for a row nobody set up.
+    // something does and what that brings, in grey, so an empty line is not mistaken for a row nobody set up.
     const running = runningSchedules(tables.recurringItems, row.id, month)
-    const next = empty ? running.map((r) => nextDue(r, addMonths(month, 1))).filter((m): m is MonthKey => m !== null).sort()[0] : undefined
+    const comes = running.map((s) => ({ s, next: nextDue(s, addMonths(month, 1)) })).filter((x): x is { s: RecurringItem; next: MonthKey } => x.next !== null)
+    const next = empty ? comes.map((x) => x.next).sort()[0] : undefined
+    const upcoming = next ? { amount: comes.filter((x) => x.next === next).reduce((a, x) => a + x.s.amount, 0), currency: c.currency } : undefined
+    // What repeats in the row and has nothing in this month is listed under it all the same, so the row reads the
+    // same in every month: a yearly item is a grey line in the eleven months it does not land in.
+    const resting = comes.filter((x) => !c.items.some((i) => i.recurringItemId === x.s.id))
+    // one line says everything of a row that has one thing in it; from two on, the row opens to them
+    const listed = live.length > 1 || (resting.length > 0 && live.length + resting.length > 1)
+    const children: StatementLine[] = !listed ? [] : [
+      ...c.items.map((it) => {
+        const schedule = it.recurringItemId ? schedulesById.get(it.recurringItemId) : undefined
+        return {
+          id: `${row.id}:${it.id}`, kind: 'item' as const, label: it.label || 'Amount', amount: it.effectiveAmount, currency: c.currency, children: [],
+          status: it.status, estimate: !it.skipped && it.status === 'projected', skipped: !!it.skipped, scheduled: it.recurringItemId != null,
+          repeats: schedule ? describeCadence(schedule, household!.locale) : undefined,
+          rowId: row.id, itemId: it.id,
+        }
+      }),
+      ...resting.map(({ s, next: lands }) => ({
+        id: `${row.id}:next:${s.id}`, kind: 'item' as const, label: s.name, amount: 0, currency: c.currency, children: [], empty: true,
+        scheduled: true, repeats: describeCadence(s, household!.locale), nextDue: lands, resting: true, upcoming: { amount: s.amount, currency: c.currency },
+        rowId: row.id,
+      })),
+    ]
     // a transfer that feeds an account says how through its rule symbol, not through a tag
     const rule = canCarryRule(row) ? ruleOf(row) : undefined
     return {
@@ -247,7 +263,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
       automatic: c.source === 'derived', chip: c.source === 'derived' && !rule ? 'automatic' : undefined, rule, missingRate: c.missingRate || undefined,
       native: c.currency !== base ? { amount: c.value, currency: c.currency } : undefined,
       net: row.section === 'income' && c.deductionsBase > 0 ? c.netBase : undefined,
-      ...(running.length ? { scheduled: true, repeats: repeatsText(running, household!.locale), nextDue: next } : {}),
+      ...(running.length ? { scheduled: true, repeats: repeatsText(running, household!.locale), nextDue: next, upcoming, resting: empty || undefined } : {}),
       rowId: row.id, ...over,
     }
   }
