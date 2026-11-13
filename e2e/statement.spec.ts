@@ -1360,9 +1360,94 @@ test.describe('working the month in the Statement', () => {
     await moneyOut.getByRole('button', { name: 'Biscuit – Costs: empty' }).click()
     await dlg.getByRole('button', { name: 'Stop Dog tax' }).click()
     await dlg.getByRole('button', { name: 'From November 2026 on' }).click()
+    // stopped at once; the dialog stays open and says so, and the box of what lands elsewhere is gone
+    await expect(dlg.getByRole('status')).toHaveText('"Dog tax" is stopped from November 2026 on. What you typed here is still unsaved.')
+    await expect(dlg.getByTestId('elsewhere')).toHaveCount(0)
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
     await expect(dlg).toBeHidden()
     await expect(line('Biscuit – Costs').locator('[data-repeats]')).toHaveCount(0)
     await expect(line('Biscuit – Costs')).not.toContainText('next')
+  })
+
+  test('a long list of items scrolls inside the row\'s dialog, and removing one that repeats keeps what was typed', async ({ page }) => {
+    await openStatement(page)
+    await goToMonth(page, 'November 2026')
+    const moneyOut = page.getByRole('region', { name: 'Money out' })
+    const dlg = page.getByRole('dialog')
+    // once the window has its size: the whole dialog is inside it
+    const inside = (l: Locator, height: number) => expect(async () => {
+      const box = (await l.boundingBox())!
+      expect(box.y).toBeGreaterThanOrEqual(0)
+      expect(box.y + box.height).toBeLessThanOrEqual(height)
+    }).toPass({ timeout: 3000 })
+    await moneyOut.getByRole('button', { name: 'Living', exact: true }).click()
+
+    // two subscriptions that repeat, saved
+    await moneyOut.getByRole('button', { name: /^Health:/ }).click()
+    await dlg.getByRole('tab', { name: 'Itemized' }).click()
+    for (const [i, name] of ['Music', 'Films'].entries()) {
+      if (i > 0 || (await dlg.getByLabel('Item label').count()) === 0) await dlg.getByRole('button', { name: 'Add item' }).click()
+      await dlg.getByLabel('Item label').last().fill(name)
+      await dlg.getByLabel('Item amount').last().fill('10')
+      await dlg.getByLabel(`Repeats, ${name}`).selectOption({ label: 'Every month' })
+    }
+    await dlg.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(dlg).toBeHidden()
+    const health = moneyOut.getByRole('button', { name: /^Health:/ })
+    const before = euros((await health.getAttribute('aria-label'))!)
+
+    // many more are typed: the dialog stays on the screen, its list scrolls, and "Save" stays in reach
+    await moneyOut.getByRole('button', { name: /^Health:/ }).click()
+    for (let i = 1; i <= 14; i++) {
+      await dlg.getByRole('button', { name: 'Add item' }).click()
+      await dlg.getByLabel('Item label').last().fill(`Service ${i}`)
+      await dlg.getByLabel('Item amount').last().fill(String(i))
+    }
+    await inside(dlg, 900)
+    const save = dlg.getByRole('button', { name: 'Save', exact: true })
+    await expect(save).toBeInViewport({ ratio: 1 })
+    await dlg.getByText('Health · November 2026').scrollIntoViewIfNeeded()
+    await expect(dlg.getByText('Health · November 2026')).toBeInViewport({ ratio: 1 })
+    await expect(save).toBeInViewport({ ratio: 1 })
+    await settled(dlg)
+    await page.screenshot({ path: 'e2e/output/cell-long-list.png' })
+    await dlg.getByLabel('Item label').last().scrollIntoViewIfNeeded()
+    await expect(dlg.getByLabel('Item label').last()).toBeInViewport({ ratio: 1 })
+    await expect(save).toBeInViewport({ ratio: 1 })
+    // the same on a phone
+    await page.setViewportSize({ width: 390, height: 844 })
+    await inside(dlg, 844)
+    await expect(save).toBeInViewport({ ratio: 1 })
+    await dlg.getByLabel('Item label').first().scrollIntoViewIfNeeded()
+    await expect(dlg.getByLabel('Item label').first()).toBeInViewport({ ratio: 1 })
+    await page.setViewportSize({ width: 1440, height: 900 })
+
+    // one that repeats is removed from this month on: that is done at once, and the dialog keeps everything else
+    const films = dlg.locator('div.rounded-md.border').filter({ hasText: 'Films' }).first()
+    await films.getByRole('button', { name: 'Remove item' }).click()
+    await films.getByRole('button', { name: 'This and following months' }).click()
+    await expect(dlg).toBeVisible()
+    await expect(dlg.getByRole('status')).toHaveText('"Films" is removed from November 2026 on. What you typed here is still unsaved.')
+    await expect(dlg.getByText('Films', { exact: true })).toHaveCount(0)
+    await expect(dlg.getByLabel('Item label')).toHaveCount(14)
+    await expect(dlg.getByLabel('Item label').last()).toHaveValue('Service 14')
+    // and one with all its occurrences: the remove dialog asks, and the list is still there afterwards
+    const music = dlg.locator('div.rounded-md.border').filter({ hasText: 'Music' }).first()
+    await music.getByRole('button', { name: 'Remove item' }).click()
+    await music.getByRole('button', { name: 'All occurrences' }).click()
+    await page.getByRole('dialog').last().getByRole('button', { name: 'Delete', exact: true }).click()
+    await expect(dlg).toHaveCount(1)
+    await expect(dlg.getByRole('status')).toHaveText('"Music" is removed. What you typed here is still unsaved.')
+    await expect(dlg.getByLabel('Item label')).toHaveCount(14)
+    await expect(dlg.getByLabel('Item label').first()).toHaveValue('Service 1')
+
+    // saved: the fourteen are in the month (1 + 2 + … + 14 = 105), the two that were removed are not (10 each)
+    await dlg.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(dlg).toBeHidden()
+    await expect.poll(async () => euros((await health.getAttribute('aria-label'))!)).toBe(before - 20 + 105)
+    await moneyOut.getByRole('button', { name: 'Items of Health' }).click()
+    await expect(moneyOut.getByRole('button', { name: /^Health: Service 14: €14\.00/ })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: /^Health: (Music|Films):/ })).toHaveCount(0)
   })
 
   test('the link symbol joins a row and its account: pressing it goes to the other end, and an open one adds the missing row', async ({ page }) => {

@@ -535,6 +535,10 @@ test.describe('recurring from the grid', () => {
     const remove = page.getByRole('dialog', { name: 'Schedule "Car insurance"' })
     await expect(remove.getByText(/Its posted amount in \d+ open months/)).toBeVisible()
     await remove.getByRole('button', { name: 'Delete', exact: true }).click()
+    // the removal is done; the editor stays open and says so, in case more was typed in it
+    await expect(remove).toBeHidden()
+    await expect(page.getByRole('dialog').getByRole('status')).toHaveText('"Car insurance" is removed. What you typed here is still unsaved.')
+    await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click()
     await expect(page.getByRole('dialog')).toBeHidden()
     await expect(page.getByRole('button', { name: /^The car – Insurance Oct 2026: empty/ })).toBeVisible()
     await expect(page.getByRole('button', { name: /^The car – Insurance Jan 2027: empty/ })).toBeVisible()

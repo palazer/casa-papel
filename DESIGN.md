@@ -484,7 +484,10 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 
 - Buttons: `size="sm"` (28 px) for a toolbar's one primary action (`Close month`, `Export now`), `size="xs"` (24 px) for
   everything else in toolbars, lists and islands, `icon-xs` for icon buttons in toolbars. Dialog footers keep the default
-  size. Variants: `default` (lime) for the primary action or the active toggle, `outline` for the rest and inactive
+  size. **A dialog is never taller than the window** (`max-h-[calc(100dvh-2rem)]` on `DialogContent`): what does not
+  fit scrolls inside it (`overflow-y-auto overscroll-contain`), and its footer sticks to the foot (`sticky`, on an
+  opaque mix of muted and popover so the lines passing under it do not show through), so Save and Cancel stay in
+  reach under a long list. Variants: `default` (lime) for the primary action or the active toggle, `outline` for the rest and inactive
   toggles, `ghost` for quiet actions (Edit, Cancel), `destructive` for the irreversible. Toggle idiom:
   `variant={active ? 'default' : 'outline'}` (the entity-kind picker under People & things).
 - `MonthPicker`: two `icon-xs outline` buttons around the month as an `h2 text-sm font-medium`; lives in the page
@@ -589,6 +592,10 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
     schedule of the row with nothing in this month's list: the symbol and its name muted, its amount as a field, a
     bin (`Stop <name>`: `From <Month> on`, `All occurrences`) and the same `RepeatField` without `Only this month`.
     A change there counts from the month on screen.
+  - *Removing what repeats is done at once and never closes the dialog.* An item's bin asks `Only this month`,
+    `This and following months` or `All occurrences`; the answer is a step of its own (it does not wait for Save),
+    the item leaves the list, and a muted `role="status"` line says so: `"Films" is removed from November 2026 on.
+    What you typed here is still unsaved.` Everything else typed in the dialog stays as it is until Save or Cancel.
   - *The line under the list.* While nothing in the row repeats by itself it is a fieldset "The total" (`Every
     month`: later months show the total as one amount; `Only this month`). Once something does, it is one sentence
     in the foreground colour, said before saving because the row then stops carrying anything else forward: `From

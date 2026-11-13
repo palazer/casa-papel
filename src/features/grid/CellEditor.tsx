@@ -111,6 +111,8 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   const [others, setOthers] = useState<Record<string, { text?: string; repeat?: Repeating }>>({})
   /** The schedule from another month that is being asked how to stop. */
   const [stopping, setStopping] = useState<string | null>(null)
+  /** What a removal did, said in the dialog: it is done at once, and the rest of what was typed is still here. */
+  const [notice, setNotice] = useState<string | null>(null)
 
   const original = useMemo(() => new Map((cell?.items ?? []).map((i) => [i.id, i])), [cell])
   const schedules = useMemo(() => new Map(tables.recurringItems.map((r) => [r.id, r])), [tables.recurringItems])
@@ -248,7 +250,16 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
     setItems((l) => l.filter((x) => x.id !== id))
   }
 
-  /** Scheduled items are removed through the store so the schedule does not post them straight back. */
+  /** A schedule that was stopped or removed leaves the list; everything else typed here stays, still unsaved. */
+  function dropSchedule(scheduleId: string, said: string) {
+    setItems((list) => list.filter((x) => x.recurringItemId !== scheduleId))
+    setNotice(`${said} What you typed here is still unsaved.`)
+  }
+
+  /**
+   * Scheduled items are removed through the store so the schedule does not post them straight back. That is done at
+   * once and is a step of its own; the dialog stays open, so what else was typed in it is not lost.
+   */
   function removeScheduled(it: CellItem, how: 'this-month' | 'from-now-on' | 'all') {
     const scheduleId = it.recurringItemId!
     setRemoving(null)
@@ -260,8 +271,20 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
     } else if (how === 'all') {
       setRemovingSchedule(scheduleId)
     } else {
-      void run(() => endRecurringFrom(store, scheduleId, month))
+      void run(async () => {
+        await endRecurringFrom(store, scheduleId, month)
+        dropSchedule(scheduleId, `"${it.label}" is removed from ${formatMonth(month, locale, 'long')} on.`)
+      }, false)
     }
+  }
+
+  /** A schedule that lands in other months, stopped from this one on. */
+  function stopElsewhere(scheduleId: string, name: string) {
+    setStopping(null)
+    void run(async () => {
+      await endRecurringFrom(store, scheduleId, month)
+      dropSchedule(scheduleId, `"${name}" is stopped from ${formatMonth(month, locale, 'long')} on.`)
+    }, false)
   }
 
   function restoreScheduled(it: CellItem) {
@@ -492,7 +515,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                       {stopping === s.id && (
                         <div className="flex flex-wrap items-center gap-2 text-xs">
                           <span className="text-muted-foreground">Stop "{s.name}":</span>
-                          <Button size="xs" variant="outline" onClick={() => void run(() => endRecurringFrom(store, s.id, month))} disabled={busy}>From {formatMonth(month, locale, 'long')} on</Button>
+                          <Button size="xs" variant="outline" onClick={() => stopElsewhere(s.id, s.name)} disabled={busy}>From {formatMonth(month, locale, 'long')} on</Button>
                           <Button size="xs" variant="outline" onClick={() => { setStopping(null); setRemovingSchedule(s.id) }} disabled={busy}>All occurrences</Button>
                           <Button size="xs" variant="ghost" onClick={() => setStopping(null)}>Cancel</Button>
                         </div>
@@ -542,6 +565,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                 <p className="flex justify-between border-t pt-1 font-medium"><span>Net</span><span className="tabular-nums">{formatAmount(cell.netBase, household.baseCurrency, locale)}</span></p>
               </div>
             )}
+            {notice && <p className="text-xs text-muted-foreground" role="status">{notice}</p>}
             {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
           </div>
         )}
@@ -558,7 +582,12 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
           </DialogFooter>
         )}
       </DialogContent>
-      {removingSchedule && <RemoveDialog target={{ kind: 'schedule', id: removingSchedule }} tables={tables} household={household} onClose={() => setRemovingSchedule(null)} onDone={onClose} />}
+      {removingSchedule && (
+        <RemoveDialog
+          target={{ kind: 'schedule', id: removingSchedule }} tables={tables} household={household} onClose={() => setRemovingSchedule(null)}
+          onDone={() => dropSchedule(removingSchedule, `"${schedules.get(removingSchedule)?.name ?? 'It'}" is removed.`)}
+        />
+      )}
     </Dialog>
   )
 }
