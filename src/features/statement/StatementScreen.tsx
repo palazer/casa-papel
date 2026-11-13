@@ -150,8 +150,8 @@ export function StatementScreen() {
   /** The lines a link symbol has just moved the page to, for the two seconds they stay marked. */
   const [marked, setMarked] = useState<ReadonlySet<string> | null>(null)
   const markTimer = useRef<number | undefined>(undefined)
-  /** A row that was just added, until the page has shown where it is. */
-  const landing = useRef<string | null>(null)
+  /** A row that was just added, or moved to another category (`under` is that category's line), until the page has shown where it is. */
+  const landing = useRef<{ id: string; under?: string } | null>(null)
   /** The step the guided setup is on, and the household it was worked out for. */
   const [stepAt, setStepAt] = useState<SetupStepKey | null>(null)
   const [stepFor, setStepFor] = useState<string | null>(null)
@@ -203,14 +203,16 @@ export function StatementScreen() {
   const onToggle = useCallback((line: StatementLine) => setOpenLines((s) => ({ ...s, [line.id]: !(s[line.id] ?? ((line.open ?? false) || autoOpen.has(line.id))) })), [autoOpen])
 
   const openThese = useCallback((ids: string[]) => setOpenLines((s) => ({ ...s, ...Object.fromEntries(ids.map((id) => [id, true])) })), [])
-  // a row added a moment ago: once its dialog is closed and its line is on the page, the page shows where it landed
+  // a row added or moved a moment ago: once its dialog is closed and its line is on the page (for a moved row: under
+  // its new category, which the page learns a moment after the save), the page shows where it landed
   useEffect(() => {
-    const id = landing.current
-    if (!id || editor || !statement) return
+    const to = landing.current
+    if (!to || editor || !statement) return
     const all = linesOf(statement)
-    if (!pathTo(all, id)) return
+    const path = pathTo(all, to.id)
+    if (!path || (to.under && !path.includes(to.under))) return
     landing.current = null
-    reveal([id], all, { open: openThese, mark: setMarked, timer: markTimer }, true)
+    reveal([to.id], all, { open: openThese, mark: setMarked, timer: markTimer }, true)
   }, [editor, statement, openThese])
 
   // A heading someone folded stays folded on this device: read once the household is known, written as it changes.
@@ -294,7 +296,7 @@ export function StatementScreen() {
    */
   function onAdded(row: Row) {
     setOpenLines((s) => ({ ...s, [row.kind === 'pocket-money' ? 'pocket' : `cat:${row.section}:${row.categoryId ?? 'none'}`]: true }))
-    landing.current = row.id
+    landing.current = { id: row.id }
     if (!statement!.closed) setEditor({ rowId: row.id })
   }
   /** How much goes to an account: the dialog of the row that fills it, or the short one while nothing does. */
@@ -578,7 +580,13 @@ export function StatementScreen() {
           </button>
         </div>
       )}
-      {editing && <CellEditor key={`${editing.id}:${m}`} tables={tables} engine={engine} household={household} row={editing} month={m} startRule={editor?.start} onClose={() => setEditor(null)} />}
+      {editing && (
+        <CellEditor
+          key={`${editing.id}:${m}`} tables={tables} engine={engine} household={household} row={editing} month={m} startRule={editor?.start} onClose={() => setEditor(null)}
+          // a row saved into another category: once the dialog is closed the page shows where it went, as for a new row
+          onMoved={(categoryId) => { landing.current = { id: editing.id, under: `cat:${editing.section}:${categoryId ?? 'none'}` } }}
+        />
+      )}
       {goalEdit && (
         <GoalDialog
           household={household} tables={tables} goal={goalEdit.goal} preset={goalEdit.preset} onClose={() => setGoalEdit(null)}

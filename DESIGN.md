@@ -506,7 +506,14 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   codes (`w-24`, named `Currency of <row>`, the household's own first) beside "Amount in <code>", and on a line
   "Amounts in" above the items when itemized; it is the row's currency for every month, saved with the amount as one
   step, and a muted sentence says so once it differs. A row the app works out, a follower and a month that carries
-  another currency have no select; "Currency…" in the row menu stays for changing it without an amount. A currency
+  another currency have no select; "Currency…" in the row menu stays for changing it without an amount.
+  **A row's category is shown and changed there too**: on the line of the `Single amount | Itemized` tabs, at its
+  right end (under the tabs where there is no room), a muted `Category` and a `w-40` select named `Category of <row>`
+  with the section's categories and `No category`. It is the row's, for every month, and is saved with the amount in
+  the same step; once it differs a muted right-aligned sentence says `Once saved, this row is under Fun, in every
+  month.` Saved from the Statement, the page then shows where the row went, as for a new row: its new category opens
+  and its line is marked for two seconds. Only rows the Statement lists under categories have it (plain income and
+  expense rows, in a section that has categories); "Category…" in the row menu stays, with `New category…`. A currency
   without any rate is fetched as soon as it is picked, so the rate line can answer before the save.
   The cell editor's rate line (`src/features/grid/RateLine.tsx`) sits under an amount in another currency:
   `≈ €3,120.00 · 1 EUR = 1.084 USD · [ECB] 2 Nov 2026` with the table's chip tones, a ghost `xs` "Change this month's

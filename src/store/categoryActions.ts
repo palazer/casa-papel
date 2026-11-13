@@ -1,8 +1,7 @@
 import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing'
-import { sortRows } from '@/engine'
 import { CategorySchema, DEFAULT_CATEGORIES, RowSchema, newId, type Category, type Money, type MonthKey, type Section, type Tables } from '@/model'
 import type { Mutation, Store } from './store'
-import { categoryEstimateMutations, estimateRowName, estimateRowOf, loadTables } from './actions'
+import { categoryEstimateMutations, categoryPlacement, estimateRowName, estimateRowOf, loadTables } from './actions'
 
 const now = () => Date.now()
 const live = (cs: Category[]) => cs.filter((c) => !c.deletedAt)
@@ -96,10 +95,7 @@ export async function setRowCategory(store: Store, rowId: string, categoryId: st
     if (cat.section !== row.section) throw new Error(`"${cat.name}" belongs to another section.`)
   }
   if ((row.categoryId ?? null) === categoryId) return
-  if (row.kind === 'category-estimate') throw new Error(`"${row.name}" is its category's estimate and stays with it.`)
-  const group = sortRows(tables.rows.filter((r) => !r.deletedAt && r.id !== rowId && r.section === row.section && (r.categoryId ?? null) === categoryId), tables.categories)
-  const order = generateKeyBetween(group.at(-1)?.order ?? null, null)
-  await store.commit([{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, categoryId, order, updatedAt: now() }) }])
+  await store.commit([{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, ...categoryPlacement(tables, row, categoryId), updatedAt: now() }) }])
 }
 
 /** The usual expense categories, skipping names the household already has (case does not matter). Pure. */

@@ -39,6 +39,8 @@ interface Props {
   /** For a row that can carry a rule: the choice the dialog opens on, instead of how this month's amount is set now. */
   startRule?: RuleKind
   onClose: () => void
+  /** The row was saved into another category (null: into none): the screen can show where it went. */
+  onMoved?: (categoryId: string | null) => void
 }
 
 type Mode = 'value' | 'items'
@@ -50,10 +52,11 @@ const STATUS_LABEL: Record<ItemStatus, string> = { projected: 'Estimate', commit
  * how it repeats. A single amount stays every month, is for this month only, or goes on a schedule; every item says
  * for itself how it repeats, and the row's schedules that land in other months are listed too, so they can be
  * changed from any month. A row that can carry a rule (pocket money, the transfer that fills an account) starts with
- * "How the amount is set": a fixed amount shows these fields, a percentage or the rest shows the rule's. The currency
- * the row is typed in is chosen beside the amount: it is the row's, for every month, and is saved with the amount.
+ * "How the amount is set": a fixed amount shows these fields, a percentage or the rest shows the rule's. Two things
+ * of the row itself are chosen here too, for every month of it, and saved with the amount: the currency it is typed
+ * in, beside the amount, and the category it sorts under, on the line of the two tabs.
  */
-export function CellEditor({ tables, engine, household, row, month, startRule, onClose }: Props) {
+export function CellEditor({ tables, engine, household, row, month, startRule, onClose, onMoved }: Props) {
   const store = useStore()
   const cell = engine.cells[cellKey(row.id, month)]
   const closed = engine.totals[month]?.closed ?? false
@@ -77,6 +80,18 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   const canPickCurrency = stored === rowCurrency && !row.followsRowId && !derivedRowReason(row, household.closingRule)
   /** What the save hands on: the row's new currency (null for the household's own), or nothing when it did not change. */
   const newCurrency = picked != null && picked !== rowCurrency ? (picked === base ? null : picked) : undefined
+  // ----- the row's category: one of its section's, for a row the Statement lists under categories -----
+  const categories = useMemo(
+    () => tables.categories.filter((c) => !c.deletedAt && c.section === row.section).sort((a, b) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0)),
+    [tables.categories, row.section],
+  )
+  const rowCategory = row.categoryId && categories.some((c) => c.id === row.categoryId) ? row.categoryId : ''
+  /** The category chosen here ('' for none), until it is saved with the amount. */
+  const [category, setCategory] = useState(rowCategory)
+  const canPickCategory = categories.length > 0 && row.section !== 'transfer' && (row.kind === 'plain' || row.kind === 'salary')
+  const newCategory = category !== rowCategory ? category || null : undefined
+  /** What changed on the row itself and goes with the save; nothing when neither did. */
+  const rowChange = newCurrency !== undefined || newCategory !== undefined ? { currency: newCurrency, categoryId: newCategory } : undefined
   const locale = household.locale
   /** Rows driven by a schedule: no carry-forward, no single amount; the posted items are the content. */
   const isRecurringRow = engine.recurringRowIds.includes(row.id)
@@ -167,6 +182,12 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
     return engine.cells[cellKey(row.id, engine.months[idx - 1])]?.value ?? 0
   }
 
+  /** A save of the amount, and of what changed on the row with it; a row that changed category tells the screen. */
+  const saving = (fn: () => Promise<void>) => async () => {
+    await fn()
+    if (newCategory !== undefined) onMoved?.(newCategory)
+  }
+
   // one save at a time: Enter in the amount field is not a button, so `busy` alone does not stop a second press
   const running = useRef(false)
   async function run(fn: () => Promise<void>, close = true) {
@@ -196,11 +217,11 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
       if (minor === 0) return setError('Type the amount that repeats.')
       if (rhythm.kind === 'months' && rhythm.months.length === 0) return setError('Pick at least one month.')
       // the amount becomes the row's schedule, named after the row; it lands this month only if its rhythm does
-      return void run(() => saveRowMonth(store, row.id, month, { items: [single], repeats: { [single.id]: rhythm }, scope: 'from-now-on', currency: newCurrency }))
+      return void run(saving(() => saveRowMonth(store, row.id, month, { items: [single], repeats: { [single.id]: rhythm }, scope: 'from-now-on', row: rowChange })))
     }
     // A plain value takes the row's defaults; any other certainty or source is stored as one unlabelled item.
-    if (status === 'default' && fundedBy === row.defaultFundedBy) return void run(() => setCellValue(store, row.id, month, minor, saveScope, newCurrency))
-    void run(() => setCellItems(store, row.id, month, [single], saveScope, newCurrency))
+    if (status === 'default' && fundedBy === row.defaultFundedBy) return void run(saving(() => setCellValue(store, row.id, month, minor, saveScope, rowChange)))
+    void run(saving(() => setCellItems(store, row.id, month, [single], saveScope, rowChange)))
   }
 
   /** A scheduled item whose amount or funding was edited here. */
@@ -226,7 +247,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
       if (draft.repeat?.kind === 'months' && draft.repeat.months.length === 0) return setError(`Pick at least one month for "${s.name}".`)
       changes[s.id] = { amount, repeat: draft.repeat }
     }
-    void run(() => saveRowMonth(store, row.id, month, { items, repeats, applyTo, others: changes, scope: isRecurringRow ? 'this-month' : saveScope, currency: newCurrency }))
+    void run(saving(() => saveRowMonth(store, row.id, month, { items, repeats, applyTo, others: changes, scope: isRecurringRow ? 'this-month' : saveScope, row: rowChange })))
   }
 
   function updateItem(id: string, patch: Partial<CellItem>) {
@@ -337,10 +358,31 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
         ) : (
           <div className="space-y-4">
             {facts && !facts.error && <RulePicker facts={facts} kind={ruleKind} onKind={setRuleKind} />}
-            {!isRecurringRow && (
-              <div className="inline-flex rounded-md border p-0.5 text-sm" role="tablist">
-                <button role="tab" aria-selected={mode === 'value'} className={cn('rounded px-3 py-1', mode === 'value' && 'bg-muted font-medium')} onClick={() => setMode('value')}>Single amount</button>
-                <button role="tab" aria-selected={mode === 'items'} className={cn('rounded px-3 py-1', mode === 'items' && 'bg-muted font-medium')} onClick={() => setMode('items')}>Itemized</button>
+            {(!isRecurringRow || canPickCategory) && (
+              <div className="space-y-1.5">
+                {/* how the amount is typed on the left; where the row sorts on the right, on the same line where there is room */}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  {!isRecurringRow ? (
+                    <div className="inline-flex rounded-md border p-0.5 text-sm" role="tablist">
+                      <button role="tab" aria-selected={mode === 'value'} className={cn('rounded px-3 py-1', mode === 'value' && 'bg-muted font-medium')} onClick={() => setMode('value')}>Single amount</button>
+                      <button role="tab" aria-selected={mode === 'items'} className={cn('rounded px-3 py-1', mode === 'items' && 'bg-muted font-medium')} onClick={() => setMode('items')}>Itemized</button>
+                    </div>
+                  ) : <span />}
+                  {canPickCategory && (
+                    <span className="flex items-center gap-2 text-sm">
+                      <span className="text-muted-foreground">Category</span>
+                      <NativeSelect aria-label={`Category of ${row.name}`} className="w-40" value={category} onChange={(e) => setCategory(e.target.value)}>
+                        {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        <option value="">No category</option>
+                      </NativeSelect>
+                    </span>
+                  )}
+                </div>
+                {newCategory !== undefined && (
+                  <p className="text-right text-xs text-muted-foreground" data-testid="category-note">
+                    Once saved, this row is {category ? `under ${categories.find((c) => c.id === category)?.name}` : 'in no category'}, in every month.
+                  </p>
+                )}
               </div>
             )}
 

@@ -1369,6 +1369,77 @@ test.describe('working the month in the Statement', () => {
     await expect(line('Biscuit – Costs')).not.toContainText('next')
   })
 
+  test('a row\'s category is shown in its dialog and changed there: the row moves, and the page shows where it went', async ({ page }) => {
+    await openStatement(page)
+    await goToMonth(page, 'November 2026')
+    const moneyOut = page.getByRole('region', { name: 'Money out' })
+    const dlg = page.getByRole('dialog')
+    const row = moneyOut.getByRole('button', { name: /^Sam – Personal:/ })
+    const heading = (name: string) => moneyOut.getByRole('button', { name, exact: true })
+
+    // the dialog says which category the row is under, at the right end of the line of the two tabs
+    await heading('Personal').click()
+    await row.click()
+    const select = dlg.getByLabel('Category of Sam – Personal')
+    await expect(select.locator('option:checked')).toHaveText('Personal')
+    await expect(select.locator('option')).toHaveText(['Housing', 'Living', 'Transport', 'Family & pets', 'Fun', 'Personal', 'No category'])
+    const tabs = (await dlg.getByRole('tablist').boundingBox())!
+    const box = (await select.boundingBox())!
+    const whole = (await dlg.boundingBox())!
+    expect(Math.abs(tabs.y + tabs.height / 2 - (box.y + box.height / 2))).toBeLessThan(6)
+    expect(box.x).toBeGreaterThan(tabs.x + tabs.width)
+    expect(whole.x + whole.width - (box.x + box.width)).toBeLessThan(24)
+    await expect(dlg.getByTestId('category-note')).toHaveCount(0)
+
+    // another one is picked: the dialog says what Save will do, and nothing has moved yet
+    await select.selectOption({ label: 'Fun' })
+    await expect(dlg.getByTestId('category-note')).toHaveText('Once saved, this row is under Fun, in every month.')
+    await settled(dlg)
+    await dlg.screenshot({ path: 'e2e/output/cell-category.png' })
+    // on a phone the choice goes under the tabs and stays inside the dialog
+    await page.setViewportSize({ width: 390, height: 844 })
+    await expect(async () => {
+      const b = (await select.boundingBox())!
+      expect(b.x).toBeGreaterThanOrEqual(0)
+      expect(b.x + b.width).toBeLessThanOrEqual(390)
+    }).toPass({ timeout: 3000 })
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await dlg.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(dlg).toBeHidden()
+
+    // saved: "Fun" was closed and opens, the row is in it and marked for a moment
+    await expect(row).toBeVisible()
+    await expect(moneyOut.locator('[data-line]').filter({ hasText: 'Sam – Personal' }).first()).toHaveAttribute('data-marked', 'true')
+    await expect(heading('Fun')).toHaveAttribute('aria-expanded', 'true')
+    // it is under "Fun" and no longer under "Personal", which is still open
+    await heading('Fun').click()
+    await expect(row).toHaveCount(0)
+    await expect(heading('Personal')).toHaveAttribute('aria-expanded', 'true')
+    await heading('Fun').click()
+    await expect(row).toBeVisible()
+
+    // one step: undo takes the row back to "Personal"
+    await page.getByRole('button', { name: 'Undo' }).click()
+    await heading('Fun').click()
+    await expect(row).toBeVisible()
+    await row.click()
+    await expect(dlg.getByLabel('Category of Sam – Personal').locator('option:checked')).toHaveText('Personal')
+
+    // "No category" takes it out of all of them
+    await dlg.getByLabel('Category of Sam – Personal').selectOption({ label: 'No category' })
+    await expect(dlg.getByTestId('category-note')).toHaveText('Once saved, this row is in no category, in every month.')
+    await dlg.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(dlg).toBeHidden()
+    await expect(heading('No category')).toHaveAttribute('aria-expanded', 'true')
+    await heading('Personal').click()
+    await expect(row).toBeVisible()
+
+    // a transfer has no category, and its dialog offers none
+    await moneyOut.getByRole('button', { name: /^To Travel:/ }).click()
+    await expect(dlg).toBeVisible()
+    await expect(dlg.getByLabel(/^Category of/)).toHaveCount(0)
+  })
+
   test('a long list of items scrolls inside the row\'s dialog, and removing one that repeats keeps what was typed', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'November 2026')

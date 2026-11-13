@@ -62,34 +62,53 @@ export function freezeNext(tables: Tables, engine: EngineOutput, rowId: string, 
   return [putCell({ rowId, month: next, mode: 'value', value: held, items: [], note: null, currencyOverride: null, updatedAt: now() })]
 }
 
-/**
- * The row's dialog can change the row's currency in the same step as the month's amount: the row record that goes
- * with that save. `undefined` leaves the row alone; null is the household currency.
- */
-export function rowCurrencyPut(tables: Tables, rowId: string, currency: string | null | undefined): Mutation[] {
-  if (currency === undefined) return []
-  const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
-  if (!row || (row.currency ?? null) === currency) return []
-  return [{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, currency, updatedAt: now() }) }]
+/** What the row's dialog can change on the row itself, in the same step as the month's amount. A field left out stays as it is. */
+export interface RowChange {
+  /** The currency the row is typed in; null is the household's own. */
+  currency?: string | null
+  /** The category the row sorts under, one of its section's; null is none. */
+  categoryId?: string | null
 }
 
-export async function setCellValue(store: Store, rowId: string, month: MonthKey, value: Money, scope: EditScope, rowCurrency?: string | null): Promise<void> {
+/** Where a row goes when it moves to a category of its section (or to none): the end of that group. Throws when it cannot go there. */
+export function categoryPlacement(tables: Tables, row: Row, categoryId: string | null): { categoryId: string | null; order: string } {
+  if (categoryId) {
+    const cat = tables.categories.find((c) => c.id === categoryId && !c.deletedAt)
+    if (!cat) throw new Error('That category no longer exists.')
+    if (cat.section !== row.section) throw new Error(`"${cat.name}" belongs to another section.`)
+  }
+  if (row.kind === 'category-estimate') throw new Error(`"${row.name}" is its category's estimate and stays with it.`)
+  const group = sortRows(tables.rows.filter((r) => !r.deletedAt && r.id !== row.id && r.section === row.section && (r.categoryId ?? null) === categoryId), tables.categories)
+  return { categoryId, order: generateKeyBetween(group.at(-1)?.order ?? null, null) }
+}
+
+/** The row record that goes with a save of the row's dialog: one put for whatever changed on the row, none when nothing did. */
+export function rowChangePut(tables: Tables, rowId: string, change: RowChange | undefined): Mutation[] {
+  const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
+  if (!change || !row) return []
+  let next: Row = row
+  if (change.currency !== undefined && (row.currency ?? null) !== change.currency) next = { ...next, currency: change.currency }
+  if (change.categoryId !== undefined && (row.categoryId ?? null) !== change.categoryId) next = { ...next, ...categoryPlacement(tables, row, change.categoryId) }
+  return next === row ? [] : [{ op: 'put', table: 'rows', record: RowSchema.parse({ ...next, updatedAt: now() }) }]
+}
+
+export async function setCellValue(store: Store, rowId: string, month: MonthKey, value: Money, scope: EditScope, rowChange?: RowChange): Promise<void> {
   const { tables, engine } = await engineUpTo(store, month)
   assertOpen(tables, month)
   const mutations: Mutation[] = scope === 'this-month' ? freezeNext(tables, engine, rowId, month) : []
   const existing = cellOf(tables, rowId, month)
   mutations.push(putCell({ rowId, month, mode: 'value', value, items: [], note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, updatedAt: now() }))
-  mutations.push(...rowCurrencyPut(tables, rowId, rowCurrency))
+  mutations.push(...rowChangePut(tables, rowId, rowChange))
   await store.commit(mutations)
 }
 
-export async function setCellItems(store: Store, rowId: string, month: MonthKey, items: CellItem[], scope: EditScope = 'from-now-on', rowCurrency?: string | null): Promise<void> {
+export async function setCellItems(store: Store, rowId: string, month: MonthKey, items: CellItem[], scope: EditScope = 'from-now-on', rowChange?: RowChange): Promise<void> {
   const { tables, engine } = await engineUpTo(store, month)
   assertOpen(tables, month)
   const mutations: Mutation[] = scope === 'this-month' ? freezeNext(tables, engine, rowId, month) : []
   const existing = cellOf(tables, rowId, month)
   mutations.push(putCell({ rowId, month, mode: 'items', value: null, items, note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, updatedAt: now() }))
-  mutations.push(...rowCurrencyPut(tables, rowId, rowCurrency))
+  mutations.push(...rowChangePut(tables, rowId, rowChange))
   await store.commit(mutations)
 }
 

@@ -144,7 +144,7 @@ export const GUIDE: GuideTopic[] = [
       'Pick "Comes out of" → "Savings balance" or "Virtual account: Travel" for spending that should not reduce the leftover.',
       'For a whole row: row menu → "Comes out of…" → "Single amounts in this row come out of" → "Applies to": "From <Month> on" or "All months, past included" → "Save".',
       'Row menu → "Treat new values as certain" (or "…as estimates") for the row\'s default.',
-      'Row menu → "Category…" → pick one, "New category…" or "Add the usual categories"; rename and reorder them under Household → "Categories".',
+      'To move a row to another category, press it and pick under "Category" at the top right of its dialog, then "Save": the row is there in every month. Row menu → "Category…" does the same and adds "New category…" and "Add the usual categories"; rename and reorder them under Household → "Categories".',
     ],
     tips: ['section.expense', 'cell.howSure', 'cell.comesOutOf', 'row.category', 'household.categories', 'household.usualCategories', 'row.categoryEstimate', 'derived.expensesTotal', 'derived.fromSavings'],
     open: 'statement',

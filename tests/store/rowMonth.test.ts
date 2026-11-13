@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { cellKey, computeEngine } from '@/engine'
 import { describeCadence, monthRange, newId, type CellItem } from '@/model'
-import { CasaDb, Store, addRecurringItem, loadTables, planRecurringPosts, postRecurring, quickCreateHousehold, saveRowMonth, setCellItems, setCellValue } from '@/store'
+import { CasaDb, Store, addCategory, addRecurringItem, addRow, loadTables, planRecurringPosts, postRecurring, quickCreateHousehold, saveRowMonth, setCellItems, setCellValue } from '@/store'
 
 const months = monthRange('2026-01', '2026-12')
 
@@ -141,7 +141,7 @@ describe('the row\'s currency, chosen in its dialog', () => {
 
   it('goes with the amount: one step, and one undo takes both back', async () => {
     const { store, row } = await fresh()
-    await setCellValue(store, row.id, '2026-02', 100000, 'from-now-on', 'USD')
+    await setCellValue(store, row.id, '2026-02', 100000, 'from-now-on', { currency: 'USD' })
     expect(await currencyOf(store, row.id)).toBe('USD')
     expect((await valuesOf(store, row.id)).slice(0, 3)).toEqual([0, 100000, 100000])
     await store.undo()
@@ -151,20 +151,51 @@ describe('the row\'s currency, chosen in its dialog', () => {
 
   it('is saved from every way the dialog saves, and null is the household\'s own again', async () => {
     const { store, row } = await fresh()
-    await setCellItems(store, row.id, '2026-02', [item({ amount: 5000, status: 'done' })], 'from-now-on', 'TRY')
+    await setCellItems(store, row.id, '2026-02', [item({ amount: 5000, status: 'done' })], 'from-now-on', { currency: 'TRY' })
     expect(await currencyOf(store, row.id)).toBe('TRY')
-    await saveRowMonth(store, row.id, '2026-03', { items: [item({ label: 'A', amount: 100 }), item({ label: 'B', amount: 200 })], scope: 'from-now-on', currency: 'USD' })
+    await saveRowMonth(store, row.id, '2026-03', { items: [item({ label: 'A', amount: 100 }), item({ label: 'B', amount: 200 })], scope: 'from-now-on', row: { currency: 'USD' } })
     expect(await currencyOf(store, row.id)).toBe('USD')
     // left out, the row keeps what it has
     await saveRowMonth(store, row.id, '2026-04', { items: [item({ label: 'C', amount: 300 })], scope: 'from-now-on' })
     await setCellValue(store, row.id, '2026-05', 700, 'from-now-on')
     expect(await currencyOf(store, row.id)).toBe('USD')
-    await saveRowMonth(store, row.id, '2026-06', { items: [item({ label: 'D', amount: 400 })], scope: 'from-now-on', currency: null })
+    await saveRowMonth(store, row.id, '2026-06', { items: [item({ label: 'D', amount: 400 })], scope: 'from-now-on', row: { currency: null } })
     expect(await currencyOf(store, row.id)).toBeNull()
     // the same currency again writes no row
     const before = (await loadTables(store)).rows.find((r) => r.id === row.id)!.updatedAt
-    await setCellValue(store, row.id, '2026-07', 900, 'from-now-on', null)
+    await setCellValue(store, row.id, '2026-07', 900, 'from-now-on', { currency: null })
     expect((await loadTables(store)).rows.find((r) => r.id === row.id)!.updatedAt).toBe(before)
+  })
+})
+
+describe('the row\'s category, chosen in its dialog', () => {
+  const rowOf = async (store: Store, rowId: string) => (await loadTables(store)).rows.find((r) => r.id === rowId)!
+
+  it('moves the row with the amount in one step, to the end of its new category; one undo takes both back', async () => {
+    const { store, row } = await fresh()
+    const hobbies = await addCategory(store, { name: 'Hobbies', section: 'expense' })
+    const first = await addRow(store, { name: 'Climbing', section: 'expense', categoryId: hobbies.id })
+    await setCellValue(store, row.id, '2026-02', 100000, 'from-now-on', { categoryId: hobbies.id, currency: 'USD' })
+    const moved = await rowOf(store, row.id)
+    expect([moved.categoryId, moved.currency]).toEqual([hobbies.id, 'USD'])
+    expect(moved.order > (await rowOf(store, first.id)).order).toBe(true)
+    expect((await valuesOf(store, row.id))[1]).toBe(100000)
+    await store.undo()
+    const back = await rowOf(store, row.id)
+    expect([back.categoryId, back.currency, back.order]).toEqual([row.categoryId, null, row.order])
+    expect((await valuesOf(store, row.id))[1]).toBe(0)
+    // null is no category; the itemized save takes it too
+    await saveRowMonth(store, row.id, '2026-03', { items: [item({ label: 'A', amount: 100 }), item({ label: 'B', amount: 200 })], scope: 'from-now-on', row: { categoryId: null } })
+    expect((await rowOf(store, row.id)).categoryId).toBeNull()
+  })
+
+  it('refuses a category of another section, and then saves nothing at all', async () => {
+    const { store, row } = await fresh()
+    const jobs = await addCategory(store, { name: 'Jobs', section: 'income' })
+    await expect(setCellValue(store, row.id, '2026-02', 100000, 'from-now-on', { categoryId: jobs.id })).rejects.toThrow('"Jobs" belongs to another section.')
+    await expect(saveRowMonth(store, row.id, '2026-02', { items: [item({ amount: 100 })], scope: 'from-now-on', row: { categoryId: jobs.id } })).rejects.toThrow('"Jobs" belongs to another section.')
+    expect((await rowOf(store, row.id)).categoryId).toBe(row.categoryId)
+    expect((await valuesOf(store, row.id))[1]).toBe(0)
   })
 })
 
