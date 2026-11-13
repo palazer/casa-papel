@@ -508,11 +508,14 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   The cell editor's rate line (`src/features/grid/RateLine.tsx`) sits under an amount in another currency:
   `≈ €3,120.00 · 1 EUR = 1.084 USD · [ECB] 2 Nov 2026` with the table's chip tones, a ghost `xs` "Change this month's
   rate…" that reveals an inline input (one rate per currency per month), and "Use the ECB rate again" while the rate is
-  manual. The ECB day is the Month rate setting's, the first business day by default. **The Statement carries the same
-  line under its progress line**, without the amount (`1 EUR = 1.084 USD · [ECB] 2 Nov 2026`, `data-testid="month-rates"`),
-  once for every other currency the month on screen counts in (its rows and accounts, and the current accounts), so
-  the month's rate is read and typed over where the month is read; a household with one currency shows nothing there,
-  and a closed month shows the rate without the two buttons.
+  manual. The ECB day is the Month rate setting's, the first business day by default. **On the Statement the month's rate is a
+  chip in the toolbar** (`RateChip`, after the legend and before the month's primary action; `data-testid="month-rates"`),
+  once for every other currency the month on screen counts in (its rows and accounts, and the current accounts): the
+  rate alone, `1 EUR = 1.084 USD` (`No USD rate` while there is none), in the tone of where it came from (zinc ECB or
+  carried, sky yours, amber projected, rose missing), so the page carries one small tag and no line of its own. The
+  chip is a button: it opens a popover with the source in words, a field to type a rate for this month (`Save rate`),
+  `Use the ECB rate again` once the rate is yours, and the (i) text inline. A household with one currency shows
+  nothing; a closed month's chip opens to the rate and its source and changes nothing.
 - A currency is always chosen from a list, never typed: `currencyChoices` in `src/app/currencies.ts` (the household's
   own first, labelled `EUR (household currency)`, then the currencies the ECB publishes; a code in use that is not on
   the list stays selectable). A currency that comes into use and has no rate at all yet gets the ECB's by itself

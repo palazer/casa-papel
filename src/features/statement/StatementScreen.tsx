@@ -22,7 +22,6 @@ import { AddRowInline } from '@/features/grid/AddRowInline'
 import { BalanceDialog } from '@/features/grid/BalanceDialog'
 import { CurrentBalanceDialog } from '@/features/grid/CurrentBalanceDialog'
 import { CellEditor } from '@/features/grid/CellEditor'
-import { RateLine } from '@/features/grid/RateLine'
 import { RowMenu } from '@/features/grid/RowMenu'
 import { HouseholdAccountDialog } from '@/features/household/HouseholdAccountDialog'
 import { PoolDialog } from '@/features/household/PoolsCard'
@@ -32,6 +31,7 @@ import { AddCategoryInline } from './AddCategoryInline'
 import { CategoryMenu } from './CategoryMenu'
 import { EstimateDialog } from './EstimateDialog'
 import { PerPerson } from './PerPerson'
+import { RateChip } from './RateChip'
 import { monthProgress, nearestMonth, progressText } from './progress'
 import { SetupGuide } from './SetupGuide'
 import { StatementBand } from './StatementBand'
@@ -249,9 +249,8 @@ export function StatementScreen() {
     }
   }
   const progress = monthProgress(engine.rows, engine.cells, m)
-  const counted = statement.closed || progress.total > 0
   // The other currencies this month's page counts in: those of its rows and accounts, and of the current accounts
-  // behind the first line of the lower half. Each shows its rate for the month under the toolbar.
+  // behind the first line of the lower half. Each shows its rate for the month as a chip in the toolbar.
   const currencies = [...new Set([
     ...walk(linesOf(statement)).flatMap((l) => (l.native ? [l.native.currency] : [])),
     ...currentAccountsIn(tables.accounts, m).map((a) => a.currency),
@@ -533,6 +532,12 @@ export function StatementScreen() {
           <InfoTip help="statement.suggestions" />
         </span>
         <MarksLegend neg={neg} />
+        {/* What another currency is worth this month: a chip to read, and to press for a rate of one's own */}
+        {currencies.length > 0 && (
+          <span className="inline-flex flex-wrap items-center gap-1.5" data-testid="month-rates">
+            {currencies.map((c) => <RateChip key={`${c}:${m}`} tables={tables} household={household} month={m} currency={c} locked={statement.closed} />)}
+          </span>
+        )}
         {/* a household that is still being set up has nothing to close yet; a closed month can always be reopened */}
         {statement.closed ? (
           <Button size="sm" variant="outline" onClick={() => act(() => reopenMonth(store, m))}>Reopen month</Button>
@@ -543,22 +548,12 @@ export function StatementScreen() {
         {statement.warnings.map((w) => <p key={w} className="basis-full text-amber-700">{w}</p>)}
       </PageHeader>
 
-      {(counted || currencies.length > 0) && (
-        <div className="space-y-1">
-          {/* How much of the month is ticked and what is still open; a month with nothing in it has nothing to count */}
-          {counted && (
-            <p role="status" className="flex items-center gap-1 text-xs text-muted-foreground" data-testid="progress">
-              <span>{progressText(progress, statement.closed, ccy, locale)}</span>
-              <InfoTip help="statement.progress" />
-            </p>
-          )}
-          {/* What another currency is worth this month, and the way to type a rate of one's own; a closed month only shows it */}
-          {currencies.length > 0 && (
-            <div className="space-y-1" data-testid="month-rates">
-              {currencies.map((c) => <RateLine key={`${c}:${m}`} tables={tables} household={household} month={m} currency={c} help="statement.rate" locked={statement.closed} />)}
-            </div>
-          )}
-        </div>
+      {/* How much of the month is ticked and what is still open; a month with nothing in it has nothing to count */}
+      {(statement.closed || progress.total > 0) && (
+        <p role="status" className="flex items-center gap-1 text-xs text-muted-foreground" data-testid="progress">
+          <span>{progressText(progress, statement.closed, ccy, locale)}</span>
+          <InfoTip help="statement.progress" />
+        </p>
       )}
 
       {settingUp && <SetupGuide steps={steps} current={step} action={stepAction} onStep={onStep} onDone={leaveSetup} />}

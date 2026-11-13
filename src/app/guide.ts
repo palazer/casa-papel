@@ -298,7 +298,7 @@ export const GUIDE: GuideTopic[] = [
     ],
     steps: [
       'Press a row to open its dialog and pick the currency beside the amount: it is the row\'s, for every month, and is saved with the amount. The same choice is in the row menu → "Currency…" → "Amounts in this row are in" (the first entry, "EUR (household currency)", is the default) → "Save".',
-      'Open a cell of that row; under the amount, "Change this month\'s rate…" → type after "1 USD =" → "Save rate". One rate per currency per month, for every row and balance in it. The Statement shows the same line under its toolbar for every other currency the month uses.',
+      'Open a cell of that row; under the amount, "Change this month\'s rate…" → type after "1 USD =" → "Save rate". One rate per currency per month, for every row and balance in it. On the Statement the month\'s rate is a chip in the toolbar, "1 EUR = 1.08 USD": press it to type your own or to go back to the ECB\'s.',
       '"Use the ECB rate again" drops a manual rate for the published one.',
       'An account\'s currency is under "More options" in its dialog. Household → "Currency rates" → "Fetch ECB rates" fills the months since the last fetch, and is the way back after being offline.',
       '"Month rate": "First business day of the month", "Last business day of the month" or "Average over the month".',

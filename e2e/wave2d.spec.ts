@@ -137,18 +137,19 @@ test('a row in another currency: the typed amount, the household value beneath, 
   await expect(novRow.getByText('manual', { exact: true })).toHaveCount(0)
 })
 
-test('the Statement shows the month\'s rate for another currency, and takes one typed there', async ({ page }) => {
+test('the Statement shows the month\'s rate as a chip in its toolbar: pressed, it takes a rate of one\'s own and gives the ECB\'s back', async ({ page }) => {
   await page.route('https://api.frankfurter.dev/**', (r) => r.fulfill({ json: { rates: { '2026-10-01': { USD: 1.1 }, '2026-11-02': { USD: 1.25 } } } }))
   await loadDemo(page)
   const nav = page.getByRole('navigation', { name: 'Screens' })
   const rates = page.getByTestId('month-rates')
-  const line = rates.getByTestId('rate-line')
+  const chip = rates.getByTestId('rate-chip')
+  const pop = page.getByTestId('rate-popover')
   // a household with one currency has no rate to show
   await nav.getByRole('link', { name: 'Statement' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Statement' })).toBeVisible()
   await expect(rates).toHaveCount(0)
 
-  // a row in dollars: the month's rate stands under the toolbar, with where it came from and no amount before it
+  // a row in dollars: the month's rate is one chip in the toolbar, the rate and nothing else, grey for the ECB's
   await nav.getByRole('link', { name: 'Grid' }).click()
   await page.getByRole('button', { name: 'Row menu for Other income' }).click()
   await page.getByRole('menuitem', { name: 'Currency…' }).click()
@@ -157,40 +158,64 @@ test('the Statement shows the month\'s rate for another currency, and takes one 
   await dlg.getByRole('button', { name: 'Save' }).click()
   await expect(dlg).toBeHidden()
   await nav.getByRole('link', { name: 'Statement' }).click()
-  await expect(line).toHaveCount(1)
-  await expect(line).toContainText('1 EUR = 1.25 USD')
-  await expect(line).toContainText('ECB')
-  await expect(line).not.toContainText('≈')
+  await expect(chip).toHaveCount(1)
+  await expect(chip).toHaveText('1 EUR = 1.25 USD')
+  await expect(chip).toHaveAttribute('data-source', 'ECB')
+  // it stands with the toolbar's buttons, above the line that counts the month
+  await expect(page.locator('header').getByTestId('rate-chip')).toBeVisible()
+  const chipBox = (await chip.boundingBox())!
+  const legend = (await page.getByRole('button', { name: 'What the colours and marks mean' }).boundingBox())!
+  const progress = (await page.getByTestId('progress').boundingBox())!
+  expect(chipBox.y + chipBox.height).toBeLessThanOrEqual(progress.y)
+  expect(Math.abs(chipBox.y + chipBox.height / 2 - (legend.y + legend.height / 2))).toBeLessThan(6)
+  await expect(page.getByTestId('rate-line')).toHaveCount(0)
   const other = page.getByRole('region', { name: 'Money in' }).locator('[data-line]').filter({ hasText: 'Other income' }).first()
   await expect(other).toContainText('€120.00')
 
-  // a rate of one's own, typed on the spot: every dollar amount of the month follows it
-  await line.getByRole('button', { name: "Change this month's rate…" }).click()
-  await line.getByLabel('1 EUR =').fill('1.50')
-  await line.getByRole('button', { name: 'Save rate' }).click()
-  await expect(line).toContainText('1 EUR = 1.50 USD')
-  await expect(line).toContainText('manual')
+  // pressed, it says where the rate is from and takes a rate of one's own: every dollar amount of the month follows
+  await chip.click()
+  await expect(pop).toContainText('USD in November 2026')
+  await expect(pop).toContainText('The European Central Bank\'s rate. Taken on 2 Nov 2026.')
+  await expect(pop.getByRole('button', { name: 'Use the ECB rate again' })).toHaveCount(0)
+  await expect(pop.getByLabel('1 EUR =')).toHaveValue('1.25')
+  await pop.getByLabel('1 EUR =').fill('0')
+  await pop.getByRole('button', { name: 'Save rate' }).click()
+  await expect(pop.getByRole('alert')).toHaveText('A rate must be a positive number.')
+  await pop.getByLabel('1 EUR =').fill('1.50')
+  await pop.getByLabel('1 EUR =').press('Enter')
+  await expect(pop).toBeHidden()
+  await expect(chip).toHaveText('1 EUR = 1.50 USD')
+  await expect(chip).toHaveAttribute('data-source', 'manual')
   await expect(other).toContainText('€100.00')
   await page.screenshot({ path: 'e2e/output/statement-rate.png' })
 
-  // the month before keeps its own rate; a closed month shows its rate and changes none
+  // the month before keeps its own rate; a closed month's chip opens to the rate and changes none
   await page.getByRole('button', { name: 'Previous month' }).click()
   await expect(page.getByRole('heading', { level: 2, name: 'October 2026' })).toBeVisible()
-  await expect(line).toContainText('1 EUR = 1.10 USD')
+  await expect(chip).toHaveText('1 EUR = 1.10 USD')
   await page.getByRole('button', { name: 'Previous month' }).click()
   await expect(page.getByRole('heading', { level: 2, name: 'September 2026' })).toBeVisible()
   await expect(page.getByText('closed', { exact: true })).toBeVisible()
-  await expect(line).toContainText('1 EUR = 1.10 USD')
-  await expect(line.getByRole('button')).toHaveCount(1) // its (i)
+  await expect(chip).toHaveText('1 EUR = 1.10 USD')
+  await chip.click()
+  await expect(pop).toContainText('September 2026 is closed: reopen it to change its rate.')
+  await expect(pop.getByRole('textbox')).toHaveCount(0)
+  await expect(pop.getByRole('button')).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(pop).toBeHidden()
 
-  // and back to the ECB's
+  // and back to the ECB's, offered once the rate is one's own
   await page.getByRole('button', { name: 'Next month' }).click()
   await page.getByRole('button', { name: 'Next month' }).click()
   await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
   await page.route('https://api.frankfurter.dev/**', (r) => r.fulfill({ json: { rates: { '2026-11-02': { USD: 1.25 } } } }))
-  await line.getByRole('button', { name: 'Use the ECB rate again' }).click()
-  await expect(line).toContainText('1 EUR = 1.25 USD')
-  await expect(line).toContainText('ECB')
+  await chip.click()
+  await expect(pop).toContainText('Your own rate for this month.')
+  await page.screenshot({ path: 'e2e/output/statement-rate-open.png' })
+  await pop.getByRole('button', { name: 'Use the ECB rate again' }).click()
+  await expect(pop).toBeHidden()
+  await expect(chip).toHaveText('1 EUR = 1.25 USD')
+  await expect(chip).toHaveAttribute('data-source', 'ECB')
   await expect(other).toContainText('€120.00')
 })
 
