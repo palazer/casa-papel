@@ -113,27 +113,63 @@ export function accountSuggestions(tables: Tables): AccountSuggestion[] {
   return all.filter((s) => !dismissed.has(s.id))
 }
 
-export type SetupStepKey = 'income' | 'accounts' | 'expenses' | 'rest' | 'goals'
+export type SetupStepKey = 'income' | 'expenses' | 'savings' | 'virtual' | 'investments' | 'debts'
 export interface SetupStep {
   key: SetupStepKey
+  /** The step's short name, for its number in the guide ("Income"). */
   label: string
-  /** Its part of the Statement has something in it. */
+  /** What the step asks for is there: its part of the Statement has it. */
   done: boolean
-  optional: boolean
 }
 
-/** The setup strip: what a new household still has to give the Statement. A step is done when its part is not empty. */
+/**
+ * The guided setup: the main things a household gives the Statement, in the order they build on each other. Savings
+ * comes before the virtual accounts because a virtual account sits inside a savings account, and "where the rest
+ * goes" needs one too. Every step can be skipped; a step is done when what it asks for exists.
+ */
 export function setupSteps(tables: Tables): SetupStep[] {
   const household = tables.household.find((h) => !h.deletedAt)
   const rows = live(tables.rows)
+  const accounts = live(tables.accounts)
   const rest = household ? resolveRules(sortRows(tables.rows.filter((r) => !r.deletedAt), tables.categories), household.closingRule).restRowId !== null : false
   return [
-    { key: 'income', label: 'Income', done: rows.some((r) => r.section === 'income'), optional: false },
-    { key: 'accounts', label: 'Accounts', done: live(tables.accounts).length > 0, optional: false },
-    { key: 'expenses', label: 'Expenses', done: rows.some((r) => r.section === 'expense'), optional: false },
-    { key: 'rest', label: 'Where the rest goes', done: rest, optional: false },
-    { key: 'goals', label: 'Goals', done: tables.goals.some((g) => !g.deletedAt), optional: true },
+    { key: 'income', label: 'Income', done: rows.some((r) => r.section === 'income') },
+    { key: 'expenses', label: 'Expenses', done: rows.some((r) => r.section === 'expense') },
+    { key: 'savings', label: 'Savings', done: rest },
+    { key: 'virtual', label: 'Virtual accounts', done: live(tables.pools).length > 0 },
+    { key: 'investments', label: 'Investments', done: accounts.some((a) => a.type === 'investment') },
+    { key: 'debts', label: 'Loans and cards', done: accounts.some((a) => a.type === 'loan' || a.type === 'credit-card') },
   ]
+}
+
+/** A side of the Statement, by its key: the two of the month, the two of the position. */
+export type SetupSide = 'in' | 'out' | 'assets' | 'claims'
+/**
+ * What a step lights on the Statement: whole sides, and single groups by their line id. The second group of Money out
+ * is lit with every step that makes an account, because the row that moves the account shows there.
+ */
+export function setupFocus(step: SetupStepKey): { sides: SetupSide[]; lines: string[] } {
+  switch (step) {
+    case 'income': return { sides: [], lines: ['income'] }
+    case 'expenses': return { sides: [], lines: ['expenses'] }
+    case 'debts': return { sides: ['claims'], lines: ['set-aside'] }
+    default: return { sides: ['assets'], lines: ['set-aside'] }
+  }
+}
+
+/**
+ * The suggested rows a step offers: those of the part it lights that the step is about. A virtual account is not
+ * offered among the expenses of step 2: it waits for its own step, where it is offered under Assets.
+ */
+export function stepSuggestions(step: SetupStepKey, all: RowSuggestion[]): RowSuggestion[] {
+  switch (step) {
+    case 'income': return all.filter((s) => s.place === 'income' || s.place.startsWith('cat:income:'))
+    case 'expenses': return all.filter((s) => !s.pool && (s.place === 'expenses' || s.place.startsWith('cat:expense:')))
+    case 'virtual': return all.filter((s) => s.pool)
+    case 'investments': return all.filter((s) => s.place === 'set-aside' && s.template.account === 'investment')
+    case 'debts': return all.filter((s) => s.place === 'set-aside' && s.template.account === 'loan')
+    default: return []
+  }
 }
 
 /**

@@ -12,10 +12,10 @@ import { InfoTip } from '@/components/InfoTip'
  * eyebrow with 8 px of padding; `air` is a 14 px sentence-case title on a hairline that runs edge to edge, with 16 px
  * of padding, for reading pages. `tone` colours the title in a kind-of-money hue: the one deviation from nfl, where a
  * section's colour lives in its title alone. `help` puts an (i) beside the title; it is a sibling of the heading, so
- * the heading's name stays the title (`helpText` gives it words that follow what the island shows). `right` puts a control or a count at the end of the title row; `tabs` a TabBar
+ * the heading's name stays the title. `right` puts a control or a count at the end of the title row; `tabs` a TabBar
  * in place of the title; `onFold` makes the title a button that minimizes the island.
  */
-export function Island({ title, tabs, right, description, toolbar, children, className, bodyClassName, folded = false, onFold, air = false, tone, help, helpText, as: Tag = 'section', ...rest }: {
+export function Island({ title, tabs, right, description, toolbar, children, className, bodyClassName, folded = false, onFold, air = false, tone, help, as: Tag = 'section', ...rest }: {
   title?: ReactNode
   tabs?: ReactNode
   right?: ReactNode
@@ -29,8 +29,6 @@ export function Island({ title, tabs, right, description, toolbar, children, cla
   air?: boolean
   tone?: Hue
   help?: HelpKey
-  /** Words for the (i) that depend on what the island shows now; the title stays the help entry's. */
-  helpText?: string
   as?: 'section' | 'div' | 'article'
   id?: string
   'aria-label'?: string
@@ -45,7 +43,7 @@ export function Island({ title, tabs, right, description, toolbar, children, cla
   const head = tabs ?? (
     <span className={cn('flex min-w-0 items-center gap-1', air && 'pb-2')}>
       <h3 className="min-w-0 truncate">{fold ?? title}</h3>
-      {help && <InfoTip help={help} text={helpText} />}
+      {help && <InfoTip help={help} />}
     </span>
   )
   if (air) {

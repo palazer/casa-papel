@@ -8,7 +8,7 @@ import { MarksLegend } from '@/components/MarksLegend'
 import { MonthPicker } from '@/components/MonthPicker'
 import { PageHeader } from '@/components/PageHeader'
 import { doneness, type DoneState } from '@/app/display'
-import { formatMonth } from '@/app/format'
+import { readPref, writePref } from '@/app/prefs'
 import { useStore } from '@/app/store'
 import { clearHandedMonth, handedOverMonth } from '@/app/screens'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
@@ -32,7 +32,7 @@ import { CategoryMenu } from './CategoryMenu'
 import { EstimateDialog } from './EstimateDialog'
 import { PerPerson } from './PerPerson'
 import { monthProgress, nearestMonth, progressText } from './progress'
-import { SetupStrip } from './SetupStrip'
+import { SetupGuide } from './SetupGuide'
 import { StatementBand } from './StatementBand'
 import { AccountSuggestionLines, SuggestionLines } from './SuggestionLines'
 import { TopUpDialog } from './TopUpDialog'
@@ -78,6 +78,15 @@ function reveal(
     if (!gentle || !inView) el.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
     if (!gentle) el.querySelector<HTMLElement>('button')?.focus({ preventScroll: true })
   })
+}
+/** The part of the page each step of the guided setup is about: where the page goes when the guide moves to it. */
+const STEP_PART: Record<SetupStepKey, string> = {
+  income: '[data-line="income"]',
+  expenses: '[data-line="expenses"]',
+  savings: '[data-testid="band-assets"]',
+  virtual: '[data-testid="band-assets"]',
+  investments: '[data-testid="band-assets"]',
+  debts: '[data-testid="band-assets"]',
 }
 /** Said under "Add row" in an expense place when the row pays off a loan or card: its line shows in the second group. */
 const PAY_OFF_NOTE = 'It will show under "To savings, investments and debts": the money is not gone, it brings the debt down.'
@@ -134,6 +143,9 @@ export function StatementScreen() {
   const markTimer = useRef<number | undefined>(undefined)
   /** A row that was just added, until the page has shown where it is. */
   const landing = useRef<string | null>(null)
+  /** The step the guided setup is on, and the household it was worked out for. */
+  const [stepAt, setStepAt] = useState<SetupStepKey | null>(null)
+  const [stepFor, setStepFor] = useState<string | null>(null)
   useEffect(() => () => window.clearTimeout(markTimer.current), [])
   const version = useStoreVersion(store)
   /** "Suggestions" in the toolbar, once it was pressed; until then they show while the household is being set up. */
@@ -187,8 +199,19 @@ export function StatementScreen() {
     reveal([id], all, { open: openThese, mark: setMarked, timer: markTimer }, true)
   }, [editor, statement, openThese])
 
+  // The guided setup starts where this household left it, or on the first step that still has nothing. It is fixed
+  // once per household, here and not on every render: a step that gets its first row must not move the guide on.
+  if (settingUp && household && tables && stepFor !== household.id) {
+    const kept = readPref<{ household: string; step: SetupStepKey } | null>('setup.step', null)
+    const all = setupSteps(tables)
+    setStepFor(household.id)
+    setStepAt(kept?.household === household.id && all.some((s) => s.key === kept.step) ? kept.step : all.find((s) => !s.done)?.key ?? all[all.length - 1].key)
+  }
+
   if (!tables || !household || !engine || !statement) return null
   const { locale, baseCurrency: ccy, displayExpensesNegative: neg } = household
+  const steps = setupSteps(tables)
+  const step: SetupStepKey = stepAt ?? steps[0].key
   const progress = monthProgress(engine.rows, engine.cells, m)
   const horizon = engine.months.length ? monthDiff(m, engine.months[engine.months.length - 1]) : 0
   const goalText = (g: GoalProgress) => goalStatusLine(g, locale, horizon)
@@ -244,28 +267,30 @@ export function StatementScreen() {
     setRuleStart(start)
     setRuleFor(target)
   }
-  /** A step of the setup strip: go to its part of the page, with the cursor in the first thing that can be filled. */
+  /** A step of the guided setup: go to its part of the page, below the guide, with the cursor in the first thing that can be filled. */
   function jump(selector: string) {
     const el = document.querySelector<HTMLElement>(selector)
     if (!el) return
     const part = el.closest('li') ?? el
-    part.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+    const guide = document.querySelector<HTMLElement>('[data-testid="setup-guide"]')?.offsetHeight ?? 0
+    window.scrollTo({ top: Math.max(0, part.getBoundingClientRect().top + window.scrollY - guide - 8), behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
     // the first thing that takes an entry; an (i) explains and is never where the cursor should land
     const act = 'button:not([aria-label^="About "])'
     const first = part.querySelector<HTMLElement>('input') ?? part.querySelector<HTMLElement>(`[data-testid="suggestions"] ${act}, [data-testid^="foot-"] ${act}`)
     first?.focus({ preventScroll: true })
   }
+  /** The guide moves to a step: it is remembered for this household, and the page goes to the part the step is about. */
   function onStep(key: SetupStepKey) {
-    if (key === 'income') return jump('[data-line="income"]')
-    if (key === 'expenses') return jump('[data-line="expenses"]')
-    if (key === 'accounts' || key === 'goals') return jump('[data-testid="band-assets"]')
-    // where the rest goes: the row that takes it, or the first savings account; without one, a savings account first
-    const restRowId = resolveRules(engine!.rows, household!.closingRule).restRowId
-    const savings = tables!.accounts.find((a) => a.type === 'savings' && !a.deletedAt && !a.archivedMonth)
-    if (statement!.closed) return jump('[data-testid="band-assets"]')
-    if (restRowId) return setEditor({ rowId: restRowId })
-    if (!savings) return setAccountNew({ name: 'Savings', type: 'savings', types: ASSET_TYPES })
-    askRule({ accountId: savings.id }, 'rest')
+    setStepAt(key)
+    writePref('setup.step', { household: household!.id, step: key })
+    // once the step's part is drawn as the lit one
+    requestAnimationFrame(() => jump(STEP_PART[key]))
+  }
+  /** "Finish" and "Leave setup": the guide goes away for good, and the month stays where it is. */
+  function leaveSetup() {
+    setMonth(m)
+    writePref('setup.step', null)
+    act(() => updateHousehold(store, { setupOpen: false }))
   }
   /**
    * A suggested row came with its amount, so no editor opens; its category stays open once its suggestions are gone.
@@ -431,6 +456,10 @@ export function StatementScreen() {
   const act = (fn: () => Promise<unknown>) => void fn().catch((e) => setError(e instanceof Error ? e.message : 'Action failed'))
   // Accounts are added where they will show: what the household has under Assets, what it owes under Debts
   const savingsAccounts = tables.accounts.filter((a) => a.type === 'savings' && !a.deletedAt && !a.archivedMonth)
+  // step 3 once there is a savings account and nothing takes the rest of the month yet: one press asks the first of them
+  const stepAction = step === 'savings' && !statement.closed && savingsAccounts.length > 0 && !steps.find((s) => s.key === 'savings')?.done
+    ? { label: 'Choose where the rest goes', run: () => askRule({ accountId: savingsAccounts[0].id }, 'rest') }
+    : undefined
   const assetsFoot = (
     <>
       {showing && <AccountSuggestionLines suggestions={accountSuggestions(tables)} onAdd={(s) => setAccountNew({ name: s.name, type: s.type, types: ASSET_TYPES })} onError={setError} />}
@@ -470,14 +499,7 @@ export function StatementScreen() {
         </p>
       )}
 
-      {settingUp && (
-        <SetupStrip
-          steps={setupSteps(tables)} monthName={formatMonth(m, locale, 'long')} first={m === household.startMonth} noSavings={savingsAccounts.length === 0}
-          onStep={onStep}
-          // the month stays where it is once the strip is gone
-          onDone={() => { setMonth(m); act(() => updateHousehold(store, { setupOpen: false })) }}
-        />
-      )}
+      {settingUp && <SetupGuide steps={steps} current={step} action={stepAction} onStep={onStep} onDone={leaveSetup} />}
       <StatementBand title="The month" help="statement.month" band={statement.flow} ctx={flowCtx} totals={['Total in', 'Total out']} />
       <StatementBand title="At the end of the month" help="statement.position" band={statement.position} ctx={positionCtx} totals={['Total', 'Total']} amountHead={day} feet={[assetsFoot, hasDebts ? null : debtsFoot]} />
       <PerPerson household={household} tables={tables} engine={engine} month={m} />

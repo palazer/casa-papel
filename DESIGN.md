@@ -89,7 +89,7 @@ Statement frame  full width, space-y-4: the progress line, then dense islands, o
   under the list, because rows are named after their person or thing. The foot says in one muted sentence what will
   be made ("Makes Sam, Alex, Robin and the usual expense categories. Nothing else yet.") beside the lime "Open the
   Statement"; the title row carries "Back to start" while the chooser exists. The household then opens on the
-  Statement, on its first month, with the setup strip (§7).
+  Statement, on its first month, with the guided setup (§7).
 - **Guide** (`src/features/guide/GuideScreen.tsx`, words in `src/app/guide.ts`, no React there so a translation can
   follow): a reading page that opens without a household. Its header's toolbar holds one control, a `type="search"`
   Input "Search the guide" (`h-7 w-64`, full width under 768 px, Escape clears) and, while searching, a `role="status"`
@@ -417,16 +417,25 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   group named `Suggestions for <part>`. Under Assets the same line offers an account most households have (`Main
   account`, `Savings`), its description behind the same (i); its `Add` opens the account dialog with the name and
   type filled in.
-  **The setup strip.** While a household is new (`Household.setupOpen`), a dense island "Setting up" with an (i)
-  sits between the toolbar and the month. It holds the parts of the page as pills in the order a household is
-  filled: `Income`, `Accounts`, `Expenses`, `Where the rest goes`, `Goals (optional)`. A pill is a rounded-full
-  outline button with a 14 px mark: an empty circle while its part is empty (the label in medium weight), a check in
-  the income hue once it has something in it (the label muted). Pressing one goes to its part with the cursor in the
-  first field; `Where the rest goes` opens the dialog of the row that takes the rest (for a savings account that has
-  none yet, the short rule dialog on `The rest`), or the account dialog while there is no savings account. The strip
-  shows its pills and nothing else: what to do next (the first open step) and which month is being filled are the
-  words of its (i) (`Island`'s `helpText`). `Done` (`xs outline`, at the end of the title row) hides the strip for good and turns the suggestions
-  off; the page works the same without it. The Statement opens on the household's first month while the strip shows.
+  **The guided setup.** While a household is new (`Household.setupOpen`), a dense island "Setting up" with an (i)
+  sits between the toolbar and the month and stays at the top while the page scrolls (`sticky top-0 z-30`, a hairline
+  shadow). It leads through the main things a household gives the page, one step at a time, in the order they build
+  on each other: `Your first income`, `Your first expenses`, `Savings, and where the rest goes`, `Your first virtual
+  account`, `Your first investment`, `Loans and cards` (`setupSteps` in `src/store/suggestions.ts`; savings comes
+  before the virtual accounts because a virtual account sits inside a savings account). The title row carries
+  `2 of 6` and a ghost `Leave setup`. The body holds the steps as numbers, the step's prompt in `text-sm
+  font-medium` with one muted sentence under it, and the buttons at the end. A number is a 24 px round outline
+  button (32 px where the pointer is a finger) named `Step 2, Expenses: still to do`; it shows a check once its
+  step has what it asks for, and the step the guide is on is the pressed one, in the lime. Pressing a number goes
+  to that step. The buttons: a ghost `Back`, then `Skip` (outline) while the step has nothing yet and `Next`
+  (default) once it has; both move on, so no step can block. The last step ends with `Finish`. A step may carry one
+  button of its own before them (`Choose where the rest goes` in step 3, once there is a savings account and nothing
+  takes the rest). The numbers sit beside the prompt where there is room and on a line of their own below `sm`.
+  Moving to a step scrolls its part of the page to just under the guide and puts the cursor in the first field.
+  A step that gets its first row does not move the guide on: it stays until it is told to. The step is kept per
+  household across reloads (`casa.setup.step`). `Finish` and `Leave setup` hide the guide for good and turn the
+  suggestions off (the undo arrow brings it back); the page works the same without it. The Statement opens on the
+  household's first month while the guide shows.
   **Category estimates.** An expense category can carry an estimate: what it should come to in a month, typed before
   its rows are known. The category line then reads `estimate €1,450.00` in muted `text-[11px]` after its name, and
   its last line is `Not broken down yet` with the `automatic` chip, the estimate minus the category's rows, on the
@@ -597,7 +606,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   (`describeRemoval` and `planRemoval`/`planArchive` in `src/store/impact.ts`), so they cannot disagree, and every
   removal is one undoable commit ("You can undo this right after"). Archived things are listed with Restore under
   Household: Archived rows, and an Archived line in Accounts, Virtual accounts and People & things.
-- **Cheap while setting up.** While a household is being set up (`Household.setupOpen`, the strip of §7), removing
+- **Cheap while setting up.** While a household is being set up (`Household.setupOpen`, the guided setup of §7), removing
   is one click: the entry in the row menu, the category menu and the account and virtual account dialogs opened from
   the Statement reads `Delete` instead of `Archive or delete…` / `Remove…` and deletes at once, with no dialog
   (`removeIfFree` in `src/store/remove.ts`). It does so only when nothing but the thing itself goes: when rows would

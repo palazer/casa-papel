@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { cellKey, computeEngine } from '@/engine'
 import { monthRange, newId } from '@/model'
 import {
-  CasaDb, Store, accountSuggestions, addAccount, addEntity, addGoal, addRow, addSuggestion, applyTemplates, closeMonth, createHouseholdFromSetup,
-  dismissSuggestion, loadTables, removeThing, rowSuggestions, setRule, setupSteps, shownRowSuggestions, suggestionId, updateRow,
+  CasaDb, Store, accountSuggestions, addAccount, addEntity, addPool, addRow, addSuggestion, applyTemplates, closeMonth, createHouseholdFromSetup,
+  dismissSuggestion, loadTables, removeThing, rowSuggestions, setRule, setupFocus, setupSteps, shownRowSuggestions, stepSuggestions, suggestionId, updateRow,
 } from '@/store'
 
 /** What the first screen makes: the household, its people and things, the usual categories. No accounts, no rows. */
@@ -163,27 +163,58 @@ describe('suggestions for setting up on the Statement', () => {
     expect(rowSuggestions(archived).filter((s) => s.entityId === rex.id)).toEqual([])
   })
 
-  it('the setup steps tick themselves as the page fills, and nothing takes the rest until an account is given it', async () => {
+  it('the six setup steps tick themselves as the page fills, and nothing takes the rest until an account is given it', async () => {
     const store = await fresh()
     const done = async () => Object.fromEntries(setupSteps(await loadTables(store)).map((s) => [s.key, s.done]))
-    expect(setupSteps(await loadTables(store)).map((s) => [s.label, s.optional])).toEqual([['Income', false], ['Accounts', false], ['Expenses', false], ['Where the rest goes', false], ['Goals', true]])
-    expect(await done()).toEqual({ income: false, accounts: false, expenses: false, rest: false, goals: false })
+    // savings comes before the virtual accounts, which sit inside a savings account
+    expect(setupSteps(await loadTables(store)).map((s) => [s.key, s.label])).toEqual([
+      ['income', 'Income'], ['expenses', 'Expenses'], ['savings', 'Savings'], ['virtual', 'Virtual accounts'], ['investments', 'Investments'], ['debts', 'Loans and cards'],
+    ])
+    expect(await done()).toEqual({ income: false, expenses: false, savings: false, virtual: false, investments: false, debts: false })
     await addSuggestion(store, 'household:h.otherIncome', { amount: 1000_00 })
     await addSuggestion(store, 'household:h.groceries', { amount: 400_00 })
-    expect(await done()).toMatchObject({ income: true, expenses: true, accounts: false, rest: false })
+    expect(await done()).toMatchObject({ income: true, expenses: true, savings: false })
     const savings = await addAccount(store, { name: 'Savings', type: 'savings', currency: 'EUR', openingMonth: '2026-09' })
-    expect(await done()).toMatchObject({ accounts: true, rest: false })
+    // a savings account alone is not the step: something has to take the rest
+    expect(await done()).toMatchObject({ savings: false, virtual: false })
     // the month keeps its leftover until an account takes the rest
     let t = await loadTables(store)
     let out = computeEngine({ tables: t, months: ['2026-09'] })
     expect(out.totals['2026-09']).toMatchObject({ leftover: 600_00, rest: null, toSavings: 0 })
     await setRule(store, { accountId: savings.id }, { kind: 'rest' }, '2026-09')
-    expect(await done()).toMatchObject({ rest: true, goals: false })
+    expect(await done()).toMatchObject({ savings: true, virtual: false, investments: false, debts: false })
     t = await loadTables(store)
     expect(t.household[0].closingRule).toBe('savings-plug')
     out = computeEngine({ tables: t, months: ['2026-09'] })
     expect(out.totals['2026-09']).toMatchObject({ leftover: 0, rest: 600_00, toSavings: 600_00 })
-    await addGoal(store, { name: 'Cushion', kind: 'account-balance', accountId: savings.id, target: 5000_00 })
-    expect(await done()).toMatchObject({ goals: true })
+    // the three kinds of account that are left: a virtual account, an investment account, a loan or a card
+    await addPool(store, { name: 'Travel', accountId: savings.id, openingBalance: 0 })
+    expect(await done()).toMatchObject({ virtual: true, investments: false, debts: false })
+    await addAccount(store, { name: 'Fund', type: 'investment', currency: 'EUR', openingMonth: '2026-09' })
+    await addAccount(store, { name: 'Visa', type: 'credit-card', currency: 'EUR', openingMonth: '2026-09' })
+    expect(await done()).toEqual({ income: true, expenses: true, savings: true, virtual: true, investments: true, debts: true })
+  })
+
+  it('a step lights its part of the Statement and offers the suggestions that belong to it', async () => {
+    const store = await fresh()
+    // income and expenses light one group each; every step that makes an account lights its side and the second group
+    expect(setupFocus('income')).toEqual({ sides: [], lines: ['income'] })
+    expect(setupFocus('expenses')).toEqual({ sides: [], lines: ['expenses'] })
+    for (const step of ['savings', 'virtual', 'investments'] as const) expect(setupFocus(step), step).toEqual({ sides: ['assets'], lines: ['set-aside'] })
+    expect(setupFocus('debts')).toEqual({ sides: ['claims'], lines: ['set-aside'] })
+
+    const all = shownRowSuggestions(await loadTables(store))
+    const of = (step: Parameters<typeof stepSuggestions>[0]) => stepSuggestions(step, all)
+    expect(of('income').length).toBeGreaterThan(0)
+    expect(of('income').every((s) => s.section === 'income')).toBe(true)
+    // a virtual account is not offered among the expenses: it waits for its own step
+    expect(of('expenses').length).toBeGreaterThan(0)
+    expect(of('expenses').some((s) => s.pool)).toBe(false)
+    expect(titles(of('virtual'))).toEqual(['Travel', 'Clothing', 'Entertainment & dining out'])
+    expect(of('savings')).toEqual([])
+    // nothing is offered twice, and nothing of the page is lost: only what the second group offers for another step is left out
+    const offered = [...of('income'), ...of('expenses'), ...of('virtual'), ...of('investments'), ...of('debts')]
+    expect(new Set(offered.map((s) => s.id)).size).toBe(offered.length)
+    expect(all.filter((s) => !offered.includes(s)).every((s) => s.place === 'set-aside')).toBe(true)
   })
 })

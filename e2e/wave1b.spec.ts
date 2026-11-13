@@ -9,7 +9,7 @@ async function loadDemo(page: Page) {
 test.describe('wave 1b', () => {
   test.use({ viewport: { width: 1400, height: 900 } })
 
-  test('a new household is set up on the Statement: the facts first, then suggestions, accounts and the rest, with the strip keeping count', async ({ page }) => {
+  test('a new household is set up on the Statement: the facts first, then the guide leads through six steps, each of which can be skipped', async ({ page }) => {
     await page.goto('/')
     await page.getByRole('button', { name: 'Start on this device' }).click()
 
@@ -31,46 +31,48 @@ test.describe('wave 1b', () => {
     await page.screenshot({ path: 'e2e/output/setup-start.png', fullPage: true })
     await page.getByRole('button', { name: 'Open the Statement' }).click()
 
-    // the Statement opens on the first month: empty, balanced, the strip with everything still to do
+    // the Statement opens on the first month: empty, balanced, the guide on its first step with everything still to do
     await expect(page.getByRole('heading', { level: 1, name: 'Statement' })).toBeVisible()
     await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
-    const strip = page.getByTestId('setup-strip')
-    const step = (name: string) => strip.getByRole('button', { name: new RegExp(`^${name}`) })
+    const guide = page.getByTestId('setup-guide')
+    const number = (n: number) => guide.locator('[data-step]').nth(n - 1)
+    const title = guide.getByTestId('setup-title')
+    const count = guide.getByTestId('setup-count')
     const group = (name: string) => page.getByRole('group', { name: `Suggestions for ${name}` })
     const moneyOut = page.getByRole('region', { name: 'Money out' })
     const assets = page.getByRole('region', { name: 'Assets' })
     const claims = page.getByRole('region', { name: 'Debts and net worth' })
     const dlg = page.getByRole('dialog')
-    for (const name of ['Income', 'Accounts', 'Expenses', 'Where the rest goes', 'Goals']) await expect(step(name)).toHaveAttribute('data-done', 'false')
-    // the strip is its steps; what to do next and which month is being filled in are behind its (i)
-    const stripSays = async (text: string) => {
-      await strip.getByRole('button', { name: 'About Setting up' }).hover()
-      await expect(page.getByText(text)).toBeVisible()
-      await page.keyboard.press('Escape')
-      await page.mouse.move(0, 0)
-      await expect(page.getByText(text)).toBeHidden()
-    }
-    await expect(strip.locator('p')).toHaveCount(0)
-    await stripSays('Start with what comes in')
-    await stripSays('You are filling in November 2026, the first month.')
+    await expect(guide.locator('[data-step]')).toHaveCount(6)
+    for (let n = 1; n <= 6; n++) await expect(number(n)).toHaveAttribute('data-done', 'false')
+    await expect(count).toHaveText('1 of 6')
+    await expect(title).toHaveText('Your first income')
+    await expect(guide.getByTestId('setup-text')).toContainText('Type what comes in each month')
+    await expect(number(1)).toHaveAttribute('aria-current', 'step')
+    await expect(number(1)).toHaveAccessibleName('Step 1, Income: still to do')
+    await expect(guide.getByRole('button', { name: 'Back' })).toBeDisabled()
+    await expect(guide.getByRole('button', { name: 'Skip' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Suggestions', exact: true })).toHaveAttribute('aria-pressed', 'true')
     await expect(page.getByTestId('total-in')).toHaveText('Total in€0.00')
     await expect(page.getByTestId('total-out')).toHaveText('Total out€0.00')
     await page.screenshot({ path: 'e2e/output/setup-statement-empty.png', fullPage: true })
 
-    // income: the step goes to its part with the cursor in the first amount; Enter adds the row
+    // step 1, income: its number goes to its part with the cursor in the first amount; Enter adds the row
     const income = group('Income')
     await expect(income.locator('[data-suggestion]')).toHaveText([/^Ana – Salary/, /^Ben – Salary/, /^Cal – Child benefit/, /^Other income/, /^Ana – Extra income/, /^Ben – Extra income/])
     await expect(page.getByRole('button', { name: /suggestions \(/ })).toHaveCount(0)
-    await step('Income').click()
+    await number(1).click()
     await expect(income.getByLabel('Amount per month for Ana – Salary')).toBeFocused()
     await income.getByLabel('Amount per month for Ana – Salary').fill('3000')
     await income.getByLabel('Amount per month for Ana – Salary').press('Enter')
     await income.getByLabel('Amount per month for Ben – Salary').fill('2500')
     await income.getByRole('button', { name: 'Add Ben – Salary' }).click()
     await expect(page.getByTestId('total-in')).toHaveText('Total in€5,500.00')
-    await expect(step('Income')).toHaveAttribute('data-done', 'true')
-    await stripSays('Next, the accounts')
+    // the step has what it asks for: its number is ticked, and the guide stays until it is told to move on
+    await expect(number(1)).toHaveAttribute('data-done', 'true')
+    await expect(number(1)).toHaveAccessibleName('Step 1, Income: done')
+    await expect(title).toHaveText('Your first income')
+    await expect(guide.getByRole('button', { name: 'Skip' })).toHaveCount(0)
     // not for us: the line leaves the page, and the two rarer ones stay listed
     await income.getByRole('button', { name: 'Dismiss Other income' }).click()
     await expect(income.locator('[data-suggestion]')).toHaveCount(3)
@@ -78,7 +80,39 @@ test.describe('wave 1b', () => {
     // nothing takes the rest yet, so the month shows what is left over
     await expect(moneyOut.locator('[data-line]').filter({ hasText: 'Leftover' })).toContainText('€5,500.00')
 
-    // accounts: the usual two are offered under Assets
+    // step 2, expenses: each category offers its rows; what is left follows every amount
+    await guide.getByRole('button', { name: 'Next' }).click()
+    await expect(count).toHaveText('2 of 6')
+    await expect(title).toHaveText('Your first expenses')
+    await expect(number(2)).toHaveAttribute('aria-current', 'step')
+    const housing = group('Housing')
+    await expect(housing.locator('[data-suggestion]')).toHaveCount(5)
+    await expect(housing.locator('[data-suggestion]').nth(0)).toHaveText(/^The flat – Rent or mortgage/)
+    await expect(housing.locator('[data-suggestion]').nth(1)).toHaveText(/^The flat – Utilities/)
+    await housing.getByLabel('Amount per month for The flat – Rent or mortgage').fill('1400')
+    await housing.getByLabel('Amount per month for The flat – Rent or mortgage').press('Enter')
+    await expect(moneyOut.getByRole('button', { name: /^The flat – Rent or mortgage: €1,400\.00/ })).toBeVisible()
+    await expect(number(2)).toHaveAttribute('data-done', 'true')
+    await expect(moneyOut.locator('[data-line]').filter({ hasText: 'Leftover' })).toContainText('€4,100.00')
+    // pocket money is a line per adult with an amount of its own
+    const general = group('Expenses')
+    await general.getByLabel('Amount per month for Ana – Pocket').fill('300')
+    await general.getByLabel('Amount per month for Ana – Pocket').press('Enter')
+    await expect(moneyOut.getByRole('button', { name: /^Ana – Pocket: €300\.00/ })).toBeVisible()
+    await expect(moneyOut.locator('[data-line]').filter({ hasText: 'Leftover' })).toContainText('€3,800.00')
+
+    // Back goes to the step before, and a number straight to its step; a step with nothing yet is skipped, not blocked
+    await guide.getByRole('button', { name: 'Back' }).click()
+    await expect(title).toHaveText('Your first income')
+    await number(6).click()
+    await expect(title).toHaveText('Loans and cards')
+    await expect(count).toHaveText('6 of 6')
+    await expect(guide.getByRole('button', { name: 'Finish' })).toBeVisible()
+    await number(3).click()
+
+    // step 3, savings: the usual two accounts are offered under Assets; a savings account is asked to take the rest
+    await expect(title).toHaveText('Savings, and where the rest goes')
+    await expect(guide.getByRole('button', { name: 'Skip' })).toBeVisible()
     const offered = page.getByTestId('account-suggestions')
     await expect(offered.locator('[data-suggestion]')).toHaveText([/^Main account/, /^Savings/])
     await offered.getByRole('button', { name: 'Add Main account' }).click()
@@ -87,26 +121,58 @@ test.describe('wave 1b', () => {
     await dlg.getByLabel('Holds at the start of November 2026 (EUR)').fill('500')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-    await expect(step('Accounts')).toHaveAttribute('data-done', 'true')
     await expect(offered.locator('[data-suggestion]')).toHaveText([/^Savings/])
-
-    // where the rest goes: without a savings account the step asks for one, and the new account is offered the rest
-    await step('Where the rest goes').click()
-    await expect(dlg.getByRole('heading', { name: 'New account' })).toBeVisible()
-    await expect(dlg.getByLabel('Name', { exact: true })).toHaveValue('Savings')
+    await expect(guide.getByRole('button', { name: 'Choose where the rest goes' })).toHaveCount(0)
+    await offered.getByRole('button', { name: 'Add Savings' }).click()
     await expect(dlg.getByLabel('Type')).toHaveValue('savings')
     await dlg.getByLabel('Holds at the start of November 2026 (EUR)').fill('9000')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg.getByRole('heading', { name: 'How much goes to Savings?' })).toBeVisible()
     await expect(dlg.getByRole('radio', { name: 'The rest' })).toBeChecked()
+    // put off for now: the account is there, the step is not done, and the guide offers the question again
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+    await expect(number(3)).toHaveAttribute('data-done', 'false')
+    await guide.getByRole('button', { name: 'Choose where the rest goes' }).click()
+    await expect(dlg.getByRole('heading', { name: 'How much goes to Savings?' })).toBeVisible()
+    await expect(dlg.getByRole('radio', { name: 'The rest' })).toBeChecked()
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-    await expect(step('Where the rest goes')).toHaveAttribute('data-done', 'true')
-    await expect(moneyOut.getByRole('button', { name: 'To Savings: €5,500.00' })).toBeVisible()
-    await expect(assets.locator('[data-line^="acc:"]').filter({ hasText: 'Savings' })).toContainText('€14,500.00')
+    await expect(number(3)).toHaveAttribute('data-done', 'true')
+    await expect(guide.getByRole('button', { name: 'Choose where the rest goes' })).toHaveCount(0)
+    await expect(moneyOut.getByRole('button', { name: 'To Savings: €3,800.00' })).toBeVisible()
+    await expect(assets.locator('[data-line^="acc:"]').filter({ hasText: 'Savings' })).toContainText('€12,800.00')
     await expect(page.getByTestId('account-suggestions')).toHaveCount(0)
 
-    // a card, asked in plain words what is recorded for it
+    // step 4, a virtual account inside the savings account, with what goes in each month
+    await guide.getByRole('button', { name: 'Next' }).click()
+    await expect(title).toHaveText('Your first virtual account')
+    await assets.getByRole('button', { name: 'Add virtual account' }).click()
+    await dlg.getByLabel('Name').fill('Travel')
+    await dlg.getByLabel('Set aside each month (EUR)').fill('200')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(assets.locator('[data-line^="pool:"]').filter({ hasText: 'Travel' })).toContainText('€200.00')
+    await expect(moneyOut.getByRole('button', { name: 'To Savings: €3,600.00' })).toBeVisible()
+    await expect(number(4)).toHaveAttribute('data-done', 'true')
+
+    // step 5, an investment account, asked how much goes in
+    await guide.getByRole('button', { name: 'Next' }).click()
+    await expect(title).toHaveText('Your first investment')
+    await assets.getByRole('button', { name: 'Add account' }).click()
+    await dlg.getByLabel('Name', { exact: true }).fill('Fund')
+    await dlg.getByLabel('Type').selectOption('investment')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg.getByRole('heading', { name: 'How much goes to Fund?' })).toBeVisible()
+    await dlg.getByLabel('Amount per month in EUR').fill('100')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(number(5)).toHaveAttribute('data-done', 'true')
+    await expect(moneyOut.getByRole('button', { name: 'To Savings: €3,500.00' })).toBeVisible()
+
+    // step 6, a card, asked in plain words what is recorded for it; the last step ends the guide with "Finish"
+    await guide.getByRole('button', { name: 'Next' }).click()
+    await expect(title).toHaveText('Loans and cards')
+    await expect(guide.getByRole('button', { name: 'Next' })).toHaveCount(0)
     await claims.getByRole('button', { name: 'Add a card or loan' }).click()
     await dlg.getByLabel('Name', { exact: true }).fill('Visa')
     await expect(dlg.getByLabel('Type')).toHaveValue('credit-card')
@@ -117,36 +183,25 @@ test.describe('wave 1b', () => {
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
     await expect(claims.locator('[data-line^="acc:"]').filter({ hasText: 'Visa' })).toBeVisible()
-
-    // expenses: each category offers its usual rows; the rest follows every amount
-    const housing = group('Housing')
-    await expect(housing.locator('[data-suggestion]')).toHaveCount(5)
-    await expect(housing.locator('[data-suggestion]').nth(0)).toHaveText(/^The flat – Rent or mortgage/)
-    await expect(housing.locator('[data-suggestion]').nth(1)).toHaveText(/^The flat – Utilities/)
-    await housing.getByLabel('Amount per month for The flat – Rent or mortgage').fill('1400')
-    await housing.getByLabel('Amount per month for The flat – Rent or mortgage').press('Enter')
-    await expect(moneyOut.getByRole('button', { name: /^The flat – Rent or mortgage: €1,400\.00/ })).toBeVisible()
-    await expect(step('Expenses')).toHaveAttribute('data-done', 'true')
-    await expect(moneyOut.getByRole('button', { name: 'To Savings: €4,100.00' })).toBeVisible()
-    // one that comes with its virtual account: the amount is what is set aside each month
-    const fun = group('Fun')
-    await fun.getByLabel('Set aside per month for Travel').fill('200')
-    await fun.getByLabel('Set aside per month for Travel').press('Enter')
-    await expect(assets.locator('[data-line^="pool:"]').filter({ hasText: 'Travel' })).toContainText('€200.00')
-    await expect(moneyOut.getByRole('button', { name: 'To Savings: €3,900.00' })).toBeVisible()
-    // pocket money is a line per adult with an amount of its own
-    const general = group('Expenses')
-    await general.getByLabel('Amount per month for Ana – Pocket').fill('300')
-    await general.getByLabel('Amount per month for Ana – Pocket').press('Enter')
-    await expect(moneyOut.getByRole('button', { name: /^Ana – Pocket: €300\.00/ })).toBeVisible()
-    await expect(moneyOut.getByRole('button', { name: 'To Savings: €3,600.00' })).toBeVisible()
+    for (let n = 1; n <= 6; n++) await expect(number(n)).toHaveAttribute('data-done', 'true')
     await expect(page.getByTestId('total-in')).toHaveText('Total in€5,500.00')
     await expect(page.getByTestId('total-out')).toHaveText('Total out€5,500.00')
-    await stripSays('Everything a month needs is there.')
     await page.screenshot({ path: 'e2e/output/setup-statement.png', fullPage: true })
+    // the guide stays at the top while the page scrolls, on a phone too
     await page.setViewportSize({ width: 390, height: 844 })
-    await page.screenshot({ path: 'e2e/output/setup-statement-phone.png', fullPage: true })
+    await claims.scrollIntoViewIfNeeded()
+    await expect(guide).toBeInViewport()
+    await page.screenshot({ path: 'e2e/output/setup-statement-phone.png' })
     await page.setViewportSize({ width: 1400, height: 900 })
+    await claims.scrollIntoViewIfNeeded()
+    await expect(guide).toBeInViewport()
+    // the step is kept for this household across a reload
+    await number(2).click()
+    await page.reload()
+    await expect(title).toHaveText('Your first expenses')
+    await expect(count).toHaveText('2 of 6')
+    // what was open is not kept across a reload
+    await moneyOut.getByRole('button', { name: 'Pocket money', exact: true }).click()
 
     // while setting up, deleting is one click: the row goes, a line says so and offers the way back
     const menu = page.getByRole('menu')
@@ -157,7 +212,7 @@ test.describe('wave 1b', () => {
     await expect(gone).toContainText('Deleted "Ana – Pocket".')
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await expect(moneyOut.getByRole('button', { name: /^Ana – Pocket: / })).toHaveCount(0)
-    await expect(moneyOut.getByRole('button', { name: 'To Savings: €3,900.00' })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: 'To Savings: €3,800.00' })).toBeVisible()
     // what a suggestion made is offered again once it is deleted
     await expect(general.locator('[data-suggestion]').first()).toContainText('Ana – Pocket')
     await page.screenshot({ path: 'e2e/output/setup-deleted.png' })
@@ -203,15 +258,22 @@ test.describe('wave 1b', () => {
     await expect(dlg).toBeHidden()
     await expect(moneyOut.getByRole('button', { name: 'Ben – Pocket: €250.00' })).toBeVisible()
     await expect(moneyOut.getByRole('button', { name: 'Rule for Ben – Pocket: 10% of their own income' })).toBeVisible()
-    await expect(moneyOut.getByRole('button', { name: 'To Savings: €3,350.00' })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: 'To Savings: €3,250.00' })).toBeVisible()
     await page.screenshot({ path: 'e2e/output/setup-pocket-rule.png' })
 
-    // "Done" puts the strip and the suggestions away; the month stays where it was
-    await strip.getByRole('button', { name: 'Done', exact: true }).click()
-    await expect(strip).toHaveCount(0)
+    // "Leave setup" puts the guide and the suggestions away; the month stays where it was. Undo brings the guide back
+    await guide.getByRole('button', { name: 'Leave setup' }).click()
+    await expect(guide).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Suggestions', exact: true })).toHaveAttribute('aria-pressed', 'false')
     await expect(page.getByTestId('suggestions')).toHaveCount(0)
     await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
+    await page.getByRole('button', { name: 'Undo' }).click()
+    await expect(title).toHaveText('Your first expenses')
+    // "Finish" on the last step does the same, for good
+    await number(6).click()
+    await guide.getByRole('button', { name: 'Finish' }).click()
+    await expect(guide).toHaveCount(0)
+    await expect(page.getByTestId('suggestions')).toHaveCount(0)
     // from now on removing is the controlled way: archive from a month, or delete, in the dialog
     await moneyOut.getByRole('button', { name: 'Row menu for Ana – Pocket' }).click()
     await expect(menu.getByRole('menuitem', { name: 'Delete', exact: true })).toHaveCount(0)
