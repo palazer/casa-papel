@@ -122,8 +122,8 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   const [rhythm, setRhythm] = useState<Repeating>(() => ({ kind: 'every', interval: 12, anchor: parseMonth(month).month }))
   /** How an item repeats, where that was touched here; the others keep what they have. */
   const [repeats, setRepeats] = useState<Record<string, RepeatChoice>>({})
-  /** The row's schedules that land in other months, where one was changed here: its amount as typed, its rhythm. */
-  const [others, setOthers] = useState<Record<string, { text?: string; repeat?: Repeating }>>({})
+  /** The row's schedules that land in other months, where one was changed here: its amount as typed, its rhythm, its name. */
+  const [others, setOthers] = useState<Record<string, { text?: string; repeat?: Repeating; name?: string }>>({})
   /** The schedule from another month that is being asked how to stop. */
   const [stopping, setStopping] = useState<string | null>(null)
   /** What a removal did, said in the dialog: it is done at once, and the rest of what was typed is still here. */
@@ -238,14 +238,14 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
       const choice = repeatFor(it)
       if (choice.kind === 'months' && choice.months.length === 0) return setError(`Pick at least one month for ${named ?? 'the item that repeats'}.`)
     }
-    const changes: Record<string, { amount?: number; repeat?: Repeating }> = {}
+    const changes: Record<string, { amount?: number; repeat?: Repeating; name?: string }> = {}
     for (const s of elsewhere) {
       const draft = others[s.id]
       if (!draft) continue
       const amount = otherAmount(s.id)
       if (amount != null && !Number.isFinite(amount)) return setError(`"${s.name}" has an amount that is not a number I can read.`)
       if (draft.repeat?.kind === 'months' && draft.repeat.months.length === 0) return setError(`Pick at least one month for "${s.name}".`)
-      changes[s.id] = { amount, repeat: draft.repeat }
+      changes[s.id] = { amount, repeat: draft.repeat, name: draft.name }
     }
     void run(saving(() => saveRowMonth(store, row.id, month, { items, repeats, applyTo, others: changes, scope: isRecurringRow ? 'this-month' : saveScope, row: rowChange })))
   }
@@ -337,7 +337,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-xl" aria-describedby={undefined}>
+      <DialogContent className="sm:max-w-2xl" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
@@ -479,15 +479,13 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                   const moved = !!schedule && !sameRepeat(choice, storedRepeat(it))
                   return (
                     <div key={it.id} className={cn('space-y-2 rounded-md border p-2', schedule && 'border-transfer/40')}>
-                      <div className="grid grid-cols-[1fr_7rem] gap-2 sm:grid-cols-[1fr_7rem_7rem_9rem_2rem]">
-                        {schedule ? (
-                          <div className="flex min-w-0 items-center gap-1.5 text-sm">
-                            <Repeat className="size-3.5 shrink-0 text-transfer" aria-hidden />
-                            <span className="truncate">{it.label}</span>
-                          </div>
-                        ) : (
-                          <Input aria-label="Item label" placeholder="What" value={it.label} onChange={(e) => updateItem(it.id, { label: e.target.value })} />
-                        )}
+                      {/* the name takes what the other fields leave: they are as narrow as their content allows */}
+                      <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-2 sm:grid-cols-[minmax(0,1fr)_6.5rem_7rem_8.5rem_2rem]">
+                        {/* a name can always be typed over; for something that repeats it is the schedule's name, in every open month */}
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          {schedule && <Repeat className="size-3.5 shrink-0 text-transfer" aria-hidden />}
+                          <Input aria-label="Item label" placeholder={schedule?.name ?? 'What'} value={it.label} onChange={(e) => updateItem(it.id, { label: e.target.value })} />
+                        </div>
                         <Input
                           aria-label="Item amount" inputMode="decimal" placeholder="0"
                           defaultValue={amountToInput(it.amount, currency, locale)}
@@ -502,8 +500,11 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                         </NativeSelect>
                         <Button size="icon" variant="ghost" aria-label="Remove item" onClick={() => (schedule ? setRemoving(removing === it.id ? null : it.id) : removePlain(it.id))}><Trash2 /></Button>
                       </div>
+                      {schedule && it.label.trim() !== '' && it.label.trim() !== schedule.name && (
+                        <p className="text-xs text-muted-foreground" data-testid="rename-note">Renamed from "{schedule.name}" in every open month.</p>
+                      )}
                       {(schedule || canSchedule) && (
-                        <RepeatField value={choice} onChange={(c) => setRepeats((r) => ({ ...r, [it.id]: c }))} month={month} locale={locale} name={it.label.trim() || row.name} none="Only this month" />
+                        <RepeatField value={choice} onChange={(c) => setRepeats((r) => ({ ...r, [it.id]: c }))} month={month} locale={locale} name={it.label.trim() || schedule?.name || row.name} none="Only this month" />
                       )}
                       {moved && (
                         <p className="text-xs text-muted-foreground">
@@ -538,10 +539,10 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                   const touched = (draft?.repeat != null && !sameRepeat(draft.repeat, repeatOf(s))) || (otherAmount(s.id) != null && otherAmount(s.id) !== s.amount)
                   return (
                     <div key={s.id} className="space-y-2 rounded-md border border-dashed p-2" data-testid="elsewhere">
-                      <div className="grid grid-cols-[1fr_7rem_2rem] items-center gap-2">
-                        <div className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+                      <div className="grid grid-cols-[minmax(0,1fr)_6.5rem_2rem] items-center gap-2">
+                        <div className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
                           <Repeat className="size-3.5 shrink-0" aria-hidden />
-                          <span className="truncate">{s.name}</span>
+                          <Input aria-label={`Name of ${s.name}`} placeholder={s.name} value={draft?.name ?? s.name} onChange={(e) => setOthers((o) => ({ ...o, [s.id]: { ...o[s.id], name: e.target.value } }))} />
                         </div>
                         <Input
                           aria-label={`Amount of ${s.name}`} inputMode="decimal" placeholder="0" defaultValue={amountToInput(s.amount, currency, locale)}

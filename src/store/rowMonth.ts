@@ -17,8 +17,8 @@ export interface RowMonthSave {
   repeats?: Record<string, RepeatChoice>
   /** For a scheduled item whose amount or source was edited and whose rhythm was not: this month alone, or from here on. */
   applyTo?: Record<string, EditScope>
-  /** The row's schedules that do not land this month, where one was changed, by schedule id: from this month on. */
-  others?: Record<string, { amount?: Money; repeat?: Repeating }>
+  /** The row's schedules that do not land this month, where one was changed, by schedule id: from this month on (a new name: in every open month). */
+  others?: Record<string, { amount?: Money; repeat?: Repeating; name?: string }>
   /** While nothing in the row repeats by itself: what later months do with the total. */
   scope: EditScope
   /** What the dialog changed on the row itself, for every month of it: its currency, its category. */
@@ -29,11 +29,30 @@ const isCellPut = (m: Mutation, rowId: string, month: MonthKey) =>
   m.op === 'put' && m.table === 'cells' && m.record.rowId === rowId && m.record.month === month
 
 /**
+ * Another name for something that repeats. It is the same thing under a better name, not a change from a month on:
+ * every schedule of the row that carried the old name takes the new one (a rhythm changed earlier left one behind for
+ * the months before), and so do the items they posted in the open months, done or not. Closed months keep what they show.
+ */
+function planRename(tables: Tables, rowId: string, from: string, to: string, ts: number): Mutation[] {
+  const closed = new Set(tables.monthStates.filter((s) => s.closed).map((s) => s.month))
+  const renamed = tables.recurringItems.filter((r) => !r.deletedAt && r.rowId === rowId && r.name === from)
+  const ids = new Set(renamed.map((r) => r.id))
+  const posted = (i: CellItem) => !!i.recurringItemId && ids.has(i.recurringItemId)
+  const muts: Mutation[] = renamed.map((r) => ({ op: 'put', table: 'recurringItems', record: RecurringItemSchema.parse({ ...r, name: to, updatedAt: ts }) }))
+  for (const c of tables.cells) {
+    if (c.rowId !== rowId || closed.has(c.month) || !c.items.some((i) => posted(i) && i.label !== to)) continue
+    muts.push({ op: 'put', table: 'cells', record: CellSchema.parse({ ...c, items: c.items.map((i) => (posted(i) ? { ...i, label: to } : i)), updatedAt: ts }) })
+  }
+  return muts
+}
+
+/**
  * The mutations behind `saveRowMonth`. An item set to repeat becomes a schedule that starts this month, and the item
  * is linked to it, so the poster does not add it a second time; one that does not land this month leaves it. A
  * schedule whose rhythm or amount changed is changed from this month on (`planChangeRecurringFrom`), so earlier
  * months keep what they show; "only this month" on a scheduled item ends its schedule after this month. A row that
- * gets its first schedule here keeps the amounts its earlier months carried (`pinCarriedMonths`).
+ * gets its first schedule here keeps the amounts its earlier months carried (`pinCarriedMonths`). A scheduled item
+ * whose name was typed over is renamed (`planRename`), in every open month.
  */
 export function planRowMonthSave(tables: Tables, engine: EngineOutput, rowId: string, month: MonthKey, save: RowMonthSave, ts: number): Mutation[] {
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
@@ -52,13 +71,23 @@ export function planRowMonthSave(tables: Tables, engine: EngineOutput, rowId: st
   const scheduleOf = (id: string) => t.recurringItems.find((r) => r.id === id && !r.deletedAt && r.rowId === rowId)
 
   const items: CellItem[] = []
-  for (const it of save.items) {
+  for (const typed of save.items) {
+    let it = typed
     const choice = save.repeats?.[it.id]
     if (it.kind !== 'normal' || it.skipped) {
       items.push(it)
       continue
     }
-    const schedule = it.recurringItemId ? scheduleOf(it.recurringItemId) : undefined
+    let schedule = it.recurringItemId ? scheduleOf(it.recurringItemId) : undefined
+    // a scheduled item's name was typed over: the schedule is renamed; an emptied name keeps the one it has
+    const name = it.label.trim()
+    if (schedule && name !== schedule.name) {
+      if (name) {
+        push(planRename(t, rowId, schedule.name, name, ts))
+        schedule = scheduleOf(schedule.id)
+      }
+      if (schedule) it = { ...it, label: schedule.name }
+    }
     if (!schedule) {
       if (it.recurringItemId || !choice || choice.kind === 'none') {
         items.push(it)
@@ -98,8 +127,14 @@ export function planRowMonthSave(tables: Tables, engine: EngineOutput, rowId: st
   }
 
   for (const [id, change] of Object.entries(save.others ?? {})) {
-    const schedule = scheduleOf(id)
+    let schedule = scheduleOf(id)
     if (!schedule) continue
+    const name = change.name?.trim()
+    if (name && name !== schedule.name) {
+      push(planRename(t, rowId, schedule.name, name, ts))
+      schedule = scheduleOf(id)
+      if (!schedule) continue
+    }
     const patch = {
       ...(change.repeat && !sameRepeat(change.repeat, repeatOf(schedule)) ? cadenceOf(change.repeat) : {}),
       ...(change.amount != null && change.amount !== schedule.amount ? { amount: change.amount } : {}),

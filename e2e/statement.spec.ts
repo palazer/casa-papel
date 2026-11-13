@@ -1261,7 +1261,7 @@ test.describe('working the month in the Statement', () => {
     await page.screenshot({ path: 'e2e/output/statement-repeats.png', fullPage: true })
     // pressing it opens the row's dialog, where it is listed too
     await passName.click()
-    await expect(dlg.getByTestId('elsewhere')).toContainText('Annual pass')
+    await expect(dlg.getByTestId('elsewhere').getByLabel('Name of Annual pass')).toHaveValue('Annual pass')
     await dlg.getByRole('button', { name: 'Cancel' }).click()
     await expect(dlg).toBeHidden()
 
@@ -1345,7 +1345,7 @@ test.describe('working the month in the Statement', () => {
     await moneyOut.getByRole('button', { name: 'Biscuit – Costs: empty' }).click()
     await expect(dlg).toContainText('Nothing lands this month')
     const dogTax = dlg.getByTestId('elsewhere')
-    await expect(dogTax).toContainText('Dog tax')
+    await expect(dogTax.getByLabel('Name of Dog tax')).toHaveValue('Dog tax')
     await expect(dlg.getByLabel('Amount of Dog tax')).toHaveValue('120')
     await expect(dlg.getByLabel('Repeats, Dog tax')).toHaveValue('12')
     await expect(dlg.getByLabel('In which month, Dog tax')).toHaveValue('3')
@@ -1445,6 +1445,56 @@ test.describe('working the month in the Statement', () => {
     await expect(dlg.getByLabel(/^Category of/)).toHaveCount(0)
   })
 
+  test('a saved item that repeats is renamed by typing over its name, and the name has room', async ({ page }) => {
+    await openStatement(page)
+    await goToMonth(page, 'November 2026')
+    const moneyOut = page.getByRole('region', { name: 'Money out' })
+    const dlg = page.getByRole('dialog')
+    const health = moneyOut.getByRole('button', { name: /^Health:/ })
+    await moneyOut.getByRole('button', { name: 'Living', exact: true }).click()
+
+    // something that repeats every month, saved
+    await health.click()
+    await dlg.getByRole('tab', { name: 'Itemized' }).click()
+    await dlg.getByRole('button', { name: 'Add item' }).click()
+    await dlg.getByLabel('Item label').last().fill('Gym')
+    await dlg.getByLabel('Item amount').last().fill('30')
+    await dlg.getByLabel('Repeats, Gym').selectOption({ label: 'Every month' })
+    await dlg.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(dlg).toBeHidden()
+
+    // opened again, its name is a field like a plain item's, wide enough for a real name
+    await health.click()
+    const name = dlg.locator('input[value="Gym"]')
+    await expect(name).toHaveAccessibleName('Item label')
+    expect((await name.boundingBox())!.width).toBeGreaterThan(170)
+    await expect(dlg.getByTestId('rename-note')).toHaveCount(0)
+    await name.fill('Sports club membership')
+    await expect(dlg.getByTestId('rename-note')).toHaveText('Renamed from "Gym" in every open month.')
+    await expect(dlg.getByLabel('Repeats, Sports club membership')).toHaveValue('1')
+    await settled(dlg)
+    await dlg.screenshot({ path: 'e2e/output/cell-rename.png' })
+    await dlg.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(dlg).toBeHidden()
+
+    // the item carries the new name in this month and in the ones after it
+    await moneyOut.getByRole('button', { name: 'Items of Health' }).click()
+    await expect(moneyOut.getByRole('button', { name: /^Health: Sports club membership: €30\.00/ })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: /^Health: Gym:/ })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Next month' }).click()
+    await expect(page.getByRole('heading', { level: 2, name: 'December 2026' })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: /^Health:/ }).first()).toBeVisible()
+    await health.first().click()
+    await expect(dlg.locator('input[value="Sports club membership"]')).toHaveCount(1)
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+
+    // one step: undo gives the old name back
+    await page.getByRole('button', { name: 'Undo' }).click()
+    await health.first().click()
+    await expect(dlg.locator('input[value="Gym"]')).toHaveCount(1)
+    await expect(dlg.locator('input[value="Sports club membership"]')).toHaveCount(0)
+  })
+
   test('a long list of items scrolls inside the row\'s dialog, and removing one that repeats keeps what was typed', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'November 2026')
@@ -1499,16 +1549,18 @@ test.describe('working the month in the Statement', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
 
     // one that repeats is removed from this month on: that is done at once, and the dialog keeps everything else
-    const films = dlg.locator('div.rounded-md.border').filter({ hasText: 'Films' }).first()
+    // a saved item's name is a field like any other: it is found by what the field holds
+    const box = (name: string) => dlg.locator('div.rounded-md.border').filter({ has: page.locator(`input[value="${name}"]`) }).first()
+    const films = box('Films')
     await films.getByRole('button', { name: 'Remove item' }).click()
     await films.getByRole('button', { name: 'This and following months' }).click()
     await expect(dlg).toBeVisible()
     await expect(dlg.getByRole('status')).toHaveText('"Films" is removed from November 2026 on. What you typed here is still unsaved.')
-    await expect(dlg.getByText('Films', { exact: true })).toHaveCount(0)
-    await expect(dlg.getByLabel('Item label')).toHaveCount(14)
+    await expect(dlg.locator('input[value="Films"]')).toHaveCount(0)
+    await expect(dlg.getByLabel('Item label')).toHaveCount(15)
     await expect(dlg.getByLabel('Item label').last()).toHaveValue('Service 14')
     // and one with all its occurrences: the remove dialog asks, and the list is still there afterwards
-    const music = dlg.locator('div.rounded-md.border').filter({ hasText: 'Music' }).first()
+    const music = box('Music')
     await music.getByRole('button', { name: 'Remove item' }).click()
     await music.getByRole('button', { name: 'All occurrences' }).click()
     await page.getByRole('dialog').last().getByRole('button', { name: 'Delete', exact: true }).click()

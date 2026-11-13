@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { cellKey, computeEngine } from '@/engine'
 import { describeCadence, monthRange, newId, type CellItem } from '@/model'
-import { CasaDb, Store, addCategory, addRecurringItem, addRow, loadTables, planRecurringPosts, postRecurring, quickCreateHousehold, saveRowMonth, setCellItems, setCellValue } from '@/store'
+import { CasaDb, Store, addCategory, addRecurringItem, addRow, closeMonth, loadTables, planRecurringPosts, postRecurring, quickCreateHousehold, saveRowMonth, setCellItems, setCellValue } from '@/store'
 
 const months = monthRange('2026-01', '2026-12')
 
@@ -133,6 +133,67 @@ describe('a row\'s month saved from its dialog', () => {
     await saveRowMonth(store, row.id, '2026-06', { items: [item({ label: 'C', amount: 700 })], scope: 'from-now-on' })
     expect((await valuesOf(store, row.id)).slice(4, 8)).toEqual([50000, 700, 700, 700])
     expect(await schedulesOf(store, row.id)).toEqual([])
+  })
+})
+
+describe('something that repeats, renamed in the row\'s dialog', () => {
+  const labelsOf = async (store: Store, rowId: string) => {
+    const cells = (await loadTables(store)).cells.filter((c) => c.rowId === rowId)
+    return months.map((m) => cells.find((c) => c.month === m)?.items.map((i) => i.label).join('+') ?? '')
+  }
+
+  it('the name typed over an item renames its schedule and what it posted in every open month, done or not; one undo takes it back', async () => {
+    const { store, row } = await fresh()
+    await addRecurringItem(store, { name: 'Getsafe', rowId: row.id, amount: 6000, startMonth: '2026-01' })
+    await postRecurring(store, months)
+    const feb = (await itemsOf(store, row.id, '2026-02'))[0]
+    await saveRowMonth(store, row.id, '2026-02', { items: [{ ...feb, status: 'done' }], scope: 'from-now-on' })
+    await closeMonth(store, '2026-01')
+    const before = await valuesOf(store, row.id)
+
+    const march = (await itemsOf(store, row.id, '2026-03'))[0]
+    await saveRowMonth(store, row.id, '2026-03', { items: [{ ...march, label: '  Liability insurance ' }], scope: 'from-now-on' })
+    expect((await schedulesOf(store, row.id)).map((s) => s.name)).toEqual(['Liability insurance'])
+    // January is closed and keeps what it shows; February is done and is renamed all the same
+    expect(await labelsOf(store, row.id)).toEqual(['Getsafe', ...months.slice(1).map(() => 'Liability insurance')])
+    expect(await valuesOf(store, row.id)).toEqual(before)
+    // nothing is left for the poster to put right
+    expect(planRecurringPosts(await loadTables(store), months)).toEqual([])
+
+    await store.undo()
+    expect((await schedulesOf(store, row.id)).map((s) => s.name)).toEqual(['Getsafe'])
+    expect(await labelsOf(store, row.id)).toEqual(months.map(() => 'Getsafe'))
+  })
+
+  it('an emptied name keeps the one it has, and a rhythm changed earlier is renamed with it', async () => {
+    const { store, row } = await fresh()
+    await addRecurringItem(store, { name: 'Ticket', rowId: row.id, amount: 9800, startMonth: '2026-01' })
+    await postRecurring(store, months)
+    const april = (await itemsOf(store, row.id, '2026-04'))[0]
+    await saveRowMonth(store, row.id, '2026-04', { items: [april], scope: 'from-now-on', repeats: { [april.id]: { kind: 'every', interval: 3, anchor: 4 } } })
+    expect((await schedulesOf(store, row.id)).map((s) => s.name)).toEqual(['Ticket', 'Ticket'])
+    const july = (await itemsOf(store, row.id, '2026-07'))[0]
+    await saveRowMonth(store, row.id, '2026-07', { items: [{ ...july, label: '   ' }], scope: 'from-now-on' })
+    expect((await schedulesOf(store, row.id)).map((s) => s.name)).toEqual(['Ticket', 'Ticket'])
+    expect((await labelsOf(store, row.id))[6]).toBe('Ticket')
+
+    await saveRowMonth(store, row.id, '2026-07', { items: [{ ...july, label: 'Train pass' }], scope: 'from-now-on' })
+    expect((await schedulesOf(store, row.id)).map((s) => s.name)).toEqual(['Train pass', 'Train pass'])
+    expect(await labelsOf(store, row.id)).toEqual(['Train pass', 'Train pass', 'Train pass', 'Train pass', '', '', 'Train pass', '', '', 'Train pass', '', ''])
+  })
+
+  it('one that lands in other months is renamed from its box, with or without another change', async () => {
+    const { store, row } = await fresh()
+    const yearly = await addRecurringItem(store, { name: 'Car insurance', rowId: row.id, amount: 48000, cadence: { intervalMonths: 12, anchorMonth: 6 }, startMonth: '2026-01' })
+    await postRecurring(store, months)
+    await saveRowMonth(store, row.id, '2026-03', { items: [], scope: 'from-now-on', others: { [yearly.id]: { name: 'Car cover' } } })
+    expect((await schedulesOf(store, row.id)).map((s) => [s.name, s.amount])).toEqual([['Car cover', 48000]])
+    expect((await labelsOf(store, row.id))[5]).toBe('Car cover')
+    const now = (await schedulesOf(store, row.id))[0]
+    await saveRowMonth(store, row.id, '2026-03', { items: [], scope: 'from-now-on', others: { [now.id]: { name: 'Car policy', amount: 50000 } } })
+    expect((await schedulesOf(store, row.id)).filter((s) => !s.endMonth).map((s) => [s.name, s.amount])).toEqual([['Car policy', 50000]])
+    expect(await valuesOf(store, row.id)).toEqual([0, 0, 0, 0, 0, 50000, 0, 0, 0, 0, 0, 0])
+    expect((await labelsOf(store, row.id))[5]).toBe('Car policy')
   })
 })
 

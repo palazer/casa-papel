@@ -604,6 +604,13 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
     schedule of the row with nothing in this month's list: the symbol and its name muted, its amount as a field, a
     bin (`Stop <name>`: `From <Month> on`, `All occurrences`) and the same `RepeatField` without `Only this month`.
     A change there counts from the month on screen.
+  - *A name can always be typed over.* An item's name is a field whether the item is plain or on a schedule (the
+    `Repeat` icon stands before the field of one that is), and so is the name in a box of what lands in other
+    months (`Name of <name>`). Typing over the name of something that repeats renames it, not from a month on but
+    as the same thing under a better name: every schedule of the row that carried the old name and every item they
+    posted in the open months take it (`planRename`), and a muted line says `Renamed from "Gym" in every open
+    month.` An emptied name keeps the one it has. The name takes what the other fields leave: the dialog is
+    `sm:max-w-2xl` and the item grid `minmax(0,1fr) 6.5rem 7rem 8.5rem 2rem`.
   - *Removing what repeats is done at once and never closes the dialog.* An item's bin asks `Only this month`,
     `This and following months` or `All occurrences`; the answer is a step of its own (it does not wait for Save),
     the item leaves the list, and a muted `role="status"` line says so: `"Films" is removed from November 2026 on.
