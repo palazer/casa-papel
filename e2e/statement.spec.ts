@@ -18,6 +18,9 @@ async function goToMonth(page: Page, name: string) {
 
 const total = (page: Page, side: 'in' | 'out' | 'assets' | 'claims') => page.getByTestId(`total-${side}`)
 
+/** A dialog that has finished opening: a screenshot taken before that shows it half faded in. */
+const settled = (dlg: Locator) => dlg.evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)).then(() => undefined))
+
 /** Where something starts, and where its middle is, across the page: for things that must share a column. */
 const leftOf = async (l: Locator) => (await l.boundingBox())!.x
 const middleOf = async (l: Locator) => { const b = (await l.boundingBox())!; return b.x + b.width / 2 }
@@ -510,7 +513,7 @@ test.describe('working the month in the Statement', () => {
     await moneyOut.getByRole('button', { name: /^To investments: €500\.00/ }).click()
     await expect(dlg.getByRole('heading', { name: 'To investments · November 2026' })).toBeVisible()
     await expect(dlg.getByRole('radiogroup', { name: 'How the amount is set' }).getByRole('radio')).toHaveText(['A fixed amount', 'A percentage of income', 'A percentage of one income', 'A percentage of what is left', 'The rest'])
-    await expect(dlg.getByText('Applies to')).toBeVisible()
+    await expect(dlg.getByRole('radiogroup', { name: 'Repeats' }).getByRole('radio')).toHaveText(['Every month', 'Only this month'])
     await dlg.getByRole('button', { name: 'Cancel' }).click()
     await expect(dlg).toBeHidden()
     const investments = moneyOut.locator('[data-line]').filter({ has: page.getByRole('button', { name: /^To investments:/ }) })
@@ -530,7 +533,7 @@ test.describe('working the month in the Statement', () => {
     await dlg.getByRole('radio', { name: 'A percentage of income' }).click()
     // the fields of the amount make way for the rule's
     await expect(dlg.getByLabel('Amount in EUR')).toHaveCount(0)
-    await expect(dlg.getByText('Applies to')).toHaveCount(0)
+    await expect(dlg.getByRole('radiogroup', { name: 'Repeats' })).toHaveCount(0)
     await expect(dlg.getByRole('button', { name: 'Save' })).toBeDisabled()
     await dlg.getByLabel('Percentage of income').fill('120')
     await expect(dlg.getByRole('alert')).toContainText('above 0 and at most 100')
@@ -587,7 +590,7 @@ test.describe('working the month in the Statement', () => {
     await moneyOut.getByRole('button', { name: /^To investments: €500\.00/ }).click()
     await expect(dlg.getByLabel('Amount in EUR')).toHaveValue('500')
     await expect(dlg.getByTestId('rule-runs')).toContainText('for October 2026 alone')
-    await expect(dlg.getByText('Applies to')).toHaveCount(0)
+    await expect(dlg.getByRole('radiogroup', { name: 'Repeats' })).toHaveCount(0)
     await dlg.getByRole('button', { name: 'Cancel' }).click()
     await goToMonth(page, 'December 2026')
     await expect(moneyOut.getByRole('button', { name: 'To investments: €740.50' })).toBeVisible()
@@ -1206,7 +1209,7 @@ test.describe('working the month in the Statement', () => {
     await page.getByRole('button', { name: 'Expand all' }).click()
 
     // rent lands every month: the row carries the symbol, and the symbol says how it repeats
-    await expect(line('The flat – Rent').getByRole('img', { name: 'Repeats: Monthly' })).toBeVisible()
+    await expect(line('The flat – Rent').getByRole('img', { name: 'Repeats: Every month' })).toBeVisible()
     await expect(line('The flat – Rent')).not.toContainText('next')
     // the car insurance lands every three months, not in November: the empty line says it is on a schedule, and when it lands
     const insurance = line('The car – Insurance')
@@ -1229,6 +1232,96 @@ test.describe('working the month in the Statement', () => {
     await expect(page.getByRole('rowheader', { name: /^Groceries/ }).locator('[data-repeats]')).toHaveCount(0)
     await page.getByRole('button', { name: 'What the colours and marks mean' }).click()
     await expect(page.getByText('On a schedule: it lands in its months by itself.')).toBeVisible()
+  })
+
+  test('what repeats is set in the row\'s dialog: one item of a row, and a yearly row from a month it does not land in', async ({ page }) => {
+    await openStatement(page)
+    const moneyOut = page.getByRole('region', { name: 'Money out' })
+    const dlg = page.getByRole('dialog')
+    const line = (name: string) => moneyOut.locator('[data-line]').filter({ hasText: name }).first()
+    const open = async (month: string) => {
+      await goToMonth(page, month)
+      await page.getByRole('button', { name: 'Expand all' }).click()
+    }
+    await open('November 2026')
+
+    // one item of a row: every item says how it repeats, and a new one starts on "Only this month"
+    await moneyOut.getByRole('button', { name: /^Health:/ }).click()
+    await dlg.getByRole('tab', { name: 'Itemized' }).click()
+    await dlg.getByRole('button', { name: 'Add item' }).click()
+    await dlg.getByLabel('Item label').last().fill('Physio')
+    await dlg.getByLabel('Item amount').last().fill('45')
+    const repeats = dlg.getByLabel('Repeats, Physio')
+    await expect(repeats).toHaveValue('none')
+    await expect(repeats.locator('option')).toHaveText(['Only this month', 'Every month', 'Every 2 months', 'Every 3 months', 'Every 6 months', 'Every year', 'In chosen months'])
+    // while nothing repeats by itself, the line under the list asks about the total
+    await expect(dlg.getByRole('radiogroup', { name: 'The total' }).getByRole('radio')).toHaveText(['Every month', 'Only this month'])
+    await expect(dlg.getByTestId('repeat-next')).toHaveCount(0)
+    await repeats.selectOption({ label: 'Every year' })
+    await expect(dlg.getByLabel('In which month, Physio')).toHaveValue('11')
+    await expect(dlg.getByTestId('repeat-lands')).toHaveText('Lands in November each year.')
+    // once something repeats, the row shows only that from the next month on, and says so before it is saved
+    await expect(dlg.getByRole('radiogroup', { name: 'The total' })).toHaveCount(0)
+    await expect(dlg.getByTestId('repeat-next')).toHaveText('From December 2026 this row shows only what repeats. Nothing lands in December 2026.')
+    // asked another way it keeps its month; a month more is one box
+    await repeats.selectOption({ label: 'In chosen months' })
+    await dlg.getByRole('group', { name: 'Months, Physio' }).getByLabel('Dec').check()
+    await expect(dlg.getByTestId('repeat-lands')).toHaveText('Lands in Nov and Dec.')
+    await repeats.selectOption({ label: 'Every month' })
+    await expect(dlg.getByTestId('repeat-lands')).toHaveText('Lands in every month.')
+    await expect(dlg.getByTestId('repeat-next')).toHaveText('From December 2026 this row shows only what repeats: Physio €45.00.')
+    await page.screenshot({ path: 'e2e/output/repeats-items.png' })
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    // the row carries the symbol now; this month keeps both its items
+    await expect(line('Health').getByRole('img', { name: 'Repeats: Every month' })).toBeVisible()
+    await expect(moneyOut.getByRole('button', { name: /^Health:/ })).toHaveAccessibleName(/^Health: €75\.00/)
+    // the next month shows what repeats and nothing else; the month before keeps what it carried
+    await open('December 2026')
+    await expect(moneyOut.getByRole('button', { name: /^Health:/ })).toHaveAccessibleName(/^Health: €45\.00/)
+    await open('October 2026')
+    await expect(moneyOut.getByRole('button', { name: /^Health:/ })).toHaveAccessibleName(/^Health: €30\.00/)
+    // reopened, the item shows how it repeats; "Only this month" ends it after this month
+    await open('December 2026')
+    await moneyOut.getByRole('button', { name: /^Health:/ }).click()
+    await expect(dlg).toContainText('On a schedule')
+    await expect(dlg.getByLabel('Repeats, Physio')).toHaveValue('1')
+    await dlg.getByLabel('Repeats, Physio').selectOption({ label: 'Only this month' })
+    await expect(dlg).toContainText('Ends after December 2026.')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await open('January 2027')
+    await expect(moneyOut.getByRole('button', { name: 'Health: empty' })).toBeVisible()
+    await expect(line('Health').locator('[data-repeats]')).toHaveCount(0)
+
+    // a yearly row seen from a month it does not land in: the dialog lists what repeats there all the same
+    await open('November 2026')
+    await moneyOut.getByRole('button', { name: 'Biscuit – Costs: empty' }).click()
+    await expect(dlg).toContainText('Nothing lands this month')
+    const dogTax = dlg.getByTestId('elsewhere')
+    await expect(dogTax).toContainText('Dog tax')
+    await expect(dlg.getByLabel('Amount of Dog tax')).toHaveValue('120')
+    await expect(dlg.getByLabel('Repeats, Dog tax')).toHaveValue('12')
+    await expect(dlg.getByLabel('In which month, Dog tax')).toHaveValue('3')
+    await expect(dogTax.getByTestId('repeat-lands')).toHaveText('Lands in March each year. Not in November 2026; next: March 2027.')
+    await settled(dlg)
+    await page.screenshot({ path: 'e2e/output/repeats-elsewhere.png' })
+    // its amount is changed from here on
+    await dlg.getByLabel('Amount of Dog tax').fill('130')
+    await expect(dogTax).toContainText('Counts from November 2026; earlier months keep what they show.')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(line('Biscuit – Costs')).toContainText('next Mar 2027')
+    await open('March 2027')
+    await expect(moneyOut.getByRole('button', { name: /^Biscuit – Costs:/ })).toHaveAccessibleName(/^Biscuit – Costs: €130\.00/)
+    // and it is stopped from any month too
+    await open('November 2026')
+    await moneyOut.getByRole('button', { name: 'Biscuit – Costs: empty' }).click()
+    await dlg.getByRole('button', { name: 'Stop Dog tax' }).click()
+    await dlg.getByRole('button', { name: 'From November 2026 on' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(line('Biscuit – Costs').locator('[data-repeats]')).toHaveCount(0)
+    await expect(line('Biscuit – Costs')).not.toContainText('next')
   })
 
   test('the link symbol joins a row and its account: pressing it goes to the other end, and an open one adds the missing row', async ({ page }) => {
@@ -1448,6 +1541,38 @@ test.describe('working the month in the Statement', () => {
 
 test.describe('the Statement on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
+
+  test('the row\'s dialog with its "Repeats" lines fits the screen', async ({ page }) => {
+    await openStatement(page)
+    await goToMonth(page, 'November 2026')
+    const moneyOut = page.getByRole('region', { name: 'Money out' })
+    const dlg = page.getByRole('dialog')
+    const fits = async (l: Locator) => {
+      const box = (await l.boundingBox())!
+      expect(box.x).toBeGreaterThanOrEqual(0)
+      expect(box.x + box.width).toBeLessThanOrEqual(390)
+    }
+    await moneyOut.getByRole('button', { name: 'Living', exact: true }).tap()
+    await moneyOut.getByRole('button', { name: /^Health:/ }).tap()
+    // a single amount on a schedule in chosen months: the twelve boxes stay inside the dialog
+    await dlg.getByRole('radio', { name: 'On a schedule' }).tap()
+    await dlg.getByLabel('How often, Health').selectOption({ label: 'In chosen months' })
+    await fits(dlg)
+    await fits(dlg.getByRole('group', { name: 'Months, Health' }))
+    await settled(dlg)
+    await page.screenshot({ path: 'e2e/output/repeats-single-phone.png' })
+    // an item with its own line under it
+    await dlg.getByRole('tab', { name: 'Itemized' }).tap()
+    await dlg.getByRole('button', { name: 'Add item' }).tap()
+    await dlg.getByLabel('Item label').last().fill('Physio')
+    await dlg.getByLabel('Item amount').last().fill('45')
+    await dlg.getByLabel('Repeats, Physio').selectOption({ label: 'Every 3 months' })
+    await fits(dlg.getByLabel('Repeats, Physio'))
+    await fits(dlg.getByLabel('From which month, Physio'))
+    await expect(dlg.getByTestId('repeat-lands')).toHaveText('Lands in Feb, May, Aug and Nov.')
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    await page.screenshot({ path: 'e2e/output/repeats-items-phone.png' })
+  })
 
   test('the two sides stack, each with its own total', async ({ page }) => {
     await openStatement(page)

@@ -10,10 +10,13 @@ import { amountToInput, formatAmount, formatMonth, parseAmount } from '@/app/for
 import { readPref, writePref } from '@/app/prefs'
 import { useStore } from '@/app/store'
 import { cellKey, type EngineOutput } from '@/engine'
-import { RecurringDialog } from '@/features/recurring/RecurringDialog'
-import { canCarryRule, compareMonths, describeCadence, isTakenFromAccount, newId, type CellItem, type Household, type ItemStatus, type MonthKey, type Row, type Tables } from '@/model'
+import { RepeatField } from '@/features/recurring/RepeatField'
 import {
-  changeRecurringFrom, clearCell, endRecurringFrom, itemsFromCurrent, reopenMonth, setCellItems, setCellValue, skipRecurringMonth,
+  addMonths, cadenceOf, canCarryRule, compareMonths, isDue, isTakenFromAccount, newId, nextDue, parseMonth, repeatOf, runningSchedules, sameRepeat,
+  type CellItem, type Household, type ItemStatus, type MonthKey, type RepeatChoice, type Repeating, type Row, type Tables,
+} from '@/model'
+import {
+  clearCell, endRecurringFrom, itemsFromCurrent, reopenMonth, saveRowMonth, setCellItems, setCellValue, skipRecurringMonth,
   type EditScope, type RuleTarget,
 } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
@@ -43,8 +46,10 @@ const STATUS_LABEL: Record<ItemStatus, string> = { projected: 'Estimate', commit
 
 /**
  * The one dialog of a row in a month (DESIGN.md §8): its amount, as a single amount or as items, how sure it is and
- * which months it applies to. A row that can carry a rule (pocket money, the transfer that fills an account) starts
- * with "How the amount is set": a fixed amount shows these fields, a percentage or the rest shows the rule's.
+ * how it repeats. A single amount stays every month, is for this month only, or goes on a schedule; every item says
+ * for itself how it repeats, and the row's schedules that land in other months are listed too, so they can be
+ * changed from any month. A row that can carry a rule (pocket money, the transfer that fills an account) starts with
+ * "How the amount is set": a fixed amount shows these fields, a percentage or the rest shows the rule's.
  */
 export function CellEditor({ tables, engine, household, row, month, startRule, onClose }: Props) {
   const store = useStore()
@@ -86,10 +91,44 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   const [removingSchedule, setRemovingSchedule] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [recurring, setRecurring] = useState(false)
+  /** A single amount put on a schedule; every month and only this month are `scope`. */
+  const [onSchedule, setOnSchedule] = useState(false)
+  const [rhythm, setRhythm] = useState<Repeating>(() => ({ kind: 'every', interval: 12, anchor: parseMonth(month).month }))
+  /** How an item repeats, where that was touched here; the others keep what they have. */
+  const [repeats, setRepeats] = useState<Record<string, RepeatChoice>>({})
+  /** The row's schedules that land in other months, where one was changed here: its amount as typed, its rhythm. */
+  const [others, setOthers] = useState<Record<string, { text?: string; repeat?: Repeating }>>({})
+  /** The schedule from another month that is being asked how to stop. */
+  const [stopping, setStopping] = useState<string | null>(null)
 
   const original = useMemo(() => new Map((cell?.items ?? []).map((i) => [i.id, i])), [cell])
   const schedules = useMemo(() => new Map(tables.recurringItems.map((r) => [r.id, r])), [tables.recurringItems])
+  /** A schedule can be started here on a row that takes one: not on one a rule can work out, nor on an estimate. */
+  const canSchedule = !canCarryRule(row) && row.kind !== 'to-savings' && row.kind !== 'category-estimate' && row.pocketMode == null
+  /** How an item repeats as stored: its schedule's rhythm while that runs on after this month. */
+  const storedRepeat = (it: CellItem): RepeatChoice => {
+    const s = it.recurringItemId ? schedules.get(it.recurringItemId) : undefined
+    return s && !s.deletedAt && !(s.endMonth && compareMonths(s.endMonth, month) <= 0) ? repeatOf(s) : { kind: 'none' }
+  }
+  const repeatFor = (it: CellItem): RepeatChoice => repeats[it.id] ?? storedRepeat(it)
+  const repeating = (it: CellItem) => it.kind === 'normal' && !it.skipped && repeatFor(it).kind !== 'none'
+  /** The row's schedules with nothing in this month's list: they land in other months, and are changed from here too. */
+  const elsewhere = runningSchedules(tables.recurringItems, row.id, month).filter((s) => !items.some((i) => i.recurringItemId === s.id) && nextDue(s, month) !== null)
+  /** The amount typed for one of them: undefined while untouched, not a number when it cannot be read. */
+  const otherAmount = (id: string): number | undefined => {
+    const typed = others[id]?.text
+    if (typed == null) return undefined
+    return typed.trim() === '' ? 0 : parseAmount(typed, currency, locale) ?? Number.NaN
+  }
+  /** Once saved, something in the row lands by itself: later months then show only that. */
+  const willRepeat = elsewhere.length > 0 || items.some(repeating)
+  /** Items that are this month's alone: they are what a row on a schedule does not bring back. */
+  const plain = items.filter((it) => it.kind === 'normal' && !it.skipped && !repeating(it))
+  const nextMonth = addMonths(month, 1)
+  const landsNext = [
+    ...items.filter(repeating).filter((it) => isDue({ ...cadenceOf(repeatFor(it) as Repeating), startMonth: month, endMonth: null }, nextMonth)).map((it) => ({ name: it.label.trim() || row.name, amount: it.amount })),
+    ...elsewhere.filter((s) => isDue({ ...cadenceOf(others[s.id]?.repeat ?? repeatOf(s)), startMonth: s.startMonth, endMonth: s.endMonth }, nextMonth)).map((s) => ({ name: s.name, amount: otherAmount(s.id) ?? s.amount })),
+  ]
   const fundingOptions = useMemo(() => buildFundingOptions(tables.pools, [row.defaultFundedBy, ...items.map((i) => i.fundedBy)]), [tables.pools, row.defaultFundedBy, items])
 
   useEffect(() => {
@@ -130,9 +169,15 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
       setError('That is not a number I can read.')
       return
     }
+    const single: CellItem = { id: newId(), label: '', amount: minor, status: status === 'default' ? row.defaultStatus : status, fundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }
+    if (onSchedule && !ruleRuns) {
+      if (minor === 0) return setError('Type the amount that repeats.')
+      if (rhythm.kind === 'months' && rhythm.months.length === 0) return setError('Pick at least one month.')
+      // the amount becomes the row's schedule, named after the row; it lands this month only if its rhythm does
+      return void run(() => saveRowMonth(store, row.id, month, { items: [single], repeats: { [single.id]: rhythm }, scope: 'from-now-on' }))
+    }
     // A plain value takes the row's defaults; any other certainty or source is stored as one unlabelled item.
     if (status === 'default' && fundedBy === row.defaultFundedBy) return void run(() => setCellValue(store, row.id, month, minor, saveScope))
-    const single: CellItem = { id: newId(), label: '', amount: minor, status: status === 'default' ? row.defaultStatus : status, fundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }
     void run(() => setCellItems(store, row.id, month, [single], saveScope))
   }
 
@@ -142,21 +187,24 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
     return !!it.recurringItemId && !!o && (o.amount !== it.amount || o.fundedBy !== it.fundedBy)
   }
 
+  /** The items, how each repeats and what changed on the schedules of other months, saved as one step. */
   function saveItems() {
-    for (const it of items) if (it.kind === 'normal' && !Number.isFinite(it.amount)) return setError(`${it.label.trim() ? `"${it.label.trim()}"` : 'An item'} has an amount that is not a number I can read.`)
-    void run(async () => {
-      let next = items
-      for (const it of items) {
-        if (!changedScheduled(it) || !it.recurringItemId) continue
-        if ((applyTo[it.id] ?? 'this-month') === 'from-now-on') {
-          const newId_ = await changeRecurringFrom(store, it.recurringItemId, month, { amount: it.amount, fundedBy: it.fundedBy })
-          next = next.map((x) => (x.id === it.id ? { ...x, recurringItemId: newId_, pinned: false } : x))
-        } else {
-          next = next.map((x) => (x.id === it.id ? { ...x, pinned: true } : x))
-        }
-      }
-      await setCellItems(store, row.id, month, next, isRecurringRow ? 'this-month' : saveScope)
-    })
+    for (const it of items) {
+      const named = it.label.trim() ? `"${it.label.trim()}"` : null
+      if (it.kind === 'normal' && !Number.isFinite(it.amount)) return setError(`${named ?? 'An item'} has an amount that is not a number I can read.`)
+      const choice = repeatFor(it)
+      if (choice.kind === 'months' && choice.months.length === 0) return setError(`Pick at least one month for ${named ?? 'the item that repeats'}.`)
+    }
+    const changes: Record<string, { amount?: number; repeat?: Repeating }> = {}
+    for (const s of elsewhere) {
+      const draft = others[s.id]
+      if (!draft) continue
+      const amount = otherAmount(s.id)
+      if (amount != null && !Number.isFinite(amount)) return setError(`"${s.name}" has an amount that is not a number I can read.`)
+      if (draft.repeat?.kind === 'months' && draft.repeat.months.length === 0) return setError(`Pick at least one month for "${s.name}".`)
+      changes[s.id] = { amount, repeat: draft.repeat }
+    }
+    void run(() => saveRowMonth(store, row.id, month, { items, repeats, applyTo, others: changes, scope: isRecurringRow ? 'this-month' : saveScope }))
   }
 
   function updateItem(id: string, patch: Partial<CellItem>) {
@@ -208,8 +256,8 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
     cell?.source === 'derived' ? 'Worked out by the app' :
     cell?.source === 'inherit' ? 'Carried from the previous month' :
     cell?.source === 'value' ? 'Set in this month' :
-    cell?.source === 'items' ? (soloItem ? 'Set in this month' : isRecurringRow ? 'Posted from a schedule' : `${cell.items.length} item${cell.items.length === 1 ? '' : 's'}`) :
-    cell?.source === 'empty' ? (isRecurringRow ? 'Nothing due this month' : 'Nothing yet') : ''
+    cell?.source === 'items' ? (soloItem ? 'Set in this month' : isRecurringRow ? 'On a schedule' : `${cell.items.length} item${cell.items.length === 1 ? '' : 's'}`) :
+    cell?.source === 'empty' ? (isRecurringRow ? 'Nothing lands this month' : 'Nothing yet') : ''
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
@@ -252,11 +300,25 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                   <p className="text-xs text-muted-foreground" data-testid="rule-runs">This amount is for {formatMonth(month, locale, 'long')} alone. A rule works this row out in every month without a typed amount; to change the rule, open a month it works out.</p>
                 ) : (
                   <fieldset className="space-y-1.5">
-                    <legend className="text-sm font-medium"><span className="inline-flex items-center gap-1">Applies to <InfoTip help="cell.appliesTo" /></span></legend>
-                    <Segmented value={scope} onChange={(v) => setScope(v as EditScope)} options={[{ value: 'from-now-on', label: 'This month and onwards' }, { value: 'this-month', label: 'Only this month' }]} />
-                    <p className="text-xs text-muted-foreground">
-                      {scope === 'from-now-on' ? 'Later months that follow this row will pick up the new amount.' : 'The next month keeps the old amount.'}
-                    </p>
+                    <legend className="text-sm font-medium"><span className="inline-flex items-center gap-1">Repeats <InfoTip help="cell.repeats" /></span></legend>
+                    <Segmented
+                      label="Repeats" value={onSchedule ? 'schedule' : scope}
+                      onChange={(v) => {
+                        setOnSchedule(v === 'schedule')
+                        if (v !== 'schedule') setScope(v as EditScope)
+                      }}
+                      options={[{ value: 'from-now-on', label: 'Every month' }, ...(canSchedule ? [{ value: 'schedule', label: 'On a schedule' }] : []), { value: 'this-month', label: 'Only this month' }]}
+                    />
+                    {onSchedule ? (
+                      <>
+                        <RepeatField value={rhythm} onChange={(c) => { if (c.kind !== 'none') setRhythm(c) }} month={month} locale={locale} name={row.name} label="How often" monthly={false} />
+                        <p className="text-xs text-muted-foreground">On a schedule the amount lands only in its months; the months between stay empty.</p>
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        {scope === 'from-now-on' ? 'The amount stays in every later month until you change it.' : 'The next month keeps the old amount.'}
+                      </p>
+                    )}
                   </fieldset>
                 )}
                 <fieldset className="space-y-1.5">
@@ -283,7 +345,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
               </div>
             ) : (
               <div className="space-y-2">
-                {items.length === 0 && <p className="text-sm text-muted-foreground">No items yet.</p>}
+                {items.length === 0 && elsewhere.length === 0 && <p className="text-sm text-muted-foreground">No items yet.</p>}
                 {items.map((it) => {
                   if (it.kind === 'carry') {
                     return (
@@ -305,14 +367,16 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                     )
                   }
                   const edited = changedScheduled(it)
+                  const choice = repeatFor(it)
+                  /** The rhythm was changed here: that counts from this month on, so the amount is not asked about separately. */
+                  const moved = !!schedule && !sameRepeat(choice, storedRepeat(it))
                   return (
                     <div key={it.id} className={cn('space-y-2 rounded-md border p-2', schedule && 'border-transfer/40')}>
                       <div className="grid grid-cols-[1fr_7rem] gap-2 sm:grid-cols-[1fr_7rem_7rem_9rem_2rem]">
                         {schedule ? (
-                          <div className="flex min-w-0 items-center gap-1.5 text-sm" title={`Repeats: ${describeCadence(schedule, locale)}`}>
+                          <div className="flex min-w-0 items-center gap-1.5 text-sm">
                             <Repeat className="size-3.5 shrink-0 text-transfer" aria-hidden />
                             <span className="truncate">{it.label}</span>
-                            <span className="truncate text-xs text-muted-foreground">{describeCadence(schedule, locale)}</span>
                           </div>
                         ) : (
                           <Input aria-label="Item label" placeholder="What" value={it.label} onChange={(e) => updateItem(it.id, { label: e.target.value })} />
@@ -331,7 +395,15 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                         </NativeSelect>
                         <Button size="icon" variant="ghost" aria-label="Remove item" onClick={() => (schedule ? setRemoving(removing === it.id ? null : it.id) : removePlain(it.id))}><Trash2 /></Button>
                       </div>
-                      {schedule && edited && (
+                      {(schedule || canSchedule) && (
+                        <RepeatField value={choice} onChange={(c) => setRepeats((r) => ({ ...r, [it.id]: c }))} month={month} locale={locale} name={it.label.trim() || row.name} none="Only this month" />
+                      )}
+                      {moved && (
+                        <p className="text-xs text-muted-foreground">
+                          {choice.kind === 'none' ? `Ends after ${formatMonth(month, locale, 'long')}.` : `Counts from ${formatMonth(month, locale, 'long')}; earlier months keep what they show.`}
+                        </p>
+                      )}
+                      {schedule && edited && !moved && (
                         <div className="flex flex-wrap items-center gap-2 text-xs">
                           <span className="text-muted-foreground">Apply the change to</span>
                           <Segmented
@@ -353,6 +425,39 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                     </div>
                   )
                 })}
+                {/* what repeats in this row and does not land this month: seen, changed and stopped from here all the same */}
+                {elsewhere.map((s) => {
+                  const draft = others[s.id]
+                  const touched = (draft?.repeat != null && !sameRepeat(draft.repeat, repeatOf(s))) || (otherAmount(s.id) != null && otherAmount(s.id) !== s.amount)
+                  return (
+                    <div key={s.id} className="space-y-2 rounded-md border border-dashed p-2" data-testid="elsewhere">
+                      <div className="grid grid-cols-[1fr_7rem_2rem] items-center gap-2">
+                        <div className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+                          <Repeat className="size-3.5 shrink-0" aria-hidden />
+                          <span className="truncate">{s.name}</span>
+                        </div>
+                        <Input
+                          aria-label={`Amount of ${s.name}`} inputMode="decimal" placeholder="0" defaultValue={amountToInput(s.amount, currency, locale)}
+                          onChange={(e) => { setError(null); setOthers((o) => ({ ...o, [s.id]: { ...o[s.id], text: e.target.value } })) }}
+                        />
+                        <Button size="icon" variant="ghost" aria-label={`Stop ${s.name}`} onClick={() => setStopping(stopping === s.id ? null : s.id)}><Trash2 /></Button>
+                      </div>
+                      <RepeatField
+                        value={draft?.repeat ?? repeatOf(s)} month={month} locale={locale} name={s.name}
+                        onChange={(c) => { if (c.kind !== 'none') setOthers((o) => ({ ...o, [s.id]: { ...o[s.id], repeat: c } })) }}
+                      />
+                      {touched && <p className="text-xs text-muted-foreground">Counts from {formatMonth(month, locale, 'long')}; earlier months keep what they show.</p>}
+                      {stopping === s.id && (
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <span className="text-muted-foreground">Stop "{s.name}":</span>
+                          <Button size="xs" variant="outline" onClick={() => void run(() => endRecurringFrom(store, s.id, month))} disabled={busy}>From {formatMonth(month, locale, 'long')} on</Button>
+                          <Button size="xs" variant="outline" onClick={() => { setStopping(null); setRemovingSchedule(s.id) }} disabled={busy}>All occurrences</Button>
+                          <Button size="xs" variant="ghost" onClick={() => setStopping(null)}>Cancel</Button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <Button size="sm" variant="outline" onClick={addItem}>Add item</Button>
@@ -365,12 +470,24 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                     {currency !== household.baseCurrency && <RateLine tables={tables} household={household} month={month} currency={currency} amount={itemsTotal} />}
                   </div>
                 </div>
+                {willRepeat ? (plain.length > 0 || !isRecurringRow) && (
+                  // said before saving: a row on a schedule does not carry its other items, or its total, into the next month
+                  <p className="text-xs" data-testid="repeat-next">
+                    From {formatMonth(nextMonth, locale, 'long')} this row shows only what repeats
+                    {landsNext.length ? `: ${landsNext.map((l) => `${l.name} ${formatAmount(l.amount, currency, locale)}`).join(', ')}.` : `. Nothing lands in ${formatMonth(nextMonth, locale, 'long')}.`}
+                  </p>
+                ) : !isRecurringRow && !ruleRuns && (
+                  <fieldset className="space-y-1.5">
+                    <legend className="text-sm font-medium">The total</legend>
+                    <Segmented label="The total" value={scope} onChange={(v) => setScope(v as EditScope)} options={[{ value: 'from-now-on', label: 'Every month' }, { value: 'this-month', label: 'Only this month' }]} />
+                    <p className="text-xs text-muted-foreground">
+                      {scope === 'from-now-on' ? `Nothing here repeats by itself: later months show the total, ${formatAmount(itemsTotal, currency, locale)}, as one amount.` : 'The next month keeps the old amount.'}
+                    </p>
+                  </fieldset>
+                )}
                 <p className="text-xs text-muted-foreground">Set an item to Done when it is paid or received. A done cell shows a green dot; in the current month the dot also shows red for nothing done yet and amber for partly done.</p>
                 {row.section === 'expense' && (
                   <p className="text-xs text-muted-foreground">{HELP['cell.comesOutOf'].text}</p>
-                )}
-                {!isRecurringRow && !ruleRuns && (
-                  <Segmented value={scope} onChange={(v) => setScope(v as EditScope)} options={[{ value: 'from-now-on', label: 'This month and onwards' }, { value: 'this-month', label: 'Only this month' }]} />
                 )}
               </div>
             )}
@@ -391,7 +508,6 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
           <DialogFooter className="flex-row flex-wrap gap-2 sm:justify-between">
             <div className="flex gap-2">
               {!isRecurringRow && <Button variant="ghost" onClick={() => void run(() => clearCell(store, row.id, month))} disabled={busy || !cell?.cell}>{ruleRuns ? 'Clear (back to the rule)' : 'Clear (inherit)'}</Button>}
-              <Button variant="ghost" onClick={() => setRecurring(true)} disabled={busy}>Make recurring…</Button>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
@@ -401,17 +517,6 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
         )}
       </DialogContent>
       {removingSchedule && <RemoveDialog target={{ kind: 'schedule', id: removingSchedule }} tables={tables} household={household} onClose={() => setRemovingSchedule(null)} onDone={onClose} />}
-      {recurring && (
-        <RecurringDialog
-          tables={tables}
-          household={household}
-          item={null}
-          defaultMonth={month}
-          prefill={{ rowId: row.id, name: row.name, amount: mode === 'value' ? (parseAmount(text, currency, locale) ?? undefined) : itemsTotal }}
-          onClose={() => setRecurring(false)}
-          onSaved={onClose}
-        />
-      )}
     </Dialog>
   )
 }

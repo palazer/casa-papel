@@ -15,33 +15,26 @@ import { addRecurringItem, addRow, updateRecurringItem, type RecurringInput } fr
 const MONTH_NAMES = Array.from({ length: 12 }, (_, i) => new Intl.DateTimeFormat('en', { month: 'short' }).format(new Date(2026, i, 1)))
 type CadenceChoice = '1' | '2' | '3' | '6' | '12' | 'months'
 
-export interface RecurringPrefill { rowId?: string; name?: string; amount?: number }
-
 interface Props {
   tables: Tables
   household: Household
   /** null = create */
   item: RecurringItem | null
   defaultMonth: MonthKey
-  prefill?: RecurringPrefill
   onClose: () => void
-  onSaved?: () => void
 }
 
-export function RecurringDialog({ tables, household, item, defaultMonth, prefill, onClose, onSaved }: Props) {
+export function RecurringDialog({ tables, household, item, defaultMonth, onClose }: Props) {
   const store = useStore()
   const { locale, baseCurrency } = household
   const rows = sortRows(tables.rows.filter((r) => !r.deletedAt && !r.archivedMonth && r.kind !== 'to-savings' && r.pocketMode == null), tables.categories)
   const adults = tables.entities.filter((e) => e.kind === 'adult' && !e.deletedAt)
   const pools = tables.pools.filter((p) => !p.deletedAt && (!p.archivedMonth || poolRef(p.id) === item?.fundedBy))
-  const [name, setName] = useState(item?.name ?? prefill?.name ?? '')
-  const [rowId, setRowId] = useState(item?.rowId ?? prefill?.rowId ?? rows[0]?.id ?? '__new__')
+  const [name, setName] = useState(item?.name ?? '')
+  const [rowId, setRowId] = useState(item?.rowId ?? rows[0]?.id ?? '__new__')
   const [newRowName, setNewRowName] = useState('')
   const [newRowSection, setNewRowSection] = useState<Section>('expense')
-  const [amount, setAmount] = useState(() => {
-    const minor = item?.amount ?? prefill?.amount
-    return minor == null ? '' : amountToInput(minor, item?.currency ?? baseCurrency, locale)
-  })
+  const [amount, setAmount] = useState(() => (item == null ? '' : amountToInput(item.amount, item.currency ?? baseCurrency, locale)))
   const [cadence, setCadence] = useState<CadenceChoice>(() => (item?.dueMonths?.length ? 'months' : (String(item?.cadence?.intervalMonths ?? 1) as CadenceChoice)))
   const [anchor, setAnchor] = useState<number>(item?.cadence?.anchorMonth ?? Number(defaultMonth.slice(5)))
   const [dueMonths, setDueMonths] = useState<Set<number>>(() => new Set(item?.dueMonths ?? []))
@@ -82,7 +75,6 @@ export function RecurringDialog({ tables, household, item, defaultMonth, prefill
       }
       if (item) await updateRecurringItem(store, item.id, base)
       else await addRecurringItem(store, base as Parameters<typeof addRecurringItem>[1])
-      onSaved?.()
       onClose()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save.')
@@ -96,7 +88,7 @@ export function RecurringDialog({ tables, household, item, defaultMonth, prefill
       <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{item ? 'Edit schedule' : 'New schedule'}</DialogTitle>
-          <DialogDescription>Posted into every due month that is still open. Change the amount here and every open month follows.</DialogDescription>
+          <DialogDescription>Lands in each of its months that is still open. Change the amount here and every open month follows.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="rc-name">Name</Label><Input id="rc-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Car insurance" /></div>
@@ -121,7 +113,7 @@ export function RecurringDialog({ tables, household, item, defaultMonth, prefill
           <div className="space-y-1.5">
             <Label htmlFor="rc-cadence">How often</Label>
             <NativeSelect id="rc-cadence" className="w-full" value={cadence} onChange={(e) => setCadence(e.target.value as CadenceChoice)}>
-              <option value="1">Monthly</option><option value="2">Every 2 months</option><option value="3">Every 3 months</option><option value="6">Every 6 months</option><option value="12">Yearly</option><option value="months">Specific months</option>
+              <option value="1">Every month</option><option value="2">Every 2 months</option><option value="3">Every 3 months</option><option value="6">Every 6 months</option><option value="12">Every year</option><option value="months">In chosen months</option>
             </NativeSelect>
           </div>
           {cadence !== '1' && cadence !== 'months' && (

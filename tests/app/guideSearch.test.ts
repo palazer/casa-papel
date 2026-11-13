@@ -10,7 +10,7 @@ describe('searching the guide', () => {
     expect(searchGuide(GUIDE, '', HELP)).toHaveLength(GUIDE.length)
     expect(searchGuide(GUIDE, '   ', HELP)).toHaveLength(GUIDE.length)
     expect(keys('lisbon')).toEqual(['virtual-accounts']) // a paragraph's example
-    expect(keys('make recurring')).toEqual(['schedules']) // a step's control
+    expect(keys('how often')).toEqual(['schedules']) // a step's control
     expect(keys('honest')).toEqual(['debts']) // only in a related tip's text
     expect(keys('wallet')).toEqual(['investments']) // only in the account-type facts
   })

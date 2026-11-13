@@ -532,12 +532,42 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 - The estimate dialog (`src/features/statement/EstimateDialog.tsx`), titled `Estimate for <category> · <month>`: one
   amount in the household currency with an (i) (`row.categoryEstimate`), then two read-only lines that follow what
   is typed (`Rows this month`, `Not broken down yet`; a muted sentence when the rows already add up to more), then
-  "Applies to" as the cell editor's `Segmented` (`This month and onwards` / `Only this month`). Footer: a ghost
+  "Applies to" as a `Segmented` (`This month and onwards` / `Only this month`). Footer: a ghost
   `Remove estimate` when there is one, Cancel, Save. A closed month disables it.
 - **A dialog saves once.** Its buttons are disabled while a save runs, and the save itself refuses a second start
   (`useSave` in `src/features/grid/RowDialogs.tsx`, the cell editor's `run`), because Enter in a field is not a
   button: pressed twice, it must not add a top-up or a virtual account twice. A field that cannot be read says so
   when Save is pressed and nothing is stored: never a silent zero (an item's amount in the cell editor included).
+- **"Repeats": how an amount repeats is set where it is typed.** The cell editor asks it under the amount and under
+  every item; there is no second form on the way (the long schedule form stays under Household → Schedules for the
+  rest: the account, whose it is, an end month, notes). One set of words everywhere: `Every month`, `Every 2 months`,
+  `Every 3 months`, `Every 6 months`, `Every year`, `In chosen months`, `Only this month` (`describeCadence` writes
+  them as `Every year (Jan)`, `In Mar, Sep`).
+  - *A single amount*: a fieldset "Repeats" with an (i) (`cell.repeats`) and a `Segmented`: `Every month` (the
+    amount stays in every later month until it is changed: the plain carry-forward, no schedule and no symbol), `On a
+    schedule`, `Only this month`, with the chosen option's sentence under it. `On a schedule` shows the
+    `RepeatField` (`src/features/recurring/RepeatField.tsx`) labelled "How often"; it starts on every year in the
+    month on screen. A row a rule can work out, the rest and a category's estimate are not offered a schedule.
+  - *The `RepeatField`*: one line in `text-xs`: a muted word, a `NativeSelect` (`h-7`) named `Repeats, <what>`,
+    then `in` or `from` and a month select where the rhythm needs a month, or twelve small `Check`s for chosen
+    months (a group `Months, <what>`, 4 across, 6 from `sm`). Under it a muted sentence always says where it lands
+    (`landsText`): `Lands in Feb, May, Aug and Nov.`, `Lands in January each year. Not in November 2026; next:
+    January 2027.` A rhythm asked another way keeps its months.
+  - *Itemized*: every item carries the line under its fields, named after the item; a new item starts on `Only this
+    month`. An item set to repeat becomes a schedule from the month on screen when the dialog is saved, named after
+    the item. Changing a scheduled item's rhythm counts from the month on screen (`Counts from November 2026; earlier
+    months keep what they show.`), and `Only this month` ends it after this month (`Ends after November 2026.`); the
+    question "Apply the change to" is asked only while the rhythm itself is unchanged.
+  - *What lands in other months* is listed too, in every month (`data-testid="elsewhere"`): a dashed box per
+    schedule of the row with nothing in this month's list: the symbol and its name muted, its amount as a field, a
+    bin (`Stop <name>`: `From <Month> on`, `All occurrences`) and the same `RepeatField` without `Only this month`.
+    A change there counts from the month on screen.
+  - *The line under the list.* While nothing in the row repeats by itself it is a fieldset "The total" (`Every
+    month`: later months show the total as one amount; `Only this month`). Once something does, it is one sentence
+    in the foreground colour, said before saving because the row then stops carrying anything else forward: `From
+    December 2026 this row shows only what repeats: Physio €45.00.` (or `Nothing lands in December 2026.`).
+  - The save is one step and one undo (`saveRowMonth` in `src/store/rowMonth.ts`). The months before a row's first
+    schedule keep the amounts they carried (`pinCarriedMonths`).
 - **One dialog per row: the amount and the rule together.** The cell editor (`src/features/grid/CellEditor.tsx`),
   titled `<row> · <month>`, is the only dialog a row has, on the Statement and in the Grid. For a row that can carry
   a rule (the transfer that fills a savings account, an investment account or a virtual account; an adult's pocket
@@ -546,7 +576,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   left`, `The rest`; for pocket money `A percentage of <Adult>'s income` in place of `The rest`) with an (i) and the chosen option's sentence under
   it (for the rest, also what a month that overruns does to that account). What follows depends on the choice:
   - `A fixed amount`, in a month whose amount is typed: the editor's own fields (Single amount / Itemized, the
-    amount, "Applies to", "How sure") and its footer (Clear, Make recurring…, Cancel, Save).
+    amount, "Repeats", "How sure") and its footer (Clear, Cancel, Save).
   - A percentage or the rest, and any choice in a month the app works out: the rule's fields (`RuleFields`): that
     option's one field (`Amount per month in <CCY>` or the percentage), then "Counts from" as a `MonthField` with an
     (i) and the sentence that earlier months keep their amounts (it starts on the month the dialog was opened from,
@@ -641,7 +671,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   found with `getByLabel(name, { exact: true })`, since the (i)'s name contains the field's): `TipLabel` pairs a form label with one,
   `Island`, `StatTile` and the grid's `derivedRow` take a `help` key, the grid's row label puts
   it between the name and the row menu. Where it goes: section titles, every total and balance the app works out,
-  automatic and following rows, stat labels, the cell editor's "Applies to", "How sure", "Comes out of", its rate line and its deductions block, a row's currency, who a row belongs to, what it is deducted from and its share of a followed row, the `in EUR` balance line, the Statement's progress line, its two halves, its Set aside group, its main account line, Net worth, Free and "Per person", the
+  automatic and following rows, stat labels, the cell editor's "Repeats", "How sure", "Comes out of", its rate line and its deductions block, a row's currency, who a row belongs to, what it is deducted from and its share of a followed row, the `in EUR` balance line, the Statement's progress line, its two halves, its Set aside group, its main account line, Net worth, Free and "Per person", the
   household settings, "Track the balance", the Archived list, Goals and the schedules' status column.
 - Every text lives in `src/app/help.ts`: `HELP[key] = { title, text }`, keys `area.name`, titles up to 40 characters,
   texts two or three plain sentences up to 360 characters in the app's own words (virtual accounts, people & things,

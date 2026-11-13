@@ -39,7 +39,7 @@ export function RecurringList() {
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <MonthPicker months={months} month={m} onChange={setMonth} locale={locale} />
         <span className="text-muted-foreground">
-          In the grid, open any posted item to change its amount for one month or from now on, skip a month, or end it; open any cell and choose "Make recurring" to start a new one.
+          What repeats is set where its amount is typed: open a row's month on the Statement or in the Grid and use "Repeats" under the amount or under an item. This is the full list, with the rest of each schedule behind "Edit…".
         </span>
         <Button size="xs" className="ml-auto" onClick={() => setEditing('new')}>Add schedule</Button>
       </div>

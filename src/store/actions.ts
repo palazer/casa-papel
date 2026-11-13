@@ -18,7 +18,7 @@ export async function loadTables(store: Store): Promise<Tables> {
   return out as unknown as Tables
 }
 
-async function engineUpTo(store: Store, month: MonthKey): Promise<{ tables: Tables; engine: EngineOutput; household: Household }> {
+export async function engineUpTo(store: Store, month: MonthKey): Promise<{ tables: Tables; engine: EngineOutput; household: Household }> {
   const tables = await loadTables(store)
   const household = tables.household.find((h) => !h.deletedAt)
   if (!household) throw new Error('No household yet')
@@ -44,7 +44,7 @@ const putCell = (cell: CellInput): Mutation => ({ op: 'put', table: 'cells', rec
  * `this-month` freezes the next month at the old value so the chain continues as before.
  */
 /** When editing only this month, pin the following month at the old value if it was inheriting. */
-function freezeNext(tables: Tables, engine: EngineOutput, rowId: string, month: MonthKey): Mutation[] {
+export function freezeNext(tables: Tables, engine: EngineOutput, rowId: string, month: MonthKey): Mutation[] {
   // a scheduled row never carries forward, so there is nothing to freeze (and a value cell there would post a phantom amount)
   if (engine.recurringRowIds.includes(rowId)) return []
   // a row a rule works out fills its own months: holding the next one would take that month away from the rule

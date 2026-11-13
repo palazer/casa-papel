@@ -48,11 +48,41 @@ export function repeatsText(items: CadenceLike[], locale = 'en'): string {
   return items.length === 1 ? describeCadence(items[0], locale) : `${items.length} items repeat`
 }
 
+/** How a schedule repeats, in the words the app uses for it everywhere: "Every month", "Every year (Jan)", "In Mar, Sep". */
 export function describeCadence(item: CadenceLike, locale = 'en'): string {
   const fmt = new Intl.DateTimeFormat(locale, { month: 'short' })
   const names = (ms: number[]) => ms.map((m) => fmt.format(new Date(2026, m - 1, 1))).join(', ')
-  if (item.dueMonths && item.dueMonths.length > 0) return `Months: ${names(dueMonthNumbers(item))}`
-  if (!item.cadence || item.cadence.intervalMonths === 1) return 'Monthly'
-  if (item.cadence.intervalMonths === 12) return `Yearly (${names([item.cadence.anchorMonth])})`
+  if (item.dueMonths && item.dueMonths.length > 0) return `In ${names(dueMonthNumbers(item))}`
+  if (!item.cadence || item.cadence.intervalMonths === 1) return 'Every month'
+  if (item.cadence.intervalMonths === 12) return `Every year (${names([item.cadence.anchorMonth])})`
   return `Every ${item.cadence.intervalMonths} months (${names(dueMonthNumbers(item))})`
+}
+
+/**
+ * How an amount repeats, the way a row's dialog asks it: not at all, every so many months (landing in `anchor` and
+ * every `interval` months from there), or in chosen months of the year. A schedule stores the last two as `cadence`
+ * and `dueMonths`.
+ */
+export type RepeatChoice =
+  | { kind: 'none' }
+  | { kind: 'every'; interval: 1 | 2 | 3 | 6 | 12; anchor: number }
+  | { kind: 'months'; months: number[] }
+export type Repeating = Exclude<RepeatChoice, { kind: 'none' }>
+
+/** A schedule's rhythm as a choice. */
+export function repeatOf(item: CadenceLike): Repeating {
+  if (item.dueMonths && item.dueMonths.length > 0) return { kind: 'months', months: dueMonthNumbers(item) }
+  return { kind: 'every', interval: item.cadence?.intervalMonths ?? 1, anchor: item.cadence?.anchorMonth ?? 1 }
+}
+
+/** A choice as a schedule stores it. Every month has no month of its own, so its anchor is always January. */
+export function cadenceOf(choice: Repeating): CadenceLike {
+  if (choice.kind === 'months') return { cadence: null, dueMonths: [...new Set(choice.months)].sort((a, b) => a - b) }
+  return { cadence: { intervalMonths: choice.interval, anchorMonth: choice.interval === 1 ? 1 : choice.anchor }, dueMonths: null }
+}
+
+/** Two choices that land in the same months are the same choice, however they were picked. */
+export function sameRepeat(a: RepeatChoice, b: RepeatChoice): boolean {
+  if (a.kind === 'none' || b.kind === 'none') return a.kind === b.kind
+  return dueMonthNumbers(cadenceOf(a)).join() === dueMonthNumbers(cadenceOf(b)).join()
 }

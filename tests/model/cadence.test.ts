@@ -22,10 +22,10 @@ describe('cadence', () => {
     expect(isDue(q, '2027-01')).toBe(false)
   })
   it('describes itself', () => {
-    expect(describeCadence({ cadence: { intervalMonths: 1, anchorMonth: 1 }, dueMonths: null })).toBe('Monthly')
+    expect(describeCadence({ cadence: { intervalMonths: 1, anchorMonth: 1 }, dueMonths: null })).toBe('Every month')
     expect(describeCadence({ cadence: { intervalMonths: 3, anchorMonth: 1 }, dueMonths: null })).toBe('Every 3 months (Jan, Apr, Jul, Oct)')
-    expect(describeCadence({ cadence: { intervalMonths: 12, anchorMonth: 5 }, dueMonths: null })).toBe('Yearly (May)')
-    expect(describeCadence({ cadence: null, dueMonths: [3, 9] })).toBe('Months: Mar, Sep')
+    expect(describeCadence({ cadence: { intervalMonths: 12, anchorMonth: 5 }, dueMonths: null })).toBe('Every year (May)')
+    expect(describeCadence({ cadence: null, dueMonths: [3, 9] })).toBe('In Mar, Sep')
   })
   it('names the next month it falls due in, from a month on', () => {
     const yearly = { ...base, cadence: { intervalMonths: 12 as const, anchorMonth: 1 } }
@@ -48,7 +48,7 @@ describe('cadence', () => {
     const all = [yearly, ended, gone, other]
     expect(runningSchedules(all, r1, '2026-03')).toEqual([yearly, ended])
     expect(runningSchedules(all, r1, '2026-04')).toEqual([yearly])
-    expect(repeatsText([yearly])).toBe('Yearly (Jan)')
+    expect(repeatsText([yearly])).toBe('Every year (Jan)')
     expect(repeatsText([yearly, ended])).toBe('2 items repeat')
   })
 })

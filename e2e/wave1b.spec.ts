@@ -434,15 +434,32 @@ test.describe('wave 1b', () => {
 
     await page.getByRole('link', { name: 'Grid' }).click()
     await expect(page.getByRole('button', { name: /^Water Nov 2026/ })).toContainText('90')
-    // a recurring item straight from a cell, prefilled with the row and its amount
+    // an amount goes on a schedule where it is typed: "Repeats" in the cell's own dialog, and no second form
     await page.getByRole('button', { name: /^Groceries Nov 2026/ }).click()
-    await page.getByRole('button', { name: 'Make recurring…' }).click()
-    await expect(page.getByLabel('Amount (EUR)')).toHaveValue('700')
-    await page.getByRole('dialog').last().getByLabel('Name', { exact: true }).fill('Weekly shop')
-    await page.getByRole('button', { name: 'Save' }).click()
-    await expect(page.getByRole('dialog')).toBeHidden()
+    const dlg = page.getByRole('dialog')
+    await expect(dlg.getByRole('button', { name: 'Make recurring…' })).toHaveCount(0)
+    await expect(dlg.getByLabel('Amount in EUR')).toHaveValue('700')
+    await expect(dlg.getByRole('radiogroup', { name: 'Repeats' }).getByRole('radio')).toHaveText(['Every month', 'On a schedule', 'Only this month'])
+    await dlg.getByRole('radio', { name: 'On a schedule' }).click()
+    // it starts on every year in the month on screen, and says where it lands
+    await expect(dlg.getByLabel('How often, Groceries')).toHaveValue('12')
+    await expect(dlg.getByTestId('repeat-lands')).toHaveText('Lands in November each year.')
+    await dlg.getByLabel('How often, Groceries').selectOption({ label: 'Every 2 months' })
+    await expect(dlg.getByTestId('repeat-lands')).toHaveText('Lands in Jan, Mar, May, Jul, Sept and Nov.')
+    await dlg.getByLabel('From which month, Groceries').selectOption({ label: 'December' })
+    await expect(dlg.getByTestId('repeat-lands')).toHaveText('Lands in Feb, Apr, Jun, Aug, Oct and Dec. Not in November 2026; next: December 2026.')
+    await page.screenshot({ path: 'e2e/output/repeats-single.png' })
+    await dlg.getByLabel('From which month, Groceries').selectOption({ label: 'November' })
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    // it lands in November and not in December; the row's name carries the repeat symbol
+    await expect(page.getByRole('button', { name: /^Groceries Nov 2026/ })).toContainText('700')
+    await expect(page.getByRole('button', { name: /^Groceries Dec 2026: empty/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^Groceries Jan 2027/ })).toContainText('700')
+    await expect(page.getByRole('rowheader', { name: /^Groceries/ }).getByRole('img', { name: 'Repeats: Every 2 months (Jan, Mar, May, Jul, Sept, Nov)' })).toBeVisible()
+    // the schedule is named after its row, and the full list has it
     await page.getByRole('link', { name: 'Household' }).click()
-    await expect(page.getByRole('cell', { name: 'Weekly shop', exact: true })).toBeVisible()
+    await expect(page.getByRole('cell', { name: 'Every 2 months (Jan, Mar, May, Jul, Sept, Nov)' })).toBeVisible()
     await page.getByRole('link', { name: 'Grid' }).click()
     await expect(page.getByRole('button', { name: /^Water Dec 2026: empty/ })).toBeVisible()
     await expect(page.getByRole('button', { name: /^Water Feb 2027/ })).toContainText('90')
@@ -472,7 +489,7 @@ test.describe('recurring from the grid', () => {
 
     // amount change from November on: October keeps the old amount
     await rent('Nov 2026').click()
-    await expect(page.getByText('Posted from a schedule')).toBeVisible()
+    await expect(page.getByText('On a schedule')).toBeVisible()
     await page.getByLabel('Item amount').fill('1700')
     await page.getByRole('radio', { name: 'This and following months' }).click()
     await page.getByRole('button', { name: 'Save' }).click()
