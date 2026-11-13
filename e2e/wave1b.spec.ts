@@ -160,6 +160,14 @@ test.describe('wave 1b', () => {
     await page.screenshot({ path: 'e2e/output/setup-step-2-phone.png' })
     await page.setViewportSize(WIDE)
 
+    // a heading folded on the way is open again when the guide comes back to its step
+    const expensesHead = moneyOut.getByRole('button', { name: 'Expenses', exact: true })
+    await expensesHead.click()
+    await expect(expensesHead).toHaveAttribute('aria-expanded', 'false')
+    await number(1).click()
+    await number(2).click()
+    await expect(expensesHead).toHaveAttribute('aria-expanded', 'true')
+
     // Back goes to the step before, and a number straight to its step; a step with nothing yet is skipped, not blocked
     await guide.getByRole('button', { name: 'Back' }).click()
     await expect(title).toHaveText('Your first income')

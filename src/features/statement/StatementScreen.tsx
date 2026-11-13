@@ -95,6 +95,9 @@ const PAY_OFF_NOTE = 'It will show under "To savings, investments and debts": th
 /** What "Add account" offers under Assets, and "Add a card or loan" under Debts. */
 const ASSET_TYPES: AccountType[] = ['checking', 'joint', 'savings', 'investment', 'other-asset', 'cash']
 const DEBT_TYPES: AccountType[] = ['credit-card', 'loan']
+/** The headings that fold (DESIGN.md §7). Which of them are folded is kept on this device, for each household. */
+const GROUPS = ['income', 'from-accounts', 'expenses', 'moved', 'set-aside', 'debts', 'net-worth']
+const foldedPref = (householdId: string) => `statement.folded.${householdId}`
 const ADD = 'text-muted-foreground'
 
 /**
@@ -117,6 +120,8 @@ export function StatementScreen() {
   useEffect(() => clearHandedMonth(), [])
   /** Lines someone opened or closed; the rest follow their own default. */
   const [openLines, setOpenLines] = useState<Record<string, boolean>>({})
+  /** The household whose folded headings were read into `openLines`. */
+  const [foldsFor, setFoldsFor] = useState<string | null>(null)
   /** The row whose dialog is open: its amount and, for a row that can carry one, its rule (which may start on a choice). */
   const [editor, setEditor] = useState<{ rowId: string; start?: RuleChoice['kind'] } | null>(null)
   /** The goal dialog: an existing goal, or a new one starting on the line it was asked from. */
@@ -206,6 +211,16 @@ export function StatementScreen() {
     landing.current = null
     reveal([id], all, { open: openThese, mark: setMarked, timer: markTimer }, true)
   }, [editor, statement, openThese])
+
+  // A heading someone folded stays folded on this device: read once the household is known, written as it changes.
+  const householdId = household?.id ?? null
+  if (householdId && foldsFor !== householdId) {
+    setFoldsFor(householdId)
+    setOpenLines(Object.fromEntries(readPref<string[]>(foldedPref(householdId), []).map((id) => [id, false])))
+  }
+  useEffect(() => {
+    if (householdId && foldsFor === householdId) writePref(foldedPref(householdId), GROUPS.filter((id) => openLines[id] === false))
+  }, [openLines, householdId, foldsFor])
 
   // The guided setup starts where this household left it, or on the first step that still has nothing. It is fixed
   // once per household, here and not on every render: a step that gets its first row must not move the guide on.
@@ -303,6 +318,8 @@ export function StatementScreen() {
   function onStep(key: SetupStepKey) {
     setStepAt(key)
     writePref('setup.step', { household: household!.id, step: key })
+    // a heading the step is about is open when the guide gets to it
+    openThese(setupFocus(key).lines)
     // once the step's part is drawn as the lit one
     requestAnimationFrame(() => jump(STEP_PART[key]))
   }
@@ -471,7 +488,7 @@ export function StatementScreen() {
   const positionCtx: LineContext = { ...base, withChange: true, onGoal, onBalance: setBalanceFor, onCurrentBalance: () => setCurrentBalance(true), footer: (line) => (line.id === 'debts' ? debtsFoot : null), menu: lineMenu }
   const day = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${lastDayOfMonth(m)}T00:00:00Z`))
   const foldable = walk([...statement.flow.left.lines, ...statement.flow.right.lines, ...statement.position.left.lines, ...statement.position.right.lines])
-    .filter((l) => l.kind !== 'group' && (l.children.length > 0 || !!l.goals?.length || autoOpen.has(l.id)))
+    .filter((l) => l.kind === 'group' || l.children.length > 0 || !!l.goals?.length || autoOpen.has(l.id))
   const setAll = (open: boolean) => setOpenLines(Object.fromEntries(foldable.map((l) => [l.id, open])))
   const act = (fn: () => Promise<unknown>) => void fn().catch((e) => setError(e instanceof Error ? e.message : 'Action failed'))
   // Accounts are added where they will show: what the household has under Assets, what it owes under Debts

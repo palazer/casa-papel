@@ -94,6 +94,9 @@ test.describe('the Statement', () => {
     await page.getByRole('button', { name: 'Reopen month' }).click()
     await expect(page.getByText('closed', { exact: true })).toHaveCount(0)
     await expect(page.getByTestId('progress')).toHaveText(/^(\d+ of \d+ done|All \d+ done)/)
+    // "Collapse all" folded the headings too: the one that holds the row is opened again
+    await expect(page.getByRole('checkbox', { name: 'To savings done' })).toHaveCount(0)
+    await moneyOut.getByRole('button', { name: 'To savings, investments and debts', exact: true }).click()
     await expect(page.getByRole('checkbox', { name: 'To savings done' })).toBeVisible()
     await page.getByRole('button', { name: 'Close month' }).click()
     await expect(page.getByText('closed', { exact: true })).toBeVisible()
@@ -1421,6 +1424,71 @@ test.describe('working the month in the Statement', () => {
     // the legend says what the symbol means
     await page.getByRole('button', { name: 'What the colours and marks mean' }).click()
     await expect(page.getByText('Linked, on the Statement: a row and the account it fills, takes from or pays off.')).toBeVisible()
+  })
+
+  test('a heading folds with everything under it: its total stays, it stays folded, and what is looked for opens it', async ({ page }) => {
+    await openStatement(page)
+    const moneyIn = page.getByRole('region', { name: 'Money in' })
+    const moneyOut = page.getByRole('region', { name: 'Money out' })
+    const assets = page.getByRole('region', { name: 'Assets' })
+    const claims = page.getByRole('region', { name: 'Debts and net worth' })
+    const heading = (side: Locator, name: string) => side.getByRole('button', { name, exact: true })
+    const setAside = heading(moneyOut, 'To savings, investments and debts')
+    const saved = moneyOut.getByRole('checkbox', { name: 'To savings done' })
+
+    // every heading is open at first, and is a button that says so
+    for (const h of [heading(moneyIn, 'Income'), heading(moneyIn, 'From accounts'), heading(moneyOut, 'Expenses'), setAside, heading(claims, 'Debts'), heading(claims, 'Net worth')]) {
+      await expect(h).toHaveAttribute('aria-expanded', 'true')
+    }
+    await expect(saved).toBeVisible()
+    const totalOut = await total(page, 'out').textContent()
+
+    // folded: its lines and its "Add row" are gone, the heading keeps its total and the side its own
+    await setAside.click()
+    await expect(setAside).toHaveAttribute('aria-expanded', 'false')
+    await expect(saved).toHaveCount(0)
+    await expect(moneyOut.getByRole('button', { name: 'Add transfer row' })).toHaveCount(0)
+    await expect(moneyOut.locator('[data-line="set-aside"]')).toContainText(/€[\d,]+\.\d\d/)
+    await expect(total(page, 'out')).toHaveText(totalOut!)
+    // the heading is pressed anywhere on its line
+    const band = moneyOut.locator('[data-line="expenses"]')
+    const box = (await band.boundingBox())!
+    await band.click({ position: { x: box.width / 2, y: box.height / 2 } })
+    await expect(moneyOut.getByRole('button', { name: 'Housing', exact: true })).toHaveCount(0)
+    await page.screenshot({ path: 'e2e/output/statement-folded.png', fullPage: true })
+    await band.click({ position: { x: box.width / 2, y: box.height / 2 } })
+    await expect(moneyOut.getByRole('button', { name: 'Housing', exact: true })).toBeVisible()
+
+    // it stays folded: in another month, after another screen, and when the page is loaded again
+    await page.getByRole('button', { name: 'Next month' }).click()
+    await expect(setAside).toHaveAttribute('aria-expanded', 'false')
+    await page.getByRole('button', { name: 'Previous month' }).click()
+    await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Grid' }).click()
+    await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
+    await expect(setAside).toHaveAttribute('aria-expanded', 'false')
+    await page.reload()
+    await expect(setAside).toHaveAttribute('aria-expanded', 'false')
+    await expect(heading(moneyOut, 'Expenses')).toHaveAttribute('aria-expanded', 'true')
+    await expect(saved).toHaveCount(0)
+
+    // the link symbol on an account goes to its row: the heading that hides the row opens
+    await assets.getByRole('button', { name: /^Filled by To investments: go there/ }).click()
+    const row = moneyOut.locator('[data-line]').filter({ hasText: 'To investments' }).first()
+    await expect(row).toHaveAttribute('data-marked', 'true')
+    await expect(setAside).toHaveAttribute('aria-expanded', 'true')
+
+    // "Collapse all" folds the headings too, "Expand all" opens everything
+    await page.getByRole('button', { name: 'Collapse all' }).click()
+    for (const h of [heading(moneyIn, 'Income'), heading(moneyIn, 'From accounts'), heading(moneyOut, 'Expenses'), setAside, heading(claims, 'Debts'), heading(claims, 'Net worth')]) {
+      await expect(h).toHaveAttribute('aria-expanded', 'false')
+    }
+    await expect(moneyIn.getByRole('checkbox')).toHaveCount(0)
+    await expect(moneyOut.getByRole('button', { name: 'Housing', exact: true })).toHaveCount(0)
+    await expect(claims.getByText('Free', { exact: true })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Expand all' }).click()
+    await expect(saved).toBeVisible()
+    await expect(moneyOut.getByText('The flat – Rent')).toBeVisible()
+    await expect(claims.getByText('Free', { exact: true })).toBeVisible()
   })
 
   test('a top-up on a virtual account whose amount a rule works out says that the month then keeps a typed amount', async ({ page }) => {

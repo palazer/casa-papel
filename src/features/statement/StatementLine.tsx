@@ -100,10 +100,10 @@ export function StatementLines({ lines, level, ctx, parent }: { lines: Line[]; l
 }
 
 /**
- * One line of the Statement (DESIGN.md §7). A group is a heading on its hue's tint with its lines always under it; a
- * category, an account or an itemized row opens as an accordion; a row and its items carry a tick and open the row's
- * one dialog; everything else is a name, its tags and its amount. A transfer that feeds an account, and that account,
- * carry the rule symbol.
+ * One line of the Statement (DESIGN.md §7). A group is a heading on its hue's tint that folds away with everything
+ * under it, its total staying on the heading; a category, an account or an itemized row opens as an accordion; a row
+ * and its items carry a tick and open the row's one dialog; everything else is a name, its tags and its amount. A
+ * transfer that feeds an account, and that account, carry the rule symbol.
  */
 function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: number; ctx: LineContext; parent?: Line }) {
   const { locale, ccy } = ctx
@@ -111,11 +111,11 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
   const item = line.kind === 'item'
   const rowLike = line.kind === 'row' || item
   const foot = (group || line.kind === 'category') ? ctx.footer?.(line) : null
-  // a category opens even while it is empty: its first row is added inside it
-  const expandable = !group && (line.children.length > 0 || !!line.goals?.length || (line.kind === 'category' && !!foot))
+  // a group and a category open even while they are empty: the first row is added inside them
+  const expandable = line.children.length > 0 || !!line.goals?.length || !!foot
   // a goal is not started on something that is archived: the goal dialog would have nothing to attach it to
   const canGoal = !!ctx.onGoal && !line.archived && (line.kind === 'pool' || (line.kind === 'account' && !!line.accountId) || line.id === 'net-worth')
-  const open = group || (expandable && ctx.isOpen(line))
+  const open = expandable && ctx.isOpen(line)
   const listId = `st-${line.id}`
   const hue = line.hue ? HUE[line.hue] : undefined
   // grey: a note, what is left out of the sums, a skipped item, and what is on a schedule and does not land this month
@@ -188,7 +188,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
     </>
   )
   const below = open && (line.children.length > 0 || !!line.goals?.length || !!foot) && (
-    <div id={group ? undefined : listId} className="divide-y divide-border/60 border-t border-border/60">
+    <div id={listId} className="divide-y divide-border/60 border-t border-border/60">
       {!!line.goals?.length && <GoalDetail goals={line.goals} line={line} level={inner} ctx={ctx} />}
       {line.children.length > 0 && <StatementLines lines={line.children} level={inner} ctx={ctx} parent={line} />}
       {foot && <div className={cn('flex flex-wrap items-center gap-x-1 gap-y-1 py-1 pr-2 text-xs', INDENT[Math.min(inner, INDENT.length - 1)])}>{foot}</div>}
@@ -278,7 +278,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
     </button>
   ) : (
     <span className="flex min-w-0 max-w-full items-center gap-1.5">
-      {!group && <span className="w-3.5 shrink-0" aria-hidden />}
+      <span className="w-3.5 shrink-0" aria-hidden />
       {tickGap}
       {name}
     </span>
@@ -286,7 +286,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
 
   return (
     <li inert={locked || undefined} className={cn(locked && LOCKED)}>
-      <div className={cn(ROW, pad, 'group/line', group && hue?.tint, expandable && 'relative hover:bg-muted/50', marked && MARKED)} data-line={line.id} data-marked={marked || undefined}>
+      <div className={cn(ROW, pad, 'group/line', group && hue?.tint, expandable && 'relative', expandable && !group && 'hover:bg-muted/50', marked && MARKED)} data-line={line.id} data-marked={marked || undefined}>
         <div className={LABEL}>
           {head}
           {tags}

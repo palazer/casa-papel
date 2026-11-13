@@ -263,12 +263,17 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   its name in small caps and closes with its total in `font-semibold` over a hairline. Lines are `min-h-11 text-sm`
   on phones and `md:min-h-7 md:text-xs`, separated by `divide-border/60`, amounts in a fixed right-aligned column:
   a **group** (Income, From accounts, Expenses, To savings, investments and debts, Debts, Net worth) is a heading in its hue
-  on the hue's `tint` with its lines always under it; a **category**, an account that holds virtual accounts and an itemized row open as an
+  on the hue's `tint` that folds away with everything under it (its lines and what adds to them), its total staying on
+  the heading; a **category**, an account that holds virtual accounts and an itemized row open as an
   accordion (a chevron button with `aria-expanded`, each level 20 px further in, items on `bg-muted/20` with the
-  `Repeat` icon when scheduled); a category's amount is the sum of its rows. A category or an account that opens is
+  `Repeat` icon when scheduled); a category's amount is the sum of its rows. A group, a category or an account that opens is
   pressed anywhere on its line: its button (the chevron and the name) is stretched over the whole line, which turns
-  `bg-muted/50` under the pointer, and the line's other controls (the rule symbol, `Top up…`, the (i), the goal
-  target, the `…`, the balance) sit above it. Tags follow the name and wrap under it
+  `bg-muted/50` under the pointer (a group keeps its tint), and the line's other controls (the rule symbol, `Top up…`, the (i), the goal
+  target, the `…`, the balance) sit above it. A group's chevron stands in the column of its categories' chevrons, so
+  the names stay in one column and no line moves; every group is open until it is folded, and which ones are folded
+  is kept on the device, per household (`statement.folded.<household>`, a preference, never household data). What
+  looks for a line inside a folded group opens it: a link symbol, a row that was just added, and the guided setup
+  when it comes to the group's step. Tags follow the name and wrap under it
   when there is no room: a zinc chip with the currency code and the original amount in muted `text-[11px]` for a
   line in another currency (the amount column is always the household currency), a rose `no rate` chip, `net €…`
   on an income with deductions, and a zinc chip for what the line is (`automatic`, `calculated`,
@@ -278,7 +283,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   percentage in muted `text-[11px]`, the income hue once reached, a rose `late` chip when late; opening the line
   shows the goal's name, its bar and the sentence that says how far the plan gets (`goalStatusLine`), with `Edit`
   beside the name; there is no list of all goals. The toolbar holds the `MonthPicker`, `Expand all` / `Collapse all`
-  (every category at once; not "Open" and "Close", which would read as the month's), the `Suggestions` toggle, the
+  (every group and category at once; not "Open" and "Close", which would read as the month's), the `Suggestions` toggle, the
   `MarksLegend` and, last, the month's one primary action: `Close month` (`sm`, lime) while it is open, `Reopen month`
   (`sm outline`) once closed; `Close month` is left out while the "Setting up" guide shows. Under the header sits the
   **progress line** (`monthProgress` and `progressText` in `src/features/statement/progress.ts`): a muted `text-xs`

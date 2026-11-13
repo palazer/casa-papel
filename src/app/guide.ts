@@ -63,7 +63,7 @@ export const GUIDE: GuideTopic[] = [
       'Move between months with the arrows beside the month name; "Add <year>" at the last month grows the plan.',
       'Open a category, "Housing" say, and tick "The flat – Rent" once the rent has left; a second press takes the tick back. An itemized row opens to its items, each with a tick of its own.',
       'Press a line, "The flat – Utilities" say, to record what it really was: "Amount in EUR", "Only this month", "Certain", then "Save".',
-      '"Expand all" and "Collapse all" open and close every category at once; "What the colours and marks mean" is the legend.',
+      'Press a heading, "To savings, investments and debts" say, to fold it away with everything under it: its total stays, and it stays folded on this device. "Expand all" and "Collapse all" open and close every heading and category at once; "What the colours and marks mean" is the legend.',
       '"Close month" when everything has moved: the month gets a "closed" chip and its grid column greys out. "Reopen month" undoes it (also from a month name in the Grid and "Reopen <Month>" in the editor).',
       'To plan the months ahead, open the Grid; a month name there → "Open in the Statement" comes back to that month.',
       'Try things first: "Look at the demo first" on the welcome screen or "Open the demo sandbox" under Data; "Leave the demo" brings you back.',
