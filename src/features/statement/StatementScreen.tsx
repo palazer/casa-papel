@@ -415,11 +415,6 @@ export function StatementScreen() {
         <>
           {suggested(line)}
           {addRow(line, section as Section, { label: `Add row to ${line.label}`, defaultCategoryId: categoryId })}
-          {section === 'expense' && !statement!.closed && (
-            <Button variant="ghost" size="sm" className="text-muted-foreground" aria-label={`${line.budget != null ? 'Change' : 'Set'} estimate for ${line.label}`} onClick={() => setEstimateFor(categoryId)}>
-              {line.budget != null ? 'Change estimate' : 'Set estimate'}
-            </Button>
-          )}
         </>
       )
     }
@@ -461,7 +456,13 @@ export function StatementScreen() {
     if (statement!.closed) return null
     if (line.kind === 'category' && line.id.startsWith('cat:')) {
       const category = tables!.categories.find((c) => c.id === line.id.split(':')[2] && !c.deletedAt)
-      return category ? <CategoryMenu category={category} tables={tables!} household={household!} onError={setError} onDeleted={onDeleted} triggerClassName={LINE_MENU} /> : null
+      // an expense category's estimate for the month is set from here (a closed month has no menu at all)
+      return category ? (
+        <CategoryMenu
+          category={category} tables={tables!} household={household!} onError={setError} onDeleted={onDeleted} triggerClassName={LINE_MENU}
+          onEstimate={category.section === 'expense' ? () => setEstimateFor(category.id) : undefined} hasEstimate={line.budget != null}
+        />
+      ) : null
     }
     if (line.kind === 'pool' && line.poolId) return editButton(line.label, () => setPoolEdit(line.poolId!))
     if (line.kind === 'account' && line.accountId) return editButton(line.label, () => setAccountEdit(line.accountId!))

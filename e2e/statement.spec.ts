@@ -312,7 +312,11 @@ test.describe('working the month in the Statement', () => {
 
     // an existing category: Housing has Rent 1,650 and Utilities 210
     await moneyOut.getByRole('button', { name: 'Housing', exact: true }).click()
-    await moneyOut.getByRole('button', { name: 'Set estimate for Housing' }).click()
+    // the estimate is set from the category's "…"; its foot holds no button for it
+    await expect(moneyOut.getByRole('button', { name: /^(Set|Change) estimate/ })).toHaveCount(0)
+    await moneyOut.getByRole('button', { name: 'Category menu for Housing' }).click()
+    await expect(page.getByRole('menuitem')).toHaveText(['Rename…', 'Set estimate…', 'Move up', 'Move down', 'Remove…'])
+    await page.getByRole('menuitem', { name: 'Set estimate…' }).click()
     await dlg.getByLabel('Estimate per month in EUR', { exact: true }).fill('2000')
     await expect(dlg.getByTestId('estimate-left')).toHaveText('€140.00')
     await dlg.getByRole('button', { name: 'Save' }).click()
@@ -334,7 +338,8 @@ test.describe('working the month in the Statement', () => {
     await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
     await goToMonth(page, 'November 2026')
     await moneyOut.getByRole('button', { name: 'Housing', exact: true }).click()
-    await moneyOut.getByRole('button', { name: 'Change estimate for Housing' }).click()
+    await moneyOut.getByRole('button', { name: 'Category menu for Housing' }).click()
+    await page.getByRole('menuitem', { name: 'Change estimate…' }).click()
     await dlg.getByRole('button', { name: 'Remove estimate' }).click()
     await expect(dlg).toBeHidden()
     expect(await amountOf('Housing')).toBe(1860)
@@ -983,7 +988,7 @@ test.describe('working the month in the Statement', () => {
 
     // a category: rename, move, remove. Its rows are kept
     await moneyOut.getByRole('button', { name: 'Category menu for Housing' }).click()
-    await expect(menu.getByRole('menuitem')).toHaveText(['Rename…', 'Move up', 'Move down', 'Remove…'])
+    await expect(menu.getByRole('menuitem')).toHaveText(['Rename…', 'Set estimate…', 'Move up', 'Move down', 'Remove…'])
     await expect(menu.getByRole('menuitem', { name: 'Move up' })).toBeDisabled()
     await menu.getByRole('menuitem', { name: 'Rename…' }).click()
     await dlg.getByLabel('Category name').fill('Living')

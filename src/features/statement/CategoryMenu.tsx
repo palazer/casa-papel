@@ -12,12 +12,17 @@ import { RemoveDialog } from '@/features/remove/RemoveDialog'
 const byOrder = (a: Category, b: Category) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0)
 
 /**
- * What can be done to a category from its line on the Statement (DESIGN.md §7): rename it, move it among its
- * section's categories, remove it. Its rows are kept either way; removing moves them to "No category". The same
- * actions as the Categories card under Household.
+ * What can be done to a category from its line on the Statement (DESIGN.md §7): rename it, set what it should come
+ * to in a month (an expense category's estimate), move it among its section's categories, remove it. Its rows are
+ * kept either way; removing moves them to "No category". Renaming, moving and removing are the actions of the
+ * Categories card under Household.
  */
-export function CategoryMenu({ category, tables, household, onError, onDeleted, triggerClassName }: {
+export function CategoryMenu({ category, tables, household, onError, onDeleted, onEstimate, hasEstimate = false, triggerClassName }: {
   category: Category; tables: Tables; household: Household; onError: (msg: string) => void
+  /** An expense category in an open month: open its estimate for the month on screen. Left out, the menu has no such item. */
+  onEstimate?: () => void
+  /** The category has an estimate in that month, so the item changes it. */
+  hasEstimate?: boolean
   /** The category was deleted in one click (a household that is being set up). */
   onDeleted?: (name: string) => void
   triggerClassName?: string
@@ -54,6 +59,7 @@ export function CategoryMenu({ category, tables, household, onError, onDeleted, 
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-max">
           <DropdownMenuItem onClick={() => { setName(category.name); setProblem(null); setOpen('rename') }}>Rename…</DropdownMenuItem>
+          {onEstimate && <DropdownMenuItem onClick={onEstimate}>{hasEstimate ? 'Change estimate…' : 'Set estimate…'}</DropdownMenuItem>}
           <DropdownMenuItem disabled={at <= 0} onClick={act(() => moveCategory(store, category.id, 'up'))}>Move up</DropdownMenuItem>
           <DropdownMenuItem disabled={at === siblings.length - 1} onClick={act(() => moveCategory(store, category.id, 'down'))}>Move down</DropdownMenuItem>
           <DropdownMenuSeparator />

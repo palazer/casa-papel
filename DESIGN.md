@@ -355,7 +355,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   whose lines are categories (Expenses), and in the lower half, nothing is ticked: the `+` stands in the arrow's
   column and the words under the category or account names. The button that carries a lead has no left padding of
   its own (`LEAD_BUTTON`); an open `Add row` form takes a line of its own and starts on the names' column
-  (`LEAD_PAD`). Only the first control of a line carries the lead; `Add category`, `Set estimate` and `Add virtual
+  (`LEAD_PAD`). Only the first control of a line carries the lead; `Add category` and `Add virtual
   account` follow it as plain ghost buttons. Browser tests measure the columns, at 1440 px and at 390 px.
   **The link symbol.** Money that moves between a row of the month and an account of the lower half is one flow
   with two ends, and both ends say so: two chain rings (`Link2`, 14 px, muted, in a 20 px slot like the rule symbol,
@@ -473,8 +473,9 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   its last line is `Not broken down yet` with the `automatic` chip, the estimate minus the category's rows, on the
   estimate shade until it is ticked or the month closes. It shrinks as rows are added and is gone at zero; once the
   rows add up to more, the category shows their sum and still names its estimate, with no mark for being over. The
-  line is a button that opens the estimate it comes from, and the opened category's foot holds `Set estimate` /
-  `Change estimate` beside `Add row to <category>`. `Add category` under Expenses takes an optional estimate
+  line is a button that opens the estimate it comes from, and the category's `…` menu holds `Set estimate…` /
+  `Change estimate…` after `Rename…` (not a button at the category's foot, which keeps `Add row to <category>`
+  and the suggestions only). `Add category` under Expenses takes an optional estimate
   (`Estimate`, `EUR per month, optional`), so a category can be a name and a number and count at once. The engine
   keeps the estimate on a row of kind `category-estimate` in that category, so every screen counts the same rest:
   the Grid shows it as an automatic row named `<category> – Not broken down yet`. "No category"

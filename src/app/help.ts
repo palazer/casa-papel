@@ -54,7 +54,7 @@ export const HELP = {
   'cell.deductions': { title: 'Deducted from this income', text: 'Rows marked as deducted from this income, taken off this month\'s amount. The net is what actually arrives; the deductions stay as expenses in their own rows.' },
   'cell.rate': { title: 'This month\'s rate', text: 'How this amount becomes the household currency. An ECB rate is the European Central Bank\'s for the day the Month rate setting under Household picks, the first business day by default. A manual rate is yours and applies to every row in that currency that month. Projected and carried rates are estimates.' },
 
-  'row.categoryEstimate': { title: 'Category estimate', text: 'What you expect a category to come to in a month, before you know every row. Its rows are taken off it and what is left counts as "Not broken down yet"; once the rows add up to more, the category is their sum. Set it on the Statement, inside the category.' },
+  'row.categoryEstimate': { title: 'Category estimate', text: 'What you expect a category to come to in a month, before you know every row. Its rows are taken off it and what is left counts as "Not broken down yet"; once the rows add up to more, the category is their sum. Set it on the Statement, from the "…" after the category\'s name.' },
   // Household settings
   'household.bufferScope': { title: 'Where changes apply', text: 'The cash buffer can change from this month on, leaving earlier months as they were, for this month only, or for every open month at once. Closed months never change.' },
   'household.buffer': { title: 'Cash kept in the account', text: 'With the savings-plug rule, this much stays in the current account at month end instead of going to savings.' },
