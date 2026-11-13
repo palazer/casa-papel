@@ -280,7 +280,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   beside the name; there is no list of all goals. The toolbar holds the `MonthPicker`, `Expand all` / `Collapse all`
   (every category at once; not "Open" and "Close", which would read as the month's), the `Suggestions` toggle, the
   `MarksLegend` and, last, the month's one primary action: `Close month` (`sm`, lime) while it is open, `Reopen month`
-  (`sm outline`) once closed; `Close month` is left out while the "Setting up" strip shows. Under the header sits the
+  (`sm outline`) once closed; `Close month` is left out while the "Setting up" guide shows. Under the header sits the
   **progress line** (`monthProgress` and `progressText` in `src/features/statement/progress.ts`): a muted `text-xs`
   `role="status"` line with an (i), `7 of 21 done · €… still to pay · €… to come in`, then `All 21 done`, and `Closed ·
   all done` for a closed month; a month with nothing in it shows no line. The month is worked in its upper half: a row and each of its items
@@ -432,6 +432,18 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   button of its own before them (`Choose where the rest goes` in step 3, once there is a savings account and nothing
   takes the rest). The numbers sit beside the prompt where there is room and on a line of their own below `sm`.
   Moving to a step scrolls its part of the page to just under the guide and puts the cursor in the first field.
+  **Lit and locked.** A step lights the part of the page it is about and locks the rest (`setupFocus`): step 1 the
+  Income group, step 2 the Expenses group, steps 3 to 5 the Assets side with the second group on the right (`To
+  savings, investments and debts`, where what is saved shows), step 6 the Debts side with that same group. A locked
+  part is dimmed (`LOCKED` in `lead.ts`: `opacity-40 saturate-50`) and `inert`: it takes no press and no cursor and
+  is not read out, but it still shows its amounts and still counts. A side with nothing lit is locked as a whole; in
+  a side that is partly lit only the groups that are not lit are locked, so nothing is dimmed twice. `Per person`
+  is locked on every step. The toolbar, the guide and every dialog always work. `Skip`, a number and `Leave setup`
+  are the ways past a lock, and nothing stays locked once the guide is gone. Suggestions are offered in the lit part
+  only, and only the step's own (`stepSuggestions`): the usual accounts in step 3; the usual virtual accounts in
+  step 4, at the foot of Assets where they will sit (`Suggestions for Virtual accounts`; while the guide shows they
+  are not offered among the expenses); the investment rows in step 5 and the loan rows in step 6, in the second
+  group. In steps 3 and 5 `Add account` starts on the type the step asks for.
   A step that gets its first row does not move the guide on: it stays until it is told to. The step is kept per
   household across reloads (`casa.setup.step`). `Finish` and `Leave setup` hide the guide for good and turn the
   suggestions off (the undo arrow brings it back); the page works the same without it. The Statement opens on the

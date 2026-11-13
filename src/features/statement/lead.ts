@@ -11,5 +11,10 @@ export const TICK_GAP = 'w-11 shrink-0 md:w-6'
  * (6 px), and among ticked rows the tick (44 px, 24 px from `md`) and its gap.
  */
 export const LEAD_PAD = { ticks: 'pl-[4.375rem] md:pl-[3.125rem]', plain: 'pl-5' } as const
+/**
+ * A part of the page the guided setup has not come to yet (DESIGN.md §7): dimmed, and `inert` with it, so it can
+ * neither be pressed nor reached with the keyboard until its step.
+ */
+export const LOCKED = 'opacity-40 saturate-50'
 /** What an add control's button needs so that its lead and its text sit on those columns; the button's own 1 px border is taken back. */
 export const LEAD_BUTTON = '-ml-px gap-1.5 pl-0 pr-2'

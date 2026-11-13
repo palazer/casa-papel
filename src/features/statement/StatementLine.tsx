@@ -10,7 +10,7 @@ import { formatAmount, formatPercent, formatShare } from '@/app/format'
 import type { HelpKey } from '@/app/help'
 import { HUES, type Hue } from '@/app/hues'
 import type { GoalProgress, StatementHue, StatementLine as Line } from '@/engine'
-import { CHEVRON_SLOT, TICK_GAP, TICK_SLOT } from './lead'
+import { CHEVRON_SLOT, LOCKED, TICK_GAP, TICK_SLOT } from './lead'
 
 /** What every line of a side needs to draw itself. The working parts are optional: a side without them is read-only. */
 export interface LineContext {
@@ -49,6 +49,8 @@ export interface LineContext {
   onLinkOpen?: (line: Line) => void
   /** The lines the page has just moved to from a link symbol: marked for a moment. */
   marked?: ReadonlySet<string> | null
+  /** The guided setup: a top line (a group, an account) that is not part of the step it is on. It is dimmed and cannot be used. */
+  locked?: (line: Line) => boolean
   /** Top up a virtual account that is short this month. */
   onTopUp?: (poolId: string) => void
   /** The "…" after a row's name: the Grid's row menu (rename, category, archive or delete, …). */
@@ -119,6 +121,8 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
   const quiet = line.kind === 'note' || line.memo || line.skipped
   const tip = TIP[line.id]
   const marked = !!ctx.marked?.has(line.id)
+  // only a top line is asked: what is under it is locked with it
+  const locked = level === 0 && !!ctx.locked?.(line)
   const inner = group ? level : level + 1
   const pad = INDENT[Math.min(level, INDENT.length - 1)]
   /** A row shown under its account's name keeps its own name in what its controls are called. */
@@ -227,7 +231,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
       </>
     )
     return (
-      <li>
+      <li inert={locked || undefined} className={cn(locked && LOCKED)}>
         <div className={cn(ROW, pad, 'group/line', item && 'bg-muted/20', marked && MARKED)} data-line={line.id} data-marked={marked || undefined}>
           {expandable ? (
             <button
@@ -271,7 +275,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
   )
 
   return (
-    <li>
+    <li inert={locked || undefined} className={cn(locked && LOCKED)}>
       <div className={cn(ROW, pad, 'group/line', group && hue?.tint, expandable && 'relative hover:bg-muted/50', marked && MARKED)} data-line={line.id} data-marked={marked || undefined}>
         <div className={LABEL}>
           {head}

@@ -19,7 +19,9 @@ const STEP: Record<SetupStepKey, { title: string; text: string }> = {
  * page scrolls. It leads through the main things a household gives the page, one step at a time: the step's prompt and
  * one sentence, the steps as numbers (a tick once a step has what it asks for; pressing a number goes there), and
  * Back / Skip or Next. "Skip" moves on from a step that has nothing yet, "Next" from one that has; the last step ends
- * with "Finish". "Leave setup" puts the guide away for good. It changes nothing in the household itself.
+ * with "Finish". "Leave setup" puts the guide away for good. It changes nothing in the household itself. The screen
+ * lights the part of the page the step is about and locks the rest (`setupFocus`), so the guide is also the way past
+ * a lock: Skip, a number, or leaving.
  */
 export function SetupGuide({ steps, current, action, onStep, onDone }: {
   steps: SetupStep[]

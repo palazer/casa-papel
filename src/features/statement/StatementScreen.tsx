@@ -13,9 +13,9 @@ import { useStore } from '@/app/store'
 import { clearHandedMonth, handedOverMonth } from '@/app/screens'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { useStoreVersion } from '@/app/useStoreVersion'
-import { buildStatement, cellKey, currentAccountsIn, type GoalProgress, type Statement, type StatementLine } from '@/engine'
+import { buildStatement, cellKey, currentAccountsIn, type GoalProgress, type Statement, type StatementLine, type StatementSide } from '@/engine'
 import { isPocketRow, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type MonthKey, type Row, type Section } from '@/model'
-import { accountSuggestions, addPayOffRow, addPlanYear, closeMonth, removeIfFree, reopenMonth, ruleRowOf, setCellDone, setDerivedDone, setItemStatus, setupSteps, shownRowSuggestions, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupStepKey } from '@/store'
+import { accountSuggestions, addPayOffRow, addPlanYear, closeMonth, removeIfFree, reopenMonth, ruleRowOf, setCellDone, setDerivedDone, setItemStatus, setupFocus, setupSteps, shownRowSuggestions, stepSuggestions, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupSide, type SetupStepKey } from '@/store'
 import { GoalDialog } from '@/features/goals/GoalDialog'
 import { goalStatusLine } from '@/features/goals/goalText'
 import { AddRowInline } from '@/features/grid/AddRowInline'
@@ -83,11 +83,13 @@ function reveal(
 const STEP_PART: Record<SetupStepKey, string> = {
   income: '[data-line="income"]',
   expenses: '[data-line="expenses"]',
-  savings: '[data-testid="band-assets"]',
-  virtual: '[data-testid="band-assets"]',
-  investments: '[data-testid="band-assets"]',
-  debts: '[data-testid="band-assets"]',
+  savings: '[data-side="assets"]',
+  virtual: '[data-side="assets"]',
+  investments: '[data-side="assets"]',
+  debts: '[data-side="claims"]',
 }
+/** The type "Add account" starts on in a step of the guided setup that asks for one kind of account. */
+const STEP_ACCOUNT: Partial<Record<SetupStepKey, AccountType>> = { savings: 'savings', investments: 'investment' }
 /** Said under "Add row" in an expense place when the row pays off a loan or card: its line shows in the second group. */
 const PAY_OFF_NOTE = 'It will show under "To savings, investments and debts": the money is not gone, it brings the debt down.'
 /** What "Add account" offers under Assets, and "Add a card or loan" under Debts. */
@@ -101,6 +103,7 @@ const ADD = 'text-muted-foreground'
  * come from `buildStatement`, which reads them off the engine. The month is worked here too: a tick marks a row or an
  * item done, a click on a line opens the cell editor to overwrite the amount or say how sure it is, the progress line
  * counts what is still open, and "Close month" locks it. With two or more adults, "Per person" closes the page.
+ * While a household is new the guided setup leads through it: one part of the page is lit, the rest locked.
  */
 export function StatementScreen() {
   const store = useStore()
@@ -178,11 +181,16 @@ export function StatementScreen() {
   }, [m, shortNow, closedNow])
   // Suggested rows sit where they will appear: under a group, or inside the category they belong to
   const showing = (suggest ?? household?.setupOpen ?? false) && !closedNow
-  const suggestions = useMemo(() => {
+  // During the guided setup only the step's own are offered, so the lit part is all there is to read. A virtual
+  // account is not offered among the expenses: it waits for its step and is offered under Assets, where it will sit.
+  const offers = useMemo(() => {
+    const all = tables ? shownRowSuggestions(tables) : []
+    const ofStep = settingUp && stepAt ? stepSuggestions(stepAt, all) : all
     const byPlace = new Map<string, RowSuggestion[]>()
-    if (tables) for (const s of shownRowSuggestions(tables)) byPlace.set(s.place, [...(byPlace.get(s.place) ?? []), s])
-    return byPlace
-  }, [tables])
+    for (const s of settingUp ? ofStep.filter((x) => !x.pool) : ofStep) byPlace.set(s.place, [...(byPlace.get(s.place) ?? []), s])
+    return { byPlace, pools: settingUp ? ofStep.filter((x) => x.pool) : [] }
+  }, [tables, settingUp, stepAt])
+  const suggestions = offers.byPlace
   /** A category that has something usual to offer opens by itself, so the offer is seen. */
   const autoOpen = useMemo(() => new Set(showing ? [...suggestions].filter(([, list]) => list.some((s) => s.usual)).map(([place]) => place) : []), [showing, suggestions])
   const isOpen = useCallback((line: StatementLine) => openLines[line.id] ?? ((line.open ?? false) || autoOpen.has(line.id)), [openLines, autoOpen])
@@ -212,6 +220,18 @@ export function StatementScreen() {
   const { locale, baseCurrency: ccy, displayExpensesNegative: neg } = household
   const steps = setupSteps(tables)
   const step: SetupStepKey = stepAt ?? steps[0].key
+  // The guided setup lights the part of the page its step is about: whole sides, and single groups. A side with
+  // nothing lit is locked as a whole; in a side that is partly lit, the groups that are not are locked one by one.
+  const focus = settingUp ? setupFocus(step) : null
+  const sideOf: Record<SetupSide, StatementSide> = { in: statement.flow.left, out: statement.flow.right, assets: statement.position.left, claims: statement.position.right }
+  const lockedSide = (key: SetupSide) => !!focus && !focus.sides.includes(key) && !sideOf[key].lines.some((l) => focus.lines.includes(l.id))
+  const lockedLines = new Set<string>()
+  if (focus) {
+    for (const key of ['in', 'out', 'assets', 'claims'] as const) {
+      if (focus.sides.includes(key) || lockedSide(key)) continue
+      for (const l of sideOf[key].lines) if (!focus.lines.includes(l.id)) lockedLines.add(l.id)
+    }
+  }
   const progress = monthProgress(engine.rows, engine.cells, m)
   const horizon = engine.months.length ? monthDiff(m, engine.months[engine.months.length - 1]) : 0
   const goalText = (g: GoalProgress) => goalStatusLine(g, locale, horizon)
@@ -439,7 +459,7 @@ export function StatementScreen() {
   const poolEditing = poolEdit ? tables.pools.find((p) => p.id === poolEdit && !p.deletedAt) : undefined
 
   // a closed month shows its rules and changes none
-  const base = { locale, ccy, isOpen, onToggle, goalText, onRule: statement.closed ? undefined : onRule, onTopUp: statement.closed ? undefined : setTopUpFor, onLink: goToLink, onLinkOpen: statement.closed ? undefined : addPayOff, marked }
+  const base = { locale, ccy, isOpen, onToggle, goalText, onRule: statement.closed ? undefined : onRule, onTopUp: statement.closed ? undefined : setTopUpFor, onLink: goToLink, onLinkOpen: statement.closed ? undefined : addPayOff, marked, locked: focus ? (line: StatementLine) => lockedLines.has(line.id) : undefined }
   const flowCtx: LineContext = { ...base, withChange: false, closed: statement.closed, doneOf, onTick, onEdit: (rowId) => setEditor({ rowId }), busy, footer, onEstimate: setEstimateFor, rowMenu, menu: lineMenu }
   // the estimate dialog reads the category's line: what the month shows now, and what its rows explain
   const estimateCategory = estimateFor ? tables.categories.find((c) => c.id === estimateFor && !c.deletedAt) : undefined
@@ -462,8 +482,15 @@ export function StatementScreen() {
     : undefined
   const assetsFoot = (
     <>
-      {showing && <AccountSuggestionLines suggestions={accountSuggestions(tables)} onAdd={(s) => setAccountNew({ name: s.name, type: s.type, types: ASSET_TYPES })} onError={setError} />}
-      <Button variant="ghost" size="sm" className={cn(ADD, LEAD_BUTTON)} onClick={() => setAccountNew({ types: ASSET_TYPES })}><AddLead ticks={false} /> <span data-lead="text">Add account</span></Button>
+      {/* during the guided setup the usual accounts belong to the savings step, and the usual virtual accounts to theirs */}
+      {showing && (!settingUp || step === 'savings') && <AccountSuggestionLines suggestions={accountSuggestions(tables)} onAdd={(s) => setAccountNew({ name: s.name, type: s.type, types: ASSET_TYPES })} onError={setError} />}
+      {showing && offers.pools.length > 0 && (
+        <SuggestionLines
+          suggestions={offers.pools} label="Virtual accounts" month={m} currency={ccy} locale={locale} onAdded={onSuggested} onError={setError} ticks={false}
+          onNeed={(type) => setAccountNew({ type, types: [type], payOff: false })}
+        />
+      )}
+      <Button variant="ghost" size="sm" className={cn(ADD, LEAD_BUTTON)} onClick={() => setAccountNew({ types: ASSET_TYPES, type: settingUp ? STEP_ACCOUNT[step] : undefined })}><AddLead ticks={false} /> <span data-lead="text">Add account</span></Button>
       {savingsAccounts.length > 0 && <Button variant="ghost" size="sm" className={ADD} onClick={() => setPoolNew(true)}><Plus /> Add virtual account</Button>}
     </>
   )
@@ -500,9 +527,12 @@ export function StatementScreen() {
       )}
 
       {settingUp && <SetupGuide steps={steps} current={step} action={stepAction} onStep={onStep} onDone={leaveSetup} />}
-      <StatementBand title="The month" help="statement.month" band={statement.flow} ctx={flowCtx} totals={['Total in', 'Total out']} />
-      <StatementBand title="At the end of the month" help="statement.position" band={statement.position} ctx={positionCtx} totals={['Total', 'Total']} amountHead={day} feet={[assetsFoot, hasDebts ? null : debtsFoot]} />
-      <PerPerson household={household} tables={tables} engine={engine} month={m} />
+      <StatementBand title="The month" help="statement.month" band={statement.flow} ctx={flowCtx} totals={['Total in', 'Total out']} locked={[lockedSide('in'), lockedSide('out')]} />
+      <StatementBand
+        title="At the end of the month" help="statement.position" band={statement.position} ctx={positionCtx} totals={['Total', 'Total']} amountHead={day}
+        feet={[assetsFoot, hasDebts ? null : debtsFoot]} locked={[lockedSide('assets'), lockedSide('claims')]}
+      />
+      <PerPerson household={household} tables={tables} engine={engine} month={m} locked={settingUp} />
 
       {/* What a one-click delete took away, with the way back. It floats at the foot of the window, because the thing
           that was deleted can be anywhere on a long page; it goes with the next change. */}

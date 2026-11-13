@@ -5,13 +5,14 @@ import { formatAmount } from '@/app/format'
 import type { HelpKey } from '@/app/help'
 import type { StatementBand as Band, StatementSide } from '@/engine'
 import { AMOUNT_COL, CHANGE_COL, StatementLines, changeText, type LineContext } from './StatementLine'
+import { LOCKED } from './lead'
 
 /**
  * One half of the Statement (DESIGN.md §2, the statement frame): an island holding two sides, side by side from
  * 1024 px and stacked below it. Each side is a column whose total sits at the bottom, so on a wide screen the two
  * totals share a line, the way a T-account closes.
  */
-export function StatementBand({ title, help, band, ctx, totals, amountHead, right, feet }: {
+export function StatementBand({ title, help, band, ctx, totals, amountHead, right, feet, locked }: {
   title: string
   help: HelpKey
   band: Band
@@ -23,12 +24,14 @@ export function StatementBand({ title, help, band, ctx, totals, amountHead, righ
   right?: ReactNode
   /** What can be added to each side, under its lines: the left side's controls, then the right side's. */
   feet?: [ReactNode, ReactNode]
+  /** The guided setup: a whole side that is not part of the step it is on, the left one and the right one. */
+  locked?: [boolean, boolean]
 }) {
   return (
     <Island title={title} help={help} right={right} bodyClassName="px-0 pb-0 pt-1" data-testid={`band-${band.left.key}`}>
       <div className="grid grid-cols-1 divide-border/60 max-lg:divide-y lg:grid-cols-2 lg:divide-x">
-        <Side side={band.left} total={totals[0]} ctx={ctx} amountHead={amountHead} foot={feet?.[0]} />
-        <Side side={band.right} total={totals[1]} ctx={ctx} amountHead={amountHead} foot={feet?.[1]} />
+        <Side side={band.left} total={totals[0]} ctx={ctx} amountHead={amountHead} foot={feet?.[0]} locked={locked?.[0]} />
+        <Side side={band.right} total={totals[1]} ctx={ctx} amountHead={amountHead} foot={feet?.[1]} locked={locked?.[1]} />
       </div>
       {band.difference !== 0 && (
         <p role="alert" className="border-t px-2 py-1.5 text-xs text-destructive">
@@ -39,9 +42,9 @@ export function StatementBand({ title, help, band, ctx, totals, amountHead, righ
   )
 }
 
-function Side({ side, total, ctx, amountHead, foot }: { side: StatementSide; total: string; ctx: LineContext; amountHead?: string; foot?: ReactNode }) {
+function Side({ side, total, ctx, amountHead, foot, locked }: { side: StatementSide; total: string; ctx: LineContext; amountHead?: string; foot?: ReactNode; locked?: boolean }) {
   return (
-    <section aria-label={side.label} className="flex min-w-0 flex-col">
+    <section aria-label={side.label} data-side={side.key} inert={locked || undefined} className={cn('flex min-w-0 flex-col', locked && LOCKED)}>
       <div className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         <h4 className="min-w-0 flex-1 truncate">{side.label}</h4>
         {ctx.withChange && <span className={CHANGE_COL}>change</span>}

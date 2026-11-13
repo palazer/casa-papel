@@ -5,6 +5,7 @@ import { formatAmount } from '@/app/format'
 import { computePersonBudgets, type EngineOutput, type PersonBudget } from '@/engine'
 import type { Household, MonthKey, Tables } from '@/model'
 import { AMOUNT_COL } from './StatementLine'
+import { LOCKED } from './lead'
 
 const LINES: Array<{ label: string; of: (p: PersonBudget) => number }> = [
   { label: 'Income', of: (p) => p.income },
@@ -18,12 +19,16 @@ const CELL = 'h-11 px-2 md:h-7'
  * money, and what that leaves for the household. A dense island like the halves above it, a column per adult. From
  * 1024 px it is as wide as a half's left side, so the names stay close to their amounts.
  */
-export function PerPerson({ household, tables, engine, month }: { household: Household; tables: Tables; engine: EngineOutput; month: MonthKey }) {
+export function PerPerson({ household, tables, engine, month, locked = false }: {
+  household: Household; tables: Tables; engine: EngineOutput; month: MonthKey
+  /** The guided setup is on: no step is about this card, so it is dimmed until the setup is left. */
+  locked?: boolean
+}) {
   const { locale, baseCurrency: ccy } = household
   const people = useMemo(() => computePersonBudgets(tables, engine, month), [tables, engine, month])
   if (people.length < 2) return null
   return (
-    <Island title="Per person" help="statement.perPerson" className="lg:w-1/2" bodyClassName="overflow-x-auto px-0 pb-0 pt-1" data-testid="per-person">
+    <Island title="Per person" help="statement.perPerson" className={cn('lg:w-1/2', locked && LOCKED)} bodyClassName="overflow-x-auto px-0 pb-0 pt-1" inert={locked || undefined} data-testid="per-person">
       <table className="w-full text-sm md:text-xs">
         <thead>
           <tr className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">

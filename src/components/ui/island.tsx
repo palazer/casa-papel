@@ -31,6 +31,8 @@ export function Island({ title, tabs, right, description, toolbar, children, cla
   help?: HelpKey
   as?: 'section' | 'div' | 'article'
   id?: string
+  /** Nothing in it can be pressed or reached with the keyboard: the guided setup locks what its step is not about. */
+  inert?: boolean
   'aria-label'?: string
   'data-testid'?: string
 }) {
