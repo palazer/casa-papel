@@ -1,5 +1,5 @@
 import { useMemo, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { ChevronDown, ChevronRight, Lock } from 'lucide-react'
+import { ChevronDown, ChevronRight, Lock, Repeat } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { InfoTip } from '@/components/InfoTip'
@@ -14,7 +14,7 @@ import { handMonth, useScreen } from '@/app/screens'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { cellKey, currentAccountsIn, groupRowsByCategory, mainAccountLabel, type EngineOutput } from '@/engine'
-import { isOldPocketShare, isShareRule, monthOfDate, parseMonth, resolveRules, type Household, type Money, type MonthKey, type Row, type RuleState, type Section, type Tables } from '@/model'
+import { isOldPocketShare, isShareRule, monthOfDate, parseMonth, repeatsText, resolveRules, runningSchedules, type Household, type Money, type MonthKey, type Row, type RuleState, type Section, type Tables } from '@/model'
 import { addPlanYear, closeMonth, derivedRowReason, reopenMonth } from '@/store'
 import { AddRowInline } from './AddRowInline'
 import { BalanceDialog } from './BalanceDialog'
@@ -333,6 +333,9 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
   const ruleMonth = months.find((m) => m === thisMonth && openMonth(m)) ?? months.find((m) => m > thisMonth && openMonth(m)) ?? months.find(openMonth) ?? months[0]
   /** A row a rule works out says which, the way a follower names its row. */
   const ruleTag = rule && rule.kind !== 'idle' ? ruleText({ ...rule, of: rule.ofRowId ? tables.rows.find((r) => r.id === rule.ofRowId && !r.deletedAt)?.name : undefined }, locale) : null
+  /** On a schedule that has not ended: the Statement's repeat symbol, beside the name. */
+  const running = runningSchedules(tables.recurringItems, row.id, thisMonth)
+  const repeats = running.length ? `Repeats: ${repeatsText(running, locale)}` : null
   return (
     <tr className={cn('group', band)}>
       <th scope="row" className={cn('sticky left-0 z-10 px-2 py-0.5 text-left font-normal', band ?? 'bg-card')}>
@@ -340,6 +343,7 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
           <div className="min-w-0 flex-1">
             <div className="truncate text-xs font-medium">
               {row.name}{tagCcy && tagCcy !== ccy ? <span className="ml-1 text-[10px] font-normal text-muted-foreground">{tagCcy}</span> : null}
+              {repeats ? <span role="img" aria-label={repeats} title={repeats} className="ml-1 inline-flex align-[-1px]" data-repeats><Repeat className="size-3 text-muted-foreground" aria-hidden /></span> : null}
               {followed ? <span className="ml-1 text-[10px] font-normal text-muted-foreground" title={`${shareTag ? `${shareTag}the amount of` : 'Same amount as'} ${followed.name}`}>= {shareTag}{followed.name}</span> : null}
               {deductedFrom ? <span className="ml-1 text-[10px] font-normal text-muted-foreground" title={`Deducted from ${deductedFrom.name}`}>out of {deductedFrom.name}</span> : null}
               {ruleTag ? <span className="ml-1 text-[10px] font-normal text-muted-foreground" title={`Rule: ${ruleTag}`}>= {ruleTag}</span> : null}

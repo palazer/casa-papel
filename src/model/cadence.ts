@@ -1,4 +1,4 @@
-import { compareMonths, parseMonth, type MonthKey } from './month'
+import { addMonths, compareMonths, parseMonth, type MonthKey } from './month'
 import type { RecurringItem } from './schema'
 
 type CadenceLike = Pick<RecurringItem, 'cadence' | 'dueMonths'>
@@ -25,6 +25,27 @@ export function isActiveIn(item: RangeLike, month: MonthKey): boolean {
 export function isDue(item: CadenceLike & RangeLike, month: MonthKey): boolean {
   if (!isActiveIn(item, month)) return false
   return dueMonthNumbers(item).includes(parseMonth(month).month)
+}
+
+/** The first month from `from` on in which the item falls due; null once it has ended. */
+export function nextDue(item: CadenceLike & RangeLike, from: MonthKey): MonthKey | null {
+  let m = compareMonths(from, item.startMonth) < 0 ? item.startMonth : from
+  // the due months come round every year, so twelve steps see them all
+  for (let i = 0; i < 12; i++, m = addMonths(m, 1)) {
+    if (item.endMonth && compareMonths(m, item.endMonth) > 0) return null
+    if (isDue(item, m)) return m
+  }
+  return null
+}
+
+/** A row's schedules that still run in `month` or after it: neither removed nor ended before it. */
+export function runningSchedules(items: RecurringItem[], rowId: string, month: MonthKey): RecurringItem[] {
+  return items.filter((r) => !r.deletedAt && r.rowId === rowId && !(r.endMonth && compareMonths(r.endMonth, month) < 0))
+}
+
+/** How a row repeats, in a few words: its one schedule's rhythm, or how many of its items repeat. */
+export function repeatsText(items: CadenceLike[], locale = 'en'): string {
+  return items.length === 1 ? describeCadence(items[0], locale) : `${items.length} items repeat`
 }
 
 export function describeCadence(item: CadenceLike, locale = 'en'): string {

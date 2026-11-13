@@ -6,7 +6,7 @@ import { InfoTip } from '@/components/InfoTip'
 import { Tick } from '@/components/Tick'
 import { cn } from '@/lib/utils'
 import { ESTIMATE_SHADE, ruleText, type DoneState } from '@/app/display'
-import { formatAmount, formatPercent, formatShare } from '@/app/format'
+import { formatAmount, formatMonth, formatPercent, formatShare } from '@/app/format'
 import type { HelpKey } from '@/app/help'
 import { HUES, type Hue } from '@/app/hues'
 import type { GoalProgress, StatementHue, StatementLine as Line } from '@/engine'
@@ -154,7 +154,13 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
   )
   const tags = (
     <>
-      {item && line.scheduled && <Repeat className="size-3 shrink-0 text-muted-foreground" aria-hidden />}
+      {/* on a schedule: an item a schedule posted, and the row that has one, also in a month where nothing lands */}
+      {line.scheduled && (
+        <span role="img" aria-label={line.repeats ? `Repeats: ${line.repeats}` : 'Repeats'} title={line.repeats ? `Repeats: ${line.repeats}` : 'Repeats'} className="inline-flex shrink-0" data-repeats>
+          <Repeat className="size-3 text-muted-foreground" aria-hidden />
+        </span>
+      )}
+      {line.nextDue && <span className="shrink-0 text-[11px] text-muted-foreground">next {formatMonth(line.nextDue, locale)}</span>}
       {line.accountKind && <span className="shrink-0 text-[11px] text-muted-foreground">{line.accountKind}</span>}
       {line.native && (
         <>

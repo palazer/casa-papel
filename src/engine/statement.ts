@@ -13,7 +13,7 @@
  *   out = spending + set aside and paid off + max(0, toSavings) + max(0, leftover)
  * Rows are sorted into the same buckets the engine's totals use (compute.ts, pass 2), which is what keeps the cents.
  */
-import { addMonths, canCarryRule, cardIsItemized, isTakenFromAccount, resolveRules, rowsFeeding, type Account, type Money, type MonthKey, type Row, type Section, type Tables } from '@/model'
+import { addMonths, canCarryRule, cardIsItemized, describeCadence, isTakenFromAccount, nextDue, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type Row, type Section, type Tables } from '@/model'
 import { computeGoals, type GoalProgress } from './goals'
 import { currentAccountsIn, mainAccountLabel } from './mainAccount'
 import { cellKey, type AccountSeries, type CellResult, type CellStatus, type EngineOutput } from './types'
@@ -103,7 +103,12 @@ export interface StatementLine {
   /** A linked money flow: the other end of this line, shown as the link symbol. */
   link?: StatementLink
   skipped?: boolean
+  /** On a schedule: an item a schedule posted, or a row with a schedule that has not ended. Shown as the repeat symbol. */
   scheduled?: boolean
+  /** With `scheduled`: how it repeats, in a few words ("Yearly (Jan)", "3 items repeat"). */
+  repeats?: string
+  /** A scheduled row with nothing this month: the next month something lands in it. */
+  nextDue?: MonthKey
   missingRate?: boolean
   /** The amount in the row's own currency, when that is not the base currency. */
   native?: { amount: Money; currency: string }
@@ -209,6 +214,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
     return { label: investments ? 'From investments' : 'From savings', accountKind: investments ? 'investment account' : 'savings account' }
   }
 
+  const schedulesById = new Map(tables.recurringItems.map((r) => [r.id, r]))
   const cellOf = (row: Row): CellResult | null => {
     const c = engine.cells[cellKey(row.id, month)]
     return c && c.source !== 'archived' ? c : null
@@ -218,12 +224,20 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
     const live = c.items.filter((i) => !i.skipped)
     const empty = c.source === 'empty' || (c.source === 'items' && live.length === 0)
     const children: StatementLine[] = live.length > 1
-      ? c.items.map((it) => ({
-          id: `${row.id}:${it.id}`, kind: 'item' as const, label: it.label || 'Amount', amount: it.effectiveAmount, currency: c.currency, children: [],
-          status: it.status, estimate: !it.skipped && it.status === 'projected', skipped: !!it.skipped, scheduled: it.recurringItemId != null,
-          rowId: row.id, itemId: it.id,
-        }))
+      ? c.items.map((it) => {
+          const schedule = it.recurringItemId ? schedulesById.get(it.recurringItemId) : undefined
+          return {
+            id: `${row.id}:${it.id}`, kind: 'item' as const, label: it.label || 'Amount', amount: it.effectiveAmount, currency: c.currency, children: [],
+            status: it.status, estimate: !it.skipped && it.status === 'projected', skipped: !!it.skipped, scheduled: it.recurringItemId != null,
+            repeats: schedule ? describeCadence(schedule, household!.locale) : undefined,
+            rowId: row.id, itemId: it.id,
+          }
+        })
       : []
+    // A row on a schedule says so in every month, also in one where nothing lands: there it names the next month
+    // something does, so an empty line is not mistaken for a row nobody set up.
+    const running = runningSchedules(tables.recurringItems, row.id, month)
+    const next = empty ? running.map((r) => nextDue(r, addMonths(month, 1))).filter((m): m is MonthKey => m !== null).sort()[0] : undefined
     // a transfer that feeds an account says how through its rule symbol, not through a tag
     const rule = canCarryRule(row) ? ruleOf(row) : undefined
     return {
@@ -233,6 +247,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
       automatic: c.source === 'derived', chip: c.source === 'derived' && !rule ? 'automatic' : undefined, rule, missingRate: c.missingRate || undefined,
       native: c.currency !== base ? { amount: c.value, currency: c.currency } : undefined,
       net: row.section === 'income' && c.deductionsBase > 0 ? c.netBase : undefined,
+      ...(running.length ? { scheduled: true, repeats: repeatsText(running, household!.locale), nextDue: next } : {}),
       rowId: row.id, ...over,
     }
   }

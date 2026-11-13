@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { buildStatement, computeEngine, type EngineOutput, type Statement, type StatementLine } from '@/engine'
-import { CategorySchema, FxRateSchema, GoalSchema, monthRange, newId, poolRef, type Goal, type MonthKey, type Tables } from '@/model'
+import { CategorySchema, FxRateSchema, GoalSchema, RecurringItemSchema, monthRange, newId, poolRef, type Goal, type MonthKey, type Tables } from '@/model'
 import { applyMutations, planRecurringPosts, ruleMutations, type RuleChoice, type RuleTarget } from '@/store'
 import { buildDemoTables } from '@/demo/demoHousehold'
 import type { RawFixture } from './fixtures/rawFixture'
@@ -511,5 +511,52 @@ describe('the Statement, the position', () => {
     const t = tables({ household: [household()] })
     expect(buildStatement(t, computeEngine({ tables: t, months }), '2027-01')).toBeNull()
     expect(buildStatement(tables({}), computeEngine({ tables: tables({}), months }), '2026-01')).toBeNull()
+  })
+})
+
+describe('the Statement, a row on a schedule', () => {
+  const schedule = (over: Record<string, unknown>) => RecurringItemSchema.parse({ id: newId(), createdAt: T0, updatedAt: T0, amount: 100, startMonth: '2026-01', ...over })
+  const posted = (t: Tables) => applyMutations(t, planRecurringPosts(t, months))
+
+  it('says so in every month: with its amount where it lands, and with the next month where it does not', () => {
+    const insurance = row({ name: 'Car insurance', section: 'expense' })
+    const plain = row({ name: 'Groceries', section: 'expense' })
+    const t = posted(tables({
+      household: [household()], rows: [insurance, plain], cells: [cellValue(plain.id, '2026-01', 5000)],
+      recurringItems: [schedule({ name: 'Car insurance', rowId: insurance.id, amount: 48000, cadence: { intervalMonths: 12, anchorMonth: 2 } })],
+    }))
+    const january = find(statementFor(t, '2026-01').s, insurance.id)!
+    expect(january).toMatchObject({ empty: true, scheduled: true, repeats: 'Yearly (Feb)', nextDue: '2026-02' })
+    const february = find(statementFor(t, '2026-02').s, insurance.id)!
+    expect(february).toMatchObject({ amount: 48000, scheduled: true, repeats: 'Yearly (Feb)' })
+    expect(february.empty).toBeFalsy()
+    expect(february.nextDue).toBeUndefined()
+    expect(find(statementFor(t, '2026-03').s, insurance.id)).toMatchObject({ empty: true, scheduled: true, nextDue: '2027-02' })
+    // a row whose amount simply carries on is not on a schedule
+    const groceries = find(statementFor(t, '2026-02').s, plain.id)!
+    expect(groceries.scheduled).toBeUndefined()
+    expect(groceries.nextDue).toBeUndefined()
+  })
+
+  it('a row with several says how many repeat, and each item its own rhythm; one that has ended says nothing', () => {
+    const insurances = row({ name: 'Insurance & tax', section: 'expense' })
+    const old = row({ name: 'Old contract', section: 'expense' })
+    const t = posted(tables({
+      household: [household()], rows: [insurances, old],
+      recurringItems: [
+        schedule({ name: 'Liability', rowId: insurances.id, amount: 1200 }),
+        schedule({ name: 'Legal', rowId: insurances.id, amount: 3000, cadence: { intervalMonths: 3, anchorMonth: 1 } }),
+        schedule({ name: 'Old contract', rowId: old.id, endMonth: '2026-01' }),
+      ],
+    }))
+    const january = find(statementFor(t, '2026-01').s, insurances.id)!
+    expect(january).toMatchObject({ amount: 4200, scheduled: true, repeats: '2 items repeat' })
+    expect(january.children.map((c) => [c.label, c.scheduled, c.repeats])).toEqual([['Liability', true, 'Monthly'], ['Legal', true, 'Every 3 months (Jan, Apr, Jul, Oct)']])
+    // one item lands in February: the row is one line again, and still on a schedule
+    expect(find(statementFor(t, '2026-02').s, insurances.id)).toMatchObject({ amount: 1200, scheduled: true, children: [] })
+    expect(find(statementFor(t, '2026-01').s, old.id)).toMatchObject({ amount: 100, scheduled: true })
+    const after = find(statementFor(t, '2026-02').s, old.id)!
+    expect(after.scheduled).toBeUndefined()
+    expect(after.nextDue).toBeUndefined()
   })
 })

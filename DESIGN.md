@@ -364,6 +364,12 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   accounts without a row keep the faint `=` of the rule symbol, which adds theirs, so a line never carries two faint
   marks. A plain row has no link symbol, which is how an unconnected "Car loan" row is told from a payment row. The
   Grid does not draw the symbol.
+  **The repeat symbol.** `Repeat` (12 px, muted, an image named `Repeats: Yearly (Jan)`, the same words in its
+  `title`) marks what is on a schedule: an item a schedule posted, and every row that has a schedule which has not
+  ended (`runningSchedules`). The row carries it in every month, also in one where nothing lands; there the empty
+  line adds a muted `next Jan 2027` (`nextDue`), so it is not mistaken for a row nobody set up. A row with several
+  schedules says `3 items repeat`. A row whose amount simply carries on from month to month has no symbol: that is
+  what every row does. The Grid draws the symbol beside the row's name, and the legend names it.
   Things are added where they will appear: the foot of Income and Expenses holds the Grid's `AddRowInline` (`Add row`)
   and `AddCategoryInline` (`Add category`, a name and Enter), the foot of `To savings, investments and debts` holds `Add row`, and an
   opened category ends with `Add row to <category>` with that category already chosen. A category is a line from

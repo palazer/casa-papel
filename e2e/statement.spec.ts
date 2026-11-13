@@ -1198,6 +1198,39 @@ test.describe('working the month in the Statement', () => {
     await expect(moneyIn.getByLabel('Account for the new transfer row').locator('option')).toHaveText(['Savings', 'New savings account…'])
   })
 
+  test('a row on a schedule carries the repeat symbol in every month; where nothing lands it says when it lands next', async ({ page }) => {
+    await openStatement(page)
+    const moneyOut = page.getByRole('region', { name: 'Money out' })
+    const line = (name: string) => moneyOut.locator('[data-line]').filter({ hasText: name }).first()
+    await goToMonth(page, 'November 2026')
+    await page.getByRole('button', { name: 'Expand all' }).click()
+
+    // rent lands every month: the row carries the symbol, and the symbol says how it repeats
+    await expect(line('The flat – Rent').getByRole('img', { name: 'Repeats: Monthly' })).toBeVisible()
+    await expect(line('The flat – Rent')).not.toContainText('next')
+    // the car insurance lands every three months, not in November: the empty line says it is on a schedule, and when it lands
+    const insurance = line('The car – Insurance')
+    await expect(insurance.getByRole('img', { name: 'Repeats: Every 3 months (Jan, Apr, Jul, Oct)' })).toBeVisible()
+    await expect(insurance).toContainText('next Jan 2027')
+    // a row whose amount simply carries on from month to month has no symbol
+    await expect(line('Groceries').locator('[data-repeats]')).toHaveCount(0)
+    await page.screenshot({ path: 'e2e/output/statement-repeats.png', fullPage: true })
+
+    // in the month it lands the same row shows its amount and the symbol, and no "next"
+    await goToMonth(page, 'January 2027')
+    await page.getByRole('button', { name: 'Expand all' }).click()
+    await expect(insurance.getByRole('img', { name: /^Repeats: Every 3 months/ })).toBeVisible()
+    await expect(insurance).toContainText('€210.00')
+    await expect(insurance).not.toContainText('next')
+
+    // the Grid shows the same symbol beside the row's name, and the legend says what it means
+    await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Grid' }).click()
+    await expect(page.getByRole('rowheader', { name: /^The car – Insurance/ }).getByRole('img', { name: /^Repeats: Every 3 months/ })).toBeVisible()
+    await expect(page.getByRole('rowheader', { name: /^Groceries/ }).locator('[data-repeats]')).toHaveCount(0)
+    await page.getByRole('button', { name: 'What the colours and marks mean' }).click()
+    await expect(page.getByText('On a schedule: it lands in its months by itself.')).toBeVisible()
+  })
+
   test('the link symbol joins a row and its account: pressing it goes to the other end, and an open one adds the missing row', async ({ page }) => {
     await openStatement(page)
     const moneyIn = page.getByRole('region', { name: 'Money in' })

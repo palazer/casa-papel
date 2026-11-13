@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { describeCadence, dueMonthNumbers, isDue } from '@/model'
+import { RecurringItemSchema, describeCadence, dueMonthNumbers, isDue, newId, nextDue, repeatsText, runningSchedules } from '@/model'
 
 const base = { startMonth: '2026-01', endMonth: null as string | null, dueMonths: null as number[] | null }
 
@@ -26,5 +26,29 @@ describe('cadence', () => {
     expect(describeCadence({ cadence: { intervalMonths: 3, anchorMonth: 1 }, dueMonths: null })).toBe('Every 3 months (Jan, Apr, Jul, Oct)')
     expect(describeCadence({ cadence: { intervalMonths: 12, anchorMonth: 5 }, dueMonths: null })).toBe('Yearly (May)')
     expect(describeCadence({ cadence: null, dueMonths: [3, 9] })).toBe('Months: Mar, Sep')
+  })
+  it('names the next month it falls due in, from a month on', () => {
+    const yearly = { ...base, cadence: { intervalMonths: 12 as const, anchorMonth: 1 } }
+    expect(nextDue(yearly, '2026-01')).toBe('2026-01')
+    expect(nextDue(yearly, '2026-02')).toBe('2027-01')
+    expect(nextDue(yearly, '2026-12')).toBe('2027-01')
+    // before it starts, its first month; once it has ended, none
+    expect(nextDue({ ...yearly, startMonth: '2027-06' }, '2026-03')).toBe('2028-01')
+    expect(nextDue({ ...yearly, endMonth: '2026-12' }, '2026-02')).toBeNull()
+    expect(nextDue({ ...base, cadence: null, dueMonths: [3, 9] }, '2026-04')).toBe('2026-09')
+    expect(nextDue({ ...base, cadence: null }, '2026-04')).toBe('2026-04')
+  })
+  it('a row repeats while one of its schedules has not ended: one says its rhythm, several say how many', () => {
+    const [r1, r2] = [newId(), newId()]
+    const item = (over: Record<string, unknown>) => RecurringItemSchema.parse({ id: newId(), createdAt: 0, updatedAt: 0, name: 'x', rowId: r1, amount: 100, startMonth: '2026-01', ...over })
+    const yearly = item({ cadence: { intervalMonths: 12, anchorMonth: 1 } })
+    const ended = item({ endMonth: '2026-03' })
+    const gone = item({ deletedAt: 5 })
+    const other = item({ rowId: r2 })
+    const all = [yearly, ended, gone, other]
+    expect(runningSchedules(all, r1, '2026-03')).toEqual([yearly, ended])
+    expect(runningSchedules(all, r1, '2026-04')).toEqual([yearly])
+    expect(repeatsText([yearly])).toBe('Yearly (Jan)')
+    expect(repeatsText([yearly, ended])).toBe('2 items repeat')
   })
 })
