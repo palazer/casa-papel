@@ -1598,9 +1598,17 @@ test.describe('working the month in the Statement', () => {
     const saved = moneyOut.getByRole('checkbox', { name: 'To savings done' })
 
     // every heading is open at first, and is a button that says so
-    for (const h of [heading(moneyIn, 'Income'), heading(moneyIn, 'From accounts'), heading(moneyOut, 'Expenses'), setAside, heading(claims, 'Debts'), heading(claims, 'Net worth')]) {
-      await expect(h).toHaveAttribute('aria-expanded', 'true')
-    }
+    const all = [
+      heading(moneyIn, 'Income'), heading(moneyIn, 'From accounts'), heading(moneyOut, 'Expenses'), setAside,
+      heading(assets, 'Savings accounts'), heading(assets, 'Investment accounts'), heading(claims, 'Debts'), heading(claims, 'Net worth'),
+    ]
+    for (const h of all) await expect(h).toHaveAttribute('aria-expanded', 'true')
+    // what the household has stands under a heading per kind, each with the sum of its accounts; a kind it has none of has no heading
+    const amountOn = async (l: Locator) => (await l.innerText()).match(/€[\d,]+\.\d\d/g)!.at(-1)
+    expect(await amountOn(assets.locator('[data-line="savings-accounts"]'))).toBe(await amountOn(assets.locator('[data-line^="acc:"]').filter({ hasText: 'Savings' }).first()))
+    expect(await amountOn(assets.locator('[data-line="investment-accounts"]'))).toBe(await amountOn(assets.locator('[data-line^="acc:"]').filter({ hasText: 'Index fund' })))
+    await expect(assets.locator('[data-line="other-assets"]')).toHaveCount(0)
+    await expect(assets.locator('[data-line]').first()).toHaveAttribute('data-line', 'main')
     await expect(saved).toBeVisible()
     const totalOut = await total(page, 'out').textContent()
 
@@ -1640,9 +1648,8 @@ test.describe('working the month in the Statement', () => {
 
     // "Collapse all" folds the headings too, "Expand all" opens everything
     await page.getByRole('button', { name: 'Collapse all' }).click()
-    for (const h of [heading(moneyIn, 'Income'), heading(moneyIn, 'From accounts'), heading(moneyOut, 'Expenses'), setAside, heading(claims, 'Debts'), heading(claims, 'Net worth')]) {
-      await expect(h).toHaveAttribute('aria-expanded', 'false')
-    }
+    for (const h of all) await expect(h).toHaveAttribute('aria-expanded', 'false')
+    await expect(assets.locator('[data-line^="acc:"]')).toHaveCount(0)
     await expect(moneyIn.getByRole('checkbox')).toHaveCount(0)
     await expect(moneyOut.getByRole('button', { name: 'Housing', exact: true })).toHaveCount(0)
     await expect(claims.getByText('Free', { exact: true })).toHaveCount(0)
@@ -1650,6 +1657,16 @@ test.describe('working the month in the Statement', () => {
     await expect(saved).toBeVisible()
     await expect(moneyOut.getByText('The flat – Rent')).toBeVisible()
     await expect(claims.getByText('Free', { exact: true })).toBeVisible()
+    // a heading of the lower half stays folded too, and the side's total does not change with it
+    const totalAssets = await total(page, 'assets').textContent()
+    await heading(assets, 'Investment accounts').click()
+    await expect(assets.locator('[data-line^="acc:"]').filter({ hasText: 'Index fund' })).toHaveCount(0)
+    await expect(total(page, 'assets')).toHaveText(totalAssets!)
+    await page.reload()
+    await expect(heading(assets, 'Investment accounts')).toHaveAttribute('aria-expanded', 'false')
+    await expect(heading(assets, 'Savings accounts')).toHaveAttribute('aria-expanded', 'true')
+    await heading(assets, 'Investment accounts').click()
+    await page.screenshot({ path: 'e2e/output/statement-asset-kinds.png', fullPage: true })
   })
 
   test('a top-up on a virtual account whose amount a rule works out says that the month then keeps a typed amount', async ({ page }) => {

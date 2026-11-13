@@ -13,7 +13,7 @@
  *   out = spending + set aside and paid off + max(0, toSavings) + max(0, leftover)
  * Rows are sorted into the same buckets the engine's totals use (compute.ts, pass 2), which is what keeps the cents.
  */
-import { addMonths, canCarryRule, cardIsItemized, describeCadence, isTakenFromAccount, nextDue, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
+import { accountGroup, addMonths, canCarryRule, cardIsItemized, describeCadence, isTakenFromAccount, nextDue, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
 import { computeGoals, type GoalProgress } from './goals'
 import { currentAccountsIn, mainAccountLabel } from './mainAccount'
 import { cellKey, type AccountSeries, type CellResult, type CellStatus, type EngineOutput } from './types'
@@ -449,6 +449,8 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   const accountLines = new Map<string, StatementLine>()
   const poolLines = new Map<string, StatementLine>()
   const assets: StatementLine[] = []
+  // what the household has stands under a heading per kind, each with its own sum
+  const assetsOf: Record<'savings' | 'investment' | 'other', StatementLine[]> = { savings: [], investment: [], other: [] }
   const debts: StatementLine[] = []
   let setAsideTotal: Money = 0
   let setAsideChange: Money = 0
@@ -466,6 +468,8 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
       id: 'main', kind: 'account', label: mainAccountLabel(main, accounts), amount: mm.balance, change: mm.balance - mm.start,
       children: parts, missingRate: main.missingRate || undefined,
     }
+    // named after its one account, the line says what kind of account that is, as the headings under it do for theirs
+    if (main.accountIds.length === 1) line.accountKind = 'current account'
     // worked out until the real balances are typed; then it reads like any other entered balance
     if (mm.entered) Object.assign(line, { entered: true, adjustment: mm.adjustment !== 0 ? mm.adjustment : undefined })
     else Object.assign(line, { calculated: true, chip: 'calculated' })
@@ -508,7 +512,14 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
       setAsideTotal += inPools
       setAsideChange += poolsChange
     }
-    assets.push(line)
+    const kind = accountGroup(acc)
+    assetsOf[kind === 'savings' || kind === 'investment' ? kind : 'other'].push(line)
+  }
+  // a kind the household has nothing of gets no heading
+  for (const [id, label, lines] of [
+    ['savings-accounts', 'Savings accounts', assetsOf.savings], ['investment-accounts', 'Investment accounts', assetsOf.investment], ['other-assets', 'Other assets', assetsOf.other],
+  ] as const) {
+    if (lines.length) assets.push({ ...group(id, label, 'worth', lines), change: lines.reduce((s, l) => s + (l.change ?? 0), 0) })
   }
 
   const assetsSide = side('assets', 'Assets', assets)

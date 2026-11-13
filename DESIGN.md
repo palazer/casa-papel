@@ -262,7 +262,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   the balance on both sides (`+€460.00`, a `·` for none) and the day as the balance column's head. A side opens with
   its name in small caps and closes with its total in `font-semibold` over a hairline. Lines are `min-h-11 text-sm`
   on phones and `md:min-h-7 md:text-xs`, separated by `divide-border/60`, amounts in a fixed right-aligned column:
-  a **group** (Income, From accounts, Expenses, To savings, investments and debts, Debts, Net worth) is a heading in its hue
+  a **group** (Income, From accounts, Expenses, To savings, investments and debts, Savings accounts, Investment accounts, Other assets, Debts, Net worth) is a heading in its hue
   on the hue's `tint` that folds away with everything under it (its lines and what adds to them), its total staying on
   the heading; a **category**, an account that holds virtual accounts and an itemized row open as an
   accordion (a chevron button with `aria-expanded`, each level 20 px further in, items on `bg-muted/20` with the
@@ -273,7 +273,11 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   the names stay in one column and no line moves; every group is open until it is folded, and which ones are folded
   is kept on the device, per household (`statement.folded.<household>`, a preference, never household data). What
   looks for a line inside a folded group opens it: a link symbol, a row that was just added, and the guided setup
-  when it comes to the group's step. Tags follow the name and wrap under it
+  when it comes to the group's step. **Assets stand under a heading per kind of account** (`accountGroup` in
+  `src/model/accountGroup.ts`): the current accounts' one calculated line first, then `Savings accounts`,
+  `Investment accounts` and `Other assets` in the `worth` hue, each with the sum and the change of its accounts and
+  only while it has one; the accounts keep their columns under it. The first line carries a muted `current account`
+  after its name when it is named after its one account, so every line of the side says what kind it is. Tags follow the name and wrap under it
   when there is no room: a zinc chip with the currency code and the original amount in muted `text-[11px]` for a
   line in another currency (the amount column is always the household currency), a rose `no rate` chip, `net €…`
   on an income with deductions, and a zinc chip for what the line is (`automatic`, `calculated`,

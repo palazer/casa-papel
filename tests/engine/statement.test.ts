@@ -379,7 +379,14 @@ describe('the Statement, the position', () => {
     const { t, savings, fund, visa, loan, travel } = world()
     const { s } = statementFor(t, '2026-01')
     // the rest: 5400 − 3350 − 350 − 120 − 400 − 150 = 1030
-    expect(s.position.left.lines.map((l) => [l.label, l.amount, l.change])).toEqual([['Main', 1200_00, 0], ['Savings', 8880_00, 880_00], ['Fund', 5400_00, 400_00]])
+    // the current account's line, then a heading per kind of account with its own sum; a kind there is none of has none
+    expect(s.position.left.lines.map((l) => [l.kind, l.label, l.amount, l.change])).toEqual([
+      ['account', 'Main', 1200_00, 0], ['group', 'Savings accounts', 8880_00, 880_00], ['group', 'Investment accounts', 5400_00, 400_00],
+    ])
+    expect(topLine(s, 'assets', 'main')).toMatchObject({ accountKind: 'current account' })
+    expect(topLine(s, 'assets', 'savings-accounts')!.children.map((c) => [c.label, c.amount, c.change])).toEqual([['Savings', 8880_00, 880_00]])
+    expect(topLine(s, 'assets', 'investment-accounts')!.children.map((c) => [c.label, c.amount, c.change])).toEqual([['Fund', 5400_00, 400_00]])
+    expect(topLine(s, 'assets', 'other-assets')).toBeUndefined()
     expect(find(s, `acc:${savings.id}`)).toMatchObject({ open: true })
     expect(find(s, `acc:${savings.id}`)!.children.map((c) => [c.kind, c.label, c.amount, c.change])).toEqual([['pool', 'Travel', 1850_00, -150_00], ['figure', 'Not set aside', 7030_00, 1030_00]])
     expect(find(s, `acc:${fund.id}`)!.children).toEqual([])
@@ -445,6 +452,29 @@ describe('the Statement, the position', () => {
     expect(find(s, `acc:${visa.id}`)!.link).toEqual({ to: [], text: 'No row pays off Visa yet', open: true })
     expect(find(s, `acc:${old.id}`)!.link).toBeUndefined()
     expect(find(s, `acc:${gone.id}`)!.link).toBeUndefined()
+  })
+
+  it('groups what the household has by kind: savings, investments and other assets, in their own order inside each', () => {
+    const one = account({ name: 'One', type: 'checking', tracked: false })
+    const two = account({ name: 'Two', type: 'joint', tracked: false, order: 'a1' })
+    const deposit = account({ name: 'Deposit', type: 'other-asset', openingBalance: 900_00, order: 'a2' })
+    const rainy = account({ name: 'Rainy day', type: 'savings', openingBalance: 3000_00, order: 'a3' })
+    const fund = account({ name: 'Fund', type: 'investment', openingBalance: 5000_00, order: 'a4' })
+    const instant = account({ name: 'Instant', type: 'savings', openingBalance: 1000_00, order: 'a5' })
+    const t = tables({ household: [household()], accounts: [one, two, deposit, rainy, fund, instant], rows: [], cells: [] })
+    const { s } = statementFor(t, '2026-01')
+    // several current accounts are one line named for them all: it needs no tag to say what it is
+    expect(topLine(s, 'assets', 'main')).toMatchObject({ label: 'Current accounts' })
+    expect(topLine(s, 'assets', 'main')!.accountKind).toBeUndefined()
+    expect(s.position.left.lines.slice(1).map((l) => [l.id, l.label, l.amount, l.children.map((c) => c.label)])).toEqual([
+      ['savings-accounts', 'Savings accounts', 4000_00, ['Rainy day', 'Instant']],
+      ['investment-accounts', 'Investment accounts', 5000_00, ['Fund']],
+      ['other-assets', 'Other assets', 900_00, ['Deposit']],
+    ])
+    expect(s.position.left.lines.slice(1).every((l) => l.kind === 'group' && l.open === true)).toBe(true)
+    expect(s.position.left.total).toBe(9900_00)
+    expect(s.position.difference).toBe(0)
+    expectSound(t, months)
   })
 
   it('puts a goal on the line it measures', () => {

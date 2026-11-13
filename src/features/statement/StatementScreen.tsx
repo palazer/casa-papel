@@ -97,7 +97,7 @@ const PAY_OFF_NOTE = 'It will show under "To savings, investments and debts": th
 const ASSET_TYPES: AccountType[] = ['checking', 'joint', 'savings', 'investment', 'other-asset', 'cash']
 const DEBT_TYPES: AccountType[] = ['credit-card', 'loan']
 /** The headings that fold (DESIGN.md §7). Which of them are folded is kept on this device, for each household. */
-const GROUPS = ['income', 'from-accounts', 'expenses', 'moved', 'set-aside', 'debts', 'net-worth']
+const GROUPS = ['income', 'from-accounts', 'expenses', 'moved', 'set-aside', 'savings-accounts', 'investment-accounts', 'other-assets', 'debts', 'net-worth']
 const foldedPref = (householdId: string) => `statement.folded.${householdId}`
 const ADD = 'text-muted-foreground'
 
