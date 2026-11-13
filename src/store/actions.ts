@@ -62,21 +62,34 @@ export function freezeNext(tables: Tables, engine: EngineOutput, rowId: string, 
   return [putCell({ rowId, month: next, mode: 'value', value: held, items: [], note: null, currencyOverride: null, updatedAt: now() })]
 }
 
-export async function setCellValue(store: Store, rowId: string, month: MonthKey, value: Money, scope: EditScope): Promise<void> {
+/**
+ * The row's dialog can change the row's currency in the same step as the month's amount: the row record that goes
+ * with that save. `undefined` leaves the row alone; null is the household currency.
+ */
+export function rowCurrencyPut(tables: Tables, rowId: string, currency: string | null | undefined): Mutation[] {
+  if (currency === undefined) return []
+  const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
+  if (!row || (row.currency ?? null) === currency) return []
+  return [{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, currency, updatedAt: now() }) }]
+}
+
+export async function setCellValue(store: Store, rowId: string, month: MonthKey, value: Money, scope: EditScope, rowCurrency?: string | null): Promise<void> {
   const { tables, engine } = await engineUpTo(store, month)
   assertOpen(tables, month)
   const mutations: Mutation[] = scope === 'this-month' ? freezeNext(tables, engine, rowId, month) : []
   const existing = cellOf(tables, rowId, month)
   mutations.push(putCell({ rowId, month, mode: 'value', value, items: [], note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, updatedAt: now() }))
+  mutations.push(...rowCurrencyPut(tables, rowId, rowCurrency))
   await store.commit(mutations)
 }
 
-export async function setCellItems(store: Store, rowId: string, month: MonthKey, items: CellItem[], scope: EditScope = 'from-now-on'): Promise<void> {
+export async function setCellItems(store: Store, rowId: string, month: MonthKey, items: CellItem[], scope: EditScope = 'from-now-on', rowCurrency?: string | null): Promise<void> {
   const { tables, engine } = await engineUpTo(store, month)
   assertOpen(tables, month)
   const mutations: Mutation[] = scope === 'this-month' ? freezeNext(tables, engine, rowId, month) : []
   const existing = cellOf(tables, rowId, month)
   mutations.push(putCell({ rowId, month, mode: 'items', value: null, items, note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, updatedAt: now() }))
+  mutations.push(...rowCurrencyPut(tables, rowId, rowCurrency))
   await store.commit(mutations)
 }
 

@@ -499,7 +499,13 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   set aside is a **virtual account**, never an envelope.
 - Rates are always spelled with both codes in the orientation whose number is ≥ 1 (`1 EUR = 1.08 USD`, `1 USD = 48.58 TRY`;
   `readableRate` in `src/features/household/fxDisplay.ts`); the rates table's columns read `1 EUR in USD` and store
-  `base/foreign`. The cell editor's rate line (`src/features/grid/RateLine.tsx`) sits under an amount in another currency:
+  `base/foreign`. **A row's currency is chosen where its amount is typed**: the cell editor carries a narrow select of
+  codes (`w-24`, named `Currency of <row>`, the household's own first) beside "Amount in <code>", and on a line
+  "Amounts in" above the items when itemized; it is the row's currency for every month, saved with the amount as one
+  step, and a muted sentence says so once it differs. A row the app works out, a follower and a month that carries
+  another currency have no select; "Currency…" in the row menu stays for changing it without an amount. A currency
+  without any rate is fetched as soon as it is picked, so the rate line can answer before the save.
+  The cell editor's rate line (`src/features/grid/RateLine.tsx`) sits under an amount in another currency:
   `≈ €3,120.00 · 1 EUR = 1.084 USD · [ECB] 2 Nov 2026` with the table's chip tones, a ghost `xs` "Change this month's
   rate…" that reveals an inline input (one rate per currency per month), and "Use the ECB rate again" while the rate is
   manual. The ECB day is the Month rate setting's, the first business day by default. **The Statement carries the same

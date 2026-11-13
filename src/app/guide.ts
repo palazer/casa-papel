@@ -297,7 +297,7 @@ export const GUIDE: GuideTopic[] = [
       'A currency gets its rates from the European Central Bank by itself the first time it is used (only currency codes and dates leave the device). They live under Household → "Currency rates": "Fetch ECB rates" asks again, "Month rate" picks the day of the month, "Future months" how the rate drifts. Rates are always spelled with both codes in the direction whose number is at least 1.',
     ],
     steps: [
-      'Row menu → "Currency…" → "Amounts in this row are in" (the first entry, "EUR (household currency)", is the default) → "Save".',
+      'Press a row to open its dialog and pick the currency beside the amount: it is the row\'s, for every month, and is saved with the amount. The same choice is in the row menu → "Currency…" → "Amounts in this row are in" (the first entry, "EUR (household currency)", is the default) → "Save".',
       'Open a cell of that row; under the amount, "Change this month\'s rate…" → type after "1 USD =" → "Save rate". One rate per currency per month, for every row and balance in it. The Statement shows the same line under its toolbar for every other currency the month uses.',
       '"Use the ECB rate again" drops a manual rate for the published one.',
       'An account\'s currency is under "More options" in its dialog. Household → "Currency rates" → "Fetch ECB rates" fills the months since the last fetch, and is the way back after being offline.',

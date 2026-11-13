@@ -194,6 +194,67 @@ test('the Statement shows the month\'s rate for another currency, and takes one 
   await expect(other).toContainText('€120.00')
 })
 
+test('a row\'s currency is chosen in its dialog, beside the amount: a new income in dollars', async ({ page }) => {
+  await page.route('https://api.frankfurter.dev/**', (r) => r.fulfill({ json: { rates: { '2026-10-01': { USD: 1.1 }, '2026-11-02': { USD: 1.25 } } } }))
+  await loadDemo(page)
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
+  const moneyIn = page.getByRole('region', { name: 'Money in' })
+  const dlg = page.getByRole('dialog')
+
+  // a new row opens its dialog; the currency stands beside the amount, on the household's own
+  await moneyIn.getByRole('button', { name: 'Add income row' }).click()
+  await moneyIn.getByLabel('New income row name').fill('Freelance')
+  await moneyIn.getByRole('button', { name: 'Add', exact: true }).click()
+  await expect(dlg.getByRole('heading', { name: /Freelance/ })).toBeVisible()
+  const currency = dlg.getByLabel('Currency of Freelance')
+  await expect(currency).toHaveValue('EUR')
+  await expect(dlg.getByTestId('rate-line')).toHaveCount(0)
+  await expect(dlg.getByTestId('currency-note')).toHaveCount(0)
+
+  // dollars: the label follows, the rate is fetched there and then, and the line says what the amount is worth
+  await currency.selectOption('USD')
+  await dlg.getByLabel('Amount in USD').fill('1000')
+  await expect(dlg.getByTestId('currency-note')).toHaveText('Every month of this row is in USD once saved; numbers already typed keep their digits.')
+  await expect(dlg.getByTestId('rate-line')).toContainText('€800.00')
+  await expect(dlg.getByTestId('rate-line')).toContainText('1 EUR = 1.25 USD')
+  await dlg.screenshot({ path: 'e2e/output/cell-currency.png' })
+  await dlg.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(dlg).toBeHidden()
+
+  // the Statement counts it in euros and names the currency on the line; the month's rate shows under the toolbar
+  const line = moneyIn.locator('[data-line]').filter({ hasText: 'Freelance' }).first()
+  await expect(line).toContainText('USD')
+  await expect(line).toContainText('€800.00')
+  await expect(page.getByTestId('month-rates')).toContainText('1 EUR = 1.25 USD')
+
+  // one step: one undo takes the amount and the currency back together
+  await page.getByRole('button', { name: 'Undo' }).click()
+  await expect(line).not.toContainText('USD')
+  await expect(page.getByTestId('month-rates')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Redo' }).click()
+  await expect(line).toContainText('€800.00')
+
+  // itemized: the same choice stands above the items, and goes back to the household's own
+  await line.getByRole('button', { name: /^Freelance:/ }).click()
+  await dlg.getByRole('tab', { name: 'Itemized' }).click()
+  await expect(dlg.getByLabel('Currency of Freelance')).toHaveValue('USD')
+  await dlg.getByLabel('Currency of Freelance').selectOption('EUR')
+  await expect(dlg.getByTestId('rate-line')).toHaveCount(0)
+  // the amount typed before is the first item: its digits stayed while the currency changed
+  await expect(dlg.getByLabel('Item amount')).toHaveValue('1000')
+  await dlg.getByLabel('Item label').fill('Workshop')
+  await dlg.getByLabel('Item amount').fill('300')
+  await dlg.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(dlg).toBeHidden()
+  await expect(line).not.toContainText('USD')
+  await expect(line).toContainText('€300.00')
+
+  // a row the app works out has no amount to type, and no currency to choose
+  await page.getByRole('region', { name: 'Money out' }).getByRole('button', { name: /^To savings:/ }).click()
+  await expect(dlg).toBeVisible()
+  await expect(dlg.getByLabel(/^Currency of/)).toHaveCount(0)
+})
+
 test('a currency that comes into use gets its rates by itself', async ({ page }) => {
   const asked: string[] = []
   await page.route('https://api.frankfurter.dev/**', (r) => {

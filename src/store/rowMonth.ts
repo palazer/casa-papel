@@ -3,7 +3,7 @@ import {
   CellSchema, RecurringItemSchema, cadenceOf, compareMonths, isDue, newId, repeatOf, sameRepeat,
   type CellItem, type Money, type MonthKey, type RecurringItem, type RepeatChoice, type Repeating, type Tables,
 } from '@/model'
-import { engineUpTo, freezeNext, type EditScope } from './actions'
+import { engineUpTo, freezeNext, rowCurrencyPut, type EditScope } from './actions'
 import { applyMutations } from './impact'
 import { defaultMonths } from './months'
 import { managedItem, pinCarriedMonths, planChangeRecurringFrom, planRecurringPosts } from './recurring'
@@ -21,6 +21,8 @@ export interface RowMonthSave {
   others?: Record<string, { amount?: Money; repeat?: Repeating }>
   /** While nothing in the row repeats by itself: what later months do with the total. */
   scope: EditScope
+  /** The row's currency, where the dialog changed it: for every month of the row. null is the household currency. */
+  currency?: string | null
 }
 
 const isCellPut = (m: Mutation, rowId: string, month: MonthKey) =>
@@ -118,6 +120,7 @@ export function planRowMonthSave(tables: Tables, engine: EngineOutput, rowId: st
   if (items.length > 0 || !scheduled) out.push({ op: 'put', table: 'cells', record: CellSchema.parse({ ...cell, mode: 'items', items }) })
   // a row on a schedule with nothing in the month has no cell of its own there
   else if (existing && existing.mode !== 'inherit') out.push({ op: 'put', table: 'cells', record: CellSchema.parse({ ...cell, mode: 'inherit', items: [] }) })
+  out.push(...rowCurrencyPut(tables, rowId, save.currency))
   return out
 }
 

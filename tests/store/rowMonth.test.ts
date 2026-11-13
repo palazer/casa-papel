@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { cellKey, computeEngine } from '@/engine'
 import { describeCadence, monthRange, newId, type CellItem } from '@/model'
-import { CasaDb, Store, addRecurringItem, loadTables, planRecurringPosts, postRecurring, quickCreateHousehold, saveRowMonth, setCellValue } from '@/store'
+import { CasaDb, Store, addRecurringItem, loadTables, planRecurringPosts, postRecurring, quickCreateHousehold, saveRowMonth, setCellItems, setCellValue } from '@/store'
 
 const months = monthRange('2026-01', '2026-12')
 
@@ -133,6 +133,38 @@ describe('a row\'s month saved from its dialog', () => {
     await saveRowMonth(store, row.id, '2026-06', { items: [item({ label: 'C', amount: 700 })], scope: 'from-now-on' })
     expect((await valuesOf(store, row.id)).slice(4, 8)).toEqual([50000, 700, 700, 700])
     expect(await schedulesOf(store, row.id)).toEqual([])
+  })
+})
+
+describe('the row\'s currency, chosen in its dialog', () => {
+  const currencyOf = async (store: Store, rowId: string) => (await loadTables(store)).rows.find((r) => r.id === rowId)!.currency
+
+  it('goes with the amount: one step, and one undo takes both back', async () => {
+    const { store, row } = await fresh()
+    await setCellValue(store, row.id, '2026-02', 100000, 'from-now-on', 'USD')
+    expect(await currencyOf(store, row.id)).toBe('USD')
+    expect((await valuesOf(store, row.id)).slice(0, 3)).toEqual([0, 100000, 100000])
+    await store.undo()
+    expect(await currencyOf(store, row.id)).toBeNull()
+    expect((await valuesOf(store, row.id)).slice(0, 3)).toEqual([0, 0, 0])
+  })
+
+  it('is saved from every way the dialog saves, and null is the household\'s own again', async () => {
+    const { store, row } = await fresh()
+    await setCellItems(store, row.id, '2026-02', [item({ amount: 5000, status: 'done' })], 'from-now-on', 'TRY')
+    expect(await currencyOf(store, row.id)).toBe('TRY')
+    await saveRowMonth(store, row.id, '2026-03', { items: [item({ label: 'A', amount: 100 }), item({ label: 'B', amount: 200 })], scope: 'from-now-on', currency: 'USD' })
+    expect(await currencyOf(store, row.id)).toBe('USD')
+    // left out, the row keeps what it has
+    await saveRowMonth(store, row.id, '2026-04', { items: [item({ label: 'C', amount: 300 })], scope: 'from-now-on' })
+    await setCellValue(store, row.id, '2026-05', 700, 'from-now-on')
+    expect(await currencyOf(store, row.id)).toBe('USD')
+    await saveRowMonth(store, row.id, '2026-06', { items: [item({ label: 'D', amount: 400 })], scope: 'from-now-on', currency: null })
+    expect(await currencyOf(store, row.id)).toBeNull()
+    // the same currency again writes no row
+    const before = (await loadTables(store)).rows.find((r) => r.id === row.id)!.updatedAt
+    await setCellValue(store, row.id, '2026-07', 900, 'from-now-on', null)
+    expect((await loadTables(store)).rows.find((r) => r.id === row.id)!.updatedAt).toBe(before)
   })
 })
 

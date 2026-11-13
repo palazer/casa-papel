@@ -6,17 +6,18 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Segmented } from '@/components/Segmented'
 import { cn } from '@/lib/utils'
+import { currencyChoices } from '@/app/currencies'
 import { amountToInput, formatAmount, formatMonth, parseAmount } from '@/app/format'
 import { readPref, writePref } from '@/app/prefs'
 import { useStore } from '@/app/store'
 import { cellKey, type EngineOutput } from '@/engine'
 import { RepeatField } from '@/features/recurring/RepeatField'
 import {
-  addMonths, cadenceOf, canCarryRule, compareMonths, isDue, isTakenFromAccount, newId, nextDue, parseMonth, repeatOf, runningSchedules, sameRepeat,
+  addMonths, cadenceOf, canCarryRule, compareMonths, fromMinor, isDue, isTakenFromAccount, newId, nextDue, parseMonth, repeatOf, runningSchedules, sameRepeat, toMinor,
   type CellItem, type Household, type ItemStatus, type MonthKey, type RepeatChoice, type Repeating, type Row, type Tables,
 } from '@/model'
 import {
-  clearCell, endRecurringFrom, itemsFromCurrent, reopenMonth, saveRowMonth, setCellItems, setCellValue, skipRecurringMonth,
+  clearCell, derivedRowReason, endRecurringFrom, fetchRatesFor, itemsFromCurrent, reopenMonth, saveRowMonth, setCellItems, setCellValue, skipRecurringMonth,
   type EditScope, type RuleTarget,
 } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
@@ -49,7 +50,8 @@ const STATUS_LABEL: Record<ItemStatus, string> = { projected: 'Estimate', commit
  * how it repeats. A single amount stays every month, is for this month only, or goes on a schedule; every item says
  * for itself how it repeats, and the row's schedules that land in other months are listed too, so they can be
  * changed from any month. A row that can carry a rule (pocket money, the transfer that fills an account) starts with
- * "How the amount is set": a fixed amount shows these fields, a percentage or the rest shows the rule's.
+ * "How the amount is set": a fixed amount shows these fields, a percentage or the rest shows the rule's. The currency
+ * the row is typed in is chosen beside the amount: it is the row's, for every month, and is saved with the amount.
  */
 export function CellEditor({ tables, engine, household, row, month, startRule, onClose }: Props) {
   const store = useStore()
@@ -64,8 +66,17 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   const showRuleFields = !!facts && !facts.error && (ruleKind !== 'fixed' || worked)
   /** A rule fills this row's other months, so an amount typed here is for this month alone. */
   const ruleRuns = !!facts && (facts.current !== 'fixed' || facts.wasShareOfTotal)
+  const base = household.baseCurrency
+  const rowCurrency = row.currency ?? base
   // the engine's currency: a follower takes its target's
-  const currency = cell?.currency ?? row.currency ?? household.baseCurrency
+  const stored = cell?.currency ?? rowCurrency
+  /** The currency chosen here, until it is saved with the amount. */
+  const [picked, setPicked] = useState<string | null>(null)
+  const currency = picked ?? stored
+  /** A row that types its own amounts says here which currency they are in; a month that carries another one is left alone. */
+  const canPickCurrency = stored === rowCurrency && !row.followsRowId && !derivedRowReason(row, household.closingRule)
+  /** What the save hands on: the row's new currency (null for the household's own), or nothing when it did not change. */
+  const newCurrency = picked != null && picked !== rowCurrency ? (picked === base ? null : picked) : undefined
   const locale = household.locale
   /** Rows driven by a schedule: no carry-forward, no single amount; the posted items are the content. */
   const isRecurringRow = engine.recurringRowIds.includes(row.id)
@@ -77,7 +88,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   // "How sure" on a single amount is stored as one unlabelled item; keep showing it as a single amount
   const soloItem = cell?.source === 'items' && cell.items.length === 1 && cell.items[0].kind === 'normal' && !cell.items[0].label && !cell.items[0].recurringItemId && !cell.items[0].skipped ? cell.items[0] : null
   const [mode, setMode] = useState<Mode>(isRecurringRow || (cell?.source === 'items' && !soloItem) ? 'items' : 'value')
-  const [text, setText] = useState(() => amountToInput(cell?.value ?? 0, currency, locale))
+  const [text, setText] = useState(() => amountToInput(cell?.value ?? 0, stored, locale))
   // money taken out of an account is a one-off unless you say otherwise; any other row remembers the last choice
   const oneOff = isTakenFromAccount(row)
   const [scope, setScope] = useState<EditScope>(() => (oneOff ? 'this-month' : readPref<EditScope>('editScope', 'from-now-on')))
@@ -139,6 +150,15 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
 
   const itemsTotal = items.filter((i) => !i.skipped).reduce((s, i) => s + (i.kind === 'carry' ? (cell?.items.find((x) => x.id === i.id)?.effectiveAmount ?? prevValue()) : Number.isFinite(i.amount) ? i.amount : 0), 0)
 
+  /** Another currency for the row: the digits on screen stay and are read in it. */
+  function pickCurrency(next: string) {
+    setItems((list) => list.map((it) => (it.kind === 'normal' && Number.isFinite(it.amount) ? { ...it, amount: toMinor(fromMinor(it.amount, currency), next) } : it)))
+    setPicked(next)
+    setError(null)
+    // a currency the household has no rate for yet: ask now, so the line under the amount can say what it is worth
+    if (next !== base && !tables.fxRates.some((r) => r.pair === `${base}/${next}`)) void fetchRatesFor(store, [next]).catch(() => undefined)
+  }
+
   function prevValue(): number {
     const idx = engine.months.indexOf(month)
     if (idx <= 0) return 0
@@ -174,11 +194,11 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
       if (minor === 0) return setError('Type the amount that repeats.')
       if (rhythm.kind === 'months' && rhythm.months.length === 0) return setError('Pick at least one month.')
       // the amount becomes the row's schedule, named after the row; it lands this month only if its rhythm does
-      return void run(() => saveRowMonth(store, row.id, month, { items: [single], repeats: { [single.id]: rhythm }, scope: 'from-now-on' }))
+      return void run(() => saveRowMonth(store, row.id, month, { items: [single], repeats: { [single.id]: rhythm }, scope: 'from-now-on', currency: newCurrency }))
     }
     // A plain value takes the row's defaults; any other certainty or source is stored as one unlabelled item.
-    if (status === 'default' && fundedBy === row.defaultFundedBy) return void run(() => setCellValue(store, row.id, month, minor, saveScope))
-    void run(() => setCellItems(store, row.id, month, [single], saveScope))
+    if (status === 'default' && fundedBy === row.defaultFundedBy) return void run(() => setCellValue(store, row.id, month, minor, saveScope, newCurrency))
+    void run(() => setCellItems(store, row.id, month, [single], saveScope, newCurrency))
   }
 
   /** A scheduled item whose amount or funding was edited here. */
@@ -204,7 +224,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
       if (draft.repeat?.kind === 'months' && draft.repeat.months.length === 0) return setError(`Pick at least one month for "${s.name}".`)
       changes[s.id] = { amount, repeat: draft.repeat }
     }
-    void run(() => saveRowMonth(store, row.id, month, { items, repeats, applyTo, others: changes, scope: isRecurringRow ? 'this-month' : saveScope }))
+    void run(() => saveRowMonth(store, row.id, month, { items, repeats, applyTo, others: changes, scope: isRecurringRow ? 'this-month' : saveScope, currency: newCurrency }))
   }
 
   function updateItem(id: string, patch: Partial<CellItem>) {
@@ -259,13 +279,25 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
     cell?.source === 'items' ? (soloItem ? 'Set in this month' : isRecurringRow ? 'On a schedule' : `${cell.items.length} item${cell.items.length === 1 ? '' : 's'}`) :
     cell?.source === 'empty' ? (isRecurringRow ? 'Nothing lands this month' : 'Nothing yet') : ''
 
+  // the codes alone: the field is narrow, and the household's own comes first
+  const currencySelect = (
+    <NativeSelect aria-label={`Currency of ${row.name}`} title="The currency this row is typed in" className="w-24 shrink-0" value={currency} onChange={(e) => pickCurrency(e.target.value)}>
+      {currencyChoices(base, currency).map((c) => <option key={c} value={c}>{c}</option>)}
+    </NativeSelect>
+  )
+  const currencyNote = newCurrency !== undefined && (
+    <p className="text-xs text-muted-foreground" data-testid="currency-note">
+      Every month of this row is in {currency} once saved; numbers already typed keep their digits.
+    </p>
+  )
+
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-xl" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            {sourceText}{cell ? ` · currently ${formatAmount(cell.value, currency, locale)}` : ''}
+            {sourceText}{cell ? ` · currently ${formatAmount(cell.value, stored, locale)}` : ''}
           </DialogDescription>
         </DialogHeader>
 
@@ -293,7 +325,11 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
               <div className="space-y-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="cell-amount">Amount in {currency}</Label>
-                  <Input id="cell-amount" autoFocus inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') saveValue() }} placeholder="0" />
+                  <div className="flex gap-2">
+                    <Input id="cell-amount" className="min-w-0 flex-1" autoFocus inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') saveValue() }} placeholder="0" />
+                    {canPickCurrency && currencySelect}
+                  </div>
+                  {currencyNote}
                   {currency !== household.baseCurrency && <RateLine tables={tables} household={household} month={month} currency={currency} amount={parseAmount(text, currency, locale) ?? 0} />}
                 </div>
                 {ruleRuns ? (
@@ -345,6 +381,12 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
               </div>
             ) : (
               <div className="space-y-2">
+                {canPickCurrency && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 text-sm"><span className="font-medium">Amounts in</span>{currencySelect}</div>
+                    {currencyNote}
+                  </div>
+                )}
                 {items.length === 0 && elsewhere.length === 0 && <p className="text-sm text-muted-foreground">No items yet.</p>}
                 {items.map((it) => {
                   if (it.kind === 'carry') {
