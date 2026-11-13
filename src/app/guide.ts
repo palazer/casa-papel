@@ -298,14 +298,14 @@ export const GUIDE: GuideTopic[] = [
     ],
     steps: [
       'Row menu → "Currency…" → "Amounts in this row are in" (the first entry, "EUR (household currency)", is the default) → "Save".',
-      'Open a cell of that row; under the amount, "Change this month\'s rate…" → type after "1 USD =" → "Save rate". One rate per currency per month, for every row in it.',
+      'Open a cell of that row; under the amount, "Change this month\'s rate…" → type after "1 USD =" → "Save rate". One rate per currency per month, for every row and balance in it. The Statement shows the same line under its toolbar for every other currency the month uses.',
       '"Use the ECB rate again" drops a manual rate for the published one.',
       'An account\'s currency is under "More options" in its dialog. Household → "Currency rates" → "Fetch ECB rates" fills the months since the last fetch, and is the way back after being offline.',
       '"Month rate": "First business day of the month", "Last business day of the month" or "Average over the month".',
       '"Future months": "Change by a fixed % each month" with "Change per month (%)", or "Repeat the average change of the last year"; "Use for EUR/USD" keeps a rule for one pair, "Back to the default" clears it.',
       'Type over a month in the "1 EUR in USD" column to set it by hand; empty it to go back.',
     ],
-    tips: ['row.currency', 'cell.rate', 'balance.inBase'],
+    tips: ['row.currency', 'cell.rate', 'statement.rate', 'balance.inBase'],
     open: 'household',
   },
   {

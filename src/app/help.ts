@@ -33,6 +33,7 @@ export const HELP = {
   'row.ruleFrom': { title: 'Counts from', text: 'A rule counts from this month on. The months before it keep the amounts they showed, so changing a percentage never rewrites the past. Amounts typed for this account from this month on are replaced by the rule.' },
   'row.automatic': { title: 'Automatic', text: 'The app works this amount out from the rest of the month or from a rule, so there is nothing to type. Tick it once the money has actually moved; the amount keeps following the plan.' },
   'row.currency': { title: 'Currency of this row', text: 'Amounts in this row are typed in this currency and shown in the household currency beneath, converted at each month\'s rate. Numbers already typed keep their digits and are read in the new currency; the rates live under Household.' },
+  'statement.rate': { title: 'This month\'s rate', text: 'What one unit of another currency is worth in the month on screen: every row and balance in that currency is counted at it. An ECB rate is the European Central Bank\'s, a manual rate is yours, projected and carried rates are estimates. "Change this month\'s rate…" sets yours for this month alone. A closed month shows its rate and changes none.' },
   'statement.progress': { title: 'Progress', text: 'Every line with an amount counts once; an itemized line counts each item. Still to pay adds up the open spending and transfers, to come in the open income, both in your base currency. "Close month" locks the month and counts all of it as done.' },
 
   // Balances
