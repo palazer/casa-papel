@@ -532,8 +532,12 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   `Virtual account: <name>`. Current accounts are the month's income and are not listed; a card or a loan is not a
   source. What was set to the old `Savings balance` reads under the name of the account it has always come out of
   (the first savings account) and is rewritten only when another entry is picked; an archived account stays listed
-  only while the row or an item still names it. The account that pays falls by the amount (one kept in another
-  currency by exactly what was typed in that currency, otherwise at the month's rate) and the month's leftover does not.
+  only while the row or an item still names it. The account that pays falls by the amount and the month's leftover does not.
+  **An account kept in another currency is moved in its own currency.** Whatever goes into or comes out of a savings
+  account, an investment account, a card, a loan or an other asset counts as typed when the row is in the account's
+  currency, and at the month's rate otherwise (the rest of the month and a percentage rule are household-currency
+  amounts, so they arrive converted). A virtual account is always in the household currency, also inside such an
+  account: the account moves by the converted amount, the virtual account by the household-currency one.
   The cell editor's rate line (`src/features/grid/RateLine.tsx`) sits under an amount in another currency:
   `≈ €3,120.00 · 1 EUR = 1.084 USD · [ECB] 2 Nov 2026` with the table's chip tones, a ghost `xs` "Change this month's
   rate…" that reveals an inline input (one rate per currency per month), and "Use the ECB rate again" while the rate is

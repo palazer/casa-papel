@@ -49,10 +49,10 @@ export interface CellResult {
   /** Base-currency split of an expense by where the cash comes from. */
   funding: Funding
   /**
-   * The parts that come straight out of a named account, in the row's own currency (`currency`): an account kept in
-   * that currency falls by exactly what was typed, not by the amount converted to the base currency and back.
+   * The same split in the row's own currency (`currency`), before conversion: an account kept in that currency moves
+   * by exactly what was typed, not by the amount converted to the base currency and back.
    */
-  paidFrom: Record<string, Money>
+  fundingOwn: Funding
   missingRate: boolean
   /** The base-currency value used a projected (drifted) rate. */
   rateProjected: boolean
@@ -76,8 +76,11 @@ export interface MonthTotals {
   /** Spending that comes straight out of a named account (base currency), in all and per account. */
   accountFunded: Money
   accountFundedByAccount: Record<string, Money>
-  /** The same per account as it was typed: account → currency → amount in that currency. */
-  accountFundedOwn: Record<string, Record<string, Money>>
+  /**
+   * What each source other than the month's income paid, as it was typed: source → currency → amount in that
+   * currency. The source is written as it is stored: `savings`, `pool:<id>`, `account:<id>`.
+   */
+  fundedOwn: Record<string, Record<string, Money>>
   allocations: Money
   allocationsByPool: Record<string, Money>
   toInvestment: Money

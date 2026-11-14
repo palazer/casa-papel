@@ -295,6 +295,7 @@ export const GUIDE: GuideTopic[] = [
     what: [
       '"Currency…" in the row menu sets a row\'s currency. The cell keeps the typed amount and shows "≈ €…" beneath; the row\'s name carries the code. The cell editor adds a rate line, "≈ €… · 1 EUR = 1.08 USD · ECB · 2 Nov 2026", with a chip that says where the rate came from: "ECB", "manual", "projected", "carried" or "missing".',
       'A currency gets its rates from the European Central Bank by itself the first time it is used (only currency codes and dates leave the device). They live under Household → "Currency rates": "Fetch ECB rates" asks again, "Month rate" picks the day of the month, "Future months" how the rate drifts. Rates are always spelled with both codes in the direction whose number is at least 1.',
+      'An account can be kept in another currency too. Its balance stays in that currency, with what it is worth in EUR beside it. Money that goes into it or comes out of it is converted at the month\'s rate, and an amount typed in the account\'s own currency arrives exactly as typed. Virtual accounts are always in EUR, also inside such an account.',
     ],
     steps: [
       'Press a row to open its dialog and pick the currency beside the amount: it is the row\'s, for every month, and is saved with the amount. The same choice is in the row menu → "Currency…" → "Amounts in this row are in" (the first entry, "EUR (household currency)", is the default) → "Save".',

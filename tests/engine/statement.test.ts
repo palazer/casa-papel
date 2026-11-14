@@ -666,6 +666,38 @@ describe('expenses that come straight out of an account', () => {
     expectSound(t, months)
   })
 
+  it('balances with a savings account kept in another currency: what moves it arrives converted', () => {
+    const dollars = account({ name: 'Dollar savings', type: 'savings', currency: 'USD', openingBalance: 1000_00 })
+    const travel = pool({ name: 'Travel', accountId: dollars.id, openingBalance: 100_00 })
+    const salary = row({ name: 'Salary', section: 'income', order: 'a0' })
+    const boiler = row({ name: 'Boiler', section: 'expense', order: 'b0' })
+    const trips = row({ name: 'Trips', section: 'expense', defaultFundedBy: poolRef(travel.id), order: 'b1' })
+    const toSavings = row({ name: 'To savings', section: 'transfer', kind: 'to-savings', accountId: dollars.id, order: 'c0' })
+    const fill = row({ name: 'To Travel', section: 'transfer', kind: 'pool-allocation', accountId: dollars.id, order: 'c1' })
+    const repair = row({ name: 'Car repair', section: 'transfer', kind: 'from-savings', accountId: dollars.id, order: 'c2' })
+    travel.allocationRowId = fill.id
+    const t = tables({
+      household: [household()], accounts: [dollars], pools: [travel], rows: [salary, boiler, trips, toSavings, fill, repair],
+      fxRates: [fx('USD/EUR', '2026-01', 0.9), fx('USD/EUR', '2026-02', 0.8), fx('USD/EUR', '2026-03', 0.95)],
+      cells: [
+        cellValue(salary.id, '2026-01', 3000_00), cellValue(fill.id, '2026-01', 90_00), cellValue(trips.id, '2026-01', 45_00),
+        cellItems(boiler.id, '2026-01', [{ label: 'Boiler', amount: 180_00, fundedBy: 'savings' }, { label: 'Fitting', amount: 60_00 }]),
+        cellValue(boiler.id, '2026-02', 0), cellValue(repair.id, '2026-02', 400_00), cellValue(repair.id, '2026-03', 0),
+      ],
+    })
+    const { s, out } = statementFor(t, '2026-01')
+    // the rest of January: 3,000 − 60 (the fitting) − 90 set aside = 2,850 euros, which are 3,166.67 dollars
+    expect(out.totals['2026-01'].toSavings).toBe(2850_00)
+    // + 100 dollars set aside − 50 for the trip − 200 for the boiler
+    const balance = 1000_00 + 3166_67 + 100_00 - 50_00 - 200_00
+    expect(find(s, `acc:${dollars.id}`)).toMatchObject({ amount: Math.round(balance * 0.9), native: { amount: balance, currency: 'USD' } })
+    // the virtual account inside it is in euros and is not touched by the rate
+    expect(find(s, `pool:${travel.id}`)).toMatchObject({ amount: 100_00 + 90_00 - 45_00 })
+    // February: 400 euros taken out by hand are 500 dollars at that month's rate
+    expect(out.accounts[dollars.id].months['2026-02'].outflow).toBe(500_00 + Math.round(45_00 / 0.8))
+    expectSound(t, months)
+  })
+
   it('counts the old "Savings balance" with the account it has always come out of', () => {
     const w = world()
     const cells = [

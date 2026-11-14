@@ -69,7 +69,7 @@ describe('engine: an expense that comes out of a named account', () => {
       tables: tables({ household: [household()], accounts: [...s.accounts, dollars], rows: [...s.rows, trip], cells, fxRates: [fx('USD/EUR', '2026-01', 0.9137)] }),
       months: ['2026-01'],
     })
-    expect(out.totals['2026-01'].accountFundedOwn).toEqual({ [dollars.id]: { USD: 444_44 } })
+    expect(out.totals['2026-01'].fundedOwn).toEqual({ [accountRef(dollars.id)]: { USD: 444_44 } })
     expect(out.totals['2026-01'].accountFundedByAccount[dollars.id]).toBe(out.cells[`${trip.id}|2026-01`].valueBase)
     expect(out.accounts[dollars.id].months['2026-01']).toMatchObject({ balance: 2000_00 - 444_44, outflow: 444_44 })
   })

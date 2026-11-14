@@ -415,3 +415,43 @@ test('"Belongs to" gives a row to one adult, and Per person under the Statement 
   await expect(ownSpending).toContainText('€810.00')
   await expect(page.getByText('Who pays what')).toHaveCount(0)
 })
+
+test('a savings account kept in dollars: what goes into it arrives converted at the month\'s rate', async ({ page }) => {
+  await page.route('https://api.frankfurter.dev/**', (r) => r.fulfill({ json: { rates: { '2026-10-01': { USD: 1.25 }, '2026-11-02': { USD: 1.25 } } } }))
+  await loadDemo(page)
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
+  await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
+  const dlg = page.getByRole('dialog')
+  const assets = page.getByRole('region', { name: 'Assets' })
+  const moneyOut = page.getByRole('region', { name: 'Money out' })
+
+  // a savings account in dollars that holds 1,000 of them, and gets 100 euros a month from November on
+  await assets.getByRole('button', { name: 'Add account' }).click()
+  await dlg.getByLabel('Name', { exact: true }).fill('Dollar savings')
+  await dlg.getByLabel('Type').selectOption('savings')
+  await dlg.getByRole('button', { name: /^More options/ }).click()
+  await dlg.getByLabel('Currency').selectOption('USD')
+  await dlg.getByLabel(/^Holds at the start of .*\(USD\)$/).fill('1000')
+  await dlg.getByRole('button', { name: 'Save' }).click()
+  await expect(dlg.getByRole('heading', { name: 'How much goes to Dollar savings?' })).toBeVisible()
+  await dlg.getByLabel('Amount per month in EUR').fill('100')
+  await dlg.getByRole('button', { name: 'Save' }).click()
+  await expect(dlg).toBeHidden()
+
+  // 100 euros left the month; at 1 EUR = 1.25 USD they are 125 dollars: the account holds 1,125 dollars, worth 900 euros
+  await expect(page.getByTestId('rate-chip')).toHaveText('1 EUR = 1.25 USD')
+  await expect(moneyOut.getByRole('button', { name: 'To Dollar savings: €100.00' })).toBeVisible()
+  const line = assets.locator('[data-line^="acc:"]').filter({ hasText: 'Dollar savings' })
+  await expect(line).toContainText('1,125.00')
+  await expect(line).toContainText('€900.00')
+  await page.screenshot({ path: 'e2e/output/statement-dollar-savings.png', fullPage: true })
+
+  // typed in the account's own currency, the amount arrives as typed: 200 dollars are 200 dollars
+  await moneyOut.getByRole('button', { name: 'To Dollar savings: €100.00' }).click()
+  await dlg.getByLabel('Currency of To Dollar savings').selectOption('USD')
+  await dlg.getByLabel('Amount in USD').fill('200')
+  await dlg.getByRole('button', { name: 'Save' }).click()
+  await expect(dlg).toBeHidden()
+  await expect(line).toContainText('1,200.00')
+  await expect(line).toContainText('€960.00')
+})
