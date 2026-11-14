@@ -69,6 +69,54 @@ test.describe('shell', () => {
     await expect(page.getByRole('button', { name: /^Groceries Nov 2026: -€700\.00/ })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Redo' })).toBeEnabled()
   })
+
+  test('on the Statement the month, its controls and the count of the month stay at the top while the page scrolls', async ({ page }) => {
+    await page.goto('?demo=1')
+    await page.getByRole('button', { name: 'Load the demo household' }).click()
+    const title = page.getByRole('heading', { level: 1, name: 'Statement' })
+    const month = page.getByRole('heading', { level: 2, name: 'November 2026' })
+    const bar = page.locator('[data-sticky-bar]')
+    await expect(title).toBeVisible()
+    await expect(month).toBeVisible()
+    // nothing scrolled: the bar stands in its place under the name of the screen, without a line under it
+    await expect(bar).toHaveAttribute('data-stuck', 'false')
+    await expect(bar).toHaveCSS('box-shadow', 'none')
+    await page.getByRole('button', { name: 'Expand all' }).click()
+
+    // scrolled down: the name of the screen is gone; the month, its buttons and the line that counts the month are still there
+    await page.evaluate(() => window.scrollTo(0, 500))
+    await expect(bar).toHaveAttribute('data-stuck', 'true')
+    await expect(title).not.toBeInViewport()
+    await expect(month).toBeInViewport()
+    await expect(page.getByRole('button', { name: 'Close month' })).toBeInViewport()
+    await expect(page.getByTestId('progress')).toBeInViewport()
+    const box = (await bar.boundingBox())!
+    expect(box.y).toBe(0)
+    // it is on the page's ground from the rail to the window's edge, with a hairline under it: nothing shows through or beside it
+    expect(box.x).toBe(72)
+    expect(box.x + box.width).toBe(1440)
+    await expect(bar).not.toHaveCSS('box-shadow', 'none')
+    expect(await bar.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(await page.evaluate(() => getComputedStyle(document.body).backgroundColor))
+    await page.screenshot({ path: 'e2e/output/statement-month-bar.png' })
+
+    // the month is changed from there, and the page stays where it was
+    await page.getByRole('button', { name: 'Next month' }).click()
+    await expect(page.getByRole('heading', { level: 2, name: 'December 2026' })).toBeInViewport()
+    await page.getByRole('button', { name: 'Previous month' }).click()
+    await expect(month).toBeInViewport()
+
+    // a line the page goes to stops below the bar, not under it
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+    await page.getByRole('region', { name: 'Assets' }).getByRole('button', { name: /^Filled by To investments: go there/ }).click()
+    const row = page.getByRole('region', { name: 'Money out' }).locator('[data-line]').filter({ hasText: 'To investments' }).first()
+    await expect(row).toHaveAttribute('data-marked', 'true')
+    await expect(async () => {
+      const line = (await row.boundingBox())!
+      const top = (await bar.boundingBox())!
+      expect(line.y).toBeGreaterThanOrEqual(top.y + top.height)
+      expect(line.y + line.height).toBeLessThanOrEqual(900)
+    }).toPass()
+  })
 })
 
 test.describe('shell on a phone', () => {
@@ -107,5 +155,15 @@ test.describe('shell on a phone', () => {
     await tabs.getByRole('link', { name: 'Settings' }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Data' })).toBeVisible()
     await page.screenshot({ path: 'e2e/output/shell-settings-phone.png', fullPage: true })
+  })
+
+  test('the Statement\'s toolbar scrolls away with the page: on a phone it takes three lines', async ({ page }) => {
+    await page.goto('?demo=1')
+    await page.getByRole('button', { name: 'Load the demo household' }).click()
+    const month = page.getByRole('heading', { level: 2, name: 'November 2026' })
+    await expect(month).toBeInViewport()
+    await page.evaluate(() => window.scrollTo(0, 600))
+    await expect(month).not.toBeInViewport()
+    await expect(page.locator('[data-sticky-bar]')).toHaveAttribute('data-stuck', 'false')
   })
 })

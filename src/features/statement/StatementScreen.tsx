@@ -75,8 +75,9 @@ function reveal(
     const el = document.querySelector<HTMLElement>(`[data-line="${CSS.escape(ids[0])}"]`)
     if (!el) return
     const box = el.getBoundingClientRect()
-    // the phone's tab bar covers the foot of the window
-    const inView = box.top >= 8 && box.bottom <= window.innerHeight - 80
+    // the bar with the month covers the top of the window while it is stuck there, the phone's tab bar the foot
+    const bar = document.querySelector<HTMLElement>('[data-sticky-bar][data-stuck="true"]')?.getBoundingClientRect().bottom ?? 0
+    const inView = box.top >= bar + 8 && box.bottom <= window.innerHeight - 80
     if (!gentle || !inView) el.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
     if (!gentle) el.querySelector<HTMLElement>('button')?.focus({ preventScroll: true })
   })
@@ -557,7 +558,19 @@ export function StatementScreen() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Statement" subline={<>{household.name}{statement.closed && <> · <Chip tone="zinc"><Lock aria-hidden /> closed</Chip></>}</>}>
+      {/* The month and its controls stay in view while the page scrolls, with the line that counts the month under
+          them. While a household is being set up the guide holds the top of the window instead. */}
+      <PageHeader
+        title="Statement" subline={<>{household.name}{statement.closed && <> · <Chip tone="zinc"><Lock aria-hidden /> closed</Chip></>}</>}
+        sticky={!settingUp}
+        below={(statement.closed || progress.total > 0) && (
+          // How much of the month is ticked and what is still open; a month with nothing in it has nothing to count
+          <p role="status" className="flex items-center gap-1 text-xs text-muted-foreground" data-testid="progress">
+            <span>{progressText(progress, statement.closed, ccy, locale)}</span>
+            <InfoTip help="statement.progress" />
+          </p>
+        )}
+      >
         <MonthPicker months={months} month={m} onChange={setMonth} locale={locale} onAddYear={() => act(() => addPlanYear(store))} />
         <Button size="xs" variant="outline" onClick={() => setAll(true)}>Expand all</Button>
         <Button size="xs" variant="outline" onClick={() => setAll(false)}>Collapse all</Button>
@@ -581,14 +594,6 @@ export function StatementScreen() {
         {error && <p role="alert" className="basis-full text-destructive">{error}</p>}
         {statement.warnings.map((w) => <p key={w} className="basis-full text-amber-700">{w}</p>)}
       </PageHeader>
-
-      {/* How much of the month is ticked and what is still open; a month with nothing in it has nothing to count */}
-      {(statement.closed || progress.total > 0) && (
-        <p role="status" className="flex items-center gap-1 text-xs text-muted-foreground" data-testid="progress">
-          <span>{progressText(progress, statement.closed, ccy, locale)}</span>
-          <InfoTip help="statement.progress" />
-        </p>
-      )}
 
       {settingUp && <SetupGuide steps={steps} current={step} action={stepAction} onStep={onStep} onDone={leaveSetup} />}
       <StatementBand title="The month" help="statement.month" band={statement.flow} ctx={flowCtx} totals={['Total in', 'Total out']} locked={[lockedSide('in'), lockedSide('out')]} />

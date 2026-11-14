@@ -72,6 +72,15 @@ Statement frame  full width, space-y-4: the progress line, then dense islands, o
   The toolbar holds Undo and Redo first, then the controls (`MonthPicker`, Close month, Add <year>), then the
   sync cloud. Errors and warnings are `basis-full` lines: destructive for an action that failed, `text-amber-700` for a
   warning the engine raises.
+  **On a long page the toolbar stays in view** (`sticky`, the Statement): from `md` up the toolbar and the line that
+  belongs to it (`below`: the Statement's progress line, 6 px under the controls) are one bar that sticks to the top
+  of the window, so the month and its controls are always there; the H1 and its subline scroll away. The bar is on
+  the page's ground from the rail to the window's edge (`bg-background`, `-mx-6 px-6 py-2`, `z-30`), and a hairline
+  under it (`shadow-[0_1px_0_var(--color-border)]`) shows only while it is stuck (`data-stuck`, from a mark just
+  above it that an `IntersectionObserver` watches). The header makes no box then (`md:contents`), so the bar sticks
+  for the length of the page. A line the page goes to stops below the bar, and so does a control that takes the
+  focus (`scroll-padding-top` in `index.css`). On a phone the toolbar takes three lines and scrolls with the page.
+  While a household is being set up the setup guide holds the top of the window, and the bar is not sticky.
 - **Welcome** (`src/features/home/HomeScreen.tsx`): the one screen without a toolbar (its header carries a `role="status"`
   line for the account dialog's outcome and a `role="alert"` line for an import that failed). One air island "Welcome to
   Casa Papel" lists the ways in as rows: a `sm` button (lime on the recommended path only, `outline` otherwise) and one

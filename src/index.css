@@ -214,4 +214,11 @@
   html {
     @apply font-sans;
     }
+  /* Under a bar that stays at the top of the window (PageHeader `sticky`), what the browser scrolls to by itself
+     (a control that takes the focus) stops below the bar, not under it. */
+  @media (min-width: 48rem) {
+    html:has([data-sticky-bar]) {
+      scroll-padding-top: 5.5rem;
+      }
+  }
 }
