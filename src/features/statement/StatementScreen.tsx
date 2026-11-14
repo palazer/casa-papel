@@ -15,7 +15,7 @@ import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useE
 import { useStoreVersion } from '@/app/useStoreVersion'
 import { buildStatement, cellKey, currentAccountsIn, type GoalProgress, type Statement, type StatementLine, type StatementSide } from '@/engine'
 import { isPocketRow, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type MonthKey, type Row, type Section } from '@/model'
-import { accountSuggestions, addPayOffRow, addPlanYear, closeMonth, removeIfFree, reopenMonth, ruleRowOf, setCellDone, setDerivedDone, setItemStatus, setupFocus, setupSteps, shownRowSuggestions, stepSuggestions, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupSide, type SetupStepKey } from '@/store'
+import { accountSuggestions, addPayOffRow, addPlanYear, closeMonth, moveAccount, movePool, removeIfFree, reopenMonth, ruleRowOf, setCellDone, setDerivedDone, setItemStatus, setupFocus, setupSteps, shownRowSuggestions, stepSuggestions, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupSide, type SetupStepKey } from '@/store'
 import { GoalDialog } from '@/features/goals/GoalDialog'
 import { goalStatusLine } from '@/features/goals/goalText'
 import { AddRowInline } from '@/features/grid/AddRowInline'
@@ -27,6 +27,7 @@ import { HouseholdAccountDialog } from '@/features/household/HouseholdAccountDia
 import { PoolDialog } from '@/features/household/PoolsCard'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
 import { RuleDialog } from '@/features/rules/RuleDialog'
+import { AccountMenu } from './AccountMenu'
 import { AddCategoryInline } from './AddCategoryInline'
 import { CategoryMenu } from './CategoryMenu'
 import { EstimateDialog } from './EstimateDialog'
@@ -448,10 +449,22 @@ export function StatementScreen() {
     const row = engine!.rows.find((r) => r.id === rowId)
     return row ? <RowMenu row={row} tables={tables!} household={household!} onError={setError} onDeleted={onDeleted} onRule={() => setEditor({ rowId })} triggerClassName={LINE_MENU} /> : null
   }
-  const editButton = (label: string, onClick: () => void) => (
-    <Button variant="ghost" size="icon" className={LINE_MENU} aria-label={`Edit ${label}`} title="Edit" onClick={onClick}><MoreHorizontal /></Button>
-  )
-  /** The "…" after any other line's name: a category's menu, or the way into an account's or a virtual account's dialog. */
+  /**
+   * The lines that stand beside an account or a virtual account under the same heading, in the order on screen: what
+   * "Move up" and "Move down" move it among. Accounts stand beside the accounts of their heading, virtual accounts
+   * beside those of their savings account.
+   */
+  const beside = new Map<string, StatementLine[]>()
+  const noteBeside = (lines: StatementLine[]) => {
+    for (const l of lines) {
+      for (const kids of [l.children.filter((c) => c.kind === 'account' && !!c.accountId), l.children.filter((c) => c.kind === 'pool' && !!c.poolId)]) {
+        for (const k of kids) beside.set(k.id, kids)
+      }
+      noteBeside(l.children)
+    }
+  }
+  noteBeside([...statement.position.left.lines, ...statement.position.right.lines])
+  /** The "…" after any other line's name: a category's menu, an account's or a virtual account's, each with the way into its dialog. */
   function lineMenu(line: StatementLine): ReactNode {
     if (statement!.closed) return null
     if (line.kind === 'category' && line.id.startsWith('cat:')) {
@@ -464,13 +477,31 @@ export function StatementScreen() {
         />
       ) : null
     }
-    if (line.kind === 'pool' && line.poolId) return editButton(line.label, () => setPoolEdit(line.poolId!))
-    if (line.kind === 'account' && line.accountId) return editButton(line.label, () => setAccountEdit(line.accountId!))
-    // the calculated line stands for the current accounts: one opens straight away, several are listed
+    const removeLabel = settingUp ? 'Delete' : 'Archive or delete…'
+    if (line.kind === 'pool' && line.poolId) {
+      const id = line.poolId
+      const among = (beside.get(line.id) ?? [line]).map((l) => l.poolId!)
+      return (
+        <AccountMenu
+          what="Virtual account" name={line.label} at={among.indexOf(id)} count={among.length} removeLabel={removeLabel} triggerClassName={LINE_MENU}
+          onEdit={() => setPoolEdit(id)} onMove={(direction) => act(() => movePool(store, id, direction, among))} onRemove={() => removeFrom({ kind: 'pool', id })}
+        />
+      )
+    }
+    if (line.kind === 'account' && line.accountId) {
+      const id = line.accountId
+      const among = (beside.get(line.id) ?? [line]).map((l) => l.accountId!)
+      return (
+        <AccountMenu
+          what="Account" name={line.label} at={among.indexOf(id)} count={among.length} removeLabel={removeLabel} triggerClassName={LINE_MENU}
+          onEdit={() => setAccountEdit(id)} onMove={(direction) => act(() => moveAccount(store, id, direction, among))} onRemove={() => removeFrom({ kind: 'account', id })}
+        />
+      )
+    }
+    // the calculated line stands for the current accounts: its menu lists them, one or several
     if (line.id === 'main') {
       const current = (engine!.main?.accountIds ?? []).map((id) => tables!.accounts.find((a) => a.id === id && !a.deletedAt)).filter((a): a is Account => !!a)
       if (current.length === 0) return null
-      if (current.length === 1) return editButton(current[0].name, () => setAccountEdit(current[0].id))
       return (
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className={LINE_MENU} aria-label="Edit a current account" />}><MoreHorizontal /></DropdownMenuTrigger>

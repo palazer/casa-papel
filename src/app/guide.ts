@@ -244,7 +244,7 @@ export const GUIDE: GuideTopic[] = [
       'Statement → "Debts and net worth" → "Add a card or loan" (or Household → "Accounts" → "Add account"): "Name", "Type" ("Loan" or "Credit card") and "Owed at the start of <Month>", what you owed when that month began.',
       'For a card answer "What do you record for this card?". "Add the row that pays it off" is ticked: "Save" makes the loan or card and its payment row together, and on the Statement the row\'s dialog opens for the amount.',
       'Point spending rows at a card: row menu → "Paid from…" → the card (in the demo, "Subscriptions" is paid from "Credit card").',
-      'A payment row can come later, or first. Later: the "…" of the loan or card → "Add the row that pays it off". First: Statement → "To savings, investments and debts" → "Add row" → "Pays off a loan or card" → the account, or "New loan…" to make both together; a category\'s "Add row to Transport" offers the same, and the page then shows where the line landed. In the Grid it is Expenses → "Add row" → "Pays off a loan or card", and Transfers → "Pays off a credit card" for a card whose purchases are expense rows. A vehicle\'s or company\'s suggestions offer a loan row too, with "Add a loan…" while there is none.',
+      'A payment row can come later, or first. Later: the "…" of the loan or card → "Edit…" → "Add the row that pays it off". First: Statement → "To savings, investments and debts" → "Add row" → "Pays off a loan or card" → the account, or "New loan…" to make both together; a category\'s "Add row to Transport" offers the same, and the page then shows where the line landed. In the Grid it is Expenses → "Add row" → "Pays off a loan or card", and Transfers → "Pays off a credit card" for a card whose purchases are expense rows. A vehicle\'s or company\'s suggestions offer a loan row too, with "Add a loan…" while there is none.',
       'Row menu → "Pays off…" re-points a payment row at another loan or card.',
       'Statement → "Debts and net worth" → press the balance, or Grid → "<Name> · owed" or "<Name> · outstanding" in a month → "Real balance in EUR" to correct the balance.',
     ],
@@ -317,7 +317,7 @@ export const GUIDE: GuideTopic[] = [
       'The dialog lists "Deleting removes", "Also changes" and "Resolve these first" before you decide. Every removal is one undoable step, and archived things wait under Household with "Restore".',
     ],
     steps: [
-      'Row menu (the "…" beside a row\'s name in the Grid and on the Statement) → "Archive or delete…". On the Statement a category, an account and a virtual account have a "…" too.',
+      'Row menu (the "…" beside a row\'s name in the Grid and on the Statement) → "Archive or delete…". On the Statement a category, an account and a virtual account have a "…" too: an account\'s holds "Edit…", "Move up", "Move down" and "Archive or delete…", and moves it among the accounts under the same heading.',
       'Choose "Archive from" a month → "Archive from <Month>"; or "Delete" once "Resolve these first" is empty.',
       'If it says "…has amounts in closed months (…), so it cannot be deleted. Archive it instead.", archive it.',
       'Changed your mind? Undo right after.',

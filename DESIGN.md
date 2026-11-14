@@ -414,11 +414,15 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   (`LINE_MENU`: shown while the line is hovered or the control has the focus, always and finger-sized where the
   pointer is a finger), 20 px so the line keeps its height. On a row it is the Grid's own `RowMenu` (`Row menu for
   <row>`), unchanged. On a category it is `CategoryMenu` (`Category menu for <category>`): `Rename…` (a small dialog
-  whose error stays beside the field), `Move up`, `Move down`, and removing; its rows are kept. On an account or a
-  virtual account it is named `Edit <name>` and opens the account or virtual account dialog, which removes at its foot
-  (how removing behaves, and when it is one click, is in §8);
-  the calculated line for the current accounts opens the one account behind it, or lists them (`Edit a current
-  account`) when there are several. So that a line can hold these beside its own action, every row line that opens
+  whose error stays beside the field), `Set estimate…` on an expense category, `Move up`, `Move down`, and removing;
+  its rows are kept. On an account, a card, a loan or a virtual account it is `AccountMenu` (`Account menu for
+  <name>`, `Virtual account menu for <name>`): `Edit…` (the account or virtual account dialog, which still removes
+  at its foot), `Move up` and `Move down` among the lines beside it under the same heading (virtual accounts among
+  those of their savings account; disabled at the ends; `moveAccount`, `movePool`: the two that swap trade their
+  `order`, which every list of accounts sorts by), and `Archive or delete…` (`Delete` while the household is being
+  set up; how removing behaves is in §8). So every `…` on the page opens a menu, never a dialog directly;
+  the calculated line for the current accounts lists them (`Edit a current account`: `Edit <account>…`), one or
+  several. So that a line can hold these beside its own action, every row line that opens
   something is built the way a line with a rule symbol is: its button is its name, stretched over the whole line,
   and the symbol and the menu sit above it. A menu behind an icon is as wide as its longest entry (`w-max`), never
   as narrow as the icon. A closed month shows none of this.

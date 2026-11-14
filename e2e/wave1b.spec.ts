@@ -345,13 +345,17 @@ test.describe('wave 1b', () => {
     // an account is reached in its own step. One nothing points at is deleted from its dialog in one click; one that
     // is in use says what stands in the way
     await number(6).click()
-    await claims.getByRole('button', { name: 'Edit Visa' }).click()
+    await claims.getByRole('button', { name: 'Account menu for Visa' }).click()
+    // while the household is being set up the menu deletes in one click too
+    await expect(page.getByRole('menuitem')).toHaveText(['Edit…', 'Move up', 'Move down', 'Delete'])
+    await page.getByRole('menuitem', { name: 'Edit…' }).click()
     await expect(dlg.getByRole('button', { name: 'Archive or delete…' })).toHaveCount(0)
     await dlg.getByRole('button', { name: 'Delete', exact: true }).click()
     await expect(gone).toContainText('Deleted "Visa".')
     await expect(claims.locator('[data-line^="acc:"]').filter({ hasText: 'Visa' })).toHaveCount(0)
     await number(3).click()
-    await assets.getByRole('button', { name: 'Edit Savings' }).click()
+    await assets.getByRole('button', { name: 'Account menu for Savings' }).click()
+    await page.getByRole('menuitem', { name: 'Edit…' }).click()
     await dlg.getByRole('button', { name: 'Delete', exact: true }).click()
     await expect(dlg.getByRole('heading', { name: 'Account "Savings"' })).toBeVisible()
     await expect(dlg).toContainText('Resolve these first')

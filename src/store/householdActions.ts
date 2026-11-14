@@ -86,6 +86,45 @@ export async function addPayOffRow(store: Store, accountId: string): Promise<Row
   return row
 }
 
+/**
+ * The new places after one of the things shown side by side swaps with its neighbour. `shown` is in the order on
+ * screen. The keys they have are handed out again in the new order, so only the two that swapped change; where the
+ * keys were not in strict order (two alike, as records from an import can be), all of them get fresh ones, so the
+ * swap always shows. Nothing comes back when the thing is at the end it is moved towards.
+ */
+function swapOrder<T extends { id: string; order: string }>(shown: T[], id: string, direction: 'up' | 'down'): Array<{ item: T; order: string }> {
+  const i = shown.findIndex((x) => x.id === id)
+  const j = direction === 'up' ? i - 1 : i + 1
+  if (i < 0 || j < 0 || j >= shown.length) return []
+  const moved = [...shown]
+  ;[moved[i], moved[j]] = [moved[j], moved[i]]
+  const keys = shown.map((x) => x.order)
+  const strict = keys.every((k, n) => n === 0 || keys[n - 1] < k)
+  const next = strict ? keys : generateNKeysBetween(null, null, shown.length)
+  return moved.map((item, n) => ({ item, order: next[n] })).filter((x) => x.order !== x.item.order)
+}
+
+/**
+ * Move an account one place up or down among those shown beside it (`among`: their ids in the order on screen, the
+ * accounts under the same heading of the Statement). One undoable step.
+ */
+export async function moveAccount(store: Store, id: string, direction: 'up' | 'down', among: string[]): Promise<void> {
+  const tables = await loadTables(store)
+  const shown = among.map((x) => tables.accounts.find((a) => a.id === x && !a.deletedAt)).filter((a): a is Account => !!a)
+  const ts = now()
+  const mutations: Mutation[] = swapOrder(shown, id, direction).map(({ item, order }) => ({ op: 'put', table: 'accounts', record: AccountSchema.parse({ ...item, order, updatedAt: ts }) }))
+  if (mutations.length) await store.commit(mutations)
+}
+
+/** The same for a virtual account among those of its savings account. */
+export async function movePool(store: Store, id: string, direction: 'up' | 'down', among: string[]): Promise<void> {
+  const tables = await loadTables(store)
+  const shown = among.map((x) => tables.pools.find((p) => p.id === x && !p.deletedAt)).filter((p): p is Pool => !!p)
+  const ts = now()
+  const mutations: Mutation[] = swapOrder(shown, id, direction).map(({ item, order }) => ({ op: 'put', table: 'pools', record: PoolSchema.parse({ ...item, order, updatedAt: ts }) }))
+  if (mutations.length) await store.commit(mutations)
+}
+
 export async function updateAccount(store: Store, id: string, patch: Partial<Omit<Account, 'id' | 'createdAt'>>): Promise<void> {
   const tables = await loadTables(store)
   const a = tables.accounts.find((x) => x.id === id)

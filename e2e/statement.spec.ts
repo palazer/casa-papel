@@ -18,6 +18,12 @@ async function goToMonth(page: Page, name: string) {
 
 const total = (page: Page, side: 'in' | 'out' | 'assets' | 'claims') => page.getByTestId(`total-${side}`)
 
+/** The "…" on an account's or a virtual account's line, and "Edit…" in it: the way into its dialog. */
+async function editFrom(page: Page, side: Locator, name: string, what: 'Account' | 'Virtual account' = 'Account') {
+  await side.getByRole('button', { name: `${what} menu for ${name}` }).click()
+  await page.getByRole('menuitem', { name: 'Edit…' }).click()
+}
+
 /** A dialog that has finished opening: a screenshot taken before that shows it half faded in. */
 const settled = (dlg: Locator) => dlg.evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)).then(() => undefined))
 
@@ -805,7 +811,7 @@ test.describe('working the month in the Statement', () => {
     const carLoan = claims.locator('[data-line^="acc:"]').filter({ hasText: 'Car loan' })
     await expect(carLoan).toContainText('€4,750.00')
     // its form names the row that pays it off
-    await claims.getByRole('button', { name: 'Edit Car loan' }).click()
+    await editFrom(page, claims, 'Car loan')
     await expect(dlg.getByTestId('acc-paid-by')).toHaveText('Paid off by "Car loan – Payment".')
     await dlg.getByRole('button', { name: 'Cancel' }).click()
 
@@ -817,7 +823,7 @@ test.describe('working the month in the Statement', () => {
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
     await expect(moneyOut.getByRole('button', { name: /^Visa – Payment/ })).toHaveCount(0)
-    await claims.getByRole('button', { name: 'Edit Visa' }).click()
+    await editFrom(page, claims, 'Visa')
     await expect(dlg.getByTestId('acc-paid-by')).toContainText('No row pays this off yet.')
     await dlg.getByRole('button', { name: 'Add the row that pays it off' }).click()
     // purchases on this card are expense rows, so its payment only moves money
@@ -828,6 +834,24 @@ test.describe('working the month in the Statement', () => {
     await expect(moneyOut.locator('[data-line]').filter({ hasText: 'Visa – Payment' })).toContainText('counted when bought')
     const assetsTotal = (await total(page, 'assets').innerText()).replace(/^Total\s*/, '')
     expect(assetsTotal).toBe((await total(page, 'claims').innerText()).replace(/^Total\s*/, ''))
+
+    // accounts move among those under the same heading: the two savings accounts, and the two debts
+    const under = (side: Locator, heading: string) => side.locator(`li:has(> [data-line="${heading}"]) > div > ul > li > [data-line^="acc:"]`)
+    await expect(under(assets, 'savings-accounts')).toHaveText([/^Savings/, /^Rainy day/])
+    await assets.getByRole('button', { name: 'Account menu for Rainy day' }).click()
+    await expect(page.getByRole('menuitem', { name: 'Move down' })).toBeDisabled()
+    await page.getByRole('menuitem', { name: 'Move up' }).click()
+    await expect(under(assets, 'savings-accounts')).toHaveText([/^Rainy day/, /^Savings/])
+    await expect(under(claims, 'debts')).toHaveText([/^Credit card/, /^Car loan/, /^Visa/])
+    await claims.getByRole('button', { name: 'Account menu for Car loan' }).click()
+    await page.getByRole('menuitem', { name: 'Move down' }).click()
+    await expect(under(claims, 'debts')).toHaveText([/^Credit card/, /^Visa/, /^Car loan/])
+    // the order is the household's: it is the same after the page is loaded again, and the totals did not move
+    await page.reload()
+    await expect(under(assets, 'savings-accounts')).toHaveText([/^Rainy day/, /^Savings/])
+    await expect(under(claims, 'debts')).toHaveText([/^Credit card/, /^Visa/, /^Car loan/])
+    expect((await total(page, 'assets').innerText()).replace(/^Total\s*/, '')).toBe(assetsTotal)
+    await page.screenshot({ path: 'e2e/output/statement-account-order.png', fullPage: true })
     await page.screenshot({ path: 'e2e/output/statement-accounts.png', fullPage: true })
   })
 
@@ -1009,14 +1033,36 @@ test.describe('working the month in the Statement', () => {
     await page.getByRole('button', { name: 'Undo' }).click()
     await expect(moneyOut.getByRole('button', { name: 'Home', exact: true })).toBeVisible()
 
-    // an account and a virtual account open their dialog, which removes at its foot
-    await assets.getByRole('button', { name: 'Edit Index fund' }).click()
+    // an account's "…" is a menu like a row's and a category's: its dialog, its place, its removal
+    await assets.getByRole('button', { name: 'Account menu for Index fund' }).click()
+    await expect(menu.getByRole('menuitem')).toHaveText(['Edit…', 'Move up', 'Move down', 'Archive or delete…'])
+    // alone under its heading it has nowhere to move
+    await expect(menu.getByRole('menuitem', { name: 'Move up' })).toBeDisabled()
+    await expect(menu.getByRole('menuitem', { name: 'Move down' })).toBeDisabled()
+    await menu.getByRole('menuitem', { name: 'Edit…' }).click()
     await expect(dlg.getByRole('heading', { name: 'Edit account' })).toBeVisible()
     await expect(dlg.getByLabel('Name', { exact: true })).toHaveValue('Index fund')
+    // the dialog still removes at its foot, and the menu does the same without opening it
     await dlg.getByRole('button', { name: 'Archive or delete…' }).click()
     await expect(dlg.getByRole('heading', { name: 'Account "Index fund"' })).toBeVisible()
     await dlg.getByRole('button', { name: 'Cancel' }).click()
-    await assets.getByRole('button', { name: 'Edit Travel' }).click()
+    await assets.getByRole('button', { name: 'Account menu for Index fund' }).click()
+    await menu.getByRole('menuitem', { name: 'Archive or delete…' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Account "Index fund"' })).toBeVisible()
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+    await expect(dlg).toBeHidden()
+    // a virtual account moves among those of its savings account, and stays where it was put
+    const pools = assets.locator('[data-line^="pool:"]')
+    await expect(pools).toHaveText([/^Travel/, /^Clothing/])
+    await assets.getByRole('button', { name: 'Virtual account menu for Clothing' }).click()
+    await expect(menu.getByRole('menuitem', { name: 'Move down' })).toBeDisabled()
+    await menu.getByRole('menuitem', { name: 'Move up' }).click()
+    await expect(pools).toHaveText([/^Clothing/, /^Travel/])
+    await page.getByRole('button', { name: 'Undo' }).click()
+    await expect(pools).toHaveText([/^Travel/, /^Clothing/])
+    await page.getByRole('button', { name: 'Redo' }).click()
+    await expect(pools).toHaveText([/^Clothing/, /^Travel/])
+    await editFrom(page, assets, 'Travel', 'Virtual account')
     await expect(dlg.getByRole('heading', { name: 'Edit virtual account' })).toBeVisible()
     await dlg.getByRole('button', { name: 'Cancel' }).click()
     // the calculated line stands for the current accounts, so it lists them
@@ -1032,7 +1078,7 @@ test.describe('working the month in the Statement', () => {
     await expect(moneyOut.getByText('Food', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: /^Row menu for / })).toHaveCount(0)
     await expect(page.getByRole('button', { name: /^Category menu for / })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: /^Edit / })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /^(Account|Virtual account) menu for |^Edit / })).toHaveCount(0)
   })
 
   test('one section for money from the accounts: what an expense took is marked calculated, what is taken by hand is a row with no tag', async ({ page }) => {
