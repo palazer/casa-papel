@@ -4,7 +4,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input'
 import { TipLabel } from '@/components/InfoTip'
 import { Segmented } from '@/components/Segmented'
-import { amountToInput, formatAmount, formatMonth, parseAmount } from '@/app/format'
+import { AmountHint } from '@/components/AmountHint'
+import { amountToInput, formatAmount, formatMonth, parseAmount, unreadableAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import type { Category, Household, Money, MonthKey } from '@/model'
 import { setCategoryEstimate, type EditScope } from '@/store'
@@ -48,7 +49,7 @@ export function EstimateDialog({ category, month, household, current, rows, clos
     }
   }
   function submit() {
-    if (typed == null) return setError(text.trim() === '' ? 'Type what the category should come to.' : 'That is not a number I can read.')
+    if (typed == null) return setError(text.trim() === '' ? 'Type what the category should come to.' : unreadableAmount(text))
     if (typed < 0) return setError('An estimate cannot be below zero.')
     void save(typed)
   }
@@ -65,6 +66,7 @@ export function EstimateDialog({ category, month, household, current, rows, clos
         <div className="space-y-1.5">
           <TipLabel htmlFor="category-estimate" help="row.categoryEstimate">Estimate per month in {ccy}</TipLabel>
           <Input id="category-estimate" autoFocus inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} placeholder="e.g. 1450" disabled={closed} />
+          <AmountHint text={text} currency={ccy} locale={locale} />
           {closed && <p className="text-xs text-muted-foreground">This month is closed. Reopen it to change the estimate.</p>}
         </div>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">

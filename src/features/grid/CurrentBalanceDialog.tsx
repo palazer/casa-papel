@@ -3,7 +3,8 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { amountToInput, formatAmount, formatMonth, parseAmount } from '@/app/format'
+import { AmountHint } from '@/components/AmountHint'
+import { amountToInput, formatAmount, formatMonth, parseAmount, unreadableAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import type { MainAccountMonth } from '@/engine'
 import type { Account, AccountMonth, MonthKey } from '@/model'
@@ -65,7 +66,7 @@ export function CurrentBalanceDialog({ title, accounts, month, result, actuals, 
     const balances: Record<string, number> = {}
     for (const acc of accounts) {
       const v = parseAmount(textOf(acc), acc.currency, locale)
-      if (v == null) return setError(several ? `${acc.name}: that is not a number I can read.` : 'That is not a number I can read.')
+      if (v == null) return setError(unreadableAmount(textOf(acc), several ? `${acc.name}: that is not a number I can read.` : 'That is not a number I can read.'))
       balances[acc.id] = v
     }
     void save(balances)
@@ -95,6 +96,7 @@ export function CurrentBalanceDialog({ title, accounts, month, result, actuals, 
                 onChange={(e) => { setError(null); setTexts((t) => ({ ...t, [acc.id]: e.target.value })) }} onKeyDown={(e) => { if (e.key === 'Enter') submit() }}
                 placeholder={several ? undefined : 'leave empty to use the calculated amount'}
               />
+              <AmountHint text={textOf(acc)} currency={acc.currency} locale={locale} />
             </div>
           ))}
           {closed && <p className="text-xs text-muted-foreground">This month is closed. Reopen it to change the balance.</p>}

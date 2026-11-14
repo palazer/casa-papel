@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label'
 import { MonthField } from '@/components/MonthField'
 import { NativeSelect } from '@/components/NativeSelect'
 import { Segmented } from '@/components/Segmented'
-import { amountToInput, formatMonth, parseAmount } from '@/app/format'
+import { AmountHint } from '@/components/AmountHint'
+import { amountToInput, formatMonth, parseAmount, unreadableAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import { GOAL_KIND_INFO, goalFamilyOf, monthOfDate, type Goal, type GoalFamily, type GoalKind, type Household, type Tables } from '@/model'
 import { addGoal, updateGoal } from '@/store'
@@ -78,7 +79,7 @@ export function GoalDialog({ household, tables, goal, preset, onClose, onRemove 
   async function save() {
     // a debt with nothing typed is paid down to zero
     const minor = family === 'pay-down' && target.trim() === '' ? 0 : parseAmount(target, currency, locale)
-    if (minor == null) return setError(`${family === 'pay-down' ? 'That amount' : 'Target'} is not a number I can read.`)
+    if (minor == null) return setError(unreadableAmount(target, `${family === 'pay-down' ? 'That amount' : 'Target'} is not a number I can read.`))
     setBusy(true)
     setError(null)
     try {
@@ -129,6 +130,7 @@ export function GoalDialog({ household, tables, goal, preset, onClose, onRemove 
           <div className="space-y-1.5">
             <Label htmlFor="goal-target">{family === 'pay-down' ? `Bring it down to (${currency})` : `Target (${currency})`}</Label>
             <Input id="goal-target" inputMode="decimal" value={target} onChange={(e) => setTarget(e.target.value)} placeholder={family === 'pay-down' ? '0' : 'e.g. 10000'} />
+            <AmountHint text={target} currency={currency} locale={locale} />
             {family === 'pay-down' && <p className="text-xs text-muted-foreground">Zero means nothing is owed{trackedName ? ` on ${trackedName}` : ''}. Progress counts down from what is owed when you set the goal.</p>}
           </div>
           <div className="space-y-1.5">

@@ -4,9 +4,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input'
 import { Island } from '@/components/ui/island'
 import { Label } from '@/components/ui/label'
+import { AmountHint } from '@/components/AmountHint'
 import { Check } from '@/components/Check'
 import { NativeSelect } from '@/components/NativeSelect'
-import { amountToInput, formatAmount, formatMonth, parseAmount } from '@/app/format'
+import { amountToInput, formatAmount, formatMonth, parseAmount, unreadableAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import type { EngineOutput } from '@/engine'
 import { monthOfDate, type Account, type Household, type MonthKey, type Pool, type Tables } from '@/model'
@@ -105,9 +106,9 @@ export function PoolDialog({ pool, savings, baseCurrency, locale, fromMonth, onC
   function save() {
     if (busy) return
     const openingBalance = opening.trim() ? parseAmount(opening, baseCurrency, locale) : 0
-    if (openingBalance == null) return setError('Opening balance is not a number I can read.')
+    if (openingBalance == null) return setError(unreadableAmount(opening, 'Opening balance is not a number I can read.'))
     const monthlyAllocation = monthly.trim() ? parseAmount(monthly, baseCurrency, locale) : null
-    if (monthly.trim() && monthlyAllocation == null) return setError('The monthly amount is not a number I can read.')
+    if (monthly.trim() && monthlyAllocation == null) return setError(unreadableAmount(monthly, 'The monthly amount is not a number I can read.'))
     setBusy(true)
     const p: Promise<unknown> = pool
       ? updatePool(store, pool.id, { name: name.trim(), accountId, openingBalance })
@@ -125,10 +126,10 @@ export function PoolDialog({ pool, savings, baseCurrency, locale, fromMonth, onC
         <div className="grid gap-3">
           <div className="space-y-1.5"><Label htmlFor="pool-name">Name</Label><Input id="pool-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Gifts" /></div>
           <div className="space-y-1.5"><Label htmlFor="pool-acc">Held in</Label><NativeSelect id="pool-acc" className="w-full" value={accountId} onChange={(e) => setAccountId(e.target.value)}>{savings.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</NativeSelect></div>
-          <div className="space-y-1.5"><Label htmlFor="pool-open">Already in it ({baseCurrency})</Label><Input id="pool-open" inputMode="decimal" value={opening} onChange={(e) => setOpening(e.target.value)} placeholder="0" /></div>
+          <div className="space-y-1.5"><Label htmlFor="pool-open">Already in it ({baseCurrency})</Label><Input id="pool-open" inputMode="decimal" value={opening} onChange={(e) => setOpening(e.target.value)} placeholder="0" /><AmountHint text={opening} currency={baseCurrency} locale={locale} /></div>
           {!pool && (
             <>
-              <div className="space-y-1.5"><Label htmlFor="pool-monthly">Set aside each month ({baseCurrency})</Label><Input id="pool-monthly" inputMode="decimal" value={monthly} onChange={(e) => setMonthly(e.target.value)} placeholder={fromMonth ? `optional, from ${formatMonth(fromMonth, locale)} on` : 'optional, from this month on'} /></div>
+              <div className="space-y-1.5"><Label htmlFor="pool-monthly">Set aside each month ({baseCurrency})</Label><Input id="pool-monthly" inputMode="decimal" value={monthly} onChange={(e) => setMonthly(e.target.value)} placeholder={fromMonth ? `optional, from ${formatMonth(fromMonth, locale)} on` : 'optional, from this month on'} /><AmountHint text={monthly} currency={baseCurrency} locale={locale} /></div>
               <Check label={`Also add a spending row "${name.trim() || 'Virtual account'}" that comes out of it`} checked={spendRow} onChange={(e) => setSpendRow(e.target.checked)} />
             </>
           )}

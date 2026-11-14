@@ -135,7 +135,7 @@ export const GUIDE: GuideTopic[] = [
     summary: 'Spending rows hold what leaves; categories group them, and every amount says how sure you are and what it comes out of.',
     what: [
       'Every amount is an "Estimate" (on a light yellow shade), "Certain" or "Done" (green dot). That changes how it looks and what the month\'s progress counts, never how it adds up. "Treat new values as…" in the row menu sets the default for new amounts in that row.',
-      'A cell is a "Single amount" or "Itemized": a list of items with a "What", an amount, a status and a source each, and "Mark all done" for the whole list.',
+      'A cell is a "Single amount" or "Itemized": a list of items with a "What", an amount, a status and a source each, and "Mark all done" for the whole list. Every amount field takes a sum: type "1200+150-30" and the result shows under the field, "= €1,320.00"; saving keeps the result. Only + and - are worked out.',
       '"Comes out of" says where the money is taken from: "This month\'s income", one of your accounts ("Savings account: Savings", "Investment account: Index fund") or a "Virtual account: Travel". An account that pays falls by the amount, shows as "From Savings" under "From accounts" on the Statement, and never touches the month\'s leftover. Categories ("Housing", "Living", "Transport", "Family & pets", "Fun", "Personal") group rows under a label line on a faint band.',
     ],
     steps: [

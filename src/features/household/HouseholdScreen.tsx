@@ -18,7 +18,8 @@ import { Island } from '@/components/ui/island'
 import { Label } from '@/components/ui/label'
 import { Check } from '@/components/Check'
 import { NativeSelect } from '@/components/NativeSelect'
-import { localeExample, localeLabel, amountToInput, formatAmount, formatMonth, parseAmount } from '@/app/format'
+import { localeExample, localeLabel, amountToInput, formatAmount, formatMonth, parseAmount, unreadableAmount } from '@/app/format'
+import { AmountHint } from '@/components/AmountHint'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import {
@@ -72,7 +73,13 @@ function SettingsCard({ household: h, tables, onSave, onBuffer }: { household: H
   const [name, setName] = useState(h.name)
   const [scope, setScope] = useState<MonthlyDefaultScope>('from-now-on')
   const [buffer, setBuffer] = useState(amountToInput(bufferNow, h.baseCurrency, h.locale))
-  const money = (s: string) => (s.trim() ? parseAmount(s, h.baseCurrency, h.locale) ?? 0 : 0)
+  const [bufferError, setBufferError] = useState<string | null>(null)
+  /** Saved when the field is left; what cannot be read is said under it and nothing is saved. */
+  const saveBuffer = () => {
+    const v = buffer.trim() ? parseAmount(buffer, h.baseCurrency, h.locale) : 0
+    if (v == null) return setBufferError(unreadableAmount(buffer))
+    if (v !== bufferNow) onBuffer(v, scope)
+  }
   return (
     <Island air title="Household settings" description="Closed months keep the values they were closed with.">
       <div className="grid gap-3 sm:grid-cols-2">
@@ -86,7 +93,9 @@ function SettingsCard({ household: h, tables, onSave, onBuffer }: { household: H
         </div>
         <div className="space-y-1.5 sm:col-span-2">
           <TipLabel htmlFor="s-buffer" help="household.buffer">Cash kept in the account at month end ({h.baseCurrency})</TipLabel>
-          <Input id="s-buffer" className="sm:w-64" inputMode="decimal" value={buffer} onChange={(e) => setBuffer(e.target.value)} onBlur={() => { const v = money(buffer); if (v !== bufferNow) onBuffer(v, scope) }} />
+          <Input id="s-buffer" className="sm:w-64" inputMode="decimal" value={buffer} aria-invalid={bufferError ? true : undefined} onChange={(e) => { setBufferError(null); setBuffer(e.target.value) }} onBlur={saveBuffer} />
+          <AmountHint text={buffer} currency={h.baseCurrency} locale={h.locale} />
+          {bufferError && <p role="alert" className="text-xs text-destructive">{bufferError}</p>}
           {bufferNow !== h.cashBuffer && <p className="text-muted-foreground">This month {formatAmount(bufferNow, h.baseCurrency, h.locale)} · default {formatAmount(h.cashBuffer, h.baseCurrency, h.locale)}</p>}
         </div>
         <div className="space-y-1.5 sm:col-span-2">
@@ -236,7 +245,13 @@ function AccountsCard({ household, tables, accounts: allAccounts, entities, engi
                               aria-label={`Real balance ${formatMonth(m, locale)}`} className="ml-auto h-6 w-36 text-right" inputMode="decimal"
                               defaultValue={r && r.adjustment !== 0 ? amountToInput(r.balance, a.currency, locale) : ''}
                               placeholder="same as computed"
-                              onBlur={(e) => { const v = e.target.value.trim() ? parseAmount(e.target.value, a.currency, locale) : null; setAccountActual(store, a.id, m, v).catch((err) => onError(err instanceof Error ? err.message : 'Failed')) }}
+                              onBlur={(e) => {
+                                const typed = e.target.value
+                                const v = typed.trim() ? parseAmount(typed, a.currency, locale) : null
+                                // what cannot be read is said and nothing is written: an empty field alone clears the real balance
+                                if (typed.trim() && v == null) return onError(unreadableAmount(typed))
+                                setAccountActual(store, a.id, m, v).catch((err) => onError(err instanceof Error ? err.message : 'Failed'))
+                              }}
                             />
                           </td>
                         </tr>

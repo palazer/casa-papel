@@ -7,7 +7,8 @@ import { InfoTip, TipLabel } from '@/components/InfoTip'
 import { MonthField } from '@/components/MonthField'
 import { NativeSelect } from '@/components/NativeSelect'
 import { Segmented } from '@/components/Segmented'
-import { amountToInput, formatAmount, formatMonth, formatShare, parseAmount } from '@/app/format'
+import { AmountHint } from '@/components/AmountHint'
+import { amountToInput, formatAmount, formatMonth, formatShare, parseAmount, unreadableAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import { cellKey, computeEngine } from '@/engine'
 import { addMonths, compareMonths, isShareRule, parseMonth, poolRowName, type Household, type MonthKey, type Tables } from '@/model'
@@ -100,7 +101,7 @@ export function RuleFields({ tables, household, target, facts, month, kind, onCl
   const typedAmount = amountText.trim() === '' ? null : parseAmount(amountText, ccy, locale)
   const choiceKey = choiceKeyOf(kind, typedAmount, typedShare, ofRowId)
   const typedSomething = kind === 'fixed' ? amountText.trim() !== '' : share && shareText.trim() !== ''
-  const fieldError = !choiceKey && typedSomething ? 'That is not a number I can read.' : null
+  const fieldError = !choiceKey && typedSomething ? (kind === 'fixed' ? unreadableAmount(amountText) : 'That is not a number I can read.') : null
   /** The rule tried on a copy: what the start month would show, or why it cannot be saved. */
   const preview = useMemo(() => {
     if (!choiceKey) return null
@@ -131,6 +132,7 @@ export function RuleFields({ tables, household, target, facts, month, kind, onCl
           <div className="space-y-1.5">
             <Label htmlFor="rule-amount">Amount per month in {ccy}</Label>
             <Input id="rule-amount" className="w-40" autoFocus inputMode="decimal" value={amountText} onChange={(e) => setAmountText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} placeholder="e.g. 300" />
+            <AmountHint text={amountText} currency={ccy} locale={locale} />
           </div>
         )}
         {kind === 'share-of-row' && (facts.incomes.length > 0 ? (

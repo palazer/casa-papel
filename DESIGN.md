@@ -556,6 +556,15 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   chip is a button: it opens a popover with the source in words, a field to type a rate for this month (`Save rate`),
   `Use the ECB rate again` once the rate is yours, and the (i) text inline. A household with one currency shows
   nothing; a closed month's chip opens to the rate and its source and changes nothing.
+- **An amount field takes a sum.** Every field that asks for money reads what is typed through `parseAmount`
+  (`src/app/format.ts`), which adds up a run of `+` and `-` (`7352.21+7.96`, `1200-150+30`, spaces allowed, each
+  number in either number format). While the field holds a sum, `AmountHint` (`src/components/AmountHint.tsx`)
+  says what it comes to under the field: `= €7,360.17`, `text-xs` muted with tabular digits, and nothing for a plain
+  number. Saving stores the result; the sum itself is not kept. In a row of fields (an item of the row's dialog) the
+  line stands under the amount alone and the row's other fields stay on their line (`items-start`). Multiplying and
+  dividing are not worked out, and their signs (`*`, `/`, `×`, `÷`, an `x` between two numbers) are never dropped
+  from what was typed: where the field would say it cannot read the number it says `Only + and - can be used in an
+  amount.` instead (`unreadableAmount`). Percentages and rates are not amounts and take one number.
 - A currency is always chosen from a list, never typed: `currencyChoices` in `src/app/currencies.ts` (the household's
   own first, labelled `EUR (household currency)`, then the currencies the ECB publishes; a code in use that is not on
   the list stays selectable). A currency that comes into use and has no rate at all yet gets the ECB's by itself

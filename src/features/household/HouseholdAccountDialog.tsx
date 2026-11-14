@@ -4,13 +4,14 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { AmountHint } from '@/components/AmountHint'
 import { Check } from '@/components/Check'
 import { InfoTip, TipLabel } from '@/components/InfoTip'
 import { MonthField } from '@/components/MonthField'
 import { NativeSelect } from '@/components/NativeSelect'
 import { Segmented } from '@/components/Segmented'
 import { currencyChoices, currencyLabel } from '@/app/currencies'
-import { amountToInput, formatMonth, parseAmount } from '@/app/format'
+import { amountToInput, formatMonth, parseAmount, unreadableAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import { ACCOUNT_TYPE_INFO, type Account, type AccountType, type Entity, type Row } from '@/model'
 import { addAccount, addAccountWithRow, addPayOffRow, payOffRowsOf, rowNameFor, updateAccount, type AccountRowInput } from '@/store'
@@ -112,7 +113,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
 
   async function save() {
     const openingBalance = opening.trim() ? parseAmount(opening, ccy, locale) : 0
-    if (openingBalance == null) return setError(`"${balanceWord(type)} at the start" is not a number I can read.`)
+    if (openingBalance == null) return setError(unreadableAmount(opening, `"${balanceWord(type)} at the start" is not a number I can read.`))
     const annualRate = Number(annual.replace(',', '.')) / 100
     if (type === 'investment' && !Number.isFinite(annualRate)) return setError('Growth per year is not a number.')
     const fixed = Number(fixedRate.replace(',', '.'))
@@ -155,6 +156,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="acc-open">{balanceWord(type)} at the start of {formatMonth(openingMonth, locale, 'long')} ({ccy})</Label>
             <Input id="acc-open" className="sm:w-1/2" inputMode="decimal" value={opening} onChange={(e) => setOpening(e.target.value)} placeholder="0" />
+            <AmountHint text={opening} currency={ccy} locale={locale} />
             <p className="text-xs text-muted-foreground">
               {type === 'loan' ? 'What is still owed. A payment row that names this loan brings it down.'
                 : type === 'credit-card' ? 'What you owed on the card when the month began.'

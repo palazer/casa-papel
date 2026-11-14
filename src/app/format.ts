@@ -32,10 +32,18 @@ export function amountToInput(minor: Money, currency: string, locale: string): s
   return fromMinor(minor, currency).toLocaleString(locale, { useGrouping: false, maximumFractionDigits: 3 })
 }
 
-/** Lenient parser: accepts "1.935,50", "1,935.50", "1935", "-20", ignores currency symbols. */
-export function parseAmount(input: string, currency: string, locale: string): Money | null {
-  let s = input.replace(/[^\d.,\-+]/g, '')
-  if (!s || s === '-' || s === '+') return null
+/** What a field says when someone tried to multiply or divide in it. */
+export const ONLY_PLUS_MINUS = 'Only + and - can be used in an amount.'
+/**
+ * Signs of a calculation the app does not do: `*`, `/`, their printed forms, and an `x` between two numbers. They
+ * are refused, never dropped: `1200/12` must not be read as 120012.
+ */
+const REFUSED_SIGN = /[*/\u00d7\u00f7]|\d\s*x\s*\d/i
+
+/** One number without its sign, as people type it: "1.935,50", "1,935.50", "1935". */
+function parseNumber(body: string, locale: string): number | null {
+  if (!/\d/.test(body)) return null
+  let s = body
   const dec = decimalSeparator(locale)
   const group = dec === ',' ? '.' : ','
   if (s.includes('.') && s.includes(',')) {
@@ -50,8 +58,53 @@ export function parseAmount(input: string, currency: string, locale: string): Mo
     s = after === 3 && s.indexOf(group) === idx ? s.replace(group, '') : s.replace(group, '.')
   }
   const n = Number(s)
-  if (!Number.isFinite(n)) return null
-  return toMinor(n, currency)
+  return Number.isFinite(n) ? n : null
+}
+
+/**
+ * The signed numbers a typed amount is made of, each in the currency's smallest unit, or null when it cannot be
+ * read. One number is one term; `1200-150+30` is three. A sign at the very end is a sum still being typed and counts
+ * for nothing yet; two signs in a row are no sum.
+ */
+function termsOf(input: string, currency: string, locale: string): Money[] | null {
+  // a typographic minus (or a dash pasted for one) is a minus
+  const text = input.replace(/[\u2212\u2013]/g, '-')
+  if (REFUSED_SIGN.test(text)) return null
+  // everything else that is not part of a number is ignored: spaces, a currency sign, a leading "="
+  const parts = text.replace(/[^\d.,\-+]/g, '').match(/[+-]?[^+-]*/g)?.filter((p) => p !== '') ?? []
+  const terms: Money[] = []
+  for (const [i, part] of parts.entries()) {
+    const signed = part[0] === '+' || part[0] === '-'
+    const body = signed ? part.slice(1) : part
+    if (body === '') {
+      if (i === parts.length - 1) continue
+      return null
+    }
+    const n = parseNumber(body, locale)
+    if (n == null) return null
+    terms.push(toMinor(part[0] === '-' ? -n : n, currency))
+  }
+  return terms.length ? terms : null
+}
+
+/**
+ * Lenient parser for a typed amount: accepts "1.935,50", "1,935.50", "1935", "-20", ignores currency symbols, and
+ * adds up a sum ("7352.21+7.96", "1200-150+30"). Every number is turned into whole cents first, so the result is exact.
+ */
+export function parseAmount(input: string, currency: string, locale: string): Money | null {
+  const terms = termsOf(input, currency, locale)
+  return terms ? terms.reduce((a, b) => a + b, 0) : null
+}
+
+/** What a typed sum comes to, for the line under its field: null unless the text is two or more numbers. */
+export function sumResult(input: string, currency: string, locale: string): Money | null {
+  const terms = termsOf(input, currency, locale)
+  return terms && terms.length > 1 ? terms.reduce((a, b) => a + b, 0) : null
+}
+
+/** What to say about a typed amount that cannot be read: that only + and - work when another sign was tried, else the field's own words. */
+export function unreadableAmount(input: string, fallback = 'That is not a number I can read.'): string {
+  return REFUSED_SIGN.test(input) ? ONLY_PLUS_MINUS : fallback
 }
 
 /** "English (Ireland)" for en-IE; falls back to the code. */

@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Segmented } from '@/components/Segmented'
 import { ruleText } from '@/app/display'
-import { amountToInput, formatAmount, formatMonth, parseAmount } from '@/app/format'
+import { AmountHint } from '@/components/AmountHint'
+import { amountToInput, formatAmount, formatMonth, parseAmount, unreadableAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import { cellKey, computeEngine, type EngineOutput } from '@/engine'
 import { resolveRules, type Household, type MonthKey, type Tables } from '@/model'
@@ -81,7 +82,7 @@ export function TopUpDialog({ tables, engine, household, poolId, month, onClose 
       return { error: e instanceof Error ? e.message : 'That top-up cannot be saved.' }
     }
   }, [tables, poolId, month, sourceId, amount])
-  const problem = text.trim() !== '' && amount == null ? 'That is not a number I can read.' : preview && 'error' in preview ? preview.error : null
+  const problem = text.trim() !== '' && amount == null ? unreadableAmount(text) : preview && 'error' in preview ? preview.error : null
   const lines = preview && !('error' in preview) ? preview : null
 
   function submit() {
@@ -125,6 +126,7 @@ export function TopUpDialog({ tables, engine, household, poolId, month, onClose 
           <div className="space-y-1.5">
             <Label htmlFor="top-up-amount">Amount in {ccy}</Label>
             <Input id="top-up-amount" className="w-40" autoFocus inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
+            <AmountHint text={text} currency={ccy} locale={locale} />
           </div>
           {lines && (
             <div className="space-y-1">

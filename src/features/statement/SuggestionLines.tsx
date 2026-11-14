@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { parseAmount } from '@/app/format'
+import { AmountHint } from '@/components/AmountHint'
+import { parseAmount, unreadableAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import { InfoTip } from '@/components/InfoTip'
 import { AddLead } from './AddLead'
@@ -89,7 +90,8 @@ function SuggestionLine({ suggestion: s, month, currency, locale, onAdded, onErr
           <X className="size-3.5" aria-hidden />
         </button>
       </span>
-      {unreadable && <p role="alert" className="basis-full text-destructive">That is not an amount I can read.</p>}
+      {unreadable && <p role="alert" className="basis-full text-destructive">{unreadableAmount(text, 'That is not an amount I can read.')}</p>}
+      {!unreadable && <AmountHint text={text} currency={currency} locale={locale} className="basis-full text-right" />}
     </div>
   )
 }

@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label'
 import { Segmented } from '@/components/Segmented'
 import { cn } from '@/lib/utils'
 import { currencyChoices } from '@/app/currencies'
-import { amountToInput, formatAmount, formatMonth, parseAmount } from '@/app/format'
+import { AmountHint } from '@/components/AmountHint'
+import { amountToInput, formatAmount, formatMonth, parseAmount, unreadableAmount } from '@/app/format'
 import { readPref, writePref } from '@/app/prefs'
 import { useStore } from '@/app/store'
 import { cellKey, type EngineOutput } from '@/engine'
@@ -124,6 +125,8 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   const [repeats, setRepeats] = useState<Record<string, RepeatChoice>>({})
   /** The row's schedules that land in other months, where one was changed here: its amount as typed, its rhythm, its name. */
   const [others, setOthers] = useState<Record<string, { text?: string; repeat?: Repeating; name?: string }>>({})
+  /** What was typed into an item's amount: the item keeps only the number, and a sum is shown worked out under its field. */
+  const [typedAmounts, setTypedAmounts] = useState<Record<string, string>>({})
   /** The schedule from another month that is being asked how to stop. */
   const [stopping, setStopping] = useState<string | null>(null)
   /** What a removal did, said in the dialog: it is done at once, and the rest of what was typed is still here. */
@@ -209,7 +212,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   function saveValue() {
     const minor = text.trim() === '' ? 0 : parseAmount(text, currency, locale)
     if (minor == null) {
-      setError('That is not a number I can read.')
+      setError(unreadableAmount(text))
       return
     }
     const single: CellItem = { id: newId(), label: '', amount: minor, status: status === 'default' ? row.defaultStatus : status, fundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }
@@ -234,7 +237,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   function saveItems() {
     for (const it of items) {
       const named = it.label.trim() ? `"${it.label.trim()}"` : null
-      if (it.kind === 'normal' && !Number.isFinite(it.amount)) return setError(`${named ?? 'An item'} has an amount that is not a number I can read.`)
+      if (it.kind === 'normal' && !Number.isFinite(it.amount)) return setError(unreadableAmount(typedAmounts[it.id] ?? '', `${named ?? 'An item'} has an amount that is not a number I can read.`))
       const choice = repeatFor(it)
       if (choice.kind === 'months' && choice.months.length === 0) return setError(`Pick at least one month for ${named ?? 'the item that repeats'}.`)
     }
@@ -243,7 +246,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
       const draft = others[s.id]
       if (!draft) continue
       const amount = otherAmount(s.id)
-      if (amount != null && !Number.isFinite(amount)) return setError(`"${s.name}" has an amount that is not a number I can read.`)
+      if (amount != null && !Number.isFinite(amount)) return setError(unreadableAmount(draft.text ?? '', `"${s.name}" has an amount that is not a number I can read.`))
       if (draft.repeat?.kind === 'months' && draft.repeat.months.length === 0) return setError(`Pick at least one month for "${s.name}".`)
       changes[s.id] = { amount, repeat: draft.repeat, name: draft.name }
     }
@@ -394,6 +397,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                     <Input id="cell-amount" className="min-w-0 flex-1" autoFocus inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') saveValue() }} placeholder="0" />
                     {canPickCurrency && currencySelect}
                   </div>
+                  <AmountHint text={text} currency={currency} locale={locale} />
                   {currencyNote}
                   {currency !== household.baseCurrency && <RateLine tables={tables} household={household} month={month} currency={currency} amount={parseAmount(text, currency, locale) ?? 0} />}
                 </div>
@@ -480,18 +484,26 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                   return (
                     <div key={it.id} className={cn('space-y-2 rounded-md border p-2', schedule && 'border-transfer/40')}>
                       {/* the name takes what the other fields leave: they are as narrow as their content allows */}
-                      <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-2 sm:grid-cols-[minmax(0,1fr)_6.5rem_7rem_8.5rem_2rem]">
+                      <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] items-start gap-2 sm:grid-cols-[minmax(0,1fr)_6.5rem_7rem_8.5rem_2rem]">
                         {/* a name can always be typed over; for something that repeats it is the schedule's name, in every open month */}
                         <div className="flex min-w-0 items-center gap-1.5">
                           {schedule && <Repeat className="size-3.5 shrink-0 text-transfer" aria-hidden />}
                           <Input aria-label="Item label" placeholder={schedule?.name ?? 'What'} value={it.label} onChange={(e) => updateItem(it.id, { label: e.target.value })} />
                         </div>
-                        <Input
-                          aria-label="Item amount" inputMode="decimal" placeholder="0"
-                          defaultValue={amountToInput(it.amount, currency, locale)}
-                          // an empty field is zero; anything else that cannot be read is kept as such, so saving says so instead of storing zero
-                          onChange={(e) => { setError(null); updateItem(it.id, { amount: e.target.value.trim() === '' ? 0 : parseAmount(e.target.value, currency, locale) ?? Number.NaN }) }}
-                        />
+                        <div className="space-y-0.5">
+                          <Input
+                            aria-label="Item amount" inputMode="decimal" placeholder="0"
+                            defaultValue={amountToInput(it.amount, currency, locale)}
+                            // an empty field is zero; anything else that cannot be read is kept as such, so saving says so instead of storing zero
+                            onChange={(e) => {
+                              const typed = e.target.value
+                              setError(null)
+                              setTypedAmounts((t) => ({ ...t, [it.id]: typed }))
+                              updateItem(it.id, { amount: typed.trim() === '' ? 0 : parseAmount(typed, currency, locale) ?? Number.NaN })
+                            }}
+                          />
+                          <AmountHint text={typedAmounts[it.id] ?? ''} currency={currency} locale={locale} />
+                        </div>
                         <NativeSelect aria-label="Item status" value={it.status} onChange={(e) => updateItem(it.id, { status: e.target.value as ItemStatus })}>
                           {(['projected', 'committed', 'done'] as ItemStatus[]).map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
                         </NativeSelect>
@@ -539,15 +551,18 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                   const touched = (draft?.repeat != null && !sameRepeat(draft.repeat, repeatOf(s))) || (otherAmount(s.id) != null && otherAmount(s.id) !== s.amount)
                   return (
                     <div key={s.id} className="space-y-2 rounded-md border border-dashed p-2" data-testid="elsewhere">
-                      <div className="grid grid-cols-[minmax(0,1fr)_6.5rem_2rem] items-center gap-2">
+                      <div className="grid grid-cols-[minmax(0,1fr)_6.5rem_2rem] items-start gap-2">
                         <div className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
                           <Repeat className="size-3.5 shrink-0" aria-hidden />
                           <Input aria-label={`Name of ${s.name}`} placeholder={s.name} value={draft?.name ?? s.name} onChange={(e) => setOthers((o) => ({ ...o, [s.id]: { ...o[s.id], name: e.target.value } }))} />
                         </div>
-                        <Input
-                          aria-label={`Amount of ${s.name}`} inputMode="decimal" placeholder="0" defaultValue={amountToInput(s.amount, currency, locale)}
-                          onChange={(e) => { setError(null); setOthers((o) => ({ ...o, [s.id]: { ...o[s.id], text: e.target.value } })) }}
-                        />
+                        <div className="space-y-0.5">
+                          <Input
+                            aria-label={`Amount of ${s.name}`} inputMode="decimal" placeholder="0" defaultValue={amountToInput(s.amount, currency, locale)}
+                            onChange={(e) => { setError(null); setOthers((o) => ({ ...o, [s.id]: { ...o[s.id], text: e.target.value } })) }}
+                          />
+                          <AmountHint text={draft?.text ?? ''} currency={currency} locale={locale} />
+                        </div>
                         <Button size="icon" variant="ghost" aria-label={`Stop ${s.name}`} onClick={() => setStopping(stopping === s.id ? null : s.id)}><Trash2 /></Button>
                       </div>
                       <RepeatField

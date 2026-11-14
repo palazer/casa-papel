@@ -2,7 +2,8 @@ import { useState, type KeyboardEvent } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { parseAmount } from '@/app/format'
+import { AmountHint } from '@/components/AmountHint'
+import { parseAmount, unreadableAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import type { MonthKey, Section } from '@/model'
 import { addCategory } from '@/store'
@@ -27,7 +28,7 @@ export function AddCategoryInline({ section, onError, estimate }: { section: Sec
     const n = name.trim()
     if (!n) return
     const typed = estimate && amount.trim() !== '' ? parseAmount(amount, estimate.currency, estimate.locale) : 0
-    if (typed == null || typed < 0) return onError('The estimate is not a number I can read.')
+    if (typed == null || typed < 0) return onError(unreadableAmount(amount, 'The estimate is not a number I can read.'))
     try {
       await addCategory(store, { name: n, section, estimate: estimate && typed > 0 ? { month: estimate.month, amount: typed } : undefined })
       reset()
@@ -55,6 +56,7 @@ export function AddCategoryInline({ section, onError, estimate }: { section: Sec
       )}
       <Button size="sm" onClick={() => void save()}>Add</Button>
       <Button size="sm" variant="ghost" onClick={reset}>Cancel</Button>
+      {estimate && <AmountHint text={amount} currency={estimate.currency} locale={estimate.locale} className="basis-full" />}
     </div>
   )
 }

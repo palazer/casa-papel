@@ -3,8 +3,9 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { AmountHint } from '@/components/AmountHint'
 import { Check } from '@/components/Check'
-import { amountToInput, formatAmount, formatMonth, formatPercent, parseAmount } from '@/app/format'
+import { amountToInput, formatAmount, formatMonth, formatPercent, parseAmount, unreadableAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import type { AccountMonthResult } from '@/engine'
 import { cardIsItemized, type Account, type MonthKey } from '@/model'
@@ -54,7 +55,7 @@ export function BalanceDialog({ account, month, result, locale, closed, onClose 
   function submit() {
     if (text.trim() === '') return void save(null)
     const v = parseAmount(text, ccy, locale)
-    if (v == null) return setError('That is not a number I can read.')
+    if (v == null) return setError(unreadableAmount(text))
     void save(v)
   }
 
@@ -76,6 +77,7 @@ export function BalanceDialog({ account, month, result, locale, closed, onClose 
         <div className="space-y-1.5">
           <Label htmlFor="real-balance">Real balance in {ccy}</Label>
           <Input id="real-balance" autoFocus inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} placeholder="leave empty to use the expected amount" disabled={closed} />
+          <AmountHint text={text} currency={ccy} locale={locale} />
           {closed && <p className="text-xs text-muted-foreground">This month is closed. Reopen it from the month header to change the balance.</p>}
         </div>
         {canBook && (

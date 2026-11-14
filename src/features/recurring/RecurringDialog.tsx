@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label'
 import { Check } from '@/components/Check'
 import { MonthField } from '@/components/MonthField'
 import { NativeSelect } from '@/components/NativeSelect'
-import { amountToInput, parseAmount } from '@/app/format'
+import { AmountHint } from '@/components/AmountHint'
+import { amountToInput, parseAmount, unreadableAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import { sortRows } from '@/engine'
 import type { Household, MonthKey, RecurringItem, Row, Section, Tables } from '@/model'
@@ -54,7 +55,7 @@ export function RecurringDialog({ tables, household, item, defaultMonth, onClose
 
   async function save() {
     const minor = parseAmount(amount, baseCurrency, locale)
-    if (minor == null) return setError('Amount is not a number I can read.')
+    if (minor == null) return setError(unreadableAmount(amount, 'Amount is not a number I can read.'))
     if (!name.trim()) return setError('Give it a name.')
     if (rowId === '__new__' && !newRowName.trim()) return setError('Name the new row.')
     if (cadence === 'months' && dueMonths.size === 0) return setError('Pick at least one month.')
@@ -110,7 +111,7 @@ export function RecurringDialog({ tables, household, item, defaultMonth, onClose
               <div className="space-y-1.5"><Label htmlFor="rc-newsec">Section</Label><NativeSelect id="rc-newsec" className="w-full" value={newRowSection} onChange={(e) => setNewRowSection(e.target.value as Section)}><option value="expense">Expense</option><option value="income">Income</option><option value="transfer">Transfer</option></NativeSelect></div>
             </>
           )}
-          <div className="space-y-1.5"><Label htmlFor="rc-amount">Amount ({baseCurrency})</Label><Input id="rc-amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
+          <div className="space-y-1.5"><Label htmlFor="rc-amount">Amount ({baseCurrency})</Label><Input id="rc-amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} /><AmountHint text={amount} currency={baseCurrency} locale={locale} /></div>
           <div className="space-y-1.5">
             <Label htmlFor="rc-cadence">How often</Label>
             <NativeSelect id="rc-cadence" className="w-full" value={cadence} onChange={(e) => setCadence(e.target.value as CadenceChoice)}>
