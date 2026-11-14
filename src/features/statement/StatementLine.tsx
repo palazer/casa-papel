@@ -66,6 +66,7 @@ const TIP: Record<string, HelpKey> = {
   main: 'statement.mainAccount',
   free: 'statement.free',
   'net-worth': 'statement.netWorth',
+  expenses: 'statement.expenses',
   'set-aside': 'statement.setAside',
   'from-accounts': 'statement.fromAccounts',
 }

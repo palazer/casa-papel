@@ -52,7 +52,9 @@ test.describe('the Statement', () => {
     await expect(total(page, 'in')).toHaveText('Total in€7,255.00')
     await expect(total(page, 'out')).toHaveText('Total out€7,255.00')
     const moneyOut = page.getByRole('region', { name: 'Money out' })
-    await expect(moneyOut.locator('[data-line="expenses"]')).toContainText('€4,357.00')
+    // what the month costs; the pocket money (1,000) is shared out of what is left, in the block under it
+    await expect(moneyOut.locator('[data-line="expenses"]')).toContainText('€3,357.00')
+    await expect(moneyOut.locator('[data-line="set-aside"]')).toContainText('From what is left')
     await expect(moneyOut.locator('[data-line="rowless"]')).toHaveCount(0)
 
     // the position: assets equal debts and net worth, in balances and in the month's change
@@ -110,7 +112,7 @@ test.describe('the Statement', () => {
     await expect(page.getByTestId('progress')).toHaveText(/^(\d+ of \d+ done|All \d+ done)/)
     // "Collapse all" folded the headings too: the one that holds the row is opened again
     await expect(page.getByRole('checkbox', { name: 'To savings done' })).toHaveCount(0)
-    await moneyOut.getByRole('button', { name: 'To savings, investments and debts', exact: true }).click()
+    await moneyOut.getByRole('button', { name: 'From what is left', exact: true }).click()
     await expect(page.getByRole('checkbox', { name: 'To savings done' })).toBeVisible()
     await closeMonth(page)
     await expect(page.getByText('closed', { exact: true })).toBeVisible()
@@ -196,8 +198,8 @@ test.describe('working the month in the Statement', () => {
     await expect(dlg.getByLabel('Amount in EUR')).toHaveCount(0)
     await dlg.getByRole('button', { name: 'Cancel' }).click()
     await expect(dlg).toBeHidden()
-    // pocket money is a line per adult with an amount of its own
-    await moneyOut.getByRole('button', { name: 'Pocket money', exact: true }).click()
+    // pocket money is a line per adult with an amount of its own, at the top of what is shared out of the rest
+    await expect(moneyOut.getByRole('button', { name: 'Pocket money', exact: true })).toHaveCount(0)
     await expect(page.getByRole('checkbox', { name: 'Sam – Pocket done' })).toBeVisible()
     await expect(moneyOut.getByRole('button', { name: 'Sam – Pocket: €500.00' })).toBeVisible()
 
@@ -774,7 +776,6 @@ test.describe('working the month in the Statement', () => {
     await goToMonth(page, 'November 2026')
     const moneyOut = page.getByRole('region', { name: 'Money out' })
     const dlg = page.getByRole('dialog')
-    await moneyOut.getByRole('button', { name: 'Pocket money', exact: true }).click()
     await expect(moneyOut.getByRole('button', { name: 'To savings: €2,369.00' })).toBeVisible()
 
     // a pocket line carries the rule symbol, like a transfer to an account
@@ -952,7 +953,8 @@ test.describe('working the month in the Statement', () => {
 
     // a category with something usual to offer opens by itself and lists everything it has, the usual rows first
     const transport = group('Transport')
-    await expect(transport.locator('[data-suggestion]')).toHaveText([/^The car – Fuel & parking/, /^Transport/, /^The car – Tax & inspection/, /^The car – Maintenance/])
+    // a loan's payment is one of the car's costs: it is offered in the same category, after the usual rows
+    await expect(transport.locator('[data-suggestion]')).toHaveText([/^The car – Fuel & parking/, /^Transport/, /^The car – Loan or lease/, /^The car – Tax & inspection/, /^The car – Maintenance/])
     await expect(page.getByRole('button', { name: /suggestions \(/ })).toHaveCount(0)
     // a line is its name, the amount and the buttons; what the row is for is behind its (i)
     await expect(transport).not.toContainText('Fuel or charging, parking, tolls.')
@@ -1010,24 +1012,23 @@ test.describe('working the month in the Statement', () => {
     await transport.getByLabel('Amount per month for The car – Fuel & parking').fill('90')
     await transport.getByLabel('Amount per month for The car – Fuel & parking').press('Enter')
     await expect(moneyOut.getByRole('button', { name: /^The car – Fuel & parking: €90\.00/ })).toBeVisible()
-    await expect(transport.locator('[data-suggestion]')).toHaveText([/^Transport/, /^The car – Tax & inspection/, /^The car – Maintenance/])
+    await expect(transport.locator('[data-suggestion]')).toHaveText([/^Transport/, /^The car – Loan or lease/, /^The car – Tax & inspection/, /^The car – Maintenance/])
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await page.getByRole('button', { name: 'Next month' }).click()
     await expect(moneyOut.getByRole('button', { name: /^The car – Fuel & parking: €90\.00/ })).toBeVisible()
     await page.getByRole('button', { name: 'Previous month' }).click()
 
     // "×": not for us. The line is gone from the page; the undo arrow brings it back
-    await expect(transport.getByRole('button', { name: /^Dismiss / })).toHaveCount(3)
+    await expect(transport.getByRole('button', { name: /^Dismiss / })).toHaveCount(4)
     await transport.getByRole('button', { name: 'Dismiss Transport' }).click()
-    await expect(transport.locator('[data-suggestion]')).toHaveText([/^The car – Tax & inspection/, /^The car – Maintenance/])
+    await expect(transport.locator('[data-suggestion]')).toHaveText([/^The car – Loan or lease/, /^The car – Tax & inspection/, /^The car – Maintenance/])
     await page.getByRole('button', { name: 'Undo' }).click()
-    await expect(transport.locator('[data-suggestion]')).toHaveText([/^Transport/, /^The car – Tax & inspection/, /^The car – Maintenance/])
+    await expect(transport.locator('[data-suggestion]')).toHaveText([/^Transport/, /^The car – Loan or lease/, /^The car – Tax & inspection/, /^The car – Maintenance/])
     await transport.getByRole('button', { name: 'Add Transport', exact: true }).click()
     await expect(moneyOut.getByRole('button', { name: /^Transport: / })).toBeVisible()
 
     // one that needs an account the household does not have offers that account first
-    const setAside = group('To savings, investments and debts')
-    const loan = setAside.locator('[data-suggestion$=":v.loan"]')
+    const loan = transport.locator('[data-suggestion$=":v.loan"]')
     await expect(loan.getByLabel(/^Amount per month/)).toHaveCount(0)
     await expect(loan.getByRole('button', { name: 'Add a loan for The car – Loan or lease' })).toHaveText('Add a loan…')
 
@@ -1217,7 +1218,7 @@ test.describe('working the month in the Statement', () => {
     await expect(moneyOut.getByLabel('What is it for?').locator('option[value="from-savings"]')).toHaveCount(0)
   })
 
-  test('a row under "To savings, investments and debts" says what it is for, and the place it goes to can be made with it', async ({ page }) => {
+  test('a row under "From what is left" says what it is for, and the place it goes to can be made with it; a loan is paid off from under Expenses', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'November 2026')
     const moneyIn = page.getByRole('region', { name: 'Money in' })
@@ -1229,22 +1230,27 @@ test.describe('working the month in the Statement', () => {
     const which = moneyOut.getByLabel('Which one')
     const text = moneyOut.getByTestId('add-row-text')
 
-    // the question comes first, the places money is put before the plain move between accounts
+    // the question comes first: the places the rest of the month is shared out to, then the plain move between accounts.
+    // A payment to a loan or a card is not among them: it has to be made, so it is added with the expenses
     await moneyOut.getByRole('button', { name: 'Add transfer row' }).click()
     await expect(what.locator('option')).toHaveText([
-      'Goes into a savings account', 'Deposits into an investment account', 'Fills a virtual account', 'Pays off a loan or card', 'Pocket money for an adult', 'Moves money between your accounts',
+      'Goes into a savings account', 'Deposits into an investment account', 'Fills a virtual account', 'Pocket money for an adult', 'Moves money between your accounts',
     ])
     await expect(what).toHaveValue('to-savings')
     // what the household has, then the way to make another
     await expect(which.locator('option')).toHaveText(['Savings', 'New savings account…'])
     await expect(moneyOut.getByLabel('New transfer row name')).toHaveAttribute('placeholder', 'To Savings')
+    await moneyOut.getByRole('button', { name: 'Cancel' }).click()
 
-    // a loan the household does not have yet: the row and the loan are made together
-    await what.selectOption('pay-off')
-    await expect(which.locator('option')).toHaveText(['Credit card · Credit card', 'New loan…', 'New credit card…'])
-    await which.selectOption({ label: 'New loan…' })
+    // a loan the household does not have yet, from under Expenses: the row and the loan are made together
+    const does = moneyOut.getByLabel('What the new expense row does')
+    const paid = moneyOut.getByLabel('Account for the new expense row')
+    await moneyOut.getByRole('button', { name: 'Add expense row' }).click()
+    await does.selectOption('pay-off')
+    await expect(paid.locator('option')).toHaveText(['Credit card · Credit card', 'New loan…', 'New credit card…'])
+    await paid.selectOption({ label: 'New loan…' })
     await expect(text).toHaveText('Add opens the form of the new loan. Saving it makes the loan and this row together.')
-    await expect(moneyOut.getByLabel('New transfer row name')).toHaveAttribute('placeholder', 'Named after the loan')
+    await expect(moneyOut.getByLabel('New expense row name')).toHaveAttribute('placeholder', 'Named after the loan')
     await page.screenshot({ path: 'e2e/output/statement-row-first.png', fullPage: true })
     await moneyOut.getByRole('button', { name: 'Add', exact: true }).click()
     await expect(dlg.getByRole('heading', { name: 'New account' })).toBeVisible()
@@ -1261,20 +1267,33 @@ test.describe('working the month in the Statement', () => {
     await dlg.getByLabel('Amount in EUR').fill('250')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-    await expect(moneyOut.getByRole('button', { name: /^Car loan – Payment: €250\.00/ })).toBeVisible()
+    // the payment stands with the expenses, under "No category" until it is given one, and brings the loan down
+    const part = (id: string) => moneyOut.locator(`li:has(> [data-line="${id}"])`)
+    await expect(part('expenses').getByRole('button', { name: /^Car loan – Payment: €250\.00/ })).toBeVisible()
+    await expect(part('set-aside').getByRole('button', { name: /^Car loan – Payment:/ })).toHaveCount(0)
     await expect(claims.locator('[data-line^="acc:"]').filter({ hasText: 'Car loan' })).toContainText('€4,750.00')
-    // the form is closed again, and one undo of the amount, one of the pair
-    await expect(what).toHaveCount(0)
+    // the form is closed again
+    await expect(does).toHaveCount(0)
 
-    // the card the household has is paid off from here too: its row lives under Transfers, named after the card
-    await moneyOut.getByRole('button', { name: 'Add transfer row' }).click()
-    await what.selectOption('pay-off')
-    await which.selectOption({ label: 'Credit card · Credit card' })
-    await expect(moneyOut.getByLabel('New transfer row name')).toHaveAttribute('placeholder', 'Credit card – Payment')
+    // the card the household has is paid off from there too. What was bought with it is under Expenses already, so
+    // its payment only moves money: the form says where the line will show, and the page goes there
+    await moneyOut.getByRole('button', { name: 'Add expense row' }).click()
+    await does.selectOption('pay-off')
+    await expect(paid.locator('option')).toHaveText(['Car loan · Loan', 'Credit card · Credit card', 'New loan…', 'New credit card…'])
+    await expect(text).toHaveText('Each payment brings down what is owed on the loan or card you pick; what is still owed shows under Balances.')
+    await paid.selectOption({ label: 'Credit card · Credit card' })
+    await expect(text).toHaveText('It will show under "Moved elsewhere": what was bought with this card is under Expenses already, so the payment only moves money to the card.')
+    await expect(moneyOut.getByLabel('New expense row name')).toHaveAttribute('placeholder', 'Credit card – Payment')
     await moneyOut.getByRole('button', { name: 'Add', exact: true }).click()
     await expect(dlg.getByRole('heading', { name: 'Credit card – Payment · November 2026' })).toBeVisible()
-    await dlg.getByRole('button', { name: 'Cancel' }).click()
-    await expect(moneyOut.locator('[data-line]').filter({ hasText: 'Credit card – Payment' })).toBeVisible()
+    await dlg.getByLabel('Amount in EUR').fill('60')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    const cardPayment = part('moved').locator('[data-line]').filter({ hasText: 'Credit card – Payment' })
+    await expect(cardPayment).toContainText('counted when bought')
+    await expect(cardPayment).toBeInViewport()
+    // listed, and in no sum: the heading over it counts nothing for it
+    await expect(moneyOut.locator('[data-line="moved"]')).toContainText('€0.00')
 
     // a new investment account with its own name for the row; the row's dialog opens with how the amount is set
     await moneyOut.getByRole('button', { name: 'Add transfer row' }).click()
@@ -1304,14 +1323,13 @@ test.describe('working the month in the Statement', () => {
     await expect(moneyOut.getByRole('button', { name: 'To Gifts: €20.00' })).toBeVisible()
     await expect(what).toHaveCount(0)
 
-    // a loan payment is looked for among the expenses, so a category offers it too and says where its line will show
+    // a loan payment is one of a category's costs (the car loan under Transport): added there, it stays there
     await moneyOut.getByRole('button', { name: 'Transport', exact: true }).click()
     await moneyOut.getByRole('button', { name: 'Add row to Transport' }).click()
-    await moneyOut.getByLabel('What the new expense row does').selectOption('pay-off')
-    await expect(moneyOut.getByLabel('Account for the new expense row').locator('option')).toHaveText(['Car loan · Loan', 'New loan…', 'New credit card…'])
-    await expect(text).toHaveText('It will show under "To savings, investments and debts": the money is not gone, it brings the debt down.')
-    await moneyOut.getByLabel('Account for the new expense row').selectOption({ label: 'New loan…' })
-    await expect(text).toHaveText('It will show under "To savings, investments and debts": the money is not gone, it brings the debt down. Add opens the form of the new loan.')
+    await does.selectOption('pay-off')
+    await expect(paid.locator('option')).toHaveText(['Car loan · Loan', 'Credit card · Credit card', 'New loan…', 'New credit card…'])
+    await paid.selectOption({ label: 'New loan…' })
+    await expect(text).toHaveText('Add opens the form of the new loan. Saving it makes the loan and this row together.')
     await page.screenshot({ path: 'e2e/output/statement-loan-from-category.png', fullPage: true })
     await moneyOut.getByLabel('New expense row name').fill('Bike loan')
     await moneyOut.getByLabel('New expense row name').press('Enter')
@@ -1322,8 +1340,9 @@ test.describe('working the month in the Statement', () => {
     await dlg.getByLabel('Amount in EUR').fill('75')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-    // the row is not in Transport: the page shows where it landed, in the second group, and marks it for a moment
-    const landed = moneyOut.locator('[data-line]').filter({ hasText: 'Bike loan' })
+    // the row is in Transport, beside the category's other costs: the page marks it for a moment
+    const transportPart = moneyOut.locator('li:has(> [data-line^="cat:expense:"])').filter({ has: page.getByRole('button', { name: 'Transport', exact: true }) })
+    const landed = transportPart.locator('[data-line]').filter({ hasText: 'Bike loan' })
     await expect(landed).toHaveAttribute('data-marked', 'true')
     await expect(landed).toBeInViewport()
     await expect(landed).toContainText('€75.00')
@@ -1776,7 +1795,7 @@ test.describe('working the month in the Statement', () => {
     const assets = page.getByRole('region', { name: 'Assets' })
     const claims = page.getByRole('region', { name: 'Debts and net worth' })
     const heading = (side: Locator, name: string) => side.getByRole('button', { name, exact: true })
-    const setAside = heading(moneyOut, 'To savings, investments and debts')
+    const setAside = heading(moneyOut, 'From what is left')
     const saved = moneyOut.getByRole('checkbox', { name: 'To savings done' })
 
     // every heading is open at first, and is a button that says so
@@ -2230,21 +2249,33 @@ test.describe('the Statement on a phone', () => {
     await expect(dlg).toBeHidden()
   })
 
-  test('the row form under "To savings, investments and debts" fits the screen, and makes a loan with its row', async ({ page }) => {
+  test('the row forms fit the screen: under "From what is left", and under Expenses where a loan is made with its row', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'November 2026')
     const moneyOut = page.getByRole('region', { name: 'Money out' })
     const dlg = page.getByRole('dialog')
-    await moneyOut.getByRole('button', { name: 'Add transfer row' }).tap()
-    await moneyOut.getByLabel('What is it for?').selectOption('pay-off')
-    await moneyOut.getByLabel('Which one').selectOption({ label: 'New loan…' })
-    // nothing of the form reaches past the edge of the screen
-    for (const part of [moneyOut.getByLabel('What is it for?'), moneyOut.getByLabel('Which one'), moneyOut.getByLabel('New transfer row name'), moneyOut.getByRole('button', { name: 'Cancel' }), moneyOut.getByTestId('add-row-text')]) {
-      const box = await part.boundingBox()
-      expect(box && box.x >= 0 && box.x + box.width <= 390).toBeTruthy()
+    /** Nothing of a form reaches past the edge of the screen. */
+    const fits = async (parts: Locator[]) => {
+      for (const part of parts) {
+        const box = await part.boundingBox()
+        expect(box && box.x >= 0 && box.x + box.width <= 390).toBeTruthy()
+      }
     }
+    // how the rest is shared out: the question first, then the place, then the name
+    await moneyOut.getByRole('button', { name: 'Add transfer row' }).tap()
+    await moneyOut.getByLabel('What is it for?').selectOption('to-investment')
+    await moneyOut.getByLabel('Which one').selectOption({ label: 'New investment account…' })
+    await fits([moneyOut.getByLabel('What is it for?'), moneyOut.getByLabel('Which one'), moneyOut.getByLabel('New transfer row name'), moneyOut.getByRole('button', { name: 'Cancel' }), moneyOut.getByTestId('add-row-text')])
     await moneyOut.getByLabel('What is it for?').scrollIntoViewIfNeeded()
     await page.screenshot({ path: 'e2e/output/statement-row-first-phone.png' })
+    await moneyOut.getByRole('button', { name: 'Cancel' }).tap()
+    // a loan is paid off from under Expenses
+    await moneyOut.getByRole('button', { name: 'Add expense row' }).tap()
+    await moneyOut.getByLabel('What the new expense row does').selectOption('pay-off')
+    await moneyOut.getByLabel('Account for the new expense row').selectOption({ label: 'New loan…' })
+    await fits([moneyOut.getByLabel('What the new expense row does'), moneyOut.getByLabel('Account for the new expense row'), moneyOut.getByLabel('New expense row name'), moneyOut.getByRole('button', { name: 'Cancel' }), moneyOut.getByTestId('add-row-text')])
+    await moneyOut.getByLabel('What the new expense row does').scrollIntoViewIfNeeded()
+    await page.screenshot({ path: 'e2e/output/statement-loan-row-phone.png' })
     await moneyOut.getByRole('button', { name: 'Add', exact: true }).tap()
     await dlg.getByLabel('Name', { exact: true }).fill('Car loan')
     await expect(dlg.getByTestId('acc-row')).toHaveText('Saving also adds the row "Car loan – Payment", linked to this account.')

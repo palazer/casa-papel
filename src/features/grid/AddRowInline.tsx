@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useStore } from '@/app/store'
-import type { Account, AccountType, Category, Household, MonthKey, Row, Section, Tables } from '@/model'
+import { cardIsItemized, type Account, type AccountType, type Category, type Household, type MonthKey, type Row, type Section, type Tables } from '@/model'
 import { addRow, addRowOfKind, payOffKind, rowNameFor, rowTargets, type AccountRowInput, type ExpenseRowKind, type TransferRowKind } from '@/store'
 import { NativeSelect } from '@/components/NativeSelect'
 import { cn } from '@/lib/utils'
@@ -61,18 +61,20 @@ const K = {
 const KINDS: Kind[] = [K.moves, K.toSavings, K.toInvestment, K.pool, K.pocket, K.fromSavings, K.fromInvestment, K.cardPayment, K.expense, K.payOff]
 
 /**
- * The Statement's "To savings, investments and debts": what such a row can be for, the places money is put first. Every card and loan
- * is paid off from here, whichever section its row lives in, and a virtual account can be made on the spot once there
- * is a savings account to hold it.
+ * The Statement's "From what is left": what such a row can be for, the places the rest of the month is shared out to.
+ * A virtual account can be made on the spot once there is a savings account to hold it. A payment to a loan or a card
+ * is not among them: it has to be made, so it is added with the expenses.
  */
 const SET_ASIDE: Kind[] = [
   K.toSavings,
   K.toInvestment,
   { ...K.pool, text: 'Money set aside inside a savings account for one purpose. A new virtual account comes with its own row.', create: [NEW.pool], offered: (t) => t.savings.length > 0 || t.orphanPools.length > 0 },
-  { ...K.payOff, targets: (t) => [...t.payoff, ...t.cardsItemized].map(withType) },
   K.pocket,
   K.moves,
 ]
+
+/** On the Statement every loan and card is paid off from under Expenses, whichever section its row lives in. */
+const PAYS_ANY: Kind = { ...K.payOff, targets: (t) => [...t.payoff, ...t.cardsItemized].map(withType) }
 
 const newValue = (n: New) => `new:${n.type}`
 
@@ -81,7 +83,7 @@ const newValue = (n: New) => `new:${n.type}`
  * the row does. The Statement also puts one inside each category: `defaultCategoryId` starts it there, `label` names
  * the button ("Add row to Housing"), and `onAdded` hands back the new row so the screen can open it. Where the place
  * says what the row does (the Statement's "From accounts"), `only` narrows the choices to those, and `without`
- * leaves out the ones that have a place of their own. `place="set-aside"` is the Statement's "To savings, investments and debts":
+ * leaves out the ones that have a place of their own. `place="set-aside"` is the Statement's "From what is left":
  * the form asks first what the row is for.
  *
  * A row that names an account never dead-ends on a missing one: the list of accounts ends with "New loan…" (or the
@@ -102,7 +104,10 @@ export function AddRowInline({ section, categories, tables, household, onError, 
   /** The button's classes when it carries a `lead`: its gap, and no padding of its own before the lead. */
   leadClassName?: string
   formClassName?: string
-  /** Under Expenses on the Statement: where the line of a row that pays off a loan or card will show, and why. */
+  /**
+   * Under Expenses on the Statement, where every loan and card can be paid off: what is said when the row pays a card
+   * whose purchases are expense rows already, because that line shows elsewhere on the page.
+   */
   payOffNote?: string
 }) {
   const store = useStore()
@@ -116,7 +121,8 @@ export function AddRowInline({ section, categories, tables, household, onError, 
 
   // the lists and rules the store applies in addRowOfKind, so what is offered is what is accepted
   const t = rowTargets(tables, household)
-  const list = place === 'set-aside' ? SET_ASIDE : KINDS.filter((k) => k.section === section && (!only || only.includes(k.key)) && !without?.includes(k.key))
+  const list = place === 'set-aside' ? SET_ASIDE
+    : KINDS.filter((k) => k.section === section && (!only || only.includes(k.key)) && !without?.includes(k.key)).map((k) => (payOffNote && k.key === 'pay-off' ? PAYS_ANY : k))
   const kinds = list.filter((k) => k.offered?.(t) ?? true)
   // a choice that is no longer offered (the plug got its row, the pool was filled elsewhere) falls back to the first one
   const kind: Kind | undefined = kinds.find((k) => k.key === choice) ?? kinds[0]
@@ -135,10 +141,10 @@ export function AddRowInline({ section, categories, tables, household, onError, 
   // a virtual account names its own row in its form
   const showName = creating?.type !== 'pool'
   const sameSection = !kind || kind.section === section
-  // a payment row added among the expenses shows elsewhere on the Statement: that is said in place of the usual sentence
-  const landsElsewhere = !!payOffNote && kind?.key === 'pay-off' && place !== 'set-aside'
+  // the payment to a card whose purchases are expense rows shows elsewhere on the Statement: that is said in place of the usual sentence
+  const landsElsewhere = !!payOffNote && kind?.key === 'pay-off' && !!account && cardIsItemized(account)
   const text = !kind ? null : missing ?? (
-    landsElsewhere ? `${payOffNote}${creating ? ` Add opens the form of the new ${creating.thing}.` : ''}`
+    landsElsewhere ? payOffNote
     : creating?.type === 'pool' ? 'Add opens the form of the new virtual account. Saving it makes the virtual account and its row, "To <name>".'
     : creating ? `Add opens the form of the new ${creating.thing}. Saving it makes the ${creating.thing} and this row together.`
     : kind.text)

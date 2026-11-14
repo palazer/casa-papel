@@ -85,13 +85,17 @@ export interface MonthTotals {
   allocationsByPool: Record<string, Money>
   toInvestment: Money
   pocket: Money
+  /** Paid to loans, and to cards whose payment is the spending. */
   debt: Money
+  /** Moved between the household's own accounts by plain transfer rows: an outflow of the month, not an expense. Counted in `cashExpense` too. */
+  moved: Money
   buffer: Money
   /** Positive = into savings, negative = drawn from savings. */
   toSavings: Money
   leftover: Money
   /** Derived "From savings" row: spending paid from savings, from virtual accounts and from named accounts. */
   fromSavingsDerived: Money
+  /** What the month costs: the expense rows, whatever they come out of, and `debt`. Neither `pocket` nor `moved`. */
   expensesTotal: Money
   transfersTotal: Money
   /** The part of `income` that was taken out of your own accounts by hand (savings, investments): money in, not earned. */

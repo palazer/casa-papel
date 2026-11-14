@@ -55,7 +55,10 @@ function expectSound(t: Tables, range: MonthKey[]) {
     expect(taken, `${m} taken from accounts`).toBe(tot.fromAccounts)
     expect(worked, `${m} from savings`).toBe(tot.fromSavingsDerived)
     // what covers a short month sits on the left; taken back out, the right side is the engine's outflows and closing figures
-    expect(s.flow.right.total - covered, `${m} outflows`).toBe(tot.expensesTotal + tot.allocations + tot.toInvestment + tot.toSavings + tot.leftover)
+    expect(s.flow.right.total - covered, `${m} outflows`).toBe(tot.expensesTotal + tot.moved + tot.pocket + tot.allocations + tot.toInvestment + tot.toSavings + tot.leftover)
+    // the first heading is what the month costs, to the cent what the Grid calls "Expenses total"; what is moved between the household's accounts has its own
+    expect(amountOf('out', 'expenses'), `${m} expenses`).toBe(tot.expensesTotal)
+    expect(amountOf('out', 'moved'), `${m} moved`).toBe(tot.moved)
     // one net worth: the Statement's is the engine's, and both count what stays in the main account
     expect(find(s, 'main')?.amount ?? 0, `${m} main account`).toBe(out.main?.months[m]?.balance ?? 0)
     expect(topLine(s, 'claims', 'net-worth')!.amount, `${m} net worth`).toBe(out.netWorth[m] ?? 0)
@@ -114,7 +117,8 @@ describe('the Statement balances', () => {
         return g + line.change! - r.inflow + r.outflow
       }, 0)
       // money taken out of your own accounts comes in without being earned
-      expect(topLine(s, 'claims', 'net-worth')!.change, m).toBe(tot.income - tot.fromAccounts - (tot.expensesTotal - tot.debt) + growth)
+      // a payment brings a debt down, so it costs the month and leaves net worth as it was; pocket money and money moved elsewhere are gone
+      expect(topLine(s, 'claims', 'net-worth')!.change, m).toBe(tot.income - tot.fromAccounts - (tot.expensesTotal - tot.debt + tot.pocket + tot.moved) + growth)
     }
   })
 })
@@ -128,18 +132,21 @@ describe('the Statement, the month', () => {
     // the section for money from the household's accounts is always there, empty until something comes out of one
     expect(topLine(s, 'in', 'from-accounts')).toMatchObject({ amount: 0, empty: true, children: [] })
     expect(s.flow.left.total).toBe(725500)
-    expect(s.flow.right.lines.map((l) => l.label)).toEqual(['Expenses', 'To savings, investments and debts'])
+    // first what the month costs, then what happens with what is left
+    expect(s.flow.right.lines.map((l) => l.label)).toEqual(['Expenses', 'From what is left'])
     const expenses = topLine(s, 'out', 'expenses')!
-    expect(expenses.children.map((c) => c.label)).toEqual(['Housing', 'Living', 'Transport', 'Family & pets', 'Fun', 'Personal', 'Pocket money'])
+    expect(expenses.children.map((c) => c.label)).toEqual(['Housing', 'Living', 'Transport', 'Family & pets', 'Fun', 'Personal'])
     expect(expenses.children.find((c) => c.label === 'Housing')).toMatchObject({ kind: 'category', amount: 186000 })
-    expect(expenses.children.find((c) => c.label === 'Pocket money')!.children.map((c) => [c.label, c.amount, c.automatic])).toEqual([['Sam – Pocket', 50000, false], ['Alex – Pocket', 50000, false]])
     // an itemized row opens to its items
     expect(find(s, expenses.children.find((c) => c.label === 'Personal')!.children[0].id)!.children.map((c) => [c.label, c.amount, c.status])).toEqual([['Concert tickets', 9000, 'done'], ['Books', 3200, 'done']])
+    // pocket money is shared out of what is left, so it leads that block, a line per adult
     const setAside = topLine(s, 'out', 'set-aside')!
-    expect(setAside.children.map((c) => c.label)).toEqual(['To savings', 'To investments', 'To Travel', 'To Clothing'])
+    expect(setAside.children.map((c) => [c.label, c.kind])).toEqual([['Sam – Pocket', 'row'], ['Alex – Pocket', 'row'], ['To savings', 'row'], ['To investments', 'row'], ['To Travel', 'row'], ['To Clothing', 'row']])
+    expect(setAside.children.slice(0, 2).map((c) => [c.amount, c.automatic])).toEqual([[50000, false], [50000, false]])
     // the rest: income − expenses − pocket money − the three typed transfers
-    expect(setAside.children[0]).toMatchObject({ balancing: true, automatic: true, amount: 725500 - 335700 - 100000 - 80000 })
-    expect(expenses.amount).toBe(335700 + 100000)
+    expect(setAside.children[2]).toMatchObject({ balancing: true, automatic: true, amount: 725500 - 335700 - 100000 - 80000 })
+    expect(expenses.amount).toBe(335700)
+    expect(find(s, 'pocket')).toBeUndefined()
   })
 
   it('shows spending from a virtual account on both sides', () => {
@@ -242,13 +249,53 @@ describe('the Statement, the month', () => {
     const payAmex = row({ name: 'Pay Amex', section: 'transfer', kind: 'card-payment', accountId: amex.id, order: 'c1' })
     const t = tables({ household: [household()], accounts: [visa, amex], rows: [salary, shopping, payVisa, payAmex], cells: [cellValue(salary.id, '2026-01', 2000_00), cellValue(shopping.id, '2026-01', 150_00), cellValue(payVisa.id, '2026-01', 200_00), cellValue(payAmex.id, '2026-01', 300_00)] })
     const { s } = statementFor(t, '2026-01')
-    const setAside = topLine(s, 'out', 'set-aside')!
-    expect(setAside.children.map((c) => [c.label, c.amount, !!c.memo])).toEqual([['Pay Visa', 200_00, true], ['Pay Amex', 300_00, false], ['To savings', 1550_00, false]])
-    expect(setAside.amount).toBe(1850_00)
+    // the lump card's payment is the spending: it stands with the expenses. The itemized card's only moves money to
+    // the card for what was counted when it was bought, so it is listed under "Moved elsewhere" and is in no sum
+    expect(topLine(s, 'out', 'expenses')!.children.map((c) => [c.label, c.amount, !!c.memo])).toEqual([['Shopping', 150_00, false], ['Pay Amex', 300_00, false]])
+    expect(topLine(s, 'out', 'expenses')!.amount).toBe(450_00)
+    expect(topLine(s, 'out', 'moved')).toMatchObject({ amount: 0 })
+    expect(topLine(s, 'out', 'moved')!.children.map((c) => [c.label, c.amount, !!c.memo, c.chip])).toEqual([['Pay Visa', 200_00, true, 'counted when bought']])
+    expect(topLine(s, 'out', 'set-aside')!.children.map((c) => [c.label, c.amount])).toEqual([['To savings', 1550_00]])
+    // each payment is linked to the card it pays off, wherever its line stands
+    expect(all(s).find((l) => l.label === 'Pay Amex')!.link).toMatchObject({ text: 'Pays off Amex' })
+    expect(all(s).find((l) => l.label === 'Pay Visa')!.link).toMatchObject({ text: 'Pays off Visa' })
     expect(topLine(s, 'claims', 'debts')!.children.map((c) => [c.label, c.amount, c.change])).toEqual([['Visa', 150_00, -50_00], ['Amex', 200_00, -300_00]])
     // the main account holds the 150 still to pay and gave 200 for what was owed before
     expect(find(s, 'main')).toMatchObject({ label: 'Main account', amount: -50_00, change: -50_00 })
     expect(find(s, 'main')!.children.map((c) => [c.label, c.amount])).toEqual([['At the start of the month', 0], ['Bought on the card, not yet paid', 150_00], ['Paid to the card', -200_00]])
+    expectSound(t, months)
+  })
+
+  it('puts a loan\'s payment with the expenses, in its row\'s category, and pocket money with what is left', () => {
+    const transport = CategorySchema.parse({ id: newId(), createdAt: T0, updatedAt: T0, name: 'Transport', section: 'expense', order: 'a0' })
+    const carLoan = account({ name: 'Car loan', type: 'loan', openingBalance: 9000_00 })
+    const student = account({ name: 'Student loan', type: 'loan', openingBalance: 4000_00, order: 'a1' })
+    const savings = account({ name: 'Savings', type: 'savings', openingBalance: 1000_00, order: 'a2' })
+    const salary = row({ name: 'Salary', section: 'income' })
+    const fuel = row({ name: 'The car – Fuel', section: 'expense', categoryId: transport.id, order: 'b0' })
+    const payCar = row({ name: 'Car loan – Payment', section: 'expense', kind: 'debt-payment', categoryId: transport.id, accountId: carLoan.id, order: 'b1' })
+    const payStudent = row({ name: 'Student loan – Payment', section: 'expense', kind: 'debt-payment', accountId: student.id, order: 'b2' })
+    const pocketRow = row({ name: 'Sam – Pocket', section: 'transfer', kind: 'pocket-money', order: 'c0' })
+    const toSavings = row({ name: 'To savings', section: 'transfer', kind: 'to-savings', accountId: savings.id, order: 'c1' })
+    const t = tables({
+      household: [household()], accounts: [carLoan, student, savings], categories: [transport], rows: [salary, fuel, payCar, payStudent, pocketRow, toSavings],
+      cells: [cellValue(salary.id, '2026-01', 4000_00), cellValue(fuel.id, '2026-01', 377_00), cellValue(payCar.id, '2026-01', 530_00), cellValue(payStudent.id, '2026-01', 100_00), cellValue(pocketRow.id, '2026-01', 250_00)],
+    })
+    const { s, out } = statementFor(t, '2026-01')
+    expect(s.flow.right.lines.map((l) => [l.label, l.amount])).toEqual([['Expenses', 1007_00], ['From what is left', 2993_00]])
+    // what has to be paid: the car's loan beside the car's fuel, a payment without a category under "No category"
+    const expenses = topLine(s, 'out', 'expenses')!
+    expect(expenses.children.map((c) => [c.label, c.amount, c.children.map((r) => r.label)])).toEqual([
+      ['Transport', 907_00, ['The car – Fuel', 'Car loan – Payment']], ['No category', 100_00, ['Student loan – Payment']],
+    ])
+    // what is shared out of the rest: pocket money first, then the account that takes the rest
+    expect(topLine(s, 'out', 'set-aside')!.children.map((c) => [c.label, c.amount, c.balancing])).toEqual([['Sam – Pocket', 250_00, undefined], ['To savings', 2743_00, true]])
+    // the payment still brings its loan down, and the two lines point at each other
+    const debtLine = find(s, `acc:${carLoan.id}`)!
+    expect(debtLine).toMatchObject({ amount: 8470_00, change: -530_00, link: { to: [payCar.id], text: 'Paid off by Car loan – Payment' } })
+    expect(find(s, payCar.id)!.link).toEqual({ to: [debtLine.id], text: 'Pays off Car loan' })
+    // the Grid's "Expenses total" is the same figure: payments in, pocket money out
+    expect(out.totals['2026-01']).toMatchObject({ expensesTotal: 1007_00, debt: 630_00, pocket: 250_00, moved: 0 })
     expectSound(t, months)
   })
 
@@ -265,7 +312,7 @@ describe('the Statement, the month', () => {
     expect(topLine(s, 'in', 'from-accounts')!.children.map((c) => [c.kind, c.rowId, c.label, c.accountKind, c.ownName, c.chip])).toEqual([['row', sell.id, 'From Fund', undefined, 'Sell fund', undefined]])
     expect(all(s).find((l) => l.label === 'Salary')!.net).toBe(3000_00)
     expect(all(s).find((l) => l.label === 'Tax')).toMatchObject({ amount: 1000_00, automatic: true })
-    expect(s.flow.right.lines.map((l) => [l.label, l.amount])).toEqual([['Expenses', 1000_00], ['Moved elsewhere', 100_00], ['To savings, investments and debts', 3400_00]])
+    expect(s.flow.right.lines.map((l) => [l.label, l.amount])).toEqual([['Expenses', 1000_00], ['Moved elsewhere', 100_00], ['From what is left', 3400_00]])
     expectSound(t, months)
   })
 

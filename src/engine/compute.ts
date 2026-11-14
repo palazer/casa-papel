@@ -277,7 +277,14 @@ export function computeEngine(input: EngineInput): EngineOutput {
   for (const row of rows) {
     if (row.kind !== 'category-estimate') continue
     const cat = row.section === 'expense' ? categoryOf(row, liveCats) : null
-    const siblings = cat ? rows.filter((r) => r.id !== row.id && r.section === 'expense' && (r.kind === 'plain' || r.kind === 'salary') && categoryOf(r, liveCats)?.id === cat.id) : []
+    // a loan's payment (and a card's, where the payment is the spending) stands in its category like any expense, so it explains its part
+    const paysOff = (r: Row): boolean => {
+      if (r.kind === 'debt-payment') return true
+      if (r.kind !== 'card-payment') return false
+      const acc = r.accountId ? accountsById.get(r.accountId) : undefined
+      return !acc || !cardIsItemized(acc)
+    }
+    const siblings = cat ? rows.filter((r) => r.id !== row.id && r.section === 'expense' && (r.kind === 'plain' || r.kind === 'salary' || paysOff(r)) && categoryOf(r, liveCats)?.id === cat.id) : []
     for (const m of months) {
       const c = cells[cellKey(row.id, m)]
       if (!c || c.source === 'archived') continue
@@ -285,8 +292,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
       for (const s of siblings) {
         const sc = cells[cellKey(s.id, m)]
         if (!sc || sc.source === 'archived') continue
-        // an expense counts by its funding parts, as the month's totals do
-        explained += fundingTotal(sc.funding)
+        // an expense counts by its funding parts, as the month's totals do; a payment by its amount
+        explained += paysOff(s) ? sc.valueBase : fundingTotal(sc.funding)
       }
       // an estimate whose category is gone counts nothing
       const restBase: Money = cat ? Math.max(0, c.valueBase - explained) : 0
@@ -328,7 +335,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
   for (const m of months) {
     const t: MonthTotals = {
       month: m, closed: isClosed(m), income: 0, cashExpense: 0, savingsFunded: 0, poolFunded: 0, poolFundedByPool: {}, accountFunded: 0, accountFundedByAccount: {}, fundedOwn: {},
-      allocations: 0, allocationsByPool: {}, toInvestment: 0, pocket: 0, debt: 0,
+      allocations: 0, allocationsByPool: {}, toInvestment: 0, pocket: 0, debt: 0, moved: 0,
       buffer: bufferFor(m), toSavings: 0, leftover: 0, fromSavingsDerived: 0, expensesTotal: 0, transfersTotal: 0,
       fromAccounts: 0, takeHome: 0, takeHomeBy: {}, leftForShares: 0, rest: null,
     }
@@ -397,7 +404,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
             for (const [aid, amt] of Object.entries(c.fundingOwn.accounts)) own(accountRef(aid), amt)
           } else {
             // plain transfer rows behave like outflows the user controls
-            t.debt += 0
+            t.moved += v
             t.cashExpense += v
           }
         }
@@ -470,7 +477,9 @@ export function computeEngine(input: EngineInput): EngineOutput {
       t.leftover = t.income - outflows() - userToSavings
     }
     t.fromSavingsDerived = t.savingsFunded + t.poolFunded + t.accountFunded
-    t.expensesTotal = t.cashExpense + t.savingsFunded + t.poolFunded + t.accountFunded + t.pocket + t.debt
+    // what the month costs: the expense rows, whatever they come out of, and the payments to loans and cards. Pocket
+    // money and what is moved between the household's own accounts are transfers, not expenses.
+    t.expensesTotal = t.cashExpense - t.moved + t.savingsFunded + t.poolFunded + t.accountFunded + t.debt
     t.transfersTotal = t.allocations + t.toInvestment + t.toSavings
     totals[m] = t
   }

@@ -32,11 +32,14 @@ describe('suggestions for setting up on the Statement', () => {
     const housing = t.categories.find((c) => c.name === 'Housing')!
     expect(at(`cat:expense:${housing.id}`)).toEqual(['The flat – Rent or mortgage', 'The flat – Utilities'])
     expect(at(`cat:expense:${housing.id}`, false)).toEqual(['The flat – Internet & phone', 'The flat – Home improvement', 'The flat – Home insurance'])
-    // no category of that name: the foot of Expenses, where the pocket lines sit too
-    expect(at('expenses')).toEqual(['Sam – Pocket', 'Alex – Pocket', 'Other'])
-    // a loan payment and a child's long-term savings sit with what is set aside and paid off, and wait for their account
+    // no category of that name: the foot of Expenses
+    expect(at('expenses')).toEqual(['Other'])
+    // what is shared out of the rest of the month sits in the second group: pocket money, and a child's long-term savings, which waits for its account
     const setAside = all.filter((s) => s.place === 'set-aside')
-    expect(setAside.map((s) => [s.title, s.needs, s.usual])).toEqual([['Robin – Long-term savings', 'investment', false], ['The car – Loan or lease', 'loan', false]])
+    expect(setAside.map((s) => [s.title, s.needs, s.usual])).toEqual([['Sam – Pocket', null, true], ['Alex – Pocket', null, true], ['Robin – Long-term savings', 'investment', false]])
+    // a loan's payment is something that has to be paid: it sits in its category with the car's other costs, and waits for its loan
+    const transport = t.categories.find((c) => c.name === 'Transport')!
+    expect(all.filter((s) => s.place === `cat:expense:${transport.id}` && s.needs === 'loan').map((s) => [s.title, s.usual])).toEqual([['The car – Loan or lease', false]])
     // transfers into savings and investments come from the account's rule, never from a suggestion
     expect(titles(all)).not.toContain('To savings')
     expect(titles(all)).not.toContain('To investments')
@@ -197,11 +200,12 @@ describe('suggestions for setting up on the Statement', () => {
 
   it('a step lights its part of the Statement and offers the suggestions that belong to it', async () => {
     const store = await fresh()
-    // income and expenses light one group each; every step that makes an account lights its side and the second group
+    // income and expenses light one group each; a step that makes an account money goes into lights its side and the
+    // second group, where the row that fills it shows; loans and cards light theirs and the expenses, where their payment shows
     expect(setupFocus('income')).toEqual({ sides: [], lines: ['income'] })
     expect(setupFocus('expenses')).toEqual({ sides: [], lines: ['expenses'] })
     for (const step of ['savings', 'virtual', 'investments'] as const) expect(setupFocus(step), step).toEqual({ sides: ['assets'], lines: ['set-aside'] })
-    expect(setupFocus('debts')).toEqual({ sides: ['claims'], lines: ['set-aside'] })
+    expect(setupFocus('debts')).toEqual({ sides: ['claims'], lines: ['expenses'] })
 
     const all = shownRowSuggestions(await loadTables(store))
     const of = (step: Parameters<typeof stepSuggestions>[0]) => stepSuggestions(step, all)
@@ -211,10 +215,13 @@ describe('suggestions for setting up on the Statement', () => {
     expect(of('expenses').length).toBeGreaterThan(0)
     expect(of('expenses').some((s) => s.pool)).toBe(false)
     expect(titles(of('virtual'))).toEqual(['Travel', 'Clothing', 'Entertainment & dining out'])
-    expect(of('savings')).toEqual([])
-    // nothing is offered twice, and nothing of the page is lost: only what the second group offers for another step is left out
-    const offered = [...of('income'), ...of('expenses'), ...of('virtual'), ...of('investments'), ...of('debts')]
+    // pocket money is offered where the rest of the month is shared out; a loan's payment waits for the loan's own step
+    expect(titles(of('savings'))).toEqual(['Sam – Pocket', 'Alex – Pocket'])
+    expect(of('expenses').some((s) => s.template.account === 'loan' || s.template.pocket)).toBe(false)
+    expect(titles(of('debts'))).toEqual(['The car – Loan or lease'])
+    // nothing is offered twice, and nothing of the page is lost
+    const offered = [...of('income'), ...of('expenses'), ...of('savings'), ...of('virtual'), ...of('investments'), ...of('debts')]
     expect(new Set(offered.map((s) => s.id)).size).toBe(offered.length)
-    expect(all.filter((s) => !offered.includes(s)).every((s) => s.place === 'set-aside')).toBe(true)
+    expect(all.filter((s) => !offered.includes(s))).toEqual([])
   })
 })

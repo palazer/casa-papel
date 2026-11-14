@@ -94,8 +94,8 @@ const STEP_PART: Record<SetupStepKey, string> = {
 }
 /** The type "Add account" starts on in a step of the guided setup that asks for one kind of account. */
 const STEP_ACCOUNT: Partial<Record<SetupStepKey, AccountType>> = { savings: 'savings', investments: 'investment' }
-/** Said under "Add row" in an expense place when the row pays off a loan or card: its line shows in the second group. */
-const PAY_OFF_NOTE = 'It will show under "To savings, investments and debts": the money is not gone, it brings the debt down.'
+/** Said under "Add row" in an expense place when the row pays a card whose purchases are expense rows: its line shows in another group. */
+const PAY_OFF_NOTE = 'It will show under "Moved elsewhere": what was bought with this card is under Expenses already, so the payment only moves money to the card.'
 /** What "Add account" offers under Assets, and "Add a card or loan" under Debts. */
 const ASSET_TYPES: AccountType[] = ['checking', 'joint', 'savings', 'investment', 'other-asset', 'cash']
 const DEBT_TYPES: AccountType[] = ['credit-card', 'loan']
@@ -298,11 +298,11 @@ export function StatementScreen() {
 
   /**
    * A new row opens its category and, in an open month, its dialog for the first amount (and, where it can carry one,
-   * its rule). Once the dialog is closed the page shows where the row is: a loan payment added from a category lands
-   * in the second group, pocket money under its own heading.
+   * its rule). Once the dialog is closed the page shows where the row is, also when that is another group than the
+   * one it was added from.
    */
   function onAdded(row: Row) {
-    setOpenLines((s) => ({ ...s, [row.kind === 'pocket-money' ? 'pocket' : `cat:${row.section}:${row.categoryId ?? 'none'}`]: true }))
+    setOpenLines((s) => ({ ...s, [`cat:${row.section}:${row.categoryId ?? 'none'}`]: true }))
     landing.current = { id: row.id }
     if (!statement!.closed) setEditor({ rowId: row.id })
   }
@@ -350,7 +350,7 @@ export function StatementScreen() {
    * Pocket money added without an amount asks for its rule instead: an amount, or a percentage.
    */
   function onSuggested(row: Row, amount: number | null) {
-    setOpenLines((s) => ({ ...s, [row.kind === 'pocket-money' ? 'pocket' : `cat:${row.section}:${row.categoryId ?? 'none'}`]: true }))
+    setOpenLines((s) => ({ ...s, [`cat:${row.section}:${row.categoryId ?? 'none'}`]: true }))
     if (isPocketRow(row) && !(amount != null && amount > 0) && !statement!.closed) setEditor({ rowId: row.id })
   }
   /**
@@ -398,8 +398,8 @@ export function StatementScreen() {
     else if (line.accountId) askRule({ accountId: line.accountId })
   }
   const categoriesOf = (section: Section) => tables!.categories.filter((c) => !c.deletedAt && c.section === section)
-  // a loan payment is looked for among the expenses (the car loan under Transport), so it can be added from there;
-  // the form says where its line will show, and the page goes there once it is added
+  // a loan payment belongs with the expenses (the car loan under Transport) and is added there; only the payment to a
+  // card whose purchases are expense rows shows elsewhere: the form says so, and the page goes there once it is added
   const addRow = (line: StatementLine, section: Section, over: Pick<ComponentProps<typeof AddRowInline>, 'label' | 'defaultCategoryId' | 'only' | 'place'> = {}) => (
     <AddRowInline
       section={section} categories={categoriesOf(section)} tables={tables!} household={household!} onError={setError} onAdded={onAdded}

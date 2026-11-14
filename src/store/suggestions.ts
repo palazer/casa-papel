@@ -61,10 +61,10 @@ export function rowSuggestions(tables: Tables): RowSuggestion[] {
     return r.section === t.section && sameName(r.name, title)
   })
   const placeOf = (t: RowTemplate): string => {
-    // a loan payment is an expense row, and the Statement lists it with what is set aside and paid off
-    if (t.kind === 'debt-payment' || (t.section === 'transfer' && !t.pocket)) return 'set-aside'
-    if (t.pocket) return 'expenses'
+    // what is shared out of the rest of the month, pocket money too, sits in the second group of Money out
+    if (t.section === 'transfer') return 'set-aside'
     if (t.section === 'income') return 'income'
+    // an expense, a loan's payment among them, sits in its category
     const category = t.category ? categories.find((c) => c.section === t.section && c.name === t.category) : undefined
     return category ? `cat:${t.section}:${category.id}` : 'expenses'
   }
@@ -146,28 +146,31 @@ export function setupSteps(tables: Tables): SetupStep[] {
 export type SetupSide = 'in' | 'out' | 'assets' | 'claims'
 /**
  * What a step lights on the Statement: whole sides, and single groups by their line id. The second group of Money out
- * is lit with every step that makes an account, because the row that moves the account shows there.
+ * is lit with every step that makes an account money is put into, because the row that fills the account shows there;
+ * the row that pays a loan or a card off shows with the expenses.
  */
 export function setupFocus(step: SetupStepKey): { sides: SetupSide[]; lines: string[] } {
   switch (step) {
     case 'income': return { sides: [], lines: ['income'] }
     case 'expenses': return { sides: [], lines: ['expenses'] }
-    case 'debts': return { sides: ['claims'], lines: ['set-aside'] }
+    case 'debts': return { sides: ['claims'], lines: ['expenses'] }
     default: return { sides: ['assets'], lines: ['set-aside'] }
   }
 }
 
 /**
  * The suggested rows a step offers: those of the part it lights that the step is about. A virtual account is not
- * offered among the expenses of step 2: it waits for its own step, where it is offered under Assets.
+ * offered among the expenses of step 2: it waits for its own step, where it is offered under Assets. A loan's payment
+ * waits for the last step in the same way, and pocket money is offered where the rest of the month is shared out.
  */
 export function stepSuggestions(step: SetupStepKey, all: RowSuggestion[]): RowSuggestion[] {
   switch (step) {
     case 'income': return all.filter((s) => s.place === 'income' || s.place.startsWith('cat:income:'))
-    case 'expenses': return all.filter((s) => !s.pool && (s.place === 'expenses' || s.place.startsWith('cat:expense:')))
+    case 'expenses': return all.filter((s) => !s.pool && s.template.account !== 'loan' && (s.place === 'expenses' || s.place.startsWith('cat:expense:')))
+    case 'savings': return all.filter((s) => s.template.pocket)
     case 'virtual': return all.filter((s) => s.pool)
     case 'investments': return all.filter((s) => s.place === 'set-aside' && s.template.account === 'investment')
-    case 'debts': return all.filter((s) => s.place === 'set-aside' && s.template.account === 'loan')
+    case 'debts': return all.filter((s) => s.template.account === 'loan')
     default: return []
   }
 }

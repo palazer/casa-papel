@@ -12,6 +12,11 @@
  *   in  = income + savingsFunded + poolFunded + accountFunded + max(0, −toSavings) + max(0, −leftover)
  *   out = spending + set aside and paid off + max(0, toSavings) + max(0, leftover)
  * Rows are sorted into the same buckets the engine's totals use (compute.ts, pass 2), which is what keeps the cents.
+ *
+ * Money out follows the order in which a month is decided: first what it costs, then what happens with the rest.
+ * "Expenses" is everything that has to be paid, a loan's payment among it (in the category its row has, as in the
+ * Grid): that it brings a debt down shows in the lower half. "From what is left" is how the rest is shared out:
+ * pocket money, savings, investments, virtual accounts, and the figure that closes the month.
  */
 import { accountGroup, addMonths, canCarryRule, cardIsItemized, describeCadence, isTakenFromAccount, nextDue, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
 import { computeGoals, type GoalProgress } from './goals'
@@ -377,11 +382,12 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
         break
       }
       case 'pay-off':
-        setAside.push(rowLine(row, c, v))
+        // a payment that has to be made is part of what the month costs: it stands with the expenses, in its row's category
+        expense.push({ row, line: rowLine(row, c, v) })
         break
       case 'memo':
         // paying an itemized card moves no new money: its purchases were counted when they were made
-        setAside.push(rowLine(row, c, v, { memo: true, chip: 'counted when bought' }))
+        moved.push(rowLine(row, c, v, { memo: true, chip: 'counted when bought' }))
         break
       case 'to-savings': {
         const state = rules.byRow.get(row.id)
@@ -441,11 +447,10 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   ]
   inLines.push({ ...group('from-accounts', 'From accounts', 'worth', fromAll), empty: fromAll.length === 0 || undefined })
 
-  const spending = categorised('expense', expense, estimates)
-  if (pocket.length) spending.push({ id: 'pocket', kind: 'category', label: 'Pocket money', amount: sum(pocket), children: pocket, estimate: anyEstimate(pocket) })
-  const outLines: StatementLine[] = [group('expenses', 'Expenses', 'expense', spending)]
+  const outLines: StatementLine[] = [group('expenses', 'Expenses', 'expense', categorised('expense', expense, estimates))]
   if (moved.length) outLines.push(group('moved', 'Moved elsewhere', 'transfer', moved))
-  outLines.push(group('set-aside', 'To savings, investments and debts', 'transfer', setAside))
+  // pocket money is shared out of what the month leaves, like what goes to savings and investments: it leads the block
+  outLines.push(group('set-aside', 'From what is left', 'transfer', [...pocket, ...setAside]))
 
   const moneyIn = side('in', 'Money in', inLines)
   const moneyOut = side('out', 'Money out', outLines)

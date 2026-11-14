@@ -52,7 +52,7 @@ describe('a category\'s estimate', () => {
     expect(months.map((m) => [out.cells[cellKey(estimate.id, m)].estimate, out.cells[cellKey(estimate.id, m)].value])).toEqual([[1450_00, 260_00], [1450_00, 260_00], [2000_00, 810_00]])
   })
 
-  it('looks only at spending rows of its own category', () => {
+  it('looks only at the rows of its own category, a loan\'s payment among them', () => {
     const { t, estimate, cat } = housing()
     const other = category('Living', 'a1')
     const loan = account({ name: 'Mortgage', type: 'loan', openingBalance: 100_000_00 })
@@ -60,11 +60,13 @@ describe('a category\'s estimate', () => {
     const loose = row({ name: 'Odds', section: 'expense', order: 'b5' })
     const mortgage = row({ name: 'Mortgage payment', section: 'expense', kind: 'debt-payment', categoryId: cat.id, accountId: loan.id, order: 'b6' })
     const out = computeEngine({
-      tables: { ...t, accounts: [loan], categories: [...t.categories, other], rows: [...t.rows, food, loose, mortgage], cells: [...t.cells, cellValue(food.id, '2026-01', 500_00), cellValue(loose.id, '2026-01', 70_00), cellValue(mortgage.id, '2026-01', 800_00)] },
+      tables: { ...t, accounts: [loan], categories: [...t.categories, other], rows: [...t.rows, food, loose, mortgage], cells: [...t.cells, cellValue(food.id, '2026-01', 500_00), cellValue(loose.id, '2026-01', 70_00), cellValue(mortgage.id, '2026-01', 200_00)] },
       months,
     })
-    expect(out.cells[cellKey(estimate.id, '2026-01')].value).toBe(260_00)
-    expect(out.totals['2026-01']).toMatchObject({ cashExpense: 1450_00 + 500_00 + 70_00, debt: 800_00 })
+    // the payment stands in Housing like any expense there, so it explains 200 of the 1,450: 60 are left, and
+    // neither the food of another category nor the row without one counts
+    expect(out.cells[cellKey(estimate.id, '2026-01')].value).toBe(60_00)
+    expect(out.totals['2026-01']).toMatchObject({ cashExpense: 1100_00 + 90_00 + 60_00 + 500_00 + 70_00, debt: 200_00, expensesTotal: 1450_00 + 500_00 + 70_00 })
   })
 
   it('reads its rows in the household currency, whatever they come out of', () => {

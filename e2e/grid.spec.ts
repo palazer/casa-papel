@@ -9,6 +9,20 @@ async function loadDemo(page: Page) {
 test.describe('grid', () => {
   test.use({ viewport: { width: 1400, height: 900 } })
 
+  test('"Expenses total" is what the month costs, the figure the Statement shows for Expenses', async ({ page }) => {
+    await loadDemo(page)
+    await page.getByRole('button', { name: 'Earlier months (2)' }).click()
+    // September, the closed month: 3,357 of expenses. The 1,000 of pocket money stands under Transfers and is not in it
+    await expect(page.getByRole('rowheader', { name: /^Sam – Pocket/ })).toBeVisible()
+    await expect(page.getByRole('row', { name: /^Expenses total/ }).getByRole('cell').first()).toContainText('3,357.00')
+    // the month's own menu says the same
+    await page.getByRole('button', { name: /^Sept? 2026, closed$/ }).click()
+    await expect(page.getByRole('menu')).toContainText('Expenses €3,357')
+    await page.getByRole('menuitem', { name: 'Open in the Statement' }).click()
+    await expect(page.getByRole('heading', { level: 2, name: 'September 2026' })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Money out' }).locator('[data-line="expenses"]')).toContainText('€3,357.00')
+  })
+
   test('edit a cell, itemize, close and reopen a month', async ({ page }) => {
     await loadDemo(page)
     await page.screenshot({ path: 'e2e/output/grid.png' })

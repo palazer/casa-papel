@@ -226,16 +226,18 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   Transfers instead, because its payment only moves money (`cardIsItemized` in `src/model/cards.ts` is the one reading
   of that setting for the engine, the split, the store and the grid). The store checks the same rules (`addRowOfKind`,
   `rowTargets`); a choice the lists no longer offer falls back to the first one, and Cancel forgets the choice.
-  On the Statement the foot of the second group of Money out, `To savings, investments and debts`, uses the same
+  On the Statement the foot of the second group of Money out, `From what is left`, uses the same
   form with `place="set-aside"`: the question comes
-  first as a visible label, `What is it for?`, then `Which one`, then the name. Its choices are the places money is
-  put, in this order: goes into a savings account, deposits into an investment account, fills a virtual account
-  (offered once a savings account can hold one; `New virtual account…` opens the virtual account's own form, which
-  names its row), pays off a loan or card (every loan and card, whichever section the row then lives in), pocket
-  money, and last the plain move between accounts. A loan payment is also looked for among the expenses (the car
-  loan under Transport), so the Statement's expense places offer `Pays off a loan or card` too. Its line will not
-  show where it was added, and the form says so in place of the usual sentence: `It will show under "To savings,
-  investments and debts": the money is not gone, it brings the debt down.` A new row is never left to be searched
+  first as a visible label, `What is it for?`, then `Which one`, then the name. Its choices are the places the rest
+  of the month is shared out to, in this order: goes into a savings account, deposits into an investment account,
+  fills a virtual account (offered once a savings account can hold one; `New virtual account…` opens the virtual
+  account's own form, which names its row), pocket money, and last the plain move between accounts. A payment to a
+  loan or a card is not among them: it has to be made, so it is added with the expenses. The Statement's expense
+  places (the foot of Expenses, and inside a category: the car loan under Transport) offer `Pays off a loan or card`
+  for every loan and card, and the line stays where it was added. Only the payment to a card whose purchases are
+  expense rows shows elsewhere, and the form says so in place of the usual sentence: `It will show under "Moved
+  elsewhere": what was bought with this card is under Expenses already, so the payment only moves money to the
+  card.` A new row is never left to be searched
   for: once its dialog closes, the page shows its line and marks it for two seconds (the mark of the link symbol),
   scrolling only when the line is out of view.
 - Section header rows: the chevron and the title in `text-xs font-semibold` in the section's hue; no bar, no fill.
@@ -272,7 +274,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   the balance on both sides (`+€460.00`, a `·` for none) and the day as the balance column's head. A side opens with
   its name in small caps and closes with its total in `font-semibold` over a hairline. Lines are `min-h-11 text-sm`
   on phones and `md:min-h-7 md:text-xs`, separated by `divide-border/60`, amounts in a fixed right-aligned column:
-  a **group** (Income, From accounts, Expenses, To savings, investments and debts, Savings accounts, Investment accounts, Other assets, Debts, Net worth) is a heading in its hue
+  a **group** (Income, From accounts, Expenses, From what is left, Savings accounts, Investment accounts, Other assets, Debts, Net worth) is a heading in its hue
   on the hue's `tint` that folds away with everything under it (its lines and what adds to them), its total staying on
   the heading; a **category**, an account that holds virtual accounts and an itemized row open as an
   accordion (a chevron button with `aria-expanded`, each level 20 px further in, items on `bg-muted/20` with the
@@ -360,11 +362,17 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   12 px `UserRound` (`10% 👤`). The Grid names
   the same rule after the row's name the way a follower names its row (`= 10% of income`, `= the rest`) and offers
   `Rule…` in the row menu, which opens the same dialog in the current month (a worked-out cell is not a button there).
-  **A group is named for what is in it.** The second group of Money out holds what leaves the main account but
-  stays the household's: transfers into savings, investment and virtual accounts, and payments off a loan or card.
-  It is called `To savings, investments and debts` (it was `Set aside, pay off`): the direction, as `From accounts`
-  has on the left, and the three words a new user looks for, `debts` being the heading the loan sits under in the
-  lower half. Its code name stays `set-aside`.
+  **Money out reads in the order a month is decided: what it costs, then what happens with the rest.** `Expenses`
+  is everything that has to be paid to someone else, a loan's payment among it (and a card's, where the payment is
+  the spending), in the category its row has, as in the Grid; that it brings a debt down shows in the lower half and
+  through its link. `From what is left` is how the rest is shared out: pocket money first, a line per adult, then
+  the transfers into savings, investment and virtual accounts, then the figure that closes the month. These are the
+  lines whose amount can follow a rule. The payment to a card whose purchases are expense rows moves no new money: it
+  stands under `Moved elsewhere` with the `counted when bought` chip and is in no sum. The group was `To savings,
+  investments and debts` while the page was cut by what becomes of the money (gone, or still the household's); its
+  code name stays `set-aside`. Both headings carry an (i) that says which question they answer. The Grid's `Expenses
+  total` is the same figure as the `Expenses` heading (`expensesTotal`: payments in, pocket money and plain
+  transfers out).
   **Add controls stand on the columns of the lines above them.** A line has columns before its name: the arrow's
   slot (14 px), then, among rows of an open month, the tick's (24 px, 44 px below `md`), 6 px apart; they are
   defined once, in `src/features/statement/lead.ts`, for the lines and for everything that is added under them. An
@@ -408,7 +416,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   2027`. A grey line has no tick, since nothing is to be done this month, and pressing it opens the row's dialog,
   where the same schedule is listed.
   Things are added where they will appear: the foot of Income and Expenses holds the Grid's `AddRowInline` (`Add row`)
-  and `AddCategoryInline` (`Add category`, a name and Enter), the foot of `To savings, investments and debts` holds `Add row`, and an
+  and `AddCategoryInline` (`Add category`, a name and Enter), the foot of `From what is left` holds `Add row`, and an
   opened category ends with `Add row to <category>` with that category already chosen. A category is a line from
   the moment it exists, its amount a faint `·` until it has a row, so its first row is added inside it. A new row
   opens its category and, in an open month, the cell editor for its first amount. In the lower half a line that can
@@ -448,8 +456,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   as narrow as the icon. A closed month shows none of this.
   **Suggestions.** `Suggestions` in the toolbar (a pressed button with an (i); on while a household is being set up,
   off otherwise, disabled in a closed month) shows the rows a household like this one usually has, where they will
-  appear: above the add controls of Income, Expenses and `To savings, investments and debts`, and inside the category a row belongs
-  to. A category with a usual suggestion opens by itself. A suggestion is not a row, so it is drawn as an add
+  appear: above the add controls of Income, Expenses and `From what is left` (pocket money is offered there), and
+  inside the category a row belongs to (a loan's payment in the category it is usually found in). A category with a usual suggestion opens by itself. A suggestion is not a row, so it is drawn as an add
   control, not as a line: a muted `+`, the row's name in muted medium weight, an (i) that holds its one-sentence
   description (the `InfoTip` titled with the row's name), then a 28 px amount field (`per month`, named `Amount per
   month for <row>`), an `xs outline` `Add` and a ghost `×` named `Dismiss <row>`. The sentence is not printed on the
@@ -481,8 +489,9 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   takes the rest). The numbers sit beside the prompt where there is room and on a line of their own below `sm`.
   Moving to a step scrolls its part of the page to just under the guide and puts the cursor in the first field.
   **Lit and locked.** A step lights the part of the page it is about and locks the rest (`setupFocus`): step 1 the
-  Income group, step 2 the Expenses group, steps 3 to 5 the Assets side with the second group on the right (`To
-  savings, investments and debts`, where what is saved shows), step 6 the Debts side with that same group. A locked
+  Income group, step 2 the Expenses group, steps 3 to 5 the Assets side with the second group on the right (`From
+  what is left`, where what is saved shows; step 3 offers pocket money there), step 6 the Debts side with the
+  Expenses group, where a loan's or card's payment shows. A locked
   part is dimmed (`LOCKED` in `lead.ts`: `opacity-40 saturate-50`) and `inert`: it takes no press and no cursor and
   is not read out, but it still shows its amounts and still counts. A side with nothing lit is locked as a whole; in
   a side that is partly lit only the groups that are not lit are locked, so nothing is dimmed twice. `Per person`
