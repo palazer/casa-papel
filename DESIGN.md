@@ -308,9 +308,11 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   sideways inside the island.
   **Money in from your own accounts is one section, `From accounts`**, so that Money in reads as Income plus From
   accounts. It is always shown (a faint `·` while empty), has an (i), and holds three kinds of line that each say
-  which they are. **Every line there leads with the account the money came out of**, `From <account>`, followed by
-  the kind of account in muted `text-[11px]` (`savings account`, `investment account`, `other asset`, `virtual account`,
-  `current account`), so no line leaves open where its money came from. What expenses took straight out of an
+  which they are. **Every line there leads with the account the money came out of**, `From <account>`, so no line
+  leaves open where its money came from. An account's own name says enough and nothing follows it (it was followed
+  by `savings account`, `investment account` or `other asset`, which only repeated what the Assets side's headings
+  say). The kind is said in muted `text-[11px]` only where the name alone does not tell: `virtual account` after a
+  virtual account's name, and `current account` after `From the account`. What expenses took straight out of an
   account or a virtual account ("Comes out of") is worked out, one line per account in the accounts' own order and
   then one per virtual account: such a line carries the `calculated` chip and names the expenses it
   paid for in muted `text-[11px]` (`for Weekend trip, Flights`, cut with an ellipsis, the full list in the title),

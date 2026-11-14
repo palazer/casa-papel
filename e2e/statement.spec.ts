@@ -1096,7 +1096,7 @@ test.describe('working the month in the Statement', () => {
     const clothing = moneyIn.locator('[data-line^="src:"]').filter({ hasText: 'Clothing' })
     await expect(clothing).toContainText('calculated')
     await expect(clothing).toContainText('for Clothing')
-    // every line of the section leads with the account the money came out of and says what kind of account that is
+    // every line of the section leads with the account the money came out of; a virtual account says that it is one
     await expect(clothing).toContainText('From Clothing')
     await expect(clothing).toContainText('virtual account')
     const before = euros(await taken.innerText())
@@ -1115,7 +1115,8 @@ test.describe('working the month in the Statement', () => {
     // the row is shown under the account it takes from, with its own name after it
     const own = moneyIn.locator('[data-line]').filter({ has: page.getByRole('button', { name: 'From Savings, Car repair: €400.00' }) })
     await expect(own).toContainText('From Savings')
-    await expect(own).toContainText('savings account')
+    // an account's own name says enough: the kind of account is not repeated after it
+    await expect(own).not.toContainText('savings account')
     await expect(own).toContainText('Car repair')
     await expect(page.getByRole('checkbox', { name: 'From Savings, Car repair done' })).toBeVisible()
     // a row of your own has no tag, and the section's amount counts both kinds
@@ -1858,7 +1859,7 @@ test.describe('working the month in the Statement', () => {
     const fromSavings = moneyIn.getByRole('button', { name: 'From Savings: €2,550.00' })
     await expect(fromSavings).toBeVisible()
     await expect(moneyIn.locator('[data-line]').filter({ has: page.getByRole('button', { name: 'From Savings: €2,550.00' }) })).toContainText('Top-up for Clothing')
-    await expect(moneyIn.locator('[data-line]').filter({ has: page.getByRole('button', { name: 'From Savings: €2,550.00' }) })).toContainText('savings account')
+    await expect(moneyIn.locator('[data-line]').filter({ has: page.getByRole('button', { name: 'From Savings: €2,550.00' }) })).not.toContainText('savings account')
     await expect(moneyOut.getByRole('button', { name: /^To Clothing: €2,650\.00/ })).toBeVisible()
     await expect(poolLine).not.toContainText('short')
     await expect(assets.getByRole('button', { name: 'Top up Clothing' })).toHaveCount(0)
@@ -1965,7 +1966,7 @@ test.describe('working the month in the Statement', () => {
     // the expense is there in full, the account that paid is 300 lower, and "From accounts" names it and what it paid for
     await expect(moneyOut.getByRole('button', { name: /^Health:/ })).toHaveAccessibleName(/^Health: €300\.00/)
     await expect(account('Rainy day')).toContainText('€750.00')
-    await expect(paidFrom('Rainy day')).toContainText('savings account')
+    await expect(paidFrom('Rainy day')).not.toContainText('savings account')
     await expect(paidFrom('Rainy day')).toContainText('calculated')
     await expect(paidFrom('Rainy day')).toContainText('for Health')
     await expect(paidFrom('Rainy day')).toContainText('€300.00')
@@ -1985,7 +1986,7 @@ test.describe('working the month in the Statement', () => {
     await expect(paidFrom('Rainy day')).toContainText('€300.00')
     await expect(paidFrom('Index fund')).toHaveCount(0)
     await goToMonth(page, 'December 2026')
-    await expect(paidFrom('Index fund')).toContainText('investment account')
+    await expect(paidFrom('Index fund')).not.toContainText('investment account')
     await expect(paidFrom('Index fund')).toContainText('for Health')
     await expect(paidFrom('Rainy day')).toHaveCount(0)
     await balanced()

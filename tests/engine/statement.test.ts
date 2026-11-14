@@ -175,7 +175,7 @@ describe('the Statement, the month', () => {
     const toSavings = row({ name: 'To savings', section: 'transfer', kind: 'to-savings', accountId: savings.id, order: 'c0' })
     const t = tables({ household: [household({ cashBuffer: 50_00 })], accounts: [savings], rows: [salary, rent, toSavings], cells: [cellValue(salary.id, '2026-01', 1000_00), cellValue(rent.id, '2026-01', 1500_00)] })
     const { s } = statementFor(t, '2026-01')
-    expect(coveringOf(s).map((c) => [c.label, c.accountKind, c.amount, c.balancing, c.rowId, c.chip])).toEqual([['From Savings', 'savings account', 550_00, true, toSavings.id, 'to cover the month']])
+    expect(coveringOf(s).map((c) => [c.label, c.accountKind, c.amount, c.balancing, c.rowId, c.chip])).toEqual([['From Savings', undefined, 550_00, true, toSavings.id, 'to cover the month']])
     expect(s.flow.left.lines.map((l) => l.label)).toEqual(['Income', 'From accounts'])
     expect(topLine(s, 'out', 'set-aside')!.children.map((c) => [c.label, c.amount])).toEqual([['Kept in account', 50_00]])
     expect([s.flow.left.total, s.flow.right.total]).toEqual([1550_00, 1550_00])
@@ -228,8 +228,8 @@ describe('the Statement, the month', () => {
     // the items stay in the row's own currency
     expect(hotelLine.children.map((c) => [c.label, c.amount, c.currency])).toEqual([['Night one', 33_33, 'USD'], ['Night two', 33_33, 'USD'], ['Tax', 1_11, 'USD']])
     expect(all(s).find((l) => l.label === 'Fees')).toMatchObject({ missingRate: true, amount: 10_00, native: { amount: 10_00, currency: 'GBP' } })
-    // spending "from savings" names the savings account it comes out of
-    expect(calculatedOf(s).map((c) => [c.label, c.accountKind, c.amount])).toEqual([['From Savings', 'savings account', f.savings]])
+    // spending "from savings" names the savings account it comes out of, and the name is all it says
+    expect(calculatedOf(s).map((c) => [c.label, c.accountKind, c.amount])).toEqual([['From Savings', undefined, f.savings]])
     expectSound(t, months)
   })
 
@@ -262,7 +262,7 @@ describe('the Statement, the month', () => {
     const { s } = statementFor(t, '2026-01')
     expect(s.flow.left.lines.map((l) => [l.label, l.amount])).toEqual([['Income', 4000_00], ['From accounts', 500_00]])
     // a row that takes money out of an account is shown under that account's name; its own name follows
-    expect(topLine(s, 'in', 'from-accounts')!.children.map((c) => [c.kind, c.rowId, c.label, c.accountKind, c.ownName, c.chip])).toEqual([['row', sell.id, 'From Fund', 'investment account', 'Sell fund', undefined]])
+    expect(topLine(s, 'in', 'from-accounts')!.children.map((c) => [c.kind, c.rowId, c.label, c.accountKind, c.ownName, c.chip])).toEqual([['row', sell.id, 'From Fund', undefined, 'Sell fund', undefined]])
     expect(all(s).find((l) => l.label === 'Salary')!.net).toBe(3000_00)
     expect(all(s).find((l) => l.label === 'Tax')).toMatchObject({ amount: 1000_00, automatic: true })
     expect(s.flow.right.lines.map((l) => [l.label, l.amount])).toEqual([['Expenses', 1000_00], ['Moved elsewhere', 100_00], ['To savings, investments and debts', 3400_00]])
@@ -650,9 +650,9 @@ describe('expenses that come straight out of an account', () => {
     const { s, out } = statementFor(t, '2026-01')
     const tripBase = out.cells[`${w.trip.id}|2026-01`].funding.accounts[w.fund.id]
     expect(calculatedOf(s).map((c) => [c.id, c.label, c.accountKind, c.amount, c.calculated, c.paidFor])).toEqual([
-      [`src:acc:${w.rainy.id}`, 'From Rainy day', 'savings account', 850_00, true, ['School', 'Boiler']],
-      [`src:acc:${w.fund.id}`, 'From Dollar fund', 'investment account', tripBase, true, ['Trip']],
-      [`src:acc:${w.deposit.id}`, 'From Rental deposit', 'other asset', 400_00, true, ['Boiler']],
+      [`src:acc:${w.rainy.id}`, 'From Rainy day', undefined, 850_00, true, ['School', 'Boiler']],
+      [`src:acc:${w.fund.id}`, 'From Dollar fund', undefined, tripBase, true, ['Trip']],
+      [`src:acc:${w.deposit.id}`, 'From Rental deposit', undefined, 400_00, true, ['Boiler']],
     ])
     // each expense is there in full, whatever paid it
     const lineOf = (name: string) => all(s).find((l) => l.kind === 'row' && l.label === name)!
@@ -708,7 +708,7 @@ describe('expenses that come straight out of an account', () => {
     const t = tables({ household: [household()], accounts: [w.savings, w.rainy], rows: [w.salary, w.school, w.boiler, w.toSavings], cells })
     const { s } = statementFor(t, '2026-01')
     expect(calculatedOf(s).map((c) => [c.label, c.accountKind, c.amount, c.children.map((n) => [n.label, n.amount])])).toEqual([
-      ['From Savings', 'savings account', 1150_00, [['School', 700_00], ['Boiler', 450_00]]],
+      ['From Savings', undefined, 1150_00, [['School', 700_00], ['Boiler', 450_00]]],
     ])
     expectSound(t, months)
     // a household without a savings account has no account to name

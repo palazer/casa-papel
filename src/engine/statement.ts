@@ -13,7 +13,7 @@
  *   out = spending + set aside and paid off + max(0, toSavings) + max(0, leftover)
  * Rows are sorted into the same buckets the engine's totals use (compute.ts, pass 2), which is what keeps the cents.
  */
-import { accountGroup, addMonths, canCarryRule, cardIsItemized, describeCadence, isTakenFromAccount, nextDue, payingKind, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
+import { accountGroup, addMonths, canCarryRule, cardIsItemized, describeCadence, isTakenFromAccount, nextDue, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
 import { computeGoals, type GoalProgress } from './goals'
 import { currentAccountsIn, mainAccountLabel } from './mainAccount'
 import { cellKey, fundingTotal, type AccountSeries, type CellResult, type CellStatus, type EngineOutput } from './types'
@@ -86,7 +86,11 @@ export interface StatementLine {
   chip?: string
   /** A calculated line of "From accounts": the expenses it paid for, by name. */
   paidFor?: string[]
-  /** A line of "From accounts": the kind of account the money came out of, said after its name (`virtual account`). */
+  /**
+   * What kind of account a line stands for, said after its name where the name alone does not tell: a virtual
+   * account under "From accounts", and the current accounts (`From the account`, the main line under its one
+   * account's name). An account named by its own name carries none.
+   */
   accountKind?: string
   /** A row shown under the name of the account it takes from: the row's own name, when that says something else. */
   ownName?: string
@@ -203,19 +207,16 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   const accountsById = new Map(accounts.map((a) => [a.id, a]))
   const poolsById = new Map(tables.pools.filter((p) => !p.deletedAt).map((p) => [p.id, p]))
   const warnings: string[] = []
-  const kindOf = (acc: Account | undefined): string | undefined =>
-    acc?.type === 'savings' ? 'savings account' : acc?.type === 'investment' ? 'investment account' : undefined
   /**
-   * How a line under "From accounts" is named: after the account the money comes out of, with the kind of account
-   * said beside it, so that no line there leaves open where its money came from.
+   * How a line under "From accounts" is named: after the account the money comes out of, so that no line there
+   * leaves open where its money came from. An account's own name says enough; a virtual account says that it is one.
    */
   const fromOf = (row: Row): Pick<StatementLine, 'label' | 'accountKind'> => {
     const pool = tables.pools.find((p) => !p.deletedAt && p.allocationRowId === row.id)
     if (pool) return { label: `From ${pool.name}`, accountKind: 'virtual account' }
     const acc = row.accountId ? accountsById.get(row.accountId) : undefined
-    if (acc) return { label: `From ${acc.name}`, accountKind: kindOf(acc) }
-    const investments = row.kind === 'from-investment' || row.kind === 'to-investment'
-    return { label: investments ? 'From investments' : 'From savings', accountKind: investments ? 'investment account' : 'savings account' }
+    if (acc) return { label: `From ${acc.name}` }
+    return { label: row.kind === 'from-investment' || row.kind === 'to-investment' ? 'From investments' : 'From savings' }
   }
 
   const schedulesById = new Map(tables.recurringItems.map((r) => [r.id, r]))
@@ -397,7 +398,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   if (t.rest != null && rules.restRowId === null && t.rest !== 0) {
     // the rest has no row to sit in: still part of the month, so the half keeps balancing
     warnings.push('The rest of the month has no "To savings" row to go to.')
-    const line: StatementLine = { id: 'rest', kind: 'figure', label: t.rest < 0 ? 'From savings' : 'To savings', amount: Math.abs(t.rest), children: [], balancing: true, automatic: true, chip: t.rest < 0 ? 'automatic' : 'the rest', accountKind: t.rest < 0 ? 'savings account' : undefined }
+    const line: StatementLine = { id: 'rest', kind: 'figure', label: t.rest < 0 ? 'From savings' : 'To savings', amount: Math.abs(t.rest), children: [], balancing: true, automatic: true, chip: t.rest < 0 ? 'automatic' : 'the rest' }
     if (t.rest < 0) cover.push(line)
     else setAside.push(line)
   }
@@ -414,10 +415,10 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   const paidFor = (list: StatementLine[]): string[] => [...new Set(list.map((l) => l.label))]
   const sources: StatementLine[] = []
   // "Savings balance" in a household without a savings account: no account to name
-  if (fromSavings.length) sources.push({ id: 'src:savings', kind: 'source', label: 'From savings', accountKind: 'savings account', amount: sum(fromSavings), children: fromSavings, paidFor: paidFor(fromSavings) })
+  if (fromSavings.length) sources.push({ id: 'src:savings', kind: 'source', label: 'From savings', amount: sum(fromSavings), children: fromSavings, paidFor: paidFor(fromSavings) })
   for (const acc of accounts) {
     const list = fromAccount.get(acc.id)
-    if (list) sources.push({ id: `src:acc:${acc.id}`, kind: 'source', label: `From ${acc.name}`, accountKind: payingKind(acc), amount: sum(list), children: list, paidFor: paidFor(list) })
+    if (list) sources.push({ id: `src:acc:${acc.id}`, kind: 'source', label: `From ${acc.name}`, amount: sum(list), children: list, paidFor: paidFor(list) })
   }
   for (const [pid, list] of fromPool) {
     const pool = poolsById.get(pid)

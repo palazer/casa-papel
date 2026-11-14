@@ -34,9 +34,3 @@ export function paysExpenses(account: Pick<Account, 'type'>): boolean {
   const group = accountGroup(account)
   return group === 'savings' || group === 'investment' || group === 'other'
 }
-
-/** What such an account is called beside its name: "savings account", "investment account", "other asset". */
-export function payingKind(account: Pick<Account, 'type'>): string {
-  const group = accountGroup(account)
-  return group === 'savings' ? 'savings account' : group === 'investment' ? 'investment account' : 'other asset'
-}

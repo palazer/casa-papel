@@ -119,7 +119,9 @@ describe('rules: how a transfer is worked out', () => {
     const s = buildStatement(withTaken, out, '2026-02')!
     const group = s.flow.left.lines.find((l) => l.id === 'from-accounts')!
     expect(group).toMatchObject({ label: 'From accounts', amount: 100000 })
-    expect(group.children).toMatchObject([{ kind: 'row', rowId: taken.id, label: 'From Savings', accountKind: 'savings account', amount: 100000 }])
+    expect(group.children).toMatchObject([{ kind: 'row', rowId: taken.id, label: 'From Savings', amount: 100000 }])
+    // the account's own name says enough: no kind of account after it
+    expect(group.children[0].accountKind).toBeUndefined()
     // the row is already named after its account, so its own name is not said twice
     expect(group.children[0].ownName).toBeUndefined()
     // nothing was earned by it: net worth grows by income minus spending, as in any other month
