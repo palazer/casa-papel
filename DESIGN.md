@@ -364,6 +364,11 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   its own (`LEAD_BUTTON`); an open `Add row` form takes a line of its own and starts on the names' column
   (`LEAD_PAD`). Only the first control of a line carries the lead; `Add category` and `Add virtual
   account` follow it as plain ghost buttons. Browser tests measure the columns, at 1440 px and at 390 px.
+  **A line's second line starts under its name.** What does not fit beside a name (its notes, chips and symbols)
+  goes to a second line, and on every kind of line that line starts on the names' column, never under the arrow or
+  the tick: a row keeps its arrow and tick outside the label, and a line whose name carries its own arrow (a
+  heading, a category, an account, a calculated line) is a hanging indent, the label padded by `LEAD_PAD` and the
+  name's box reaching back over it (`LEAD_HANG`).
   **The link symbol.** Money that moves between a row of the month and an account of the lower half is one flow
   with two ends, and both ends say so: two chain rings (`Link2`, 14 px, muted, in a 20 px slot like the rule symbol,
   before it) on a row that fills, takes from or pays off an account, and on that account's or virtual account's

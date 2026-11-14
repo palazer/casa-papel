@@ -10,7 +10,7 @@ import { formatAmount, formatMonth, formatPercent, formatShare } from '@/app/for
 import type { HelpKey } from '@/app/help'
 import { HUES, type Hue } from '@/app/hues'
 import type { GoalProgress, StatementHue, StatementLine as Line } from '@/engine'
-import { CHEVRON_SLOT, LOCKED, TICK_GAP, TICK_SLOT } from './lead'
+import { CHEVRON_SLOT, LEAD_HANG, LEAD_PAD, LOCKED, TICK_GAP, TICK_SLOT } from './lead'
 
 /** What every line of a side needs to draw itself. The working parts are optional: a side without them is read-only. */
 export interface LineContext {
@@ -80,7 +80,7 @@ export const AMOUNT_COL = 'w-24 shrink-0 text-right tabular-nums md:w-28'
  */
 export const LINE_MENU = 'size-5 opacity-0 group-hover/line:opacity-100 focus:opacity-100 focus-visible:opacity-100 data-popup-open:opacity-100 pointer-coarse:size-8 pointer-coarse:opacity-100'
 const ROW = 'flex min-h-11 items-center gap-1.5 pr-2 text-sm md:min-h-7 md:text-xs'
-/** The name with its tags: one line where there is room, the tags on a second line where there is not. */
+/** The name with its tags: one line where there is room, the tags on a second line, under the name, where there is not. */
 const LABEL = 'flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5 py-1'
 /** A control on a line whose own button covers the whole line: it stays above that button. */
 const ABOVE = 'relative z-10'
@@ -265,19 +265,23 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
   // column; what such a line opens to follows it, so it stays further in than its heading.
   const untickedAmongRows = line.kind === 'source' || line.kind === 'figure' || (line.kind === 'note' && parent?.kind === 'source')
   const tickGap = !ctx.closed && !!ctx.doneOf && untickedAmongRows ? <span className={TICK_GAP} aria-hidden /> : null
+  // The name carries its arrow (and the tick's place) in front of it. What does not fit beside the name goes to a
+  // second line, and that line starts under the name, not under the arrow: the label is padded by the arrow's
+  // columns and the name's box hangs back over the padding.
+  const lead = tickGap ? 'ticks' : 'plain'
   // A line that opens is pressed anywhere: its button is stretched over the whole line (as a row's is), and the other
   // controls on it sit above that.
   const head = expandable ? (
     <button
       type="button" aria-expanded={open} aria-controls={listId} onClick={() => ctx.onToggle(line)}
-      className="flex min-w-0 max-w-full items-center gap-1.5 rounded text-left outline-none after:absolute after:inset-0 after:rounded focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring"
+      className={cn('flex min-w-0 items-center gap-1.5 rounded text-left outline-none after:absolute after:inset-0 after:rounded focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring', LEAD_HANG[lead])}
     >
       <ChevronRight className={cn('size-3.5 shrink-0 text-muted-foreground transition-transform', open && 'rotate-90')} aria-hidden />
       {tickGap}
       {name}
     </button>
   ) : (
-    <span className="flex min-w-0 max-w-full items-center gap-1.5">
+    <span className={cn('flex min-w-0 items-center gap-1.5', LEAD_HANG[lead])}>
       <span className="w-3.5 shrink-0" aria-hidden />
       {tickGap}
       {name}
@@ -287,7 +291,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
   return (
     <li inert={locked || undefined} className={cn(locked && LOCKED)}>
       <div className={cn(ROW, pad, 'group/line', group && hue?.tint, expandable && 'relative', expandable && !group && 'hover:bg-muted/50', marked && MARKED)} data-line={line.id} data-marked={marked || undefined}>
-        <div className={LABEL}>
+        <div className={cn(LABEL, LEAD_PAD[lead])}>
           {head}
           {tags}
           <LinkMark line={line} ctx={ctx} className={ABOVE} />

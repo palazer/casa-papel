@@ -2117,4 +2117,22 @@ test.describe('the Statement on a phone', () => {
     await expect(loan).toBeInViewport()
     await page.screenshot({ path: 'e2e/output/statement-links-phone.png' })
   })
+
+  test('what does not fit beside a line\'s name goes to a second line that starts under the name', async ({ page }) => {
+    await openStatement(page)
+    await goToMonth(page, 'November 2026')
+    const moneyIn = page.getByRole('region', { name: 'Money in' })
+    // a calculated line: its arrow and the tick's place stand before the name, its notes after it
+    const line = moneyIn.locator('[data-line^="src:"]').filter({ hasText: 'From Clothing' }).first()
+    const name = (await line.getByText('From Clothing', { exact: true }).boundingBox())!
+    const notes = await Promise.all(['virtual account', 'calculated', 'for Clothing'].map(async (text) => (await line.getByText(text, { exact: true }).boundingBox())!))
+    const below = notes.filter((b) => b.y > name.y + name.height / 2)
+    // on a phone they do not all fit beside the name
+    expect(below.length).toBeGreaterThan(0)
+    // the second line starts where the name starts, not under the arrow
+    expect(Math.min(...below.map((b) => b.x))).toBeCloseTo(name.x, 0)
+    for (const b of notes) expect(b.x).toBeGreaterThanOrEqual(name.x - 0.5)
+    await line.scrollIntoViewIfNeeded()
+    await page.screenshot({ path: 'e2e/output/statement-wrapped-notes-phone.png' })
+  })
 })

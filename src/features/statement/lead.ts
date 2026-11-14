@@ -12,6 +12,15 @@ export const TICK_GAP = 'w-11 shrink-0 md:w-6'
  */
 export const LEAD_PAD = { ticks: 'pl-[4.375rem] md:pl-[3.125rem]', plain: 'pl-5' } as const
 /**
+ * The other half of a hanging indent: on a line whose name carries its own arrow (and tick's place), the name's box
+ * reaches back over that padding to the line's edge, so the arrow keeps its column while everything that wraps to a
+ * second line starts under the name. It may be as wide as the line again, the padding included.
+ */
+export const LEAD_HANG = {
+  ticks: '-ml-[4.375rem] max-w-[calc(100%_+_4.375rem)] md:-ml-[3.125rem] md:max-w-[calc(100%_+_3.125rem)]',
+  plain: '-ml-5 max-w-[calc(100%_+_1.25rem)]',
+} as const
+/**
  * A part of the page the guided setup has not come to yet (DESIGN.md §7): dimmed, and `inert` with it, so it can
  * neither be pressed nor reached with the keyboard until its step.
  */
