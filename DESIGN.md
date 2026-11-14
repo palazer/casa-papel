@@ -198,7 +198,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   months and kept per device (`grid.earlier`). Hiding columns hides nothing from the sums: the engine counts every
   month, and the Σ line stays the all-time total.
 - A month header is a menu button: the month's totals, then `Open in the Statement` (the Statement opens on that month,
-  for that visit only: `handMonth` in `src/app/screens.ts`), then `Close month` or `Reopen month`.
+  for that visit only: `handMonth` in `src/app/screens.ts`), then `Close month` (it opens the closing dialog, §8) or
+  `Reopen month`.
 - A cell in another currency is two lines: the typed amount over a `text-[10px] leading-3` muted `≈ €3,120` in the household
   currency at that month's rate (the cell button becomes `flex-col items-end`; the certainty styling stays on the amount
   line; the `aria-label` says `, about €3,120`). The label keeps the currency code, a follower's too. A foreign account's
@@ -298,7 +299,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   beside the name; there is no list of all goals. The toolbar holds the `MonthPicker`, `Expand all` / `Collapse all`
   (every group and category at once; not "Open" and "Close", which would read as the month's), the `Suggestions` toggle, the
   `MarksLegend` and, last, the month's one primary action: `Close month` (`sm`, lime) while it is open, `Reopen month`
-  (`sm outline`) once closed; `Close month` is left out while the "Setting up" guide shows. Under the header sits the
+  (`sm outline`) once closed; `Close month` is left out while the "Setting up" guide shows. `Close month` opens the
+  closing dialog (§8), which asks what the accounts really held before it locks the month. Under the header sits the
   **progress line** (`monthProgress` and `progressText` in `src/features/statement/progress.ts`): a muted `text-xs`
   `role="status"` line with an (i), `7 of 21 done · €… still to pay · €… to come in`, then `All 21 done`, and `Closed ·
   all done` for a closed month; a month with nothing in it shows no line. The month is worked in its upper half: a row and each of its items
@@ -414,7 +416,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   hover or focus, always where the pointer is a finger, named `Set a goal for <line>`; it opens the goal dialog with
   what the goal watches settled, so the dialog asks for the amount only. A line of something that is archived (shown
   in the months before it was) has no such button: nothing new is started on it. A goal's detail carries an `xs ghost` `Edit`. An account's balance
-  is a button named `<account> balance: <amount>` (`, entered` once it is) that opens the Grid's `BalanceDialog`.
+  is a button named `<account> balance: <amount>` (`, entered` once it is) that opens the `BalanceDialog` (§8): what
+  the account held at the start and at the end of that month.
   The line for what stays in the current accounts (the one account's name, else `Current accounts`) is worked out
   and says so with the `calculated` chip; its amount is the same kind of button and opens `CurrentBalanceDialog` (§8).
   Once the real balances are typed for a month the chip goes, the amount is underlined like any entered balance, the
@@ -601,23 +604,44 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   at 20 px (`aria-checked` true, `mixed` or false), named `<line> done`; one tap marks done, a second tap goes back to
   the row's default. From 768 px it is smaller through `className` and `dotClassName`. Automatic rows (the rest, a row
   a rule works out, followers) tick through `Cell.markedDone`.
-- The balance dialog (`src/features/grid/BalanceDialog.tsx`) of a card whose purchases are expense rows offers, when the
-  typed balance is above the expected one, a `rounded-md border` block (`data-testid="book-difference"`) with a
-  `Check` "Count the €400.00 difference as spending this month" and one muted sentence saying where it goes (a done
-  item "Not recorded" on the row `<card> – Not recorded`, paid from the card) or, unticked, that the debt rises
-  with no line to explain it. Ticked for a balance typed now, unticked when the dialog opens on an older difference.
-  Other accounts never see it: for a card that records only its payments it would count the money twice
-  (`setCardBalanceBooked` in `src/store/actions.ts`).
-- The current accounts' balance dialog (`src/features/grid/CurrentBalanceDialog.tsx`, the same frame as the balance
-  dialog) asks for what every current account held at the end of the month: `Worked out, together` as a muted line,
-  then one field per account that exists in that month, labelled `<account> (<CCY>)` (one account alone: the dialog
-  carries its name and the field reads `Real balance in <CCY>`), then `Together` and `Difference` as soon as every
-  field holds a number (household currency only; another currency is converted on saving and the dialog says so).
-  All or none: a half-filled dialog says "Fill in every account, or leave them all empty to use the calculated
-  amount." in place and saves nothing, because the plan only knows what the accounts hold together. `Use the
-  calculated amount` (ghost, left) clears them; a closed month disables the fields and says why. The difference is
-  shown, never booked as spending: where an account takes the rest, extra spending would lower that transfer in the
-  plan, not the current accounts (`setCurrentBalances` in `src/store/householdActions.ts`).
+- **A month's balances are a pair of fields per account** (`BalanceFields` and `useMonthBalances` in
+  `src/features/grid/`): `At the start` and `At the end`, both `h-8`, right-aligned and tabular. A field with a number
+  is a real balance. An empty field stands for the calculated amount: the amount is its placeholder and a muted
+  `text-[11px]` `calculated` sits under it. Under a typed end the same line reads `Difference +€270.84`; under the
+  start of an account's first month it reads `opening amount` (that start is the account's opening amount and cannot
+  be emptied). A real 0 is written as `0`, never as an empty field. The start of a month is the end of the month
+  before, one stored number, so a typed start corrects that month too, closed or not; it runs through the engine as
+  it is typed, so the calculated end an empty field shows is the one it will give. Only a field that reads
+  differently from when the dialog opened is saved (`setMonthBalances` in `src/store/monthBalances.ts`). There is no
+  "use the calculated amount" button: emptying a field is that. The pair is used three ways:
+  - **The balance dialog** (`BalanceDialog.tsx`, `<account> · <month>`): one pair across the width, each field under
+    its own label (`At the start of <Month>`, `At the end of <Month>`), under a `dl` with `Calculated for the end`
+    and, for an investment account, `Deposited so far` and `Return so far`.
+  - **The current accounts' dialog** (`CurrentBalanceDialog.tsx`, the same frame): a pair per account that exists in
+    the month, each beside its name. The plan only knows these accounts together, so a muted line says `Calculated,
+    together: €60.00 at the start, €78.00 at the end.` and the fields have no placeholder; one account in the
+    household currency is all of them and carries the figures in its own fields. All or none, for the start and for
+    the end: a half-filled moment says "Fill in every current account, or leave them all empty to use the calculated
+    amount." in place and saves nothing. `Together at the end` and `Difference` show as soon as every end holds a
+    number (household currency only; another currency is converted on saving and the dialog says so). The
+    difference is shown, never booked as spending: where an account takes the rest, extra spending would lower that
+    transfer in the plan, not the current accounts.
+  - **The closing dialog** (`CloseMonthDialog.tsx`, `Close <Month>`, `sm:max-w-xl`): opened by `Close month` on the
+    Statement and in the Grid's month menu. Every account that has a balance in the month, under the Statement's
+    headings as `text-xs font-medium` lines (`Current accounts` when there are several, `Savings accounts`,
+    `Investment accounts`, `Other assets`, `Debts`), the column heads `At the start` and `At the end` once at the
+    top; on a phone the name stands on a line of its own above its pair. `Close month` (lime) saves what was typed
+    and closes the month in one step, so one Undo takes both back (`closeMonth` with its balances); with nothing
+    typed it is the closing it always was. A household without an account that has a balance is not asked.
+  A closed month disables the fields, drops `Save` and says where to correct it: `<Month> is closed. Correct what it
+  ended on from the starting amount of <next month>, or reopen the month.`
+- A card whose purchases are expense rows gets, wherever its end is typed above the calculated one, a `rounded-md
+  border` block (`data-testid="book-difference"`) under its pair with a `Check` "Count the €400.00 difference as
+  spending this month" and one muted sentence saying where it goes (a done item "Not recorded" on the row `<card> –
+  Not recorded`, paid from the card) or, unticked, that the debt rises with no line to explain it. Ticked for a
+  balance typed now, unticked when the dialog opens on an older difference. Other accounts never see it: for a card
+  that records only its payments it would count the money twice (`cardBookingMutations` in `src/store/actions.ts`).
+  A corrected start is never booked: the month before keeps its rows.
 - The estimate dialog (`src/features/statement/EstimateDialog.tsx`), titled `Estimate for <category> · <month>`: one
   amount in the household currency with an (i) (`row.categoryEstimate`), then two read-only lines that follow what
   is typed (`Rows this month`, `Not broken down yet`; a muted sentence when the rows already add up to more), then

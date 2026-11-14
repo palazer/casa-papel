@@ -57,7 +57,7 @@ test.describe('wave 1c', () => {
     await expect(brokerNov).toBeVisible()
     await brokerNov.click()
     await expect(page.getByText('Deposited so far')).toBeVisible()
-    await page.getByLabel('Real balance in USD').fill('10500')
+    await page.getByLabel('At the end of November 2026 (USD)').fill('10500')
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByRole('dialog')).toBeHidden()
     await expect(brokerNov).toContainText('10,500')

@@ -18,6 +18,14 @@ async function goToMonth(page: Page, name: string) {
 
 const total = (page: Page, side: 'in' | 'out' | 'assets' | 'claims') => page.getByTestId(`total-${side}`)
 
+/** "Close month" asks what the accounts really held first; with nothing typed the calculated amounts stand. */
+async function closeMonth(page: Page) {
+  await page.getByRole('button', { name: 'Close month' }).click()
+  const dlg = page.getByTestId('close-month-dialog')
+  await dlg.getByRole('button', { name: 'Close month' }).click()
+  await expect(dlg).toBeHidden()
+}
+
 /** The "…" on an account's or a virtual account's line, and "Edit…" in it: the way into its dialog. */
 async function editFrom(page: Page, side: Locator, name: string, what: 'Account' | 'Virtual account' = 'Account') {
   await side.getByRole('button', { name: `${what} menu for ${name}` }).click()
@@ -104,7 +112,7 @@ test.describe('the Statement', () => {
     await expect(page.getByRole('checkbox', { name: 'To savings done' })).toHaveCount(0)
     await moneyOut.getByRole('button', { name: 'To savings, investments and debts', exact: true }).click()
     await expect(page.getByRole('checkbox', { name: 'To savings done' })).toBeVisible()
-    await page.getByRole('button', { name: 'Close month' }).click()
+    await closeMonth(page)
     await expect(page.getByText('closed', { exact: true })).toBeVisible()
     await expect(page.getByTestId('progress')).toHaveText('Closed · all done')
     await expect(page.getByRole('checkbox')).toHaveCount(0)
@@ -369,7 +377,7 @@ test.describe('working the month in the Statement', () => {
     await claims.getByRole('button', { name: /^Credit card balance:/ }).click()
     await expect(dlg.getByRole('heading', { name: 'Credit card · November 2026' })).toBeVisible()
     await expect(dlg.getByTestId('book-difference')).toHaveCount(0)
-    await dlg.getByLabel('Real balance in EUR').fill('478')
+    await dlg.getByLabel('At the end of November 2026 (EUR)').fill('478')
     await expect(dlg.getByRole('checkbox', { name: 'Count the €400.00 difference as spending this month' })).toBeChecked()
     await expect(dlg.getByTestId('book-difference')).toContainText('Credit card – Not recorded')
     await expect(dlg).toHaveCSS('opacity', '1')
@@ -391,7 +399,7 @@ test.describe('working the month in the Statement', () => {
 
     // any other account: the balance is pinned and the line says how far it is from the plan
     await assets.getByRole('button', { name: /^Index fund balance:/ }).click()
-    await dlg.getByLabel('Real balance in EUR').fill('14000')
+    await dlg.getByLabel('At the end of November 2026 (EUR)').fill('14000')
     await expect(dlg.getByTestId('book-difference')).toHaveCount(0)
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
@@ -454,18 +462,21 @@ test.describe('working the month in the Statement', () => {
     await expect(line).toContainText('calculated')
     await assets.getByRole('button', { name: 'Current accounts balance: €78.00' }).click()
     await expect(dlg.getByRole('heading', { name: 'Current accounts · November 2026' })).toBeVisible()
-    await expect(dlg.getByText('Worked out, together')).toBeVisible()
-    await expect(dlg.getByRole('button', { name: 'Use the calculated amount' })).toBeDisabled()
+    // the plan knows the two together only: no account has a calculated amount of its own
+    await expect(dlg.getByTestId('current-together')).toContainText('at the start, €78.00 at the end.')
+    const mainEnd = dlg.getByLabel('Main account: at the end of November 2026 (EUR)')
+    const jointEnd = dlg.getByLabel('Joint account: at the end of November 2026 (EUR)')
+    await expect(mainEnd).not.toHaveAttribute('placeholder', /./)
     // every account or none
-    await dlg.getByLabel('Main account (EUR)').fill('1150')
+    await mainEnd.fill('1150')
     await expect(dlg.getByTestId('current-balance-sum')).toHaveCount(0)
     await dlg.getByRole('button', { name: 'Save' }).click()
-    await expect(dlg.getByRole('alert')).toHaveText('Fill in every account, or leave them all empty to use the calculated amount.')
-    await dlg.getByLabel('Joint account (EUR)').fill('abc')
+    await expect(dlg.getByRole('alert')).toHaveText('Fill in every current account, or leave them all empty to use the calculated amount.')
+    await jointEnd.fill('abc')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg.getByRole('alert')).toHaveText('Joint account: that is not a number I can read.')
-    await dlg.getByLabel('Joint account (EUR)').fill('300')
-    await expect(dlg.getByTestId('current-balance-sum')).toHaveText('Together€1,450.00Difference+€1,372.00')
+    await jointEnd.fill('300')
+    await expect(dlg.getByTestId('current-balance-sum')).toHaveText('Together at the end€1,450.00Difference+€1,372.00')
     await expect(dlg).toHaveCSS('opacity', '1')
     await page.screenshot({ path: 'e2e/output/statement-current-balance-dialog.png' })
     await dlg.getByRole('button', { name: 'Save' }).click()
@@ -490,8 +501,10 @@ test.describe('working the month in the Statement', () => {
 
     // back to the calculated amount, in one step that Undo takes back
     await assets.getByRole('button', { name: 'Current accounts balance: €1,450.00, entered' }).click()
-    await expect(dlg.getByLabel('Main account (EUR)')).toHaveValue('1150')
-    await dlg.getByRole('button', { name: 'Use the calculated amount' }).click()
+    await expect(mainEnd).toHaveValue('1150')
+    await mainEnd.fill('')
+    await jointEnd.fill('')
+    await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
     await expect(assets.getByRole('button', { name: 'Current accounts balance: €78.00' })).toBeVisible()
     await expect(line).toContainText('calculated')
@@ -499,11 +512,79 @@ test.describe('working the month in the Statement', () => {
     await expect(assets.getByRole('button', { name: 'Current accounts balance: €1,450.00, entered' })).toBeVisible()
 
     // a closed month shows the numbers and takes no change
-    await page.getByRole('button', { name: 'Close month' }).click()
+    await closeMonth(page)
     await assets.getByRole('button', { name: 'Current accounts balance: €1,450.00, entered' }).click()
-    await expect(dlg.getByLabel('Main account (EUR)')).toBeDisabled()
-    await expect(dlg.getByText('This month is closed. Reopen it to change the balance.')).toBeVisible()
-    await expect(dlg.getByRole('button', { name: 'Save' })).toBeDisabled()
+    await expect(mainEnd).toBeDisabled()
+    await expect(dlg.getByLabel('Main account: at the start of November 2026 (EUR)')).toBeDisabled()
+    await expect(dlg.getByText('November 2026 is closed. Correct what it ended on from the starting amount of December 2026, or reopen the month.')).toBeVisible()
+    await expect(dlg.getByRole('button', { name: 'Save' })).toHaveCount(0)
+  })
+
+  test('"Close month" asks what every account held at the start and at the end, and the next month starts with it', async ({ page }) => {
+    await openStatement(page)
+    await goToMonth(page, 'November 2026')
+    const assets = page.getByRole('region', { name: 'Assets' })
+    const fund = assets.getByRole('button', { name: /^Index fund balance:/ })
+    const closing = page.getByTestId('close-month-dialog')
+    const calculatedLine = await fund.getAttribute('aria-label')
+
+    await page.getByRole('button', { name: 'Close month' }).click()
+    await expect(closing.getByRole('heading', { name: 'Close November 2026' })).toBeVisible()
+    // every account that has a balance, under the headings of the page
+    for (const heading of ['Current accounts', 'Savings accounts', 'Investment accounts', 'Debts']) await expect(closing.getByText(heading, { exact: true })).toBeVisible()
+    await expect(closing.getByTestId('current-together')).toContainText('Calculated, together:')
+    const fundStart = closing.getByLabel('Index fund: at the start of November 2026 (EUR)')
+    const fundEnd = closing.getByLabel('Index fund: at the end of November 2026 (EUR)')
+    // nothing is typed: an empty field shows the calculated amount in grey and keeps it
+    await expect(fundStart).toHaveValue('')
+    await expect(fundEnd).toHaveValue('')
+    const calculated = (await fundEnd.getAttribute('placeholder'))!
+    expect(calculated).toMatch(/^€[\d,]+\.\d\d$/)
+    expect(calculatedLine).toBe(`Index fund balance: ${calculated}`)
+    // a typed start moves the calculated end at once, and an emptied one gives it back
+    await fundStart.fill('13000')
+    await expect(fundEnd).not.toHaveAttribute('placeholder', calculated)
+    await fundStart.fill('')
+    await expect(fundEnd).toHaveAttribute('placeholder', calculated)
+    // a sum is worked out, and the difference to the calculated amount shows under the field
+    await fundEnd.fill('13900+100')
+    const endCell = closing.getByTestId('balance-end').filter({ has: page.getByLabel('Index fund: at the end of November 2026 (EUR)') })
+    await expect(endCell.getByTestId('amount-hint')).toHaveText('= €14,000.00')
+    await expect(endCell.getByTestId('balance-note')).toHaveText(/^Difference \+€[\d,]+\.\d\d$/)
+    await settled(closing)
+    await page.screenshot({ path: 'e2e/output/close-month-dialog.png' })
+    await closing.getByRole('button', { name: 'Close month' }).click()
+    await expect(closing).toBeHidden()
+    await expect(page.getByText('closed', { exact: true })).toBeVisible()
+    await expect(fund).toHaveAccessibleName('Index fund balance: €14,000.00, entered')
+
+    // the closing and its balance are one step: Undo takes both back, Redo brings both again
+    await page.getByRole('button', { name: 'Undo' }).click()
+    await expect(page.getByText('closed', { exact: true })).toHaveCount(0)
+    await expect(fund).toHaveAccessibleName(calculatedLine!)
+    await page.getByRole('button', { name: 'Redo' }).click()
+    await expect(page.getByText('closed', { exact: true })).toBeVisible()
+    await expect(fund).toHaveAccessibleName('Index fund balance: €14,000.00, entered')
+
+    // December starts with what November closed on
+    await page.getByRole('button', { name: 'Next month' }).click()
+    await expect(page.getByRole('heading', { level: 2, name: 'December 2026' })).toBeVisible()
+    await fund.click()
+    const dlg = page.getByRole('dialog')
+    await expect(dlg.getByRole('heading', { name: 'Index fund · December 2026' })).toBeVisible()
+    const start = dlg.getByLabel('At the start of December 2026 (EUR)')
+    await expect(start).toHaveValue('14000')
+    await expect(dlg.getByLabel('At the end of December 2026 (EUR)')).toHaveValue('')
+    // and the start can be corrected from here: it is November's end, closed or not
+    await start.fill('14250')
+    await settled(dlg)
+    await page.screenshot({ path: 'e2e/output/balance-start-end-dialog.png' })
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await page.getByRole('button', { name: 'Previous month' }).click()
+    await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
+    await expect(page.getByText('closed', { exact: true })).toBeVisible()
+    await expect(fund).toHaveAccessibleName('Index fund balance: €14,250.00, entered')
   })
 
   test('a rule per account: a percentage from the transfer line, another from the account, and the rest follows', async ({ page }) => {
@@ -2140,9 +2221,9 @@ test.describe('the Statement on a phone', () => {
     await page.getByRole('region', { name: 'Assets' }).getByRole('button', { name: /^Current accounts balance:/ }).tap()
     const dlg = page.getByRole('dialog')
     await expect(dlg.getByRole('heading', { name: 'Current accounts · November 2026' })).toBeVisible()
-    await dlg.getByLabel('Main account (EUR)').fill('1150')
-    await dlg.getByLabel('Joint account (EUR)').fill('300')
-    await expect(dlg.getByTestId('current-balance-sum')).toContainText('Together€1,450.00')
+    await dlg.getByLabel('Main account: at the end of November 2026 (EUR)').fill('1150')
+    await dlg.getByLabel('Joint account: at the end of November 2026 (EUR)').fill('300')
+    await expect(dlg.getByTestId('current-balance-sum')).toContainText('Together at the end€1,450.00')
     await expect(dlg).toHaveCSS('opacity', '1')
     await page.screenshot({ path: 'e2e/output/statement-current-balance-phone.png' })
     await dlg.getByRole('button', { name: 'Cancel' }).tap()

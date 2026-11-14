@@ -573,7 +573,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
       const computed: Money = start + inflow - outflow
       const actual = actuals.get(`${acc.id}|${m}`)?.actualBalance ?? null
       const balance: Money = actual ?? computed
-      series.months[m] = { computed, balance, adjustment: actual != null ? actual - computed : 0, inflow, outflow, ...inBase(acc, balance, m) }
+      series.months[m] = { start, computed, entered: actual != null, balance, adjustment: actual != null ? actual - computed : 0, inflow, outflow, ...inBase(acc, balance, m) }
       prevBalance = balance
     }
     accountSeries[acc.id] = series
@@ -629,7 +629,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
         : (prev !== 0 ? (balance - deposit + withdrawal) / prev - 1 : 0)
       if (actual != null) realised.push(monthlyReturn)
       series.months[m] = {
-        computed, balance, adjustment: actual != null ? actual - computed : 0, inflow: deposit, outflow: withdrawal,
+        start: prev, computed, entered: actual != null, balance, adjustment: actual != null ? actual - computed : 0, inflow: deposit, outflow: withdrawal,
         capital, startValue, monthlyReturn, totalReturn: capital !== 0 ? balance / capital - 1 : 0, projected: actual == null, ...inBase(acc, balance, m),
       }
       prevValue = balance
@@ -672,7 +672,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
       const computed: Money = liability ? prev + inflow - outflow : prev - outflow
       const actual = actuals.get(`${acc.id}|${m}`)?.actualBalance ?? null
       const balance: Money = actual ?? computed
-      series.months[m] = { computed, balance, adjustment: actual != null ? actual - computed : 0, inflow, outflow, projected: actual == null, ...inBase(acc, balance, m) }
+      series.months[m] = { start: prev, computed, entered: actual != null, balance, adjustment: actual != null ? actual - computed : 0, inflow, outflow, projected: actual == null, ...inBase(acc, balance, m) }
       prevBalance = balance
     }
     accountSeries[acc.id] = series

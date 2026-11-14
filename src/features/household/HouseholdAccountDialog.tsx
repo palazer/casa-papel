@@ -161,7 +161,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
               {type === 'loan' ? 'What is still owed. A payment row that names this loan brings it down.'
                 : type === 'credit-card' ? 'What you owed on the card when the month began.'
                 : type === 'other-asset' ? 'What it is worth. Enter a real value from its line whenever that changes.'
-                : 'From then on the months add to it. A real balance can be entered from its line in any month.'}
+                : 'From then on every month starts with what the month before ended on. Press the account\'s amount in a month to type what it really held at the start and at the end.'}
             </p>
           </div>
           {type === 'credit-card' && (

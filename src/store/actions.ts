@@ -22,9 +22,13 @@ export async function engineUpTo(store: Store, month: MonthKey): Promise<{ table
   const tables = await loadTables(store)
   const household = tables.household.find((h) => !h.deletedAt)
   if (!household) throw new Error('No household yet')
+  return { tables, engine: engineFor(tables, household, month), household }
+}
+
+/** The engine from the household's first month up to the month after `month`: far enough for every balance of `month`. */
+export function engineFor(tables: Tables, household: Household, month: MonthKey): EngineOutput {
   const start = compareMonths(household.startMonth, month) < 0 ? household.startMonth : month
-  const engine = computeEngine({ tables, months: monthRange(start, addMonths(month, 1)) })
-  return { tables, engine, household }
+  return computeEngine({ tables, months: monthRange(start, addMonths(month, 1)) })
 }
 
 function assertOpen(tables: Tables, month: MonthKey): void {
@@ -375,6 +379,13 @@ export const unrecordedRowName = (card: Pick<Account, 'name'>): string => `${car
  */
 export async function setCardBalanceBooked(store: Store, accountId: string, month: MonthKey, actualBalance: Money): Promise<Money> {
   const { tables, engine, household } = await engineUpTo(store, month)
+  const { mutations, booked } = cardBookingMutations(tables, engine, household, accountId, month, actualBalance)
+  await store.commit(mutations)
+  return booked
+}
+
+/** What `setCardBalanceBooked` writes, and how much of it is booked as spending. Pure, so closing a month can carry it in the same step. */
+export function cardBookingMutations(tables: Tables, engine: EngineOutput, household: Household, accountId: string, month: MonthKey, actualBalance: Money): { mutations: Mutation[]; booked: Money } {
   assertOpen(tables, month)
   const card = tables.accounts.find((a) => a.id === accountId && !a.deletedAt)
   if (!card || !cardIsItemized(card)) throw new Error('Only a card whose purchases are expense rows can count a difference as spending.')
@@ -402,8 +413,7 @@ export async function setCardBalanceBooked(store: Store, accountId: string, mont
   }
   const known = tables.accountMonths.find((a) => a.accountId === accountId && a.month === month)
   mutations.push({ op: 'put', table: 'accountMonths', record: AccountMonthSchema.parse({ ...known, accountId, month, actualBalance, updatedAt: now() }) })
-  await store.commit(mutations)
-  return Math.max(0, extra)
+  return { mutations, booked: Math.max(0, extra) }
 }
 
 export async function updateRow(store: Store, rowId: string, patch: Partial<Omit<Row, 'id' | 'createdAt'>>): Promise<void> {
@@ -431,9 +441,11 @@ export async function moveRow(store: Store, rowId: string, direction: 'up' | 'do
 
 // ---------- months ----------
 
-/** Freeze a month: inherited values become explicit, items become done, settings are pinned. */
-export async function closeMonth(store: Store, month: MonthKey): Promise<void> {
-  const { tables, engine, household } = await engineUpTo(store, month)
+/**
+ * What freezing a month writes: inherited values become explicit, items become done, settings are pinned. Pure;
+ * `closeMonth` (in `monthBalances.ts`) commits it, together with the real balances typed while closing.
+ */
+export function closeMonthMutations(tables: Tables, engine: EngineOutput, household: Household, month: MonthKey): Mutation[] {
   const mutations: Mutation[] = []
   for (const row of engine.rows) {
     const c = engine.cells[cellKey(row.id, month)]
@@ -456,7 +468,7 @@ export async function closeMonth(store: Store, month: MonthKey): Promise<void> {
       updatedAt: now(),
     }),
   })
-  await store.commit(mutations)
+  return mutations
 }
 
 export async function reopenMonth(store: Store, month: MonthKey): Promise<void> {

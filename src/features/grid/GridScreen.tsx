@@ -15,9 +15,10 @@ import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { cellKey, currentAccountsIn, groupRowsByCategory, mainAccountLabel, type EngineOutput } from '@/engine'
 import { isOldPocketShare, isShareRule, monthOfDate, parseMonth, repeatsText, resolveRules, runningSchedules, type Household, type Money, type MonthKey, type Row, type RuleState, type Section, type Tables } from '@/model'
-import { addPlanYear, closeMonth, derivedRowReason, reopenMonth } from '@/store'
+import { addPlanYear, closeMonth, derivedRowReason, monthBalances, reopenMonth } from '@/store'
 import { AddRowInline } from './AddRowInline'
 import { BalanceDialog } from './BalanceDialog'
+import { CloseMonthDialog } from './CloseMonthDialog'
 import { CurrentBalanceDialog } from './CurrentBalanceDialog'
 import { CellEditor } from './CellEditor'
 import { RowMenu } from './RowMenu'
@@ -45,6 +46,8 @@ export function GridScreen() {
   const [balanceSel, setBalanceSel] = useState<{ accountId: string; month: MonthKey } | null>(null)
   /** The month whose real balances of the current accounts are being typed. */
   const [currentSel, setCurrentSel] = useState<MonthKey | null>(null)
+  /** The month "Close month" was pressed for: its balances are asked for first. */
+  const [closing, setClosing] = useState<MonthKey | null>(null)
   const [error, setError] = useState<string | null>(null)
   /** Which rows a rule works out, read the way the engine reads them. */
   const rules = useMemo(() => (engine && household ? resolveRules(engine.rows, household.closingRule) : null), [engine, household])
@@ -191,7 +194,7 @@ export function GridScreen() {
                         {t?.closed ? (
                           <DropdownMenuItem onClick={() => act(() => reopenMonth(store, m))}>Reopen month</DropdownMenuItem>
                         ) : (
-                          <DropdownMenuItem onClick={() => act(() => closeMonth(store, m))}>Close month</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => (monthBalances(tables, engine, m).lines.length > 0 ? setClosing(m) : act(() => closeMonth(store, m)))}>Close month</DropdownMenuItem>
                         )}
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -255,7 +258,7 @@ export function GridScreen() {
               const acc = tables.accounts.find((a) => a.id === s.accountId)
               if (!acc) return []
               const open = (m: MonthKey) => { if (s.months[m]) setBalanceSel({ accountId: acc.id, month: m }) }
-              const marked = (m: MonthKey) => (s.months[m]?.adjustment ?? 0) !== 0 || s.months[m]?.projected === false
+              const marked = (m: MonthKey) => s.months[m]?.entered ?? false
               if (acc.type === 'investment') {
                 return [
                   derivedRow(`${acc.name} · value`, 'in', (m) => s.months[m]?.balance ?? null, { strong: true, currency: s.currency, onClick: open, mark: marked, hue: HUES.worth, help: 'balance.investmentValue' }),
@@ -285,14 +288,15 @@ export function GridScreen() {
       {balanceSel && (() => {
         const acc = tables.accounts.find((a) => a.id === balanceSel.accountId)
         const res = engine.accounts[balanceSel.accountId]?.months[balanceSel.month]
-        return acc && res ? <BalanceDialog key={`${acc.id}:${balanceSel.month}`} account={acc} month={balanceSel.month} result={res} locale={locale} closed={engine.totals[balanceSel.month]?.closed ?? false} onClose={() => setBalanceSel(null)} /> : null
+        return acc && res ? <BalanceDialog key={`${acc.id}:${balanceSel.month}`} account={acc} month={balanceSel.month} tables={tables} household={household} closed={engine.totals[balanceSel.month]?.closed ?? false} onClose={() => setBalanceSel(null)} /> : null
       })()}
       {currentSel && main?.months[currentSel] && (
         <CurrentBalanceDialog
-          key={currentSel} title={mainAccountLabel(main, tables.accounts)} accounts={currentAccountsIn(tables.accounts, currentSel)} month={currentSel} result={main.months[currentSel]}
-          actuals={tables.accountMonths} baseCurrency={ccy} locale={locale} closed={engine.totals[currentSel]?.closed ?? false} onClose={() => setCurrentSel(null)}
+          key={currentSel} title={mainAccountLabel(main, tables.accounts)} month={currentSel} tables={tables} household={household}
+          closed={engine.totals[currentSel]?.closed ?? false} onClose={() => setCurrentSel(null)}
         />
       )}
+      {closing && !engine.totals[closing]?.closed && <CloseMonthDialog key={closing} month={closing} tables={tables} household={household} onClose={() => setClosing(null)} />}
       {selected && selectedRow && (
         <CellEditor key={`${selectedRow.id}:${selected.month}`} tables={tables} engine={engine} household={household} row={selectedRow} month={selected.month} onClose={() => setSelected(null)} />
       )}

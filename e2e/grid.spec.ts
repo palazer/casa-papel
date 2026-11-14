@@ -71,6 +71,9 @@ test.describe('grid', () => {
     // close November via the month header
     await page.getByRole('button', { name: 'Nov 2026', exact: true }).click()
     await page.getByRole('menuitem', { name: 'Close month' }).click()
+    // closing asks what the accounts really held first
+    await expect(page.getByRole('heading', { name: 'Close November 2026' })).toBeVisible()
+    await page.getByTestId('close-month-dialog').getByRole('button', { name: 'Close month' }).click()
     await expect(page.getByRole('button', { name: 'Nov 2026, closed', exact: true })).toBeVisible()
     await page.getByRole('button', { name: /^The flat – Utilities Nov 2026/ }).click()
     await expect(page.getByText('This month is closed.')).toBeVisible()
@@ -167,8 +170,8 @@ test.describe('grid: the current accounts', () => {
     await nov.click()
     const dlg = page.getByRole('dialog')
     await expect(dlg.getByRole('heading', { name: 'Current accounts · November 2026' })).toBeVisible()
-    await dlg.getByLabel('Main account (EUR)').fill('1150')
-    await dlg.getByLabel('Joint account (EUR)').fill('300')
+    await dlg.getByLabel('Main account: at the end of November 2026 (EUR)').fill('1150')
+    await dlg.getByLabel('Joint account: at the end of November 2026 (EUR)').fill('300')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
     // the entered month is underlined, net worth follows, and December continues from the real number:

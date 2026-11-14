@@ -107,8 +107,12 @@ export interface MonthTotals {
 }
 
 export interface AccountMonthResult {
+  /** What the month began with, in the account's currency: what the month before ended on, or the opening amount in the account's first month. */
+  start: Money
   /** What the engine expects at month end, in the account's currency. */
   computed: Money
+  /** A real balance is stored for the end of this month. */
+  entered: boolean
   /** Real balance when one was entered, else computed. */
   balance: Money
   adjustment: Money

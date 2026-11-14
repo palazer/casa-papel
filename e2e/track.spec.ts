@@ -89,6 +89,11 @@ test.describe('tracking the month on a phone', () => {
     // a closed month: everything counts as done, nothing to tick. Reopening brings the ticks back; the items closing
     // marked as done (a schedule's posting, an itemized row) stay done
     await page.getByRole('button', { name: 'Close month' }).tap()
+    // closing asks what the accounts really held: with nothing typed the calculated amounts stand
+    await expect(page.getByTestId('close-month-dialog').getByLabel('Savings: at the end of November 2026 (EUR)')).toBeVisible()
+    await expect(page.getByTestId('close-month-dialog')).toHaveCSS('opacity', '1')
+    await page.screenshot({ path: 'e2e/output/close-month-phone.png' })
+    await page.getByTestId('close-month-dialog').getByRole('button', { name: 'Close month' }).tap()
     await expect(progress).toHaveText('Closed · all done')
     await expect(page.getByText('closed', { exact: true })).toBeVisible()
     await expect(page.getByRole('checkbox')).toHaveCount(0)

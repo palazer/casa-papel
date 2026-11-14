@@ -500,7 +500,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
     const line: StatementLine = { id: `acc:${acc.id}`, kind: 'account', label: acc.name, amount: r.balanceBase, change, children: [], accountId: acc.id, missingRate: r.missingRate || undefined, native: s.currency !== base ? { amount: r.balance, currency: s.currency } : undefined }
     if ((acc.type === 'savings' || acc.type === 'investment') && !acc.archivedMonth) line.rule = ruleOfRows(rowsFeeding(engine.rows, acc))
     if (acc.archivedMonth) line.archived = true
-    if (r.adjustment !== 0 || r.projected === false) line.entered = true
+    if (r.entered) line.entered = true
     if (r.adjustment !== 0) line.adjustment = s.currency !== base && r.balance !== 0 ? Math.round(r.adjustment * (r.balanceBase / r.balance)) : r.adjustment
     accountLines.set(acc.id, line)
     if (s.liability) {

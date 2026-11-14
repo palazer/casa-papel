@@ -1,62 +1,51 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { AmountHint } from '@/components/AmountHint'
-import { Check } from '@/components/Check'
-import { amountToInput, formatAmount, formatMonth, formatPercent, parseAmount, unreadableAmount } from '@/app/format'
+import { formatAmount, formatMonth, formatPercent } from '@/app/format'
 import { useStore } from '@/app/store'
-import type { AccountMonthResult } from '@/engine'
-import { cardIsItemized, type Account, type MonthKey } from '@/model'
-import { setAccountActual, setCardBalanceBooked, unrecordedRowName } from '@/store'
+import type { Account, Household, MonthKey, Tables } from '@/model'
+import { setMonthBalances } from '@/store'
+import { BalanceFields } from './BalanceFields'
+import { closedBalanceNote, useMonthBalances } from './useMonthBalances'
 
 interface Props {
   account: Account
   month: MonthKey
-  result: AccountMonthResult
-  locale: string
+  tables: Tables
+  household: Household
   closed: boolean
   onClose: () => void
 }
 
 /**
- * Pin what an account really held at the end of a month. The engine shows the gap and continues from the real number.
- * For a card whose purchases are expense rows, owing more than the plan expects means spending that was never typed:
- * the dialog offers to count the difference as that month's spending, so expenses and the debt agree.
+ * What an account really held when a month began and when it ended (DESIGN.md §8). The start is the end of the month
+ * before, so changing it corrects that month too, closed or not; the engine shows the gap and continues from the real
+ * numbers. For a card whose purchases are expense rows, owing more than the plan expects means spending that was
+ * never typed: the dialog offers to count the difference as that month's spending, so expenses and the debt agree.
  */
-export function BalanceDialog({ account, month, result, locale, closed, onClose }: Props) {
+export function BalanceDialog({ account, month, tables, household, closed, onClose }: Props) {
   const store = useStore()
-  const ccy = account.currency
-  const hasActual = result.adjustment !== 0 || result.projected === false
-  const [text, setText] = useState(hasActual ? amountToInput(result.balance, ccy, locale) : '')
-  const [error, setError] = useState<string | null>(null)
+  const form = useMonthBalances(tables, household, month, (l) => l.account.id === account.id)
   const [busy, setBusy] = useState(false)
+  const { locale } = form
+  const line = form.lines[0]
+  if (!line) return null
+  const ccy = account.currency
   const isInvestment = account.type === 'investment'
-  // ticked for a balance typed now; an old difference is only counted when someone asks for it
-  const [book, setBook] = useState(!hasActual)
-  const typed = text.trim() === '' ? null : parseAmount(text, ccy, locale)
-  const extra = typed != null ? typed - result.computed : 0
-  const canBook = cardIsItemized(account) && !closed && extra > 0
+  const owed = line.group === 'debt'
 
-  async function save(value: number | null) {
+  async function submit() {
+    const entry = form.entry()
+    if (!entry) return
     setBusy(true)
-    setError(null)
     try {
-      if (value != null && canBook && book) await setCardBalanceBooked(store, account.id, month, value)
-      else await setAccountActual(store, account.id, month, value)
+      await setMonthBalances(store, month, entry)
       onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save.')
+      form.setError(e instanceof Error ? e.message : 'Could not save.')
     } finally {
       setBusy(false)
     }
-  }
-  function submit() {
-    if (text.trim() === '') return void save(null)
-    const v = parseAmount(text, ccy, locale)
-    if (v == null) return setError(unreadableAmount(text))
-    void save(v)
   }
 
   return (
@@ -65,38 +54,23 @@ export function BalanceDialog({ account, month, result, locale, closed, onClose 
         <DialogHeader>
           <DialogTitle>{account.name} · {formatMonth(month, locale, 'long')}</DialogTitle>
           <DialogDescription>
-            {isInvestment ? 'What the account was worth at the end of the month, from your broker.' : 'What the account really held at the end of the month, from your bank.'} Later months continue from the real number.
+            {isInvestment ? 'What the account was worth when the month began and when it ended, from your broker.'
+              : owed ? 'What was really owed when the month began and when it ended, from your bank.'
+              : 'What the account really held when the month began and when it ended, from your bank.'}
+            {' '}An empty field keeps the calculated amount. The start is the end of the month before: changing it corrects that month too.
           </DialogDescription>
         </DialogHeader>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-          <dt className="text-muted-foreground">Expected</dt><dd className="text-right tabular-nums">{formatAmount(result.computed, ccy, locale)}</dd>
-          {isInvestment && <><dt className="text-muted-foreground">Deposited so far</dt><dd className="text-right tabular-nums">{formatAmount(result.capital ?? 0, ccy, locale)}</dd></>}
-          {isInvestment && <><dt className="text-muted-foreground">Return so far</dt><dd className="text-right tabular-nums">{formatPercent(result.totalReturn ?? 0, locale)}</dd></>}
-          {hasActual && <><dt className="text-muted-foreground">Difference</dt><dd className="text-right tabular-nums">{formatAmount(result.adjustment, ccy, locale, { sign: 'exceptZero' })}</dd></>}
+          <dt className="text-muted-foreground">Calculated for the end</dt><dd className="text-right tabular-nums">{formatAmount(line.endCalculated ?? 0, ccy, locale)}</dd>
+          {isInvestment && <><dt className="text-muted-foreground">Deposited so far</dt><dd className="text-right tabular-nums">{formatAmount(line.result?.capital ?? 0, ccy, locale)}</dd></>}
+          {isInvestment && <><dt className="text-muted-foreground">Return so far</dt><dd className="text-right tabular-nums">{formatPercent(line.result?.totalReturn ?? 0, locale)}</dd></>}
         </dl>
-        <div className="space-y-1.5">
-          <Label htmlFor="real-balance">Real balance in {ccy}</Label>
-          <Input id="real-balance" autoFocus inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} placeholder="leave empty to use the expected amount" disabled={closed} />
-          <AmountHint text={text} currency={ccy} locale={locale} />
-          {closed && <p className="text-xs text-muted-foreground">This month is closed. Reopen it from the month header to change the balance.</p>}
-        </div>
-        {canBook && (
-          <div className="space-y-1 rounded-md border p-2.5" data-testid="book-difference">
-            <Check label={`Count the ${formatAmount(extra, ccy, locale)} difference as spending this month`} checked={book} onChange={(e) => setBook(e.target.checked)} />
-            <p className="text-xs text-muted-foreground">
-              {book
-                ? `It is added as "Not recorded" on the row "${unrecordedRowName(account)}", paid from this card, so the month's expenses and what is owed agree. Rename it or split it into items any time.`
-                : 'Only the balance changes. What is owed rises without a line of spending to explain it.'}
-            </p>
-          </div>
-        )}
-        {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-        <DialogFooter className="flex-row flex-wrap gap-2 sm:justify-between">
-          <Button variant="ghost" onClick={() => void save(null)} disabled={busy || closed || !hasActual}>Use expected</Button>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-            <Button onClick={submit} disabled={busy || closed}>Save</Button>
-          </div>
+        <BalanceFields form={form} groups={[{ lines: [line] }]} month={month} base={household.baseCurrency} named={false} disabled={closed} onEnter={() => void submit()} />
+        {closed && <p className="text-xs text-muted-foreground">{closedBalanceNote(month, locale)}</p>}
+        {form.error && <p className="text-sm text-destructive" role="alert">{form.error}</p>}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={busy}>{closed ? 'Close' : 'Cancel'}</Button>
+          {!closed && <Button onClick={() => void submit()} disabled={busy}>Save</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

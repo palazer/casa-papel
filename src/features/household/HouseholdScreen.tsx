@@ -243,7 +243,8 @@ function AccountsCard({ household, tables, accounts: allAccounts, entities, engi
                           <td className="text-right">
                             <Input
                               aria-label={`Real balance ${formatMonth(m, locale)}`} className="ml-auto h-6 w-36 text-right" inputMode="decimal"
-                              defaultValue={r && r.adjustment !== 0 ? amountToInput(r.balance, a.currency, locale) : ''}
+                              // a real 0 is written out: an empty field means "no real balance", and leaving it would clear one
+                              defaultValue={r?.entered ? (r.balance === 0 ? '0' : amountToInput(r.balance, a.currency, locale)) : ''}
                               placeholder="same as computed"
                               onBlur={(e) => {
                                 const typed = e.target.value

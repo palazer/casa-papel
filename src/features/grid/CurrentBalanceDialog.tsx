@@ -1,120 +1,91 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { AmountHint } from '@/components/AmountHint'
-import { amountToInput, formatAmount, formatMonth, parseAmount, unreadableAmount } from '@/app/format'
+import { formatAmount, formatMonth } from '@/app/format'
 import { useStore } from '@/app/store'
-import type { MainAccountMonth } from '@/engine'
-import type { Account, AccountMonth, MonthKey } from '@/model'
-import { setCurrentBalances } from '@/store'
+import type { Household, MonthKey, Tables } from '@/model'
+import { setMonthBalances } from '@/store'
+import { BalanceFields } from './BalanceFields'
+import { closedBalanceNote, useMonthBalances, type MonthBalancesForm } from './useMonthBalances'
 
 interface Props {
   /** The line's name: the one current account's, or "Current accounts". */
   title: string
-  /** The current accounts that exist in this month, in their order: each gets a field. */
-  accounts: Account[]
   month: MonthKey
-  result: MainAccountMonth
-  /** What is stored for these accounts in this month. */
-  actuals: AccountMonth[]
-  baseCurrency: string
-  locale: string
+  tables: Tables
+  household: Household
   closed: boolean
   onClose: () => void
 }
 
 /**
- * Pin what the current accounts really held at the end of a month (DESIGN.md §8). The plan only knows what they hold
- * together, so the dialog asks for every one of them or none: their sum takes the place of the worked-out amount,
- * the line shows the difference and later months continue from the real numbers.
+ * What the plan knows about the current accounts of a month: their amounts together, in the household currency. Said
+ * wherever their fields stand, because one account alone has no calculated amount unless it is the only one.
  */
-export function CurrentBalanceDialog({ title, accounts, month, result, actuals, baseCurrency: base, locale, closed, onClose }: Props) {
-  const store = useStore()
-  const stored = (acc: Account) => actuals.find((a) => a.accountId === acc.id && a.month === month)?.actualBalance ?? null
-  const [texts, setTexts] = useState<Record<string, string>>(() => Object.fromEntries(accounts.map((acc) => {
-    const v = stored(acc)
-    return [acc.id, v != null ? amountToInput(v, acc.currency, locale) : '']
-  })))
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const several = accounts.length > 1
-  const hasActual = accounts.some((acc) => stored(acc) != null)
-  // the sum as it is typed, while every account is in the household currency; another currency is converted on saving
-  // an account that turns up while the dialog is open (another device, an undo) starts with an empty field
-  const textOf = (acc: Account): string => texts[acc.id] ?? ''
-  const typed = accounts.map((acc) => (textOf(acc).trim() === '' ? null : parseAmount(textOf(acc), acc.currency, locale)))
-  const together = accounts.every((acc) => acc.currency === base) && typed.every((v) => v != null) ? typed.reduce<number>((sum, v) => sum + (v ?? 0), 0) : null
+export function CurrentTogether({ form, base }: { form: MonthBalancesForm; base: string }) {
+  const { main, locale } = form
+  if (!main) return null
+  return <>Calculated, together: {formatAmount(main.start, base, locale)} at the start, {formatAmount(main.computed, base, locale)} at the end.</>
+}
 
-  async function save(balances: Record<string, number> | null) {
+/**
+ * What the current accounts really held when a month began and when it ended (DESIGN.md §8). The plan only knows what
+ * they hold together, so each moment takes every one of them or none: their sum takes the place of the calculated
+ * amount, the line shows the difference and later months continue from the real numbers.
+ */
+export function CurrentBalanceDialog({ title, month, tables, household, closed, onClose }: Props) {
+  const store = useStore()
+  const form = useMonthBalances(tables, household, month, (l) => l.group === 'current')
+  const [busy, setBusy] = useState(false)
+  const { locale, lines, main } = form
+  const base = household.baseCurrency
+  const several = lines.length > 1
+  // the plan's own figure for one account in the household currency is in its fields already
+  const alone = lines.length === 1 && lines[0].endCalculated != null
+  // the sum as it is typed, while every account is in the household currency; another currency is converted on saving
+  const ends = lines.map((l) => form.typed('end', l))
+  const together = main && lines.length > 0 && lines.every((l) => l.account.currency === base) && ends.every((v) => v != null) ? ends.reduce<number>((sum, v) => sum + (v ?? 0), 0) : null
+
+  async function submit() {
+    const entry = form.entry()
+    if (!entry) return
     setBusy(true)
-    setError(null)
     try {
-      await setCurrentBalances(store, month, balances)
+      await setMonthBalances(store, month, entry)
       onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save.')
+      form.setError(e instanceof Error ? e.message : 'Could not save.')
     } finally {
       setBusy(false)
     }
   }
-  function submit() {
-    const filled = accounts.filter((acc) => textOf(acc).trim() !== '')
-    if (filled.length === 0) return void save(null)
-    if (filled.length < accounts.length) return setError('Fill in every account, or leave them all empty to use the calculated amount.')
-    const balances: Record<string, number> = {}
-    for (const acc of accounts) {
-      const v = parseAmount(textOf(acc), acc.currency, locale)
-      if (v == null) return setError(unreadableAmount(textOf(acc), several ? `${acc.name}: that is not a number I can read.` : 'That is not a number I can read.'))
-      balances[acc.id] = v
-    }
-    void save(balances)
-  }
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
+      <DialogContent className={several ? 'sm:max-w-lg' : 'sm:max-w-md'} aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{title} · {formatMonth(month, locale, 'long')}</DialogTitle>
           <DialogDescription>
             {several
-              ? 'What they really held at the end of the month, from your bank. Later months continue from the real numbers.'
-              : 'What the account really held at the end of the month, from your bank. Later months continue from the real number.'}
+              ? 'What they really held when the month began and when it ended, from your bank. The plan only knows them together, so fill in every account or none.'
+              : 'What the account really held when the month began and when it ended, from your bank.'}
+            {' '}An empty field keeps the calculated amount. The start is the end of the month before: changing it corrects that month too.
           </DialogDescription>
         </DialogHeader>
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-          <dt className="text-muted-foreground">{several ? 'Worked out, together' : 'Worked out'}</dt>
-          <dd className="text-right tabular-nums">{formatAmount(result.computed, base, locale)}</dd>
-        </dl>
-        <div className="space-y-2">
-          {accounts.map((acc, i) => (
-            <div key={acc.id} className="space-y-1.5">
-              <Label htmlFor={`real-${acc.id}`}>{several ? `${acc.name} (${acc.currency})` : `Real balance in ${acc.currency}`}</Label>
-              <Input
-                id={`real-${acc.id}`} autoFocus={i === 0} inputMode="decimal" value={textOf(acc)} disabled={closed}
-                onChange={(e) => { setError(null); setTexts((t) => ({ ...t, [acc.id]: e.target.value })) }} onKeyDown={(e) => { if (e.key === 'Enter') submit() }}
-                placeholder={several ? undefined : 'leave empty to use the calculated amount'}
-              />
-              <AmountHint text={textOf(acc)} currency={acc.currency} locale={locale} />
-            </div>
-          ))}
-          {closed && <p className="text-xs text-muted-foreground">This month is closed. Reopen it to change the balance.</p>}
-          {accounts.some((acc) => acc.currency !== base) && <p className="text-xs text-muted-foreground">An account in another currency is counted in {base} at this month's rate.</p>}
-        </div>
-        {together != null && (
+        {!alone && main && <p className="text-sm text-muted-foreground" data-testid="current-together"><CurrentTogether form={form} base={base} /></p>}
+        <BalanceFields form={form} groups={[{ lines }]} month={month} base={base} named={several} disabled={closed} onEnter={() => void submit()} />
+        {lines.some((l) => l.account.currency !== base) && <p className="text-xs text-muted-foreground">An account in another currency is counted in {base} at this month's rate.</p>}
+        {together != null && main && several && (
           <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm" data-testid="current-balance-sum">
-            {several && <><dt className="text-muted-foreground">Together</dt><dd className="text-right tabular-nums">{formatAmount(together, base, locale)}</dd></>}
-            <dt className="text-muted-foreground">Difference</dt><dd className="text-right tabular-nums">{formatAmount(together - result.computed, base, locale, { sign: 'exceptZero' })}</dd>
+            <dt className="text-muted-foreground">Together at the end</dt><dd className="text-right tabular-nums">{formatAmount(together, base, locale)}</dd>
+            <dt className="text-muted-foreground">Difference</dt><dd className="text-right tabular-nums">{formatAmount(together - main.computed, base, locale, { sign: 'exceptZero' })}</dd>
           </dl>
         )}
-        {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-        <DialogFooter className="flex-row flex-wrap gap-2 sm:justify-between">
-          <Button variant="ghost" onClick={() => void save(null)} disabled={busy || closed || !hasActual}>Use the calculated amount</Button>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-            <Button onClick={submit} disabled={busy || closed}>Save</Button>
-          </div>
+        {closed && <p className="text-xs text-muted-foreground">{closedBalanceNote(month, locale)}</p>}
+        {form.error && <p className="text-sm text-destructive" role="alert">{form.error}</p>}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={busy}>{closed ? 'Close' : 'Cancel'}</Button>
+          {!closed && <Button onClick={() => void submit()} disabled={busy}>Save</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>
