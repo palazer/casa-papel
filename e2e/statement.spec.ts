@@ -1687,6 +1687,8 @@ test.describe('working the month in the Statement', () => {
 
   test('a heading folds with everything under it: its total stays, it stays folded, and what is looked for opens it', async ({ page }) => {
     await openStatement(page)
+    // the demo posts its schedules just after it loads: the walk to the month gives the amounts time to settle
+    await goToMonth(page, 'November 2026')
     const moneyIn = page.getByRole('region', { name: 'Money in' })
     const moneyOut = page.getByRole('region', { name: 'Money out' })
     const assets = page.getByRole('region', { name: 'Assets' })
@@ -1703,8 +1705,11 @@ test.describe('working the month in the Statement', () => {
     for (const h of all) await expect(h).toHaveAttribute('aria-expanded', 'true')
     // what the household has stands under a heading per kind, each with the sum of its accounts; a kind it has none of has no heading
     const amountOn = async (l: Locator) => (await l.innerText()).match(/€[\d,]+\.\d\d/g)!.at(-1)
-    expect(await amountOn(assets.locator('[data-line="savings-accounts"]'))).toBe(await amountOn(assets.locator('[data-line^="acc:"]').filter({ hasText: 'Savings' }).first()))
-    expect(await amountOn(assets.locator('[data-line="investment-accounts"]'))).toBe(await amountOn(assets.locator('[data-line^="acc:"]').filter({ hasText: 'Index fund' })))
+    // two amounts read one after the other: asked again until they are from the same state of the page
+    await expect(async () => {
+      expect(await amountOn(assets.locator('[data-line="savings-accounts"]'))).toBe(await amountOn(assets.locator('[data-line^="acc:"]').filter({ hasText: 'Savings' }).first()))
+      expect(await amountOn(assets.locator('[data-line="investment-accounts"]'))).toBe(await amountOn(assets.locator('[data-line^="acc:"]').filter({ hasText: 'Index fund' })))
+    }).toPass()
     await expect(assets.locator('[data-line="other-assets"]')).toHaveCount(0)
     await expect(assets.locator('[data-line]').first()).toHaveAttribute('data-line', 'main')
     await expect(saved).toBeVisible()
