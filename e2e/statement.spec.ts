@@ -1919,6 +1919,81 @@ test.describe('working the month in the Statement', () => {
     await expect(moneyOut.getByRole('button', { name: 'To savings: €0.00' })).toBeVisible()
     expect((await total(page, 'in').innerText()).replace(/^Total in\s*/, '')).toBe((await total(page, 'out').innerText()).replace(/^Total out\s*/, ''))
   })
+
+  test('an expense comes out of any account: the list names them, the account falls and "From accounts" says which paid', async ({ page }) => {
+    await openStatement(page)
+    await goToMonth(page, 'November 2026')
+    const dlg = page.getByRole('dialog')
+    const moneyIn = page.getByRole('region', { name: 'Money in' })
+    const moneyOut = page.getByRole('region', { name: 'Money out' })
+    const assets = page.getByRole('region', { name: 'Assets' })
+    const balanced = async () => expect((await total(page, 'in').innerText()).replace(/^Total in\s*/, '')).toBe((await total(page, 'out').innerText()).replace(/^Total out\s*/, ''))
+    const account = (name: string) => assets.locator('[data-line^="acc:"]').filter({ hasText: name })
+    const paidFrom = (name: string) => moneyIn.locator('[data-line^="src:acc:"]').filter({ hasText: `From ${name}` }).first()
+
+    // a second savings account: 1,000 when September began, and 50 a month from November on
+    await assets.getByRole('button', { name: 'Add account' }).click()
+    await dlg.getByLabel('Name', { exact: true }).fill('Rainy day')
+    await dlg.getByLabel('Type').selectOption('savings')
+    await dlg.getByLabel(/^Holds at the start of/).fill('1000')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg.getByRole('heading', { name: 'How much goes to Rainy day?' })).toBeVisible()
+    await dlg.getByLabel('Amount per month in EUR').fill('50')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(account('Rainy day')).toContainText('€1,050.00')
+
+    // the row's dialog lists this month's income, then every account that can pay under its kind, then the virtual accounts
+    await moneyOut.getByRole('button', { name: 'Living', exact: true }).click()
+    await moneyOut.getByRole('button', { name: /^Health:/ }).click()
+    const source = dlg.getByLabel('Comes out of', { exact: true })
+    await expect(source.locator('option')).toHaveText([
+      "This month's income (row default)", 'Savings account: Savings', 'Savings account: Rainy day', 'Investment account: Index fund', 'Virtual account: Travel', 'Virtual account: Clothing',
+    ])
+    await source.selectOption({ label: 'Savings account: Rainy day' })
+    await dlg.getByRole('textbox', { name: /^Amount in EUR/ }).fill('300')
+    await settled(dlg)
+    await page.screenshot({ path: 'e2e/output/statement-comes-out-of.png' })
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+
+    // the expense is there in full, the account that paid is 300 lower, and "From accounts" names it and what it paid for
+    await expect(moneyOut.getByRole('button', { name: /^Health:/ })).toHaveAccessibleName(/^Health: €300\.00/)
+    await expect(account('Rainy day')).toContainText('€750.00')
+    await expect(paidFrom('Rainy day')).toContainText('savings account')
+    await expect(paidFrom('Rainy day')).toContainText('calculated')
+    await expect(paidFrom('Rainy day')).toContainText('for Health')
+    await expect(paidFrom('Rainy day')).toContainText('€300.00')
+    await balanced()
+    await page.screenshot({ path: 'e2e/output/statement-pay-from-account.png', fullPage: true })
+
+    // the row menu sets it for the row from this month on: December comes out of the fund, November keeps what was picked for it
+    await moneyOut.getByRole('button', { name: 'Row menu for Health' }).click()
+    await page.getByRole('menuitem', { name: 'Comes out of…' }).click()
+    const rowSource = dlg.getByLabel('Single amounts in this row come out of')
+    await expect(rowSource.locator('option')).toHaveText([
+      "This month's income", 'Savings account: Savings', 'Savings account: Rainy day', 'Investment account: Index fund', 'Virtual account: Travel', 'Virtual account: Clothing',
+    ])
+    await rowSource.selectOption({ label: 'Investment account: Index fund' })
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(paidFrom('Rainy day')).toContainText('€300.00')
+    await expect(paidFrom('Index fund')).toHaveCount(0)
+    await goToMonth(page, 'December 2026')
+    await expect(paidFrom('Index fund')).toContainText('investment account')
+    await expect(paidFrom('Index fund')).toContainText('for Health')
+    await expect(paidFrom('Rainy day')).toHaveCount(0)
+    await balanced()
+
+    // which account pays is "Comes out of…"; the row's other account choice is the card it is bought on, and nothing else
+    await moneyOut.getByRole('button', { name: 'Row menu for Health' }).click()
+    await expect(page.getByRole('menuitem', { name: 'Paid from…' })).toHaveCount(0)
+    await page.getByRole('menuitem', { name: 'Paid by card…' }).click()
+    await expect(dlg.getByLabel('Card', { exact: true }).locator('option')).toHaveText(['Not by card', 'Main account (not a card)', 'Credit card'])
+    await expect(dlg).toContainText('is set under "Comes out of…" in the row menu instead')
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+    await expect(dlg).toBeHidden()
+  })
 })
 
 test.describe('the Statement on a phone', () => {

@@ -235,7 +235,7 @@ export function GridScreen() {
                 ),
                 key === 'income' && derivedRow('Income total', 'in', (m) => engine.totals[m].income, { strong: true, hue: HUES.income, band: true, help: 'derived.incomeTotal' }),
                 key === 'expense' && derivedRow('Expenses total', 'out', (m) => engine.totals[m].expensesTotal, { strong: true, hue: HUES.expense, band: true, help: 'derived.expensesTotal' }),
-                key === 'expense' && months.some((m) => engine.totals[m].fromSavingsDerived !== 0) && derivedRow('of which from savings & virtual accounts', 'in', (m) => engine.totals[m].fromSavingsDerived, { muted: true, hue: HUES.pool, help: 'derived.fromSavings' }),
+                key === 'expense' && months.some((m) => engine.totals[m].fromSavingsDerived !== 0) && derivedRow('of which paid from accounts', 'in', (m) => engine.totals[m].fromSavingsDerived, { muted: true, hue: HUES.pool, help: 'derived.fromSavings' }),
                 key === 'transfer' && derivedRow(household.closingRule === 'savings-plug' ? 'Kept in account' : 'Leftover', 'in', (m) => engine.totals[m].leftover, { strong: true, hue: HUES.transfer, band: true, help: household.closingRule === 'savings-plug' ? 'derived.keptInAccount' : 'derived.leftover' }),
               ]
             })}

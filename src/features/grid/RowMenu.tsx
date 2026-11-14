@@ -12,7 +12,7 @@ import { derivedRowReason, moveRow, removeIfFree, renameRow, restoreRow, updateR
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
 import { RowAccountDialog, RowCurrencyDialog, RowDeductionDialog, RowFollowDialog, RowScopeDialog, RowSourceDialog } from './RowDialogs'
 import { RowCategoryDialog } from './RowCategoryDialog'
-import { accountVerb } from './rowAccount'
+import { accountVerb, hasAccountChoice } from './rowAccount'
 
 type Open = 'rename' | 'category' | 'scope' | 'currency' | 'source' | 'deduction' | 'account' | 'follow' | 'remove' | null
 
@@ -71,7 +71,7 @@ export function RowMenu({ row, tables, household, onError, onDeleted, onRule, tr
           )}
           {row.section === 'expense' && <DropdownMenuItem onClick={() => setOpen('source')}>Comes out of…</DropdownMenuItem>}
           {row.section === 'expense' && <DropdownMenuItem onClick={() => setOpen('deduction')}>{deductedFrom ? `Deducted from ${deductedFrom.name}…` : 'Deducted from an income…'}</DropdownMenuItem>}
-          {row.kind !== 'pool-allocation' && <DropdownMenuItem onClick={() => setOpen('account')}>{accountVerb(row)}…</DropdownMenuItem>}
+          {row.kind !== 'pool-allocation' && hasAccountChoice(row, tables.accounts) && <DropdownMenuItem onClick={() => setOpen('account')}>{accountVerb(row)}…</DropdownMenuItem>}
           {onRule && canCarryRule(row) && !row.archivedMonth && <DropdownMenuItem onClick={onRule}>Rule…</DropdownMenuItem>}
           {canFollow && <DropdownMenuItem onClick={() => setOpen('follow')}>{followed ? `Follows ${followed.name}…` : 'Follow another row…'}</DropdownMenuItem>}
           <DropdownMenuSeparator />

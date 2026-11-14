@@ -16,8 +16,19 @@ export interface ResolvedItem extends CellItem {
 
 export interface Funding {
   cash: Money
+  /** The old "Savings balance": comes out of the first savings account (`EngineOutput.primarySavingsId`). */
   savings: Money
   pools: Record<string, Money>
+  /** Per account the expense names: a savings account, an investment account or an other asset. */
+  accounts: Record<string, Money>
+}
+
+/** An expense's whole amount in the base currency: its funding parts added up, as the month's totals count it. */
+export function fundingTotal(f: Funding): Money {
+  let total = f.cash + f.savings
+  for (const amount of Object.values(f.pools)) total += amount
+  for (const amount of Object.values(f.accounts)) total += amount
+  return total
 }
 
 export interface CellResult {
@@ -37,6 +48,11 @@ export interface CellResult {
   items: ResolvedItem[]
   /** Base-currency split of an expense by where the cash comes from. */
   funding: Funding
+  /**
+   * The parts that come straight out of a named account, in the row's own currency (`currency`): an account kept in
+   * that currency falls by exactly what was typed, not by the amount converted to the base currency and back.
+   */
+  paidFrom: Record<string, Money>
   missingRate: boolean
   /** The base-currency value used a projected (drifted) rate. */
   rateProjected: boolean
@@ -57,6 +73,11 @@ export interface MonthTotals {
   savingsFunded: Money
   poolFunded: Money
   poolFundedByPool: Record<string, Money>
+  /** Spending that comes straight out of a named account (base currency), in all and per account. */
+  accountFunded: Money
+  accountFundedByAccount: Record<string, Money>
+  /** The same per account as it was typed: account → currency → amount in that currency. */
+  accountFundedOwn: Record<string, Record<string, Money>>
   allocations: Money
   allocationsByPool: Record<string, Money>
   toInvestment: Money
@@ -66,7 +87,7 @@ export interface MonthTotals {
   /** Positive = into savings, negative = drawn from savings. */
   toSavings: Money
   leftover: Money
-  /** Derived "From savings" row: savings- and pool-funded spend. */
+  /** Derived "From savings" row: spending paid from savings, from virtual accounts and from named accounts. */
   fromSavingsDerived: Money
   expensesTotal: Money
   transfersTotal: Money

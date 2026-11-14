@@ -136,12 +136,12 @@ export const GUIDE: GuideTopic[] = [
     what: [
       'Every amount is an "Estimate" (on a light yellow shade), "Certain" or "Done" (green dot). That changes how it looks and what the month\'s progress counts, never how it adds up. "Treat new values as…" in the row menu sets the default for new amounts in that row.',
       'A cell is a "Single amount" or "Itemized": a list of items with a "What", an amount, a status and a source each, and "Mark all done" for the whole list.',
-      '"Comes out of" says where the money is taken from: "This month\'s income", the "Savings balance" or a "Virtual account: Travel". Savings and virtual accounts never touch the month\'s leftover. Categories ("Housing", "Living", "Transport", "Family & pets", "Fun", "Personal") group rows under a label line on a faint band.',
+      '"Comes out of" says where the money is taken from: "This month\'s income", one of your accounts ("Savings account: Savings", "Investment account: Index fund") or a "Virtual account: Travel". An account that pays falls by the amount, shows as "From Savings" under "From accounts" on the Statement, and never touches the month\'s leftover. Categories ("Housing", "Living", "Transport", "Family & pets", "Fun", "Personal") group rows under a label line on a faint band.',
     ],
     steps: [
       'Press a line on the Statement, or a cell in the Grid, and set "How sure": "Row default (Estimate)", "Estimate", "Certain" or "Done".',
       'Switch to "Itemized", press "Add item", fill "What" and the amount; "Mark all done" once everything is paid.',
-      'Pick "Comes out of" → "Savings balance" or "Virtual account: Travel" for spending that should not reduce the leftover.',
+      'Pick "Comes out of" → "Savings account: Savings" or "Virtual account: Travel" for spending that should not reduce the leftover.',
       'For a whole row: row menu → "Comes out of…" → "Single amounts in this row come out of" → "Applies to": "From <Month> on" or "All months, past included" → "Save".',
       'Row menu → "Treat new values as certain" (or "…as estimates") for the row\'s default.',
       'To move a row to another category, press it and pick under "Category" at the top right of its dialog, then "Save": the row is there in every month. Row menu → "Category…" does the same and adds "New category…" and "Add the usual categories"; rename and reorder them under Household → "Categories".',
@@ -243,7 +243,7 @@ export const GUIDE: GuideTopic[] = [
     steps: [
       'Statement → "Debts and net worth" → "Add a card or loan" (or Household → "Accounts" → "Add account"): "Name", "Type" ("Loan" or "Credit card") and "Owed at the start of <Month>", what you owed when that month began.',
       'For a card answer "What do you record for this card?". "Add the row that pays it off" is ticked: "Save" makes the loan or card and its payment row together, and on the Statement the row\'s dialog opens for the amount.',
-      'Point spending rows at a card: row menu → "Paid from…" → the card (in the demo, "Subscriptions" is paid from "Credit card").',
+      'Point spending rows at a card: row menu → "Paid by card…" → the card (in the demo, "Subscriptions" is paid by "Credit card").',
       'A payment row can come later, or first. Later: the "…" of the loan or card → "Edit…" → "Add the row that pays it off". First: Statement → "To savings, investments and debts" → "Add row" → "Pays off a loan or card" → the account, or "New loan…" to make both together; a category\'s "Add row to Transport" offers the same, and the page then shows where the line landed. In the Grid it is Expenses → "Add row" → "Pays off a loan or card", and Transfers → "Pays off a credit card" for a card whose purchases are expense rows. A vehicle\'s or company\'s suggestions offer a loan row too, with "Add a loan…" while there is none.',
       'Row menu → "Pays off…" re-points a payment row at another loan or card.',
       'Statement → "Debts and net worth" → press the balance, or Grid → "<Name> · owed" or "<Name> · outstanding" in a month → "Real balance in EUR" to correct the balance.',

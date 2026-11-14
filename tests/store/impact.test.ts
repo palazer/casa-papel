@@ -72,6 +72,7 @@ describe('describeRemoval', () => {
       'Its balance stops at Oct 2026; from Nov 2026 it is hidden and no longer counts towards net worth',
       '"To savings" keeps moving money, but the balance is no longer tracked from Nov 2026',
       'Its virtual accounts "Travel" and "Clothing" are archived with it from Nov 2026',
+      'From Nov 2026, "Travel" and "Clothing" come out of the month\'s income; earlier months keep the account as their source',
     ])
 
     const main = describeRemoval(t, { kind: 'account', id: idOf(t, 'accounts', 'Main account') }, OPTS)
@@ -83,17 +84,17 @@ describe('describeRemoval', () => {
     expect(main.archiveChanges[0]).toBe('Hidden from Nov 2026 on; rows that name it keep working')
   })
 
-  it('virtual accounts: closed allocations make them archive-only; archiving moves spending to savings from that month', () => {
+  it('virtual accounts: closed allocations make them archive-only; archiving moves spending to the account it was held in from that month', () => {
     const t = buildDemoTables()
     const travel = describeRemoval(t, { kind: 'pool', id: idOf(t, 'pools', 'Travel') }, OPTS)
     expect(travel).toMatchObject({ kindLabel: 'Virtual account', closedHistory: 'Sept 2026', canDelete: false, canArchive: true })
     expect(travel.loses[0]).toMatch(/^Its balance \(Sept 2026 – /)
     expect(travel.loses[1]).toMatch(/^The row "To Travel" that fills it, with its amounts in \d+ months$/)
-    expect(travel.changes).toEqual(['"Travel" comes out of the savings balance instead', 'Spending that came out of it in 1 month counts as spent from the savings balance'])
+    expect(travel.changes).toEqual(['"Travel" comes out of "Savings" instead', 'Spending that came out of it in 1 month counts as spent from "Savings"'])
     expect(travel.archiveChanges).toEqual([
       'Its balance stops at Oct 2026',
       '"To Travel" is archived from Nov 2026; nothing more is set aside',
-      'From Nov 2026, "Travel" comes out of the savings balance; earlier months keep the virtual account as their source',
+      'From Nov 2026, "Travel" comes out of "Savings"; earlier months keep the virtual account as their source',
     ])
   })
 

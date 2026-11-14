@@ -1,7 +1,7 @@
 import { generateKeyBetween } from 'fractional-indexing'
 import { computeEngine, cellKey, sortRows, type EngineOutput } from '@/engine'
 import {
-  ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RowSchema, addMonths, canCarryRule, canTakeRest, cardIsItemized, compareMonths, isOldPocketShare, isShareRule, monthKey, monthOfDate, monthRange, newId, parseMonth, poolIdOf, resolveRules, sharePercent,
+  ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RowSchema, accountIdOf, addMonths, canCarryRule, canTakeRest, cardIsItemized, compareMonths, isOldPocketShare, isShareRule, monthKey, monthOfDate, monthRange, newId, parseMonth, paysExpenses, poolIdOf, resolveRules, sharePercent,
   type Account, type Category, type Cell, type CellInput, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Pool, type Row, type RowKind, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
@@ -616,10 +616,17 @@ export async function setRowFundedBy(store: Store, rowId: string, fundedBy: Fund
   await store.commit(planRowFundedBy(tables, row, fundedBy, scope, now()))
 }
 
-/** The mutations behind `setRowFundedBy`; archiving a virtual account uses them too. */
+/** The mutations behind `setRowFundedBy`; archiving an account or a virtual account uses them too. */
 export function planRowFundedBy(tables: Tables, row: Row, fundedBy: FundedBy, scope: RowSourceScope, ts: number): Mutation[] {
   const poolId = poolIdOf(fundedBy)
   if (poolId && !tables.pools.some((p) => p.id === poolId && !p.deletedAt)) throw new Error('That virtual account no longer exists.')
+  const accountId = accountIdOf(fundedBy)
+  if (accountId) {
+    const acc = tables.accounts.find((a) => a.id === accountId && !a.deletedAt)
+    if (!acc) throw new Error('That account no longer exists.')
+    if (!paysExpenses(acc)) throw new Error(`An expense cannot come straight out of "${acc.name}": pick a savings account, an investment account or an other asset.`)
+    if (acc.archivedMonth && fundedBy !== row.defaultFundedBy) throw new Error(`"${acc.name}" is archived: pick an account that is still open.`)
+  }
   const mutations: Mutation[] = []
   if (scope !== 'all-months' && fundedBy !== row.defaultFundedBy) {
     const household = tables.household.find((h) => !h.deletedAt)

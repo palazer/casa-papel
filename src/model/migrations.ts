@@ -37,6 +37,10 @@ const STEPS: Record<number, Step> = {
   // 9 → 10: the rule 'share-of-row' (a share of one income row) and `Row.ruleRowId`, the income it is taken of.
   // Nothing to rewrite; the version keeps an older app from reading a rule it does not know.
   9: (raw) => raw,
+  // 10 → 11: an expense can come out of one named account (`account:<id>` beside `cash`, `savings` and `pool:<id>`).
+  // Nothing to rewrite: `savings` keeps meaning the first savings account. The version keeps an older app from
+  // reading a source it does not know.
+  10: (raw) => raw,
 }
 
 export function migrateExport(raw: unknown): unknown {

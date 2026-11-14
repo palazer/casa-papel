@@ -9,8 +9,9 @@ import { NativeSelect } from '@/components/NativeSelect'
 import { amountToInput, parseAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import { sortRows } from '@/engine'
-import { poolRef, type Household, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
+import type { Household, MonthKey, RecurringItem, Row, Section, Tables } from '@/model'
 import { addRecurringItem, addRow, updateRecurringItem, type RecurringInput } from '@/store'
+import { fundingOptions } from '@/features/grid/funding'
 
 const MONTH_NAMES = Array.from({ length: 12 }, (_, i) => new Intl.DateTimeFormat('en', { month: 'short' }).format(new Date(2026, i, 1)))
 type CadenceChoice = '1' | '2' | '3' | '6' | '12' | 'months'
@@ -29,7 +30,7 @@ export function RecurringDialog({ tables, household, item, defaultMonth, onClose
   const { locale, baseCurrency } = household
   const rows = sortRows(tables.rows.filter((r) => !r.deletedAt && !r.archivedMonth && r.kind !== 'to-savings' && r.pocketMode == null), tables.categories)
   const adults = tables.entities.filter((e) => e.kind === 'adult' && !e.deletedAt)
-  const pools = tables.pools.filter((p) => !p.deletedAt && (!p.archivedMonth || poolRef(p.id) === item?.fundedBy))
+  const sources = fundingOptions(tables, item ? [item.fundedBy] : [])
   const [name, setName] = useState(item?.name ?? '')
   const [rowId, setRowId] = useState(item?.rowId ?? rows[0]?.id ?? '__new__')
   const [newRowName, setNewRowName] = useState('')
@@ -130,7 +131,7 @@ export function RecurringDialog({ tables, household, item, defaultMonth, onClose
           <div className="space-y-1.5"><Label htmlFor="rc-account">{accountLabel}</Label><NativeSelect id="rc-account" className="w-full" value={accountId} onChange={(e) => setAccountId(e.target.value)}><option value="">—</option>{tables.accounts.filter((a) => !a.deletedAt && (!a.archivedMonth || a.id === accountId)).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</NativeSelect></div>
           <p className="-mt-2 text-xs text-muted-foreground sm:col-span-2">{accountHelp}</p>
           <div className="space-y-1.5"><Label htmlFor="rc-scope">Whose</Label><NativeSelect id="rc-scope" className="w-full" value={scope} onChange={(e) => setScope(e.target.value)}><option value="shared">Shared</option>{adults.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</NativeSelect></div>
-          {section === 'expense' && <div className="space-y-1.5"><Label htmlFor="rc-funded">Comes out of</Label><NativeSelect id="rc-funded" className="w-full" value={fundedBy} onChange={(e) => setFundedBy(e.target.value)}><option value="cash">This month's income</option><option value="savings">Savings balance</option>{pools.map((p) => <option key={p.id} value={poolRef(p.id)}>Virtual account: {p.name}</option>)}</NativeSelect><p className="text-xs text-muted-foreground">Spending from savings or a virtual account does not reduce this month's leftover.</p></div>}
+          {section === 'expense' && <div className="space-y-1.5"><Label htmlFor="rc-funded">Comes out of</Label><NativeSelect id="rc-funded" className="w-full" value={fundedBy} onChange={(e) => setFundedBy(e.target.value)}>{sources.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</NativeSelect><p className="text-xs text-muted-foreground">Spending from an account or a virtual account does not reduce this month's leftover.</p></div>}
           <div className="space-y-1.5"><Label>From month</Label><MonthField label="From month" value={startMonth} onChange={setStartMonth} locale={locale} /></div>
           <div className="space-y-1.5"><Label>Until month (optional)</Label><MonthField label="Until month" value={endMonth} onChange={setEndMonth} locale={locale} allowEmpty /></div>
           <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="rc-notes">Notes</Label><Input id="rc-notes" value={notes} onChange={(e) => setNotes(e.target.value)} /></div>

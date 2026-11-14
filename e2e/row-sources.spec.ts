@@ -45,7 +45,7 @@ test.describe('row sources, accounts and followers', () => {
     await page.getByRole('menuitem', { name: 'Comes out of…' }).click()
     const dlg = page.getByRole('dialog')
     await expect(dlg.getByRole('heading', { name: 'Comes out of' })).toBeVisible()
-    await dlg.getByLabel('Single amounts in this row come out of').selectOption('savings')
+    await dlg.getByLabel('Single amounts in this row come out of').selectOption({ label: 'Savings account: Savings' })
     await expect(dlg.getByText(/Earlier months stay as they are/)).toBeVisible()
     await dlg.getByRole('radio', { name: 'All months, past included' }).click()
     await expect(dlg.getByText(/Earlier months change too/)).toBeVisible()
@@ -54,8 +54,10 @@ test.describe('row sources, accounts and followers', () => {
     await expect(dlg).toBeHidden()
 
     await page.getByRole('button', { name: /^Public transport Nov 2026/ }).click()
-    await expect(dlg.getByLabel('Comes out of', { exact: true })).toHaveValue('savings')
-    await expect(dlg.getByRole('option', { name: 'Savings balance (row default)' })).toHaveCount(1)
+    await expect(dlg.getByLabel('Comes out of', { exact: true })).toHaveValue(/^account:/)
+    await expect(dlg.getByRole('option', { name: 'Savings account: Savings (row default)' })).toHaveCount(1)
+    // the account is named: no "Savings balance" is offered any more
+    await expect(dlg.getByRole('option', { name: /Savings balance/ })).toHaveCount(0)
     await page.keyboard.press('Escape')
   })
 
@@ -97,9 +99,10 @@ test.describe('row sources, accounts and followers', () => {
     await expect(dlg).toBeHidden()
 
     await page.getByRole('button', { name: 'Row menu for Groceries' }).click()
-    await page.getByRole('menuitem', { name: 'Paid from…' }).click()
-    await expect(dlg.getByLabel('Paid from')).toHaveValue(/./)
-    await expect(dlg.getByLabel('Paid from').getByRole('option')).toHaveCount(6)
+    // an ordinary expense names the card it is bought on; the account it names today stays listed until it is changed
+    await page.getByRole('menuitem', { name: 'Paid by card…' }).click()
+    await expect(dlg.getByLabel('Card', { exact: true })).toHaveValue(/./)
+    await expect(dlg.getByLabel('Card', { exact: true }).locator('option')).toHaveText(['Not by card', 'Joint account (not a card)', 'Credit card'])
     await dlg.getByRole('button', { name: 'Cancel' }).click()
   })
 })

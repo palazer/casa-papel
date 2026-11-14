@@ -7,14 +7,14 @@ import { Segmented } from '@/components/Segmented'
 import { formatMonth } from '@/app/format'
 import { useStore } from '@/app/store'
 import { sortRows } from '@/engine'
-import { ENTITY_KIND_LABEL, monthOfDate, type FundedBy, type Household, type Row, type Section, type Tables } from '@/model'
+import { ENTITY_KIND_LABEL, monthOfDate, type Account, type FundedBy, type Household, type Row, type Section, type Tables } from '@/model'
 import { accountTypeForRow, derivedRowReason, followRow, setRowAccount, setRowDeductedFrom, setRowFundedBy, setRowScope, updateRow } from '@/store'
 import { NativeSelect } from '@/components/NativeSelect'
 import { fundingOptions } from './funding'
 import { currencyChoices, currencyLabel } from '@/app/currencies'
 import { HELP } from '@/app/help'
 import { TipLabel } from '@/components/InfoTip'
-import { accountHelp, accountVerb } from './rowAccount'
+import { accountHelp, accountVerb, paysByCard } from './rowAccount'
 
 interface Base {
   row: Row
@@ -57,7 +57,7 @@ export function useSave(onClose: () => void) {
 /** Where a spending row's single amounts come out of, from a month on or for all months. */
 export function RowSourceDialog({ row, tables, household, onClose }: Base) {
   const store = useStore()
-  const options = fundingOptions(tables.pools, [row.defaultFundedBy])
+  const options = fundingOptions(tables, [row.defaultFundedBy])
   const [fundedBy, setFundedBy] = useState<FundedBy>(row.defaultFundedBy)
   const [scope, setScope] = useState<'from-month' | 'all-months'>('from-month')
   const { error, busy, save } = useSave(onClose)
@@ -88,8 +88,8 @@ export function RowSourceDialog({ row, tables, household, onClose }: Base) {
             />
             <p className="text-xs text-muted-foreground">
               {scope === 'from-month'
-                ? `Earlier months stay as they are (${oldLabel}), so past savings and virtual account balances do not move.`
-                : 'Earlier months change too: the savings balance and virtual accounts are worked out again from the start.'}
+                ? `Earlier months stay as they are (${oldLabel}), so the past balances of your accounts and virtual accounts do not move.`
+                : 'Earlier months change too: the balances of the accounts and virtual accounts involved are worked out again from the start.'}
             </p>
           </fieldset>
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
@@ -107,8 +107,11 @@ export function RowSourceDialog({ row, tables, household, onClose }: Base) {
 export function RowAccountDialog({ row, tables, onClose }: Base) {
   const store = useStore()
   const need = accountTypeForRow(row)
+  // an ordinary expense names the card it is bought on; an account of another kind stays listed only while the row still names it
+  const byCard = paysByCard(row)
+  const fits = (a: Account) => (need ? a.type === need : !byCard || a.type === 'credit-card' || a.id === row.accountId)
   // archived accounts are offered only while the row still points at one
-  const accounts = tables.accounts.filter((a) => !a.deletedAt && (!need || a.type === need) && (!a.archivedMonth || a.id === row.accountId))
+  const accounts = tables.accounts.filter((a) => !a.deletedAt && fits(a) && (!a.archivedMonth || a.id === row.accountId))
   const [accountId, setAccountId] = useState(row.accountId ?? '')
   const { error, busy, save } = useSave(onClose)
   const verb = accountVerb(row)
@@ -122,13 +125,14 @@ export function RowAccountDialog({ row, tables, onClose }: Base) {
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="row-account">{verb}</Label>
+            <Label htmlFor="row-account">{byCard ? 'Card' : verb}</Label>
             <NativeSelect id="row-account" className="w-full" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-              {!need && <option value="">—</option>}
+              {!need && <option value="">{byCard ? 'Not by card' : '—'}</option>}
               {need && !accountId && <option value="">Pick an account</option>}
-              {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}{need && !a.tracked ? ' (not tracked)' : ''}</option>)}
+              {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}{need && !a.tracked ? ' (not tracked)' : ''}{byCard && a.type !== 'credit-card' ? ' (not a card)' : ''}</option>)}
             </NativeSelect>
             <p className="text-xs text-muted-foreground">{accountHelp(row)}</p>
+            {byCard && !accounts.some((a) => a.type === 'credit-card') && <p className="text-xs text-muted-foreground">No credit card yet: add one on the Statement under "Debts and net worth".</p>}
             {need && accounts.length === 0 && <p className="text-xs text-muted-foreground">No account of the right kind yet. Add one under Household first.</p>}
           </div>
           <p className="text-xs text-muted-foreground">Applies to every month, past ones included. To switch from a month on, archive this row and add a new one.</p>

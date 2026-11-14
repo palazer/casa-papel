@@ -9,8 +9,8 @@
 import { computeEngine, cellKey, type CellResult, type EngineOutput } from '@/engine'
 import {
   AccountSchema, CategorySchema, CellSchema, EntitySchema, GoalSchema, PoolSchema, RecurringItemSchema, RowSchema,
-  ENTITY_KIND_LABEL, addMonths, compareMonths, monthOfDate, monthRange, parseMonth, poolRef,
-  type Account, type Category, type Cell, type CellInput, type Entity, type Goal, type Household, type MonthKey, type Pool, type RecurringItem, type Row,
+  ENTITY_KIND_LABEL, accountRef, addMonths, compareMonths, monthOfDate, monthRange, parseMonth, paysExpenses, poolRef,
+  type Account, type Category, type Cell, type CellInput, type Entity, type FundedBy, type Goal, type Household, type MonthKey, type Pool, type RecurringItem, type Row,
   type TableName, type Tables,
 } from '@/model'
 import type { Mutation } from './store'
@@ -198,8 +198,17 @@ function describeAccount(ctx: Ctx, acc: Account): Described {
   const schedules = ctx.schedules.filter((s) => s.accountId === acc.id)
   const goals = ctx.goals.filter((g) => g.accountId === acc.id)
   const actuals = ctx.tables.accountMonths.filter((a) => a.accountId === acc.id && (a.actualBalance != null || a.actualDeposit != null || a.actualSpend != null))
-  /** A tracked balance is part of every month from its opening: history. An untracked account is only a name. */
-  const activity = acc.tracked ? ctx.months.filter((m) => compareMonths(m, acc.openingMonth) >= 0 && !(acc.archivedMonth && compareMonths(m, acc.archivedMonth) >= 0)) : []
+  // expenses that come straight out of it ("Comes out of")
+  const ref = accountRef(acc.id)
+  const funded = ctx.rows.filter((r) => r.defaultFundedBy === ref)
+  const paid = ctx.months.filter((m) => (ctx.engine.totals[m]?.accountFundedByAccount[acc.id] ?? 0) !== 0)
+  const paying = ctx.schedules.filter((s) => s.fundedBy === ref)
+  /**
+   * A tracked balance is part of every month from its opening: history. An untracked account is only a name, until
+   * an expense comes out of it: that month's leftover depends on it.
+   */
+  const tracked = acc.tracked ? ctx.months.filter((m) => compareMonths(m, acc.openingMonth) >= 0 && !(acc.archivedMonth && compareMonths(m, acc.archivedMonth) >= 0)) : []
+  const activity = ctx.months.filter((m) => tracked.includes(m) || paid.includes(m))
   const goalWords = `The ${pick(goals.length, 'goal', 'goals')} ${quoteNames(goals.map((g) => g.name))}`
   const loses: string[] = []
   if (actuals.length) loses.push(`${plural(actuals.length, 'real balance')} you entered (${monthSpan(actuals.map((a) => a.month), locale)})`)
@@ -212,6 +221,9 @@ function describeAccount(ctx: Ctx, acc: Account): Described {
   // an expense names its paying account; a transfer or income names where the money goes
   if (plain.length) changes.push(`${quoteNames(plain.map((r) => r.name))} no longer ${pick(plain.length, 'names', 'name')} it${plain.every((r) => r.section === 'expense') ? ' as the paying account' : ''}`)
   if (schedules.length) changes.push(`${plural(schedules.length, 'schedule')} no longer ${pick(schedules.length, 'names', 'name')} it`)
+  if (funded.length) changes.push(`${quoteNames(funded.map((r) => r.name))} ${pick(funded.length, 'comes', 'come')} out of the month's income instead`)
+  if (paid.length) changes.push(`What came out of it in ${plural(paid.length, 'month')} counts as spent from that month's income, so the leftover there falls`)
+  if (paying.length) changes.push(`${plural(paying.length, 'schedule')} ${pick(paying.length, 'comes', 'come')} out of the month's income instead`)
   return {
     kindLabel: 'Account', subject: acc.name, loses, changes, blockers, note: null, activity, canArchive: true,
     archive: (from) => {
@@ -219,6 +231,13 @@ function describeAccount(ctx: Ctx, acc: Account): Described {
       const out = [acc.tracked ? `Its balance stops at ${monthLabel(addMonths(from, -1), locale)}; from ${at} it is hidden and no longer counts towards net worth` : `Hidden from ${at} on; rows that name it keep working`]
       if (typed.length) out.push(`${quoteNames(typed.map((r) => r.name))} ${pick(typed.length, 'keeps', 'keep')} moving money, but the balance is no longer tracked from ${at}`)
       if (pools.length) out.push(`Its virtual ${pick(pools.length, 'account', 'accounts')} ${quoteNames(pools.map((p) => p.name))} ${pick(pools.length, 'is', 'are')} archived with it from ${at}`)
+      // what its virtual accounts paid goes the same way: they are archived with it
+      const poolRefs = pools.map((p) => poolRef(p.id))
+      const movers = [...new Set([
+        ...ctx.rows.filter((r) => r.defaultFundedBy === ref || poolRefs.includes(r.defaultFundedBy)).map((r) => r.name),
+        ...ctx.schedules.filter((s) => s.fundedBy === ref || poolRefs.includes(s.fundedBy)).map((s) => s.name),
+      ])]
+      if (movers.length) out.push(`From ${at}, ${quoteNames(movers)} ${pick(movers.length, 'comes', 'come')} out of the month's income; earlier months keep the account as their source`)
       if (goals.length) out.push(`${goalWords} can no longer be measured`)
       return out
     },
@@ -240,13 +259,17 @@ function describePool(ctx: Ctx, pool: Pool): Described {
     return !!r && (r.allocation !== 0 || r.spend !== 0)
   })
   const goalWords = `The ${pick(goals.length, 'goal', 'goals')} ${quoteNames(goals.map((g) => g.name))}`
+  // what came out of it comes out of the account it is held in: the same money, no longer set apart
+  const next = poolFallback(ctx, pool)
+  const holder = ctx.accounts.find((a) => a.id === pool.accountId)
+  const instead = next !== 'cash' && holder ? `"${holder.name}"` : 'the month\'s income'
   const loses: string[] = [`Its balance${activity.length ? ` (${monthSpan(activity, locale)})` : ''}`]
   if (alloc) loses.push(`The row "${alloc.name}" that fills it${allocMonths.length ? `, with its amounts in ${plural(allocMonths.length, 'month')}` : ''}`)
   if (goals.length) loses.push(`${goalWords}, which ${pick(goals.length, 'watches', 'watch')} it`)
   const changes: string[] = []
-  if (funded.length) changes.push(`${quoteNames(funded.map((r) => r.name))} ${pick(funded.length, 'comes', 'come')} out of the savings balance instead`)
-  if (cellsFunded.length) changes.push(`Spending that came out of it in ${plural(cellsFunded.length, 'month')} counts as spent from the savings balance`)
-  if (schedules.length) changes.push(`${plural(schedules.length, 'schedule')} ${pick(schedules.length, 'comes', 'come')} out of the savings balance instead`)
+  if (funded.length) changes.push(`${quoteNames(funded.map((r) => r.name))} ${pick(funded.length, 'comes', 'come')} out of ${instead} instead`)
+  if (cellsFunded.length) changes.push(`Spending that came out of it in ${plural(cellsFunded.length, 'month')} counts as spent from ${instead}`)
+  if (schedules.length) changes.push(`${plural(schedules.length, 'schedule')} ${pick(schedules.length, 'comes', 'come')} out of ${instead} instead`)
   return {
     kindLabel: 'Virtual account', subject: pool.name, loses, changes, blockers: [], note: null, activity, canArchive: true,
     archive: (from) => {
@@ -254,7 +277,7 @@ function describePool(ctx: Ctx, pool: Pool): Described {
       const out = [`Its balance stops at ${monthLabel(addMonths(from, -1), locale)}`]
       if (alloc) out.push(`"${alloc.name}" is archived from ${at}; nothing more is set aside`)
       const movers = [...funded.map((r) => r.name), ...schedules.map((s) => s.name)]
-      if (movers.length) out.push(`From ${at}, ${quoteNames(movers)} ${pick(movers.length, 'comes', 'come')} out of the savings balance; earlier months keep the virtual account as their source`)
+      if (movers.length) out.push(`From ${at}, ${quoteNames(movers)} ${pick(movers.length, 'comes', 'come')} out of ${instead}; earlier months keep the virtual account as their source`)
       if (goals.length) out.push(`${goalWords} can no longer be measured`)
       return out
     },
@@ -439,63 +462,121 @@ function rowArchive(ctx: Ctx, row: Row, from: MonthKey, ts: number): Mutation[] 
   return muts
 }
 
+/**
+ * Where spending goes that came out of a virtual account once that is gone: out of the account it was held in (the
+ * same money, no longer set apart), or out of the month's income when that account cannot pay any more.
+ */
+function poolFallback(ctx: Ctx, pool: Pool): FundedBy {
+  const holder = ctx.accounts.find((a) => a.id === pool.accountId)
+  return holder && paysExpenses(holder) && !holder.archivedMonth ? accountRef(holder.id) : 'cash'
+}
+
+/** In every month, cell items that came out of `ref` come out of `to`: what a deletion does (rows and schedules are the caller's). */
+function moveItemSources(ctx: Ctx, ref: FundedBy, to: FundedBy, ts: number, skipRowId?: string): Mutation[] {
+  const muts: Mutation[] = []
+  for (const c of ctx.tables.cells) {
+    if (c.rowId === skipRowId || !c.items.some((i) => i.fundedBy === ref)) continue
+    muts.push(putCell({ ...c, items: c.items.map((i) => (i.fundedBy === ref ? { ...i, fundedBy: to } : i)) }, ts))
+  }
+  return muts
+}
+
+/**
+ * From `from` on, what came out of one of `refs` comes out of `to`; earlier months keep their source. Each step
+ * builds on the ones before it (`start` is the tables as the caller left them), so several sources retired at once
+ * cannot write over each other.
+ */
+function moveSourcesFrom(start: Tables, closed: Set<MonthKey>, refs: FundedBy[], to: FundedBy, from: MonthKey, ts: number): Mutation[] {
+  const muts: Mutation[] = []
+  let work = start
+  const add = (ms: Mutation[]) => {
+    muts.push(...ms)
+    work = applyMutations(work, ms)
+  }
+  // rows: earlier months keep the old source, the default becomes the new one
+  for (const id of start.rows.filter((r) => !r.deletedAt && refs.includes(r.defaultFundedBy)).map((r) => r.id)) {
+    const row = work.rows.find((r) => r.id === id)
+    if (row && !row.deletedAt) add(planRowFundedBy(work, row, to, { from }, ts))
+  }
+  // schedules: a copy from `from` on comes out of the new source; the old one ends the month before
+  for (const id of start.recurringItems.filter((s) => !s.deletedAt && refs.includes(s.fundedBy)).map((s) => s.id)) {
+    const s = work.recurringItems.find((x) => x.id === id)
+    if (!s || s.deletedAt) continue
+    if (compareMonths(s.startMonth, from) >= 0) add([put('recurringItems', RecurringItemSchema, s, { fundedBy: to }, ts)])
+    else if (s.endMonth == null || compareMonths(s.endMonth, from) >= 0) add(planChangeRecurringFrom(work, s, from, { fundedBy: to }, ts).mutations)
+  }
+  // whatever still comes out of them in open months from `from` on
+  const rewrites: Mutation[] = []
+  for (const c of work.cells) {
+    if (compareMonths(c.month, from) < 0 || closed.has(c.month) || !c.items.some((i) => refs.includes(i.fundedBy))) continue
+    rewrites.push(putCell({ ...c, items: c.items.map((i) => (refs.includes(i.fundedBy) ? { ...i, fundedBy: to } : i)) }, ts))
+  }
+  add(rewrites)
+  return muts
+}
+
 function accountRemoval(ctx: Ctx, acc: Account, ts: number): Mutation[] {
+  const ref = accountRef(acc.id)
   const muts: Mutation[] = [put('accounts', AccountSchema, acc, { deletedAt: ts }, ts)]
   for (const a of ctx.tables.accountMonths) if (a.accountId === acc.id) muts.push({ op: 'delete', table: 'accountMonths', key: [a.accountId, a.month] })
-  for (const r of ctx.rows) if (r.accountId === acc.id && !accountTypeForRow(r)) muts.push(put('rows', RowSchema, r, { accountId: null }, ts))
-  for (const s of ctx.schedules) if (s.accountId === acc.id) muts.push(put('recurringItems', RecurringItemSchema, s, { accountId: null }, ts))
+  // one write per row and per schedule: it may both name the account and come out of it
+  for (const r of ctx.rows) {
+    const patch: Partial<Row> = {}
+    if (r.accountId === acc.id && !accountTypeForRow(r)) patch.accountId = null
+    if (r.defaultFundedBy === ref) patch.defaultFundedBy = 'cash'
+    if (Object.keys(patch).length) muts.push(put('rows', RowSchema, r, patch, ts))
+  }
+  for (const s of ctx.schedules) {
+    const patch: Partial<RecurringItem> = {}
+    if (s.accountId === acc.id) patch.accountId = null
+    if (s.fundedBy === ref) patch.fundedBy = 'cash'
+    if (Object.keys(patch).length) muts.push(put('recurringItems', RecurringItemSchema, s, patch, ts))
+  }
+  // what came out of it counts as spent from the month's income, as the engine reads a source that is gone
+  muts.push(...moveItemSources(ctx, ref, 'cash', ts))
   for (const g of ctx.goals) if (g.accountId === acc.id) muts.push(put('goals', GoalSchema, g, { deletedAt: ts }, ts))
   return muts
 }
 
 function accountArchive(ctx: Ctx, acc: Account, from: MonthKey, ts: number): Mutation[] {
-  const muts: Mutation[] = [put('accounts', AccountSchema, acc, { archivedMonth: from }, ts)]
-  for (const p of ctx.pools) if (p.accountId === acc.id && !(p.archivedMonth && compareMonths(p.archivedMonth, from) <= 0)) muts.push(...poolArchive(ctx, p, from, ts))
-  return muts
-}
-
-function poolRemoval(ctx: Ctx, pool: Pool, ts: number): Mutation[] {
-  const ref = poolRef(pool.id)
-  const muts: Mutation[] = [put('pools', PoolSchema, pool, { deletedAt: ts }, ts)]
-  const alloc = pool.allocationRowId ? ctx.rows.find((r) => r.id === pool.allocationRowId) : undefined
-  if (alloc) muts.push(...rowRemoval(ctx, alloc, ts).filter((m) => !(m.op === 'put' && m.table === 'pools')))
-  for (const r of ctx.rows) if (r.defaultFundedBy === ref) muts.push(put('rows', RowSchema, r, { defaultFundedBy: 'savings' }, ts))
-  for (const c of ctx.tables.cells) {
-    if (c.rowId === alloc?.id || !c.items.some((i) => i.fundedBy === ref)) continue
-    muts.push(putCell({ ...c, items: c.items.map((i) => (i.fundedBy === ref ? { ...i, fundedBy: 'savings' } : i)) }, ts))
-  }
-  for (const s of ctx.schedules) if (s.fundedBy === ref) muts.push(put('recurringItems', RecurringItemSchema, s, { fundedBy: 'savings' }, ts))
-  for (const g of ctx.goals) if (g.poolId === pool.id) muts.push(put('goals', GoalSchema, g, { deletedAt: ts }, ts))
-  return muts
-}
-
-function poolArchive(ctx: Ctx, pool: Pool, from: MonthKey, ts: number): Mutation[] {
-  const ref = poolRef(pool.id)
   const muts: Mutation[] = []
   let work = ctx.tables
   const add = (ms: Mutation[]) => {
     muts.push(...ms)
     work = applyMutations(work, ms)
   }
-  add([put('pools', PoolSchema, pool, { archivedMonth: from }, ts)])
-  const alloc = pool.allocationRowId ? ctx.rows.find((r) => r.id === pool.allocationRowId) : undefined
-  if (alloc && !(alloc.archivedMonth && compareMonths(alloc.archivedMonth, from) <= 0)) add(rowArchive(ctx, alloc, from, ts))
-  // rows: earlier months keep the pool as their source, the default becomes savings
-  for (const r of ctx.rows) if (r.defaultFundedBy === ref) add(planRowFundedBy(work, r, 'savings', { from }, ts))
-  // schedules: a copy from `from` on comes out of savings; the old one ends the month before
-  for (const s of ctx.schedules) {
-    if (s.fundedBy !== ref) continue
-    if (compareMonths(s.startMonth, from) >= 0) add([put('recurringItems', RecurringItemSchema, s, { fundedBy: 'savings' }, ts)])
-    else if (s.endMonth == null || compareMonths(s.endMonth, from) >= 0) add(planChangeRecurringFrom(work, s, from, { fundedBy: 'savings' }, ts).mutations)
-  }
-  // whatever still comes out of it in open months from `from` on
-  const rewrites: Mutation[] = []
-  for (const c of work.cells) {
-    if (compareMonths(c.month, from) < 0 || ctx.closed.has(c.month) || !c.items.some((i) => i.fundedBy === ref)) continue
-    rewrites.push(putCell({ ...c, items: c.items.map((i) => (i.fundedBy === ref ? { ...i, fundedBy: 'savings' } : i)) }, ts))
-  }
-  add(rewrites)
+  add([put('accounts', AccountSchema, acc, { archivedMonth: from }, ts)])
+  // its virtual accounts go with it, and what they and the account paid comes out of the month's income from then on
+  const pools = ctx.pools.filter((p) => p.accountId === acc.id && !(p.archivedMonth && compareMonths(p.archivedMonth, from) <= 0))
+  for (const p of pools) add(poolShelve(ctx, p, from, ts))
+  add(moveSourcesFrom(work, ctx.closed, [accountRef(acc.id), ...pools.map((p) => poolRef(p.id))], 'cash', from, ts))
   return muts
+}
+
+function poolRemoval(ctx: Ctx, pool: Pool, ts: number): Mutation[] {
+  const ref = poolRef(pool.id)
+  const to = poolFallback(ctx, pool)
+  const muts: Mutation[] = [put('pools', PoolSchema, pool, { deletedAt: ts }, ts)]
+  const alloc = pool.allocationRowId ? ctx.rows.find((r) => r.id === pool.allocationRowId) : undefined
+  if (alloc) muts.push(...rowRemoval(ctx, alloc, ts).filter((m) => !(m.op === 'put' && m.table === 'pools')))
+  for (const r of ctx.rows) if (r.defaultFundedBy === ref) muts.push(put('rows', RowSchema, r, { defaultFundedBy: to }, ts))
+  muts.push(...moveItemSources(ctx, ref, to, ts, alloc?.id))
+  for (const s of ctx.schedules) if (s.fundedBy === ref) muts.push(put('recurringItems', RecurringItemSchema, s, { fundedBy: to }, ts))
+  for (const g of ctx.goals) if (g.poolId === pool.id) muts.push(put('goals', GoalSchema, g, { deletedAt: ts }, ts))
+  return muts
+}
+
+/** The virtual account itself from `from` on: hidden, and the row that fills it archived. What it paid is the caller's. */
+function poolShelve(ctx: Ctx, pool: Pool, from: MonthKey, ts: number): Mutation[] {
+  const muts: Mutation[] = [put('pools', PoolSchema, pool, { archivedMonth: from }, ts)]
+  const alloc = pool.allocationRowId ? ctx.rows.find((r) => r.id === pool.allocationRowId) : undefined
+  if (alloc && !(alloc.archivedMonth && compareMonths(alloc.archivedMonth, from) <= 0)) muts.push(...rowArchive(ctx, alloc, from, ts))
+  return muts
+}
+
+function poolArchive(ctx: Ctx, pool: Pool, from: MonthKey, ts: number): Mutation[] {
+  const shelved = poolShelve(ctx, pool, from, ts)
+  return [...shelved, ...moveSourcesFrom(applyMutations(ctx.tables, shelved), ctx.closed, [poolRef(pool.id)], poolFallback(ctx, pool), from, ts)]
 }
 
 function entityRemoval(ctx: Ctx, e: Entity, ts: number): Mutation[] {

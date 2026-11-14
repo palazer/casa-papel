@@ -1,11 +1,11 @@
 import {
-  cardIsItemized, compareMonths, fromMinor, isOldPocketShare, isShareRule, isTakenFromAccount, monthRange, poolIdOf, resolveRules, scaleMoney, toMinor,
-  type Account, type Category, type Cell, type Money, type MonthKey, type Row, type RuleState, type Section,
+  accountIdOf, cardIsItemized, compareMonths, fromMinor, isOldPocketShare, isShareRule, isTakenFromAccount, monthRange, paysExpenses, poolIdOf, resolveRules, scaleMoney, toMinor,
+  type Account, type Category, type Cell, type FundedBy, type Money, type MonthKey, type Row, type RuleState, type Section, type Tables,
 } from '@/model'
 import { buildFxIndex, convertMoney } from './fx'
 import { mainAccountSeries } from './mainAccount'
 import {
-  cellKey,
+  cellKey, fundingTotal,
   type AccountSeries, type CellResult, type CellStatus, type EngineInput, type EngineOutput,
   type Funding, type MonthTotals, type PoolSeries, type ResolvedItem, type RowTotals,
 } from './types'
@@ -61,16 +61,39 @@ export function groupRowsByCategory(rows: Row[], categories: Category[]): RowGro
   return groups
 }
 
-const zeroFunding = (): Funding => ({ cash: 0, savings: 0, pools: {} })
+const zeroFunding = (): Funding => ({ cash: 0, savings: 0, pools: {}, accounts: {} })
 
-function addFunding(f: Funding, fundedBy: string, amount: Money): void {
+/**
+ * Counts an amount under where it comes out of. `paying` are the accounts an expense can come out of: one that is
+ * gone, or that became a current account, a card or a loan since, counts as the month's income, so the money still
+ * shows up somewhere.
+ */
+function addFunding(f: Funding, fundedBy: FundedBy, amount: Money, paying: ReadonlySet<string>): void {
   if (fundedBy === 'cash') f.cash += amount
   else if (fundedBy === 'savings') f.savings += amount
   else {
-    const pid = poolIdOf(fundedBy as `pool:${string}`)
+    const pid = poolIdOf(fundedBy)
+    const aid = accountIdOf(fundedBy)
     if (pid) f.pools[pid] = (f.pools[pid] ?? 0) + amount
+    else if (aid && paying.has(aid)) f.accounts[aid] = (f.accounts[aid] ?? 0) + amount
     else f.cash += amount
   }
+}
+
+/**
+ * The account the old "Savings balance" comes out of: the first savings account a "to savings" row feeds, else the
+ * first savings account. Deliberately not the account that takes the rest: moving the rest would then move past
+ * spending between accounts. `rows` in display order, both lists without what was deleted.
+ */
+function firstSavingsAccount(rows: Row[], accounts: Account[]): string | null {
+  const savings = new Set(accounts.filter((a) => a.type === 'savings').map((a) => a.id))
+  return rows.filter((r) => r.kind === 'to-savings').map((r) => r.accountId).find((id) => id != null && savings.has(id))
+    ?? accounts.find((a) => a.type === 'savings')?.id ?? null
+}
+
+/** The same for the screens that offer "Comes out of" (`EngineOutput.primarySavingsId` when the engine's output is at hand). */
+export function primarySavingsOf(tables: Pick<Tables, 'rows' | 'accounts' | 'categories'>): string | null {
+  return firstSavingsAccount(sortRows(tables.rows.filter((r) => !r.deletedAt), tables.categories), tables.accounts.filter((a) => !a.deletedAt))
 }
 
 function emptyOutput(months: MonthKey[]): EngineOutput {
@@ -103,6 +126,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
 
   const accounts = tables.accounts.filter((a) => !a.deletedAt)
   const accountsById = new Map(accounts.map((a) => [a.id, a]))
+  /** The accounts an expense can come straight out of ("Comes out of"). */
+  const paying: ReadonlySet<string> = new Set(accounts.filter(paysExpenses).map((a) => a.id))
   const pools = tables.pools.filter((p) => !p.deletedAt)
   const adultIds = new Set(tables.entities.filter((e) => !e.deletedAt && e.kind === 'adult').map((e) => e.id))
   const poolByAllocationRow = new Map(pools.filter((p) => p.allocationRowId).map((p) => [p.allocationRowId as string, p]))
@@ -174,7 +199,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
         if (target) currency = target.currency
         source = 'derived'
         baseStatus = 'derived'
-        addFunding(funding, row.defaultFundedBy, value)
+        addFunding(funding, row.defaultFundedBy, value, paying)
       } else if (derivedPocket) {
         value = scaleMoney(pocketTotalFor(m), row.pocketShare ?? 0)
         source = 'derived'
@@ -187,13 +212,13 @@ export function computeEngine(input: EngineInput): EngineOutput {
           value = prev
           source = everSet ? 'inherit' : 'empty'
           if (everSet) baseStatus = prevBase === 'done' ? row.defaultStatus : prevBase
-          addFunding(funding, row.defaultFundedBy, value)
+          addFunding(funding, row.defaultFundedBy, value, paying)
         }
       } else if (cell.mode === 'value') {
         value = cell.value ?? 0
         source = 'value'
         everSet = true
-        addFunding(funding, row.defaultFundedBy, value)
+        addFunding(funding, row.defaultFundedBy, value, paying)
       } else {
         source = 'items'
         everSet = true
@@ -204,7 +229,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
           items.push({ ...it, effectiveAmount })
           if (it.skipped) continue
           value += effectiveAmount
-          addFunding(funding, it.fundedBy, effectiveAmount)
+          addFunding(funding, it.fundedBy, effectiveAmount, paying)
           if (it.status === 'projected') anyProjected = true
           if (it.status !== 'done') allDone = false
         }
@@ -224,11 +249,12 @@ export function computeEngine(input: EngineInput): EngineOutput {
         fundingBase.cash = Math.round(funding.cash * f)
         fundingBase.savings = Math.round(funding.savings * f)
         for (const [pid, amt] of Object.entries(funding.pools)) fundingBase.pools[pid] = Math.round(amt * f)
+        for (const [aid, amt] of Object.entries(funding.accounts)) fundingBase.accounts[aid] = Math.round(amt * f)
       }
 
       const result: CellResult = {
         rowId: row.id, month: m, value, valueBase: conv.value, deductionsBase: 0, netBase: conv.value, currency, source, status, items,
-        funding: fundingBase, missingRate: conv.missingRate, rateProjected: conv.projected, cell,
+        funding: fundingBase, paidFrom: funding.accounts, missingRate: conv.missingRate, rateProjected: conv.projected, cell,
       }
       cells[cellKey(row.id, m)] = result
       if (byRule && rule && rule.kind !== 'idle') {
@@ -260,7 +286,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
         const sc = cells[cellKey(s.id, m)]
         if (!sc || sc.source === 'archived') continue
         // an expense counts by its funding parts, as the month's totals do
-        explained += sc.funding.cash + sc.funding.savings + Object.values(sc.funding.pools).reduce((a, b) => a + b, 0)
+        explained += fundingTotal(sc.funding)
       }
       // an estimate whose category is gone counts nothing
       const restBase: Money = cat ? Math.max(0, c.valueBase - explained) : 0
@@ -269,7 +295,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
       c.value = c.currency === base ? restBase : c.valueBase > 0 ? Math.round(c.value * (restBase / c.valueBase)) : 0
       c.valueBase = restBase
       c.netBase = restBase
-      c.funding = { cash: restBase, savings: 0, pools: {} }
+      c.funding = { ...zeroFunding(), cash: restBase }
+      c.paidFrom = {}
       if (c.source !== 'empty') {
         c.source = 'derived'
         c.status = isClosed(m) || c.cell?.markedDone ? 'done' : 'derived'
@@ -298,10 +325,9 @@ export function computeEngine(input: EngineInput): EngineOutput {
 
   // ---------- pass 2: month totals ----------
   const totals: Record<MonthKey, MonthTotals> = {}
-  const toSavingsRows = rows.filter((r) => r.kind === 'to-savings')
   for (const m of months) {
     const t: MonthTotals = {
-      month: m, closed: isClosed(m), income: 0, cashExpense: 0, savingsFunded: 0, poolFunded: 0, poolFundedByPool: {},
+      month: m, closed: isClosed(m), income: 0, cashExpense: 0, savingsFunded: 0, poolFunded: 0, poolFundedByPool: {}, accountFunded: 0, accountFundedByAccount: {}, accountFundedOwn: {},
       allocations: 0, allocationsByPool: {}, toInvestment: 0, pocket: 0, debt: 0,
       buffer: bufferFor(m), toSavings: 0, leftover: 0, fromSavingsDerived: 0, expensesTotal: 0, transfersTotal: 0,
       fromAccounts: 0, takeHome: 0, takeHomeBy: {}, leftForShares: 0, rest: null,
@@ -355,6 +381,14 @@ export function computeEngine(input: EngineInput): EngineOutput {
             for (const [pid, amt] of Object.entries(c.funding.pools)) {
               t.poolFunded += amt
               t.poolFundedByPool[pid] = (t.poolFundedByPool[pid] ?? 0) + amt
+            }
+            for (const [aid, amt] of Object.entries(c.funding.accounts)) {
+              t.accountFunded += amt
+              t.accountFundedByAccount[aid] = (t.accountFundedByAccount[aid] ?? 0) + amt
+            }
+            for (const [aid, amt] of Object.entries(c.paidFrom)) {
+              const own = (t.accountFundedOwn[aid] ??= {})
+              own[c.currency] = (own[c.currency] ?? 0) + amt
             }
           } else {
             // plain transfer rows behave like outflows the user controls
@@ -430,8 +464,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
       t.toSavings = userToSavings
       t.leftover = t.income - outflows() - userToSavings
     }
-    t.fromSavingsDerived = t.savingsFunded + t.poolFunded
-    t.expensesTotal = t.cashExpense + t.savingsFunded + t.poolFunded + t.pocket + t.debt
+    t.fromSavingsDerived = t.savingsFunded + t.poolFunded + t.accountFunded
+    t.expensesTotal = t.cashExpense + t.savingsFunded + t.poolFunded + t.accountFunded + t.pocket + t.debt
     t.transfersTotal = t.allocations + t.toInvestment + t.toSavings
     totals[m] = t
   }
@@ -464,13 +498,26 @@ export function computeEngine(input: EngineInput): EngineOutput {
     return { balanceBase: conv.value, missingRate: conv.missingRate }
   }
 
+  /**
+   * What expenses took straight out of an account in a month ("Comes out of" naming it), in the account's own
+   * currency. An account in the base currency falls by the base amounts, the ones the Statement shows. Another one
+   * falls by each amount as it was typed, converted at the month's rate only when the two currencies differ: a
+   * dollar expense lowers a dollar account by exactly its dollars.
+   */
+  const paidFrom = (acc: Account, m: MonthKey): Money => {
+    if (acc.currency === base) return totals[m].accountFundedByAccount[acc.id] ?? 0
+    let paid: Money = 0
+    for (const [currency, amount] of Object.entries(totals[m].accountFundedOwn[acc.id] ?? {})) {
+      const conv = convertMoney(fx, amount, currency, acc.currency, m)
+      if (conv.missingRate) warnOnce(`${acc.id}|${currency}`, `No ${currency}→${acc.currency} rate for ${m} (${acc.name})`)
+      paid += conv.value
+    }
+    return paid
+  }
+
   // ---------- savings accounts ----------
   const accountSeries: Record<string, AccountSeries> = {}
-  // Spending "from savings" comes out of the first savings account a "to savings" row feeds. Deliberately not the
-  // account that takes the rest: moving the rest would then move past spending between accounts.
-  const primarySavingsId =
-    toSavingsRows.map((r) => r.accountId).find((id) => id && accountsById.get(id)?.type === 'savings') ??
-    accounts.find((a) => a.type === 'savings')?.id ?? null
+  const primarySavingsId = firstSavingsAccount(rows, accounts)
   for (const acc of accounts) {
     if (acc.type !== 'savings' || !acc.tracked) continue
     const series: AccountSeries = { accountId: acc.id, currency: acc.currency, liability: false, months: {} }
@@ -480,7 +527,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
       if (acc.archivedMonth && compareMonths(m, acc.archivedMonth) >= 0) break
       const start: Money = prevBalance ?? acc.openingBalance
       const inflow = savingsInflow(acc, m, rows, cells, pools, totals[m])
-      const outflow = savingsOutflow(acc, m, rows, cells, pools, totals[m], acc.id === primarySavingsId)
+      const outflow = savingsOutflow(acc, m, rows, cells, pools, totals[m], acc.id === primarySavingsId) + paidFrom(acc, m)
       const computed: Money = start + inflow - outflow
       const actual = actuals.get(`${acc.id}|${m}`)?.actualBalance ?? null
       const balance: Money = actual ?? computed
@@ -524,6 +571,9 @@ export function computeEngine(input: EngineInput): EngineOutput {
           else withdrawal -= v
         } else if (row.kind === 'from-investment') withdrawal += toAccountCurrency(c, m)
       }
+      // what expenses took straight out of the account, at the rate its deposits use
+      const spent = totals[m].accountFundedByAccount[acc.id] ?? 0
+      if (spent !== 0) withdrawal += inv.depositFxMode === 'fixed' && inv.fixedRate ? toMinor(fromMinor(spent, base) * inv.fixedRate, acc.currency) : paidFrom(acc, m)
       if (am?.actualDeposit != null) deposit = am.actualDeposit
       const rate = inv.projectionMode === 'historical-average' && realised.length > 0 ? realised.reduce((a, b) => a + b, 0) / realised.length : fixedMonthly
       const startValue: Money = inv.depositTiming === 'start' ? prev + deposit - withdrawal : prev
@@ -580,8 +630,10 @@ export function computeEngine(input: EngineInput): EngineOutput {
           outflow += inAccountCurrency(acc, c, m)
         }
       }
-      // owed grows with spending and shrinks with payments; an asset just carries until a real value is entered
-      const computed: Money = liability ? prev + inflow - outflow : prev
+      // an other asset falls by what expenses took straight out of it
+      if (!liability) outflow += paidFrom(acc, m)
+      // owed grows with spending and shrinks with payments; an asset carries, less what was paid from it, until a real value is entered
+      const computed: Money = liability ? prev + inflow - outflow : prev - outflow
       const actual = actuals.get(`${acc.id}|${m}`)?.actualBalance ?? null
       const balance: Money = actual ?? computed
       series.months[m] = { computed, balance, adjustment: actual != null ? actual - computed : 0, inflow, outflow, projected: actual == null, ...inBase(acc, balance, m) }

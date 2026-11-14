@@ -7,16 +7,16 @@
  *
  * The upper half is the main account's month. For both month-end rules the engine guarantees
  *   income = cashExpense + allocations + toInvestment + pocket + debt + toSavings + leftover
- * so with the spending paid from savings and virtual accounts added to both sides, and a negative closing figure moved
+ * so with the spending paid straight out of accounts and virtual accounts added to both sides, and a negative closing figure moved
  * across (a short month takes from savings or from the account):
- *   in  = income + savingsFunded + poolFunded + max(0, −toSavings) + max(0, −leftover)
+ *   in  = income + savingsFunded + poolFunded + accountFunded + max(0, −toSavings) + max(0, −leftover)
  *   out = spending + set aside and paid off + max(0, toSavings) + max(0, leftover)
  * Rows are sorted into the same buckets the engine's totals use (compute.ts, pass 2), which is what keeps the cents.
  */
-import { accountGroup, addMonths, canCarryRule, cardIsItemized, describeCadence, isTakenFromAccount, nextDue, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
+import { accountGroup, addMonths, canCarryRule, cardIsItemized, describeCadence, isTakenFromAccount, nextDue, payingKind, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
 import { computeGoals, type GoalProgress } from './goals'
 import { currentAccountsIn, mainAccountLabel } from './mainAccount'
-import { cellKey, type AccountSeries, type CellResult, type CellStatus, type EngineOutput } from './types'
+import { cellKey, fundingTotal, type AccountSeries, type CellResult, type CellStatus, type EngineOutput } from './types'
 
 export type StatementHue = 'income' | 'expense' | 'transfer' | 'worth' | 'pool'
 export type StatementLineKind = 'group' | 'category' | 'row' | 'item' | 'source' | 'account' | 'pool' | 'figure' | 'note'
@@ -308,6 +308,9 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   const cover: StatementLine[] = []
   const fromSavings: StatementLine[] = []
   const fromPool = new Map<string, StatementLine[]>()
+  const fromAccount = new Map<string, StatementLine[]>()
+  // the old "Savings balance" comes out of one savings account, the engine's: it is counted with what names that account
+  const spendFrom = engine.primarySavingsId ? accountsById.get(engine.primarySavingsId) : undefined
   const estimates = new Map<string, { row: Row; cell: CellResult }>()
   const expenseCategories = new Set(tables.categories.filter((c) => !c.deletedAt && c.section === 'expense').map((c) => c.id))
 
@@ -339,15 +342,23 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
           break
         }
         // the engine's totals count an expense by its funding parts, each rounded on its own
-        const pools = Object.entries(c.funding.pools)
-        const amount = c.funding.cash + c.funding.savings + pools.reduce((s, [, a]) => s + a, 0)
-        expense.push({ row, line: rowLine(row, c, amount) })
-        if (c.funding.savings !== 0) fromSavings.push({ id: `src:savings:${row.id}`, kind: 'note', label: row.name, amount: c.funding.savings, children: [], rowId: row.id })
-        for (const [pid, a] of pools) {
+        expense.push({ row, line: rowLine(row, c, fundingTotal(c.funding)) })
+        const byAccount: Record<string, Money> = { ...c.funding.accounts }
+        if (c.funding.savings !== 0) {
+          if (spendFrom) byAccount[spendFrom.id] = (byAccount[spendFrom.id] ?? 0) + c.funding.savings
+          else fromSavings.push({ id: `src:savings:${row.id}`, kind: 'note', label: row.name, amount: c.funding.savings, children: [], rowId: row.id })
+        }
+        for (const [pid, a] of Object.entries(c.funding.pools)) {
           if (a === 0) continue
           const list = fromPool.get(pid) ?? []
           list.push({ id: `src:${pid}:${row.id}`, kind: 'note', label: row.name, amount: a, children: [], rowId: row.id })
           fromPool.set(pid, list)
+        }
+        for (const [aid, a] of Object.entries(byAccount)) {
+          if (a === 0) continue
+          const list = fromAccount.get(aid) ?? []
+          list.push({ id: `src:acc:${aid}:${row.id}`, kind: 'note', label: row.name, amount: a, children: [], rowId: row.id })
+          fromAccount.set(aid, list)
         }
         break
       }
@@ -399,12 +410,15 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
     setAside.push({ id: 'leftover', kind: 'figure', label: 'Leftover', amount: t.leftover, children: [], balancing: true, automatic: true })
   }
 
-  // what expenses took straight out of savings and virtual accounts: each line names the expenses it paid for
+  // what expenses took straight out of accounts and virtual accounts: each line names its account and the expenses it paid for
   const paidFor = (list: StatementLine[]): string[] => [...new Set(list.map((l) => l.label))]
   const sources: StatementLine[] = []
-  // spending "from savings" comes out of one savings account, the engine's: the line is named after it
-  const spendFrom = engine.primarySavingsId ? accountsById.get(engine.primarySavingsId) : undefined
-  if (fromSavings.length) sources.push({ id: 'src:savings', kind: 'source', label: spendFrom ? `From ${spendFrom.name}` : 'From savings', accountKind: 'savings account', amount: sum(fromSavings), children: fromSavings, paidFor: paidFor(fromSavings) })
+  // "Savings balance" in a household without a savings account: no account to name
+  if (fromSavings.length) sources.push({ id: 'src:savings', kind: 'source', label: 'From savings', accountKind: 'savings account', amount: sum(fromSavings), children: fromSavings, paidFor: paidFor(fromSavings) })
+  for (const acc of accounts) {
+    const list = fromAccount.get(acc.id)
+    if (list) sources.push({ id: `src:acc:${acc.id}`, kind: 'source', label: `From ${acc.name}`, accountKind: payingKind(acc), amount: sum(list), children: list, paidFor: paidFor(list) })
+  }
   for (const [pid, list] of fromPool) {
     const pool = poolsById.get(pid)
     const short = engine.pools[pid]?.months[month]?.short ?? 0

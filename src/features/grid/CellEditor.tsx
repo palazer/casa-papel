@@ -157,7 +157,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
     ...items.filter(repeating).filter((it) => isDue({ ...cadenceOf(repeatFor(it) as Repeating), startMonth: month, endMonth: null }, nextMonth)).map((it) => ({ name: it.label.trim() || row.name, amount: it.amount })),
     ...elsewhere.filter((s) => isDue({ ...cadenceOf(others[s.id]?.repeat ?? repeatOf(s)), startMonth: s.startMonth, endMonth: s.endMonth }, nextMonth)).map((s) => ({ name: s.name, amount: otherAmount(s.id) ?? s.amount })),
   ]
-  const fundingOptions = useMemo(() => buildFundingOptions(tables.pools, [row.defaultFundedBy, ...items.map((i) => i.fundedBy)]), [tables.pools, row.defaultFundedBy, items])
+  const fundingOptions = useMemo(() => buildFundingOptions(tables, [row.defaultFundedBy, ...items.map((i) => i.fundedBy)]), [tables, row.defaultFundedBy, items])
 
   useEffect(() => {
     if (!oneOff) writePref('editScope', scope)

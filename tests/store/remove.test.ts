@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { computeEngine, cellKey } from '@/engine'
-import { newId, poolRef, type Tables } from '@/model'
+import { accountRef, newId, poolRef, type Tables } from '@/model'
 import {
   CasaDb, Store, addPool, addRow, archiveAccount, archiveEntity, archiveRow, defaultMonths, followRow, loadTables, postRecurring, removeAccount, removeEntity,
   removePool, removeRecurringItem, removeRow, restoreAccount, restoreRow, setRecurringPaid,
@@ -116,12 +116,13 @@ describe('remove', () => {
     expect(t.accounts.find((a) => a.id === savings)?.archivedMonth).toBe(TODAY)
     expect(t.pools.filter((p) => p.accountId === savings).map((p) => p.archivedMonth)).toEqual([TODAY, TODAY])
     expect(t.rows.find((r) => r.name === 'To Travel')?.archivedMonth).toBe(TODAY)
-    expect(t.rows.find((r) => r.name === 'Travel')?.defaultFundedBy).toBe('savings')
-    // October's pool spending keeps its source, November's moves to savings
+    // the account is gone from November: what its virtual accounts paid comes out of the month's income from then on
+    expect(t.rows.find((r) => r.name === 'Travel')?.defaultFundedBy).toBe('cash')
+    // October's pool spending keeps its source, November's moves
     const travelId = idOf(t, 'pools', 'Travel')
     const clothingId = idOf(t, 'pools', 'Clothing')
     expect(t.cells.find((c) => c.rowId === idOf(t, 'rows', 'Travel') && c.month === '2026-10')?.items[0].fundedBy).toBe(poolRef(travelId))
-    expect(t.cells.find((c) => c.rowId === idOf(t, 'rows', 'Clothing') && c.month === TODAY)?.items[0].fundedBy).toBe('savings')
+    expect(t.cells.find((c) => c.rowId === idOf(t, 'rows', 'Clothing') && c.month === TODAY)?.items[0].fundedBy).toBe('cash')
     const out = await engine()
     expect(out.accounts[savings].months['2026-10']).toBeDefined()
     expect(out.accounts[savings].months[TODAY]).toBeUndefined()
@@ -134,7 +135,7 @@ describe('remove', () => {
     expect(t.pools.find((p) => p.id === travelId)?.archivedMonth).toBe(TODAY) // virtual accounts stay put until restored themselves
   })
 
-  it('deleting a fresh virtual account removes the row that fills it and moves its spending to savings', async () => {
+  it('deleting a fresh virtual account removes the row that fills it and moves its spending to the account it was held in', async () => {
     const { store, tables } = await demo()
     let t = await tables()
     const gifts = await addPool(store, { name: 'Gifts', accountId: idOf(t, 'accounts', 'Savings'), monthlyAllocation: 5000, fromMonth: TODAY, createSpendRow: true })
@@ -147,7 +148,7 @@ describe('remove', () => {
     expect(t.pools.find((p) => p.id === gifts.id)?.deletedAt).not.toBeNull()
     expect(t.rows.find((r) => r.id === alloc.id)?.deletedAt).not.toBeNull()
     expect(t.cells.filter((c) => c.rowId === alloc.id)).toHaveLength(0)
-    expect(t.rows.find((r) => r.id === spend.id)?.defaultFundedBy).toBe('savings')
+    expect(t.rows.find((r) => r.id === spend.id)?.defaultFundedBy).toBe(accountRef(idOf(t, 'accounts', 'Savings')))
   })
 
   it('deleting a thing untags its rows; a person with closed amounts is archived instead', async () => {

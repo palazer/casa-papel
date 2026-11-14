@@ -309,9 +309,10 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   **Money in from your own accounts is one section, `From accounts`**, so that Money in reads as Income plus From
   accounts. It is always shown (a faint `·` while empty), has an (i), and holds three kinds of line that each say
   which they are. **Every line there leads with the account the money came out of**, `From <account>`, followed by
-  the kind of account in muted `text-[11px]` (`savings account`, `investment account`, `virtual account`,
-  `current account`), so no line leaves open where its money came from. What an expense took straight out of
-  savings or a virtual account is worked out: such a line carries the `calculated` chip and names the expenses it
+  the kind of account in muted `text-[11px]` (`savings account`, `investment account`, `other asset`, `virtual account`,
+  `current account`), so no line leaves open where its money came from. What expenses took straight out of an
+  account or a virtual account ("Comes out of") is worked out, one line per account in the accounts' own order and
+  then one per virtual account: such a line carries the `calculated` chip and names the expenses it
   paid for in muted `text-[11px]` (`for Weekend trip, Flights`, cut with an ellipsis, the full list in the title),
   and it opens to those expenses. What is taken by hand is a row like any other, with its tick and no chip; it too
   is shown under its account's name, with the row's own name after it in muted text when that says something else
@@ -320,7 +321,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   the chip `to cover the month`. The chip sits on the lines, never on the heading. A line without a tick among rows
   that have one (a calculated line here, `Kept in account` or `Leftover` under Set aside) keeps the tick's place
   empty while the month is open, so the names of a group stay in one column. The Grid keeps its own row `of
-  which from savings & virtual accounts` under the expenses.
+  which paid from accounts` under the expenses.
   **A virtual account that is short.** A virtual account never shows less than zero. In a month that takes more out of it
   than it holds, its line in the lower half carries a rose `short €2,730.00` chip and an `xs outline` button `Top
   up…` (named `Top up <virtual account>`), and its calculated line under "From accounts" says `€2,730.00 more
@@ -524,6 +525,15 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   and its line is marked for two seconds. Only rows the Statement lists under categories have it (plain income and
   expense rows, in a section that has categories); "Category…" in the row menu stays, with `New category…`. A currency
   without any rate is fetched as soon as it is picked, so the rate line can answer before the save.
+  **"Comes out of" names an account, never a kind of money.** The list (`fundingOptions` in
+  `src/features/grid/funding.ts`, the same in the cell editor, the row menu's "Comes out of…" and the schedule form)
+  runs `This month's income`, then every account an expense can come straight out of, each under its kind and in the
+  accounts' own order (`Savings account: <name>`, `Investment account: <name>`, `Other asset: <name>`), then
+  `Virtual account: <name>`. Current accounts are the month's income and are not listed; a card or a loan is not a
+  source. What was set to the old `Savings balance` reads under the name of the account it has always come out of
+  (the first savings account) and is rewritten only when another entry is picked; an archived account stays listed
+  only while the row or an item still names it. The account that pays falls by the amount (one kept in another
+  currency by exactly what was typed in that currency, otherwise at the month's rate) and the month's leftover does not.
   The cell editor's rate line (`src/features/grid/RateLine.tsx`) sits under an amount in another currency:
   `≈ €3,120.00 · 1 EUR = 1.084 USD · [ECB] 2 Nov 2026` with the table's chip tones, a ghost `xs` "Change this month's
   rate…" that reveals an inline input (one rate per currency per month), and "Use the ECB rate again" while the rate is
@@ -543,7 +553,11 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   unconverted and the rates card under Household is where a rate is typed or fetched again.
 - A row's menu (`src/features/grid/RowMenu.tsx`) runs Rename…, Move up, Move down, Category…, Belongs to…, Currency…,
   then Treat new values as…, Comes out of…, Deducted from an income… (spending rows, followers included; it names the
-  income once set), the account verb, Follow another row…, then Archive or delete… or Restore. Belongs to offers the
+  income once set), the account verb, Follow another row…, then Archive or delete… or Restore. The account verb says
+  what the row's account is for (`Goes into…`, `Comes from…`, `Pays off…`, `Paid into…`); on an ordinary expense
+  row it is `Paid by card…`, lists the credit cards after `Not by card` and nothing else (which account the money
+  comes out of is "Comes out of…", so the two cannot be mistaken for each other), and is left out while the
+  household has no card. Belongs to offers the
   household, an Adults group and an Other people & things group (`name · kind`), and nothing else: who a row is for
   is what "Per person" under the Statement counts and what a pocket money rule's "percentage of <Adult>'s income" is taken of.
   There is one way of sharing money (each adult's income lines are what they put in), so no screen asks for a mode,

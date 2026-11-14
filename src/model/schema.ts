@@ -1,14 +1,14 @@
 import { z } from 'zod'
 import { ID_PATTERN } from './ids'
 import { MONTH_PATTERN } from './month'
-import { FUNDED_BY_PATTERN } from './fundedBy'
+import { FUNDED_BY_PATTERN, type FundedBy } from './fundedBy'
 
 // The built page's content security policy (vite.config.ts) forbids `new Function`. Zod would only try it once and
 // fall back, but the browser logs the attempt as a violation; this skips the attempt and gives every build one code path.
 z.config({ jitless: true })
 
 /** Bump when the shape of stored data changes; add a migration in migrations.ts. */
-export const SCHEMA_VERSION = 10
+export const SCHEMA_VERSION = 11
 
 // ---------- primitives ----------
 export const IdSchema = z.string().regex(ID_PATTERN, 'expected ULID')
@@ -18,7 +18,7 @@ export const MoneySchema = z.number().int()
 export const TimestampSchema = z.number().int().nonnegative() // epoch ms
 export const FractionSchema = z.number() // 0..1 share, or a rate
 export const IsoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
-export const FundedBySchema = z.string().regex(FUNDED_BY_PATTERN) as unknown as z.ZodType<`cash` | `savings` | `pool:${string}`>
+export const FundedBySchema = z.string().regex(FUNDED_BY_PATTERN) as unknown as z.ZodType<FundedBy>
 export const ItemStatusSchema = z.enum(['projected', 'committed', 'done'])
 export const DefaultStatusSchema = z.enum(['projected', 'committed'])
 export const SectionSchema = z.enum(['income', 'expense', 'transfer'])

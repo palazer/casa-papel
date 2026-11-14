@@ -24,3 +24,19 @@ export function accountGroup(account: Pick<Account, 'type'>): AccountGroup {
       return 'other'
   }
 }
+
+/**
+ * Whether an expense can come straight out of this account ("Comes out of"): a savings account, an investment
+ * account or an other asset. A current account is the month's income itself, and a card or a loan is named on the
+ * row ("Paid with").
+ */
+export function paysExpenses(account: Pick<Account, 'type'>): boolean {
+  const group = accountGroup(account)
+  return group === 'savings' || group === 'investment' || group === 'other'
+}
+
+/** What such an account is called beside its name: "savings account", "investment account", "other asset". */
+export function payingKind(account: Pick<Account, 'type'>): string {
+  const group = accountGroup(account)
+  return group === 'savings' ? 'savings account' : group === 'investment' ? 'investment account' : 'other asset'
+}

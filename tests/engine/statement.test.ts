@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { buildStatement, computeEngine, type EngineOutput, type Statement, type StatementLine } from '@/engine'
-import { CategorySchema, FxRateSchema, GoalSchema, RecurringItemSchema, monthRange, newId, poolRef, type Goal, type MonthKey, type Tables } from '@/model'
+import { CategorySchema, FxRateSchema, GoalSchema, RecurringItemSchema, accountRef, monthRange, newId, poolRef, type Goal, type MonthKey, type Tables } from '@/model'
 import { applyMutations, planRecurringPosts, ruleMutations, type RuleChoice, type RuleTarget } from '@/store'
 import { buildDemoTables } from '@/demo/demoHousehold'
 import type { RawFixture } from './fixtures/rawFixture'
@@ -618,5 +618,70 @@ describe('the Statement, a row on a schedule', () => {
     expect(find(statementFor(t, '2026-02').s, car.id)).toMatchObject({ amount: 12000 })
     expect(find(statementFor(t, '2026-03').s, car.id)!.children.map((c) => [c.label, c.amount, c.resting ?? false])).toEqual([['Insurance', 48000, false], ['Tax', 9000, false], ['Inspection', 0, true]])
     expectSound(t, months)
+  })
+})
+
+describe('expenses that come straight out of an account', () => {
+  function world() {
+    const savings = account({ name: 'Savings', type: 'savings', openingBalance: 5000_00, order: 'a0' })
+    const rainy = account({ name: 'Rainy day', type: 'savings', openingBalance: 3000_00, order: 'a1' })
+    const fund = account({ name: 'Dollar fund', type: 'investment', currency: 'USD', openingBalance: 10_000_00, order: 'a2' })
+    const deposit = account({ name: 'Rental deposit', type: 'other-asset', openingBalance: 2000_00, order: 'a3' })
+    const salary = row({ name: 'Salary', section: 'income', order: 'a0' })
+    const school = row({ name: 'School', section: 'expense', order: 'b0' })
+    const boiler = row({ name: 'Boiler', section: 'expense', order: 'b1' })
+    const trip = row({ name: 'Trip', section: 'expense', currency: 'USD', order: 'b2' })
+    const toSavings = row({ name: 'To savings', section: 'transfer', kind: 'to-savings', accountId: savings.id, order: 'c0' })
+    return { savings, rainy, fund, deposit, salary, school, boiler, trip, toSavings }
+  }
+
+  it('says under "From accounts" which account paid what, one line per account in the accounts\' own order', () => {
+    const w = world()
+    const t = tables({
+      household: [household()], accounts: [w.savings, w.rainy, w.fund, w.deposit], rows: [w.salary, w.school, w.boiler, w.trip, w.toSavings],
+      fxRates: [fx('USD/EUR', '2026-01', 0.9137), fx('USD/EUR', '2026-02', 0.88)],
+      cells: [
+        cellValue(w.salary.id, '2026-01', 3000_00),
+        cellItems(w.school.id, '2026-01', [{ label: 'Term fee', amount: 700_00, fundedBy: accountRef(w.rainy.id) }, { label: 'Books', amount: 45_50 }]),
+        cellItems(w.boiler.id, '2026-01', [{ label: 'Boiler', amount: 400_00, fundedBy: accountRef(w.deposit.id) }, { label: 'Fitting', amount: 150_00, fundedBy: accountRef(w.rainy.id) }]),
+        cellItems(w.trip.id, '2026-01', [{ label: 'Flights', amount: 333_33, fundedBy: accountRef(w.fund.id) }, { label: 'Hotel', amount: 111_11, fundedBy: accountRef(w.fund.id) }]),
+      ],
+    })
+    const { s, out } = statementFor(t, '2026-01')
+    const tripBase = out.cells[`${w.trip.id}|2026-01`].funding.accounts[w.fund.id]
+    expect(calculatedOf(s).map((c) => [c.id, c.label, c.accountKind, c.amount, c.calculated, c.paidFor])).toEqual([
+      [`src:acc:${w.rainy.id}`, 'From Rainy day', 'savings account', 850_00, true, ['School', 'Boiler']],
+      [`src:acc:${w.fund.id}`, 'From Dollar fund', 'investment account', tripBase, true, ['Trip']],
+      [`src:acc:${w.deposit.id}`, 'From Rental deposit', 'other asset', 400_00, true, ['Boiler']],
+    ])
+    // each expense is there in full, whatever paid it
+    const lineOf = (name: string) => all(s).find((l) => l.kind === 'row' && l.label === name)!
+    expect([lineOf('School').amount, lineOf('Boiler').amount, lineOf('Trip').amount]).toEqual([745_50, 550_00, tripBase])
+    // only the books came out of the month: the rest goes to savings as if nothing else had been bought
+    expect(out.totals['2026-01'].toSavings).toBe(3000_00 - 45_50)
+    // and each account is lower by what it paid, the fund in its own currency
+    expect(find(s, `acc:${w.rainy.id}`)).toMatchObject({ amount: 3000_00 - 850_00, change: -850_00 })
+    expect(find(s, `acc:${w.deposit.id}`)).toMatchObject({ amount: 2000_00 - 400_00, change: -400_00 })
+    expect(find(s, `acc:${w.fund.id}`)!.native).toEqual({ amount: 10_000_00 - 444_44, currency: 'USD' })
+    expectSound(t, months)
+  })
+
+  it('counts the old "Savings balance" with the account it has always come out of', () => {
+    const w = world()
+    const cells = [
+      cellValue(w.salary.id, '2026-01', 3000_00),
+      cellItems(w.school.id, '2026-01', [{ label: 'Term fee', amount: 700_00, fundedBy: 'savings' }]),
+      cellItems(w.boiler.id, '2026-01', [{ label: 'Boiler', amount: 400_00, fundedBy: accountRef(w.savings.id) }, { label: 'Fitting', amount: 50_00, fundedBy: 'savings' }]),
+    ]
+    const t = tables({ household: [household()], accounts: [w.savings, w.rainy], rows: [w.salary, w.school, w.boiler, w.toSavings], cells })
+    const { s } = statementFor(t, '2026-01')
+    expect(calculatedOf(s).map((c) => [c.label, c.accountKind, c.amount, c.children.map((n) => [n.label, n.amount])])).toEqual([
+      ['From Savings', 'savings account', 1150_00, [['School', 700_00], ['Boiler', 450_00]]],
+    ])
+    expectSound(t, months)
+    // a household without a savings account has no account to name
+    const bare = tables({ household: [household()], rows: [w.salary, w.school], cells: cells.slice(0, 2) })
+    expect(calculatedOf(statementFor(bare, '2026-01').s).map((c) => [c.id, c.label, c.amount])).toEqual([['src:savings', 'From savings', 700_00]])
+    expectSound(bare, months)
   })
 })
