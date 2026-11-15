@@ -278,10 +278,18 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   on the hue's `tint` that folds away with everything under it (its lines and what adds to them), its total staying on
   the heading; a **category**, an account that holds virtual accounts and an itemized row open as an
   accordion (a chevron button with `aria-expanded`, each level 20 px further in, items on `bg-muted/20` with the
-  `Repeat` icon when scheduled); a category's amount is the sum of its rows. A group, a category or an account that opens is
+  `Repeat` icon when scheduled); a category's amount is the sum of its rows. A group or a category is
   pressed anywhere on its line: its button (the chevron and the name) is stretched over the whole line, which turns
   `bg-muted/50` under the pointer (a group keeps its tint), and the line's other controls (the rule symbol, `Top up…`, the (i), the goal
-  target, the `…`, the balance) sit above it. A group's chevron stands in the column of its categories' chevrons, so
+  target, the `…`, the balance) sit above it. **An account, a card, a loan and a virtual account open their dialog
+  when their line is pressed, as a row opens its own** (`onOpen` in `LineContext`, `lineOpen` in the screen: the
+  dialog the `…` calls `Edit…`). The line's button is then the name (`Edit <name>`), stretched over the line the same
+  way, and what is under such a line (its virtual accounts, a goal's bar, the lines that explain a single current
+  account) opens from the arrow alone, a button of its own above the line's button (`What is under <name>`, 26 px,
+  38 px for a finger), as an itemized row's items do. The amount stays the month's balances. The heading `Current
+  accounts` stands for several accounts and has no dialog, so it folds like a category. In a closed month no line
+  opens a dialog (it shows no `…` either), and an account that holds something folds from anywhere on its line as
+  before. A group's chevron stands in the column of its categories' chevrons, so
   the names stay in one column and no line moves; every group is open until it is folded, and which ones are folded
   is kept on the device, per household (`statement.folded.<household>`, a preference, never household data). What
   looks for a line inside a folded group opens it: a link symbol, a row that was just added, and the guided setup

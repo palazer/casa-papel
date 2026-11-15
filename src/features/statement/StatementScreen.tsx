@@ -476,6 +476,31 @@ export function StatementScreen() {
   }
   noteBeside([...statement.position.left.lines, ...statement.position.right.lines])
   /** The "…" after any other line's name: a category's menu, an account's or a virtual account's, each with the way into its dialog. */
+  /** The household's current account while it has exactly one: the calculated line is then that account. */
+  const onlyCurrent = (): Account | null => {
+    const current = (engine!.main?.accountIds ?? []).map((id) => tables!.accounts.find((a) => a.id === id && !a.deletedAt)).filter((a): a is Account => !!a)
+    return current.length === 1 ? current[0] : null
+  }
+  /**
+   * What pressing a line of the lower half opens: the dialog of the account or virtual account it stands for, the one
+   * its "…" calls "Edit…". A closed month opens none, as it shows no "…".
+   */
+  function lineOpen(line: StatementLine): (() => void) | null {
+    if (statement!.closed) return null
+    if (line.kind === 'pool' && line.poolId) {
+      const id = line.poolId
+      return () => setPoolEdit(id)
+    }
+    if (line.kind === 'account' && line.accountId) {
+      const id = line.accountId
+      return () => setAccountEdit(id)
+    }
+    if (line.id === 'main') {
+      const only = onlyCurrent()
+      return only ? () => setAccountEdit(only.id) : null
+    }
+    return null
+  }
   function lineMenu(line: StatementLine): ReactNode {
     if (statement!.closed) return null
     if (line.kind === 'category' && line.id.startsWith('cat:')) {
@@ -512,9 +537,8 @@ export function StatementScreen() {
     // the calculated line stands for the current accounts. One account: the line is that account and carries its
     // menu. Several: each stands under the line with a menu of its own, so the line has none
     if (line.id === 'main') {
-      const current = (engine!.main?.accountIds ?? []).map((id) => tables!.accounts.find((a) => a.id === id && !a.deletedAt)).filter((a): a is Account => !!a)
-      if (current.length !== 1) return null
-      const only = current[0]
+      const only = onlyCurrent()
+      if (!only) return null
       return (
         <AccountMenu
           what="Account" name={only.name} at={0} count={1} removeLabel={removeLabel} triggerClassName={LINE_MENU}
@@ -537,7 +561,7 @@ export function StatementScreen() {
   // a card or a loan is added under Debts; while the household owes nothing, at the foot of that side
   const hasDebts = statement.position.right.lines.some((l) => l.id === 'debts')
   const debtsFoot = <Button variant="ghost" size="sm" className={cn(ADD, LEAD_BUTTON)} onClick={() => setAccountNew({ types: DEBT_TYPES })}><AddLead ticks={false} /> <span data-lead="text">Add a card or loan</span></Button>
-  const positionCtx: LineContext = { ...base, withChange: true, onGoal, onBalance: openBalance, onCurrentBalance: () => setCurrentBalance(true), footer: (line) => (line.id === 'debts' ? debtsFoot : null), menu: lineMenu }
+  const positionCtx: LineContext = { ...base, withChange: true, onGoal, onBalance: openBalance, onCurrentBalance: () => setCurrentBalance(true), footer: (line) => (line.id === 'debts' ? debtsFoot : null), menu: lineMenu, onOpen: lineOpen }
   const day = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${lastDayOfMonth(m)}T00:00:00Z`))
   const foldable = walk([...statement.flow.left.lines, ...statement.flow.right.lines, ...statement.position.left.lines, ...statement.position.right.lines])
     .filter((l) => l.kind === 'group' || l.children.length > 0 || !!l.goals?.length || autoOpen.has(l.id))

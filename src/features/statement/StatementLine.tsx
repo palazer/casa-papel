@@ -57,6 +57,11 @@ export interface LineContext {
   rowMenu?: (rowId: string) => ReactNode
   /** The "…" after any other line's name: a category's menu, or the way into an account's or virtual account's dialog. */
   menu?: (line: Line) => ReactNode
+  /**
+   * What pressing a line that is no row opens: the dialog of the account or virtual account it stands for (the one its
+   * "…" calls "Edit…"). Null for a line that stands for neither; leave out on a side whose lines open nothing.
+   */
+  onOpen?: (line: Line) => (() => void) | null
 }
 
 const HUE: Record<StatementHue, Hue> = { income: HUES.income, expense: HUES.expense, transfer: HUES.transfer, worth: HUES.worth, pool: HUES.pool }
@@ -85,6 +90,8 @@ const ROW = 'flex min-h-11 items-center gap-1.5 pr-2 text-sm md:min-h-7 md:text-
 const LABEL = 'flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5 py-1'
 /** A control on a line whose own button covers the whole line: it stays above that button. */
 const ABOVE = 'relative z-10'
+/** That button: its name is what is read, and it reaches over the whole line (the line is `relative`). */
+const STRETCHED = 'rounded text-left outline-none after:absolute after:inset-0 after:rounded focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring'
 /** The line the page has just moved to from a link symbol (DESIGN.md §7): the focus ring's colour, never the lime. */
 const MARKED = 'bg-muted ring-2 ring-inset ring-ring'
 
@@ -153,11 +160,8 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
       {shaded ? <span data-estimate className={cn('-mr-1', ESTIMATE_SHADE)}>{amountText}</span> : amountText}
     </span>
   )
-  const name = (
-    <span className={cn('min-w-0 truncate', group && cn('font-semibold', hue?.text), (line.kind === 'category' || line.kind === 'account' || line.kind === 'source') && 'font-medium', quiet && 'text-muted-foreground', line.skipped && 'line-through')}>
-      {line.label}
-    </span>
-  )
+  const nameLook = cn('min-w-0 truncate', group && cn('font-semibold', hue?.text), (line.kind === 'category' || line.kind === 'account' || line.kind === 'source') && 'font-medium', quiet && 'text-muted-foreground', line.skipped && 'line-through')
+  const name = <span className={nameLook}>{line.label}</span>
   const tags = (
     <>
       {/* on a schedule: an item a schedule posted, and the row that has one, also in a month where nothing lands */}
@@ -273,13 +277,29 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
   // columns and the name's box hangs back over the padding.
   const lead = tickGap ? 'ticks' : 'plain'
   // A line that opens is pressed anywhere: its button is stretched over the whole line (as a row's is), and the other
-  // controls on it sit above that.
-  const head = expandable ? (
+  // controls on it sit above that. An account and a virtual account open their dialog that way, as a row does; what
+  // is under one then opens from the arrow alone, as an itemized row's items do.
+  const press = ctx.onOpen?.(line) ?? null
+  const chevron = <ChevronRight className={cn('size-3.5 shrink-0 text-muted-foreground transition-transform', open && 'rotate-90')} aria-hidden />
+  const head = press ? (
+    <span className={cn('flex min-w-0 items-center gap-1.5', LEAD_HANG[lead])}>
+      {expandable ? (
+        <button
+          type="button" aria-label={`What is under ${line.label}`} aria-expanded={open} aria-controls={listId} onClick={() => ctx.onToggle(line)}
+          className={cn(ABOVE, '-m-1.5 inline-flex shrink-0 rounded p-1.5 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:-m-3 pointer-coarse:p-3')}
+        >
+          {chevron}
+        </button>
+      ) : <span className="w-3.5 shrink-0" aria-hidden />}
+      {tickGap}
+      <button type="button" aria-label={`Edit ${line.label}`} onClick={press} className={cn(nameLook, STRETCHED)}>{line.label}</button>
+    </span>
+  ) : expandable ? (
     <button
       type="button" aria-expanded={open} aria-controls={listId} onClick={() => ctx.onToggle(line)}
-      className={cn('flex min-w-0 items-center gap-1.5 rounded text-left outline-none after:absolute after:inset-0 after:rounded focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring', LEAD_HANG[lead])}
+      className={cn('flex min-w-0 items-center gap-1.5', STRETCHED, LEAD_HANG[lead])}
     >
-      <ChevronRight className={cn('size-3.5 shrink-0 text-muted-foreground transition-transform', open && 'rotate-90')} aria-hidden />
+      {chevron}
       {tickGap}
       {name}
     </button>
@@ -293,7 +313,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
 
   return (
     <li inert={locked || undefined} className={cn(locked && LOCKED)}>
-      <div className={cn(ROW, pad, 'group/line', group && hue?.tint, expandable && 'relative', expandable && !group && 'hover:bg-muted/50', marked && MARKED)} data-line={line.id} data-marked={marked || undefined}>
+      <div className={cn(ROW, pad, 'group/line', group && hue?.tint, (expandable || press) && 'relative', (expandable || press) && !group && 'hover:bg-muted/50', marked && MARKED)} data-line={line.id} data-marked={marked || undefined}>
         <div className={cn(LABEL, LEAD_PAD[lead])}>
           {head}
           {tags}

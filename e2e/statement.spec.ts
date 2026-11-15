@@ -440,6 +440,7 @@ test.describe('working the month in the Statement', () => {
     // 800 of 10,000
     await expect(assets.locator('[data-line^="pool:"]').filter({ hasText: 'Travel' })).toContainText('Goal Travel fund:8%')
     await expect(page.getByRole('progressbar', { name: 'Travel fund' })).toHaveCount(0)
+    // September is closed: no line opens a dialog there, so the line itself still folds
     await assets.getByRole('button', { name: 'Travel', exact: true }).click()
     await expect(page.getByRole('progressbar', { name: 'Travel fund' })).toHaveAttribute('aria-valuenow', '8')
     await expect(assets.getByText(/€800\.00 of €10,000\.00/)).toBeVisible()
@@ -497,6 +498,90 @@ test.describe('working the month in the Statement', () => {
     await expect(dlg).toBeHidden()
     await expect(assets.getByRole('button', { name: 'Wallet balance: €250.00, entered' })).toBeVisible()
     await page.screenshot({ path: 'e2e/output/statement-cash-account.png', fullPage: true })
+  })
+
+  test('an account\'s line opens its dialog when it is pressed, as a row does, and the arrow opens what is under it', async ({ page }) => {
+    await openStatement(page)
+    await goToMonth(page, 'November 2026')
+    const assets = page.getByRole('region', { name: 'Assets' })
+    const claims = page.getByRole('region', { name: 'Debts and net worth' })
+    const dlg = page.getByRole('dialog')
+    const name = dlg.getByLabel('Name', { exact: true })
+    const cancel = async () => {
+      await dlg.getByRole('button', { name: 'Cancel' }).click()
+      await expect(dlg).toBeHidden()
+    }
+
+    // the name is the line's button, and it reaches over the whole line: a press beside the name opens the same dialog
+    await assets.getByRole('button', { name: 'Edit Index fund' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Edit account' })).toBeVisible()
+    await expect(name).toHaveValue('Index fund')
+    await cancel()
+    const fund = assets.locator('[data-line^="acc:"]').filter({ hasText: 'Index fund' })
+    const box = (await fund.boundingBox())!
+    await fund.click({ position: { x: box.width / 2, y: box.height / 2 } })
+    await expect(name).toHaveValue('Index fund')
+    await cancel()
+    // what else is on the line keeps its own work: the amount is the month's balances, the "…" its menu
+    await assets.getByRole('button', { name: /^Index fund balance:/ }).click()
+    await expect(dlg.getByRole('heading', { name: 'Index fund · November 2026' })).toBeVisible()
+    await cancel()
+    await assets.getByRole('button', { name: 'Account menu for Index fund' }).click()
+    await expect(page.getByRole('menuitem', { name: 'Edit…' })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('menu')).toBeHidden()
+    await expect(dlg).toBeHidden()
+
+    // an account with virtual accounts under it: the line opens the account, the arrow opens and closes what is under it
+    const under = assets.getByRole('button', { name: 'What is under Savings' })
+    const pools = assets.locator('[data-line^="pool:"]')
+    await expect(under).toHaveAttribute('aria-expanded', 'true')
+    await expect(pools).toHaveCount(2)
+    await assets.getByRole('button', { name: 'Edit Savings' }).click()
+    await expect(name).toHaveValue('Savings')
+    await cancel()
+    await expect(pools).toHaveCount(2)
+    await under.click()
+    await expect(under).toHaveAttribute('aria-expanded', 'false')
+    await expect(pools).toHaveCount(0)
+    await under.click()
+    await expect(pools).toHaveCount(2)
+
+    // a virtual account opens its own dialog, and a card under Debts its own
+    await assets.getByRole('button', { name: 'Edit Travel' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Edit virtual account' })).toBeVisible()
+    await expect(name).toHaveValue('Travel')
+    await cancel()
+    await claims.getByRole('button', { name: 'Edit Credit card' }).click()
+    await expect(name).toHaveValue('Credit card')
+    await cancel()
+    await page.screenshot({ path: 'e2e/output/statement-account-press.png', fullPage: true })
+
+    // several current accounts: their heading is no account, so it only folds; each account under it opens its own dialog
+    await expect(page.getByRole('button', { name: 'Edit Current accounts' })).toHaveCount(0)
+    await assets.getByRole('button', { name: 'Current accounts', exact: true }).click()
+    await assets.getByRole('button', { name: 'Edit Joint account' }).click()
+    await expect(name).toHaveValue('Joint account')
+    // one current account: the calculated line is that account, and opens it
+    await dlg.getByLabel('Type').selectOption('savings')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    const main = assets.locator('[data-line="main"]')
+    await expect(main).toContainText('Main account')
+    await main.getByRole('button', { name: 'Edit Main account' }).click()
+    await expect(name).toHaveValue('Main account')
+    await cancel()
+    const details = main.getByRole('button', { name: 'What is under Main account' })
+    await details.click()
+    await expect(details).toHaveAttribute('aria-expanded', 'false')
+    await expect(assets.getByText('At the start of the month')).toHaveCount(0)
+
+    // a closed month changes nothing: no line opens a dialog, and an account that holds something folds from anywhere on its line
+    await closeMonth(page)
+    await expect(page.getByRole('button', { name: /^Edit / })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /^What is under / })).toHaveCount(0)
+    await assets.getByRole('button', { name: 'Savings', exact: true }).click()
+    await expect(pools).toHaveCount(0)
   })
 
   test('the current accounts take their real balances: the difference shows, the next month continues, and it can be taken back', async ({ page }) => {
@@ -1853,7 +1938,7 @@ test.describe('working the month in the Statement', () => {
     await expect(line(moneyOut, 'To investments')).toHaveAttribute('data-marked', 'true')
 
     // the other end is opened when something hides it: a virtual account inside a folded savings account
-    await assets.getByRole('button', { name: 'Savings', exact: true }).click()
+    await assets.getByRole('button', { name: 'What is under Savings' }).click()
     await expect(assets.locator('[data-line^="pool:"]')).toHaveCount(0)
     await moneyOut.getByRole('button', { name: 'Fills Travel: go there' }).click()
     const travel = assets.locator('[data-line^="pool:"]').filter({ hasText: 'Travel' })

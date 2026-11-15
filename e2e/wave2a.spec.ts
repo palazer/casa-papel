@@ -33,7 +33,7 @@ test.describe('wave 2a', () => {
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
     // the line carries the goal's mark and opens to its bar
-    await assets.getByRole('button', { name: 'Travel', exact: true }).click()
+    await assets.getByRole('button', { name: 'What is under Travel' }).click()
     const travel = page.getByRole('progressbar', { name: 'Travel fund' })
     await expect(travel).toBeVisible()
     const pct = Number(await travel.getAttribute('aria-valuenow'))
@@ -62,7 +62,7 @@ test.describe('wave 2a', () => {
     await page.screenshot({ path: 'e2e/output/wave2a-goal-new.png' })
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-    await claims.getByRole('button', { name: 'Car loan', exact: true }).click()
+    await claims.getByRole('button', { name: 'What is under Car loan' }).click()
     const loan = page.getByRole('progressbar', { name: 'Clear the car loan' })
     await expect(loan).toHaveAttribute('aria-valuenow', '0')
     await expect(claims.getByText(/still owed, down from €5,000\.00/)).toBeVisible()
@@ -79,7 +79,7 @@ test.describe('wave 2a', () => {
     await expect(claims.getByText(/still owed, going down from €5,000\.00 to €2,000\.00/)).toBeVisible()
 
     // rename the other one
-    await assets.getByRole('button', { name: 'Travel', exact: true }).click()
+    await assets.getByRole('button', { name: 'What is under Travel' }).click()
     await assets.getByRole('button', { name: 'Edit goal Travel fund' }).click()
     await expect(dlg.getByRole('heading', { name: 'Edit goal' })).toBeVisible()
     await expect(dlg.getByLabel(/^Target \(EUR\)/)).toHaveValue('1000')
