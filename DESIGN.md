@@ -559,7 +559,9 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   the same step; once it differs a muted right-aligned sentence says `Once saved, this row is under Fun, in every
   month.` Saved from the Statement, the page then shows where the row went, as for a new row: its new category opens
   and its line is marked for two seconds. Only rows the Statement lists under categories have it (plain income and
-  expense rows, in a section that has categories); "Category…" in the row menu stays, with `New category…`. A currency
+  expense rows, and a payment that counts as spending, `paysAsExpense`: a loan's, and a card's that records only its
+  payment; in a section that has categories). A loan made with its row has no category, so the dialog that opens for
+  the amount is where it gets one. "Category…" in the row menu stays, with `New category…`. A currency
   without any rate is fetched as soon as it is picked, so the rate line can answer before the save.
   **"Comes out of" names an account, never a kind of money.** The list (`fundingOptions` in
   `src/features/grid/funding.ts`, the same in the cell editor, the row menu's "Comes out of…" and the schedule form)

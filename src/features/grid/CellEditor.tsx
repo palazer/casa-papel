@@ -14,7 +14,7 @@ import { useStore } from '@/app/store'
 import { cellKey, type EngineOutput } from '@/engine'
 import { RepeatField } from '@/features/recurring/RepeatField'
 import {
-  addMonths, cadenceOf, canCarryRule, compareMonths, fromMinor, isDue, isTakenFromAccount, newId, nextDue, parseMonth, repeatOf, runningSchedules, sameRepeat, toMinor,
+  addMonths, cadenceOf, canCarryRule, compareMonths, fromMinor, isDue, isTakenFromAccount, newId, nextDue, parseMonth, paysAsExpense, repeatOf, runningSchedules, sameRepeat, toMinor,
   type CellItem, type Household, type ItemStatus, type MonthKey, type RepeatChoice, type Repeating, type Row, type Tables,
 } from '@/model'
 import {
@@ -81,7 +81,8 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   const canPickCurrency = stored === rowCurrency && !row.followsRowId && !derivedRowReason(row, household.closingRule)
   /** What the save hands on: the row's new currency (null for the household's own), or nothing when it did not change. */
   const newCurrency = picked != null && picked !== rowCurrency ? (picked === base ? null : picked) : undefined
-  // ----- the row's category: one of its section's, for a row the Statement lists under categories -----
+  // ----- the row's category: one of its section's, for a row the Statement lists under categories (a payment that
+  // counts as spending is one of them: it stands with the expenses) -----
   const categories = useMemo(
     () => tables.categories.filter((c) => !c.deletedAt && c.section === row.section).sort((a, b) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0)),
     [tables.categories, row.section],
@@ -89,7 +90,8 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   const rowCategory = row.categoryId && categories.some((c) => c.id === row.categoryId) ? row.categoryId : ''
   /** The category chosen here ('' for none), until it is saved with the amount. */
   const [category, setCategory] = useState(rowCategory)
-  const canPickCategory = categories.length > 0 && row.section !== 'transfer' && (row.kind === 'plain' || row.kind === 'salary')
+  const paid = row.accountId ? tables.accounts.find((a) => a.id === row.accountId && !a.deletedAt) : undefined
+  const canPickCategory = categories.length > 0 && row.section !== 'transfer' && (row.kind === 'plain' || row.kind === 'salary' || paysAsExpense(row, paid))
   const newCategory = category !== rowCategory ? category || null : undefined
   /** What changed on the row itself and goes with the save; nothing when neither did. */
   const rowChange = newCurrency !== undefined || newCategory !== undefined ? { currency: newCurrency, categoryId: newCategory } : undefined

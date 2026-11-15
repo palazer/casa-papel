@@ -1,5 +1,5 @@
 import {
-  accountIdOf, accountRef, cardIsItemized, compareMonths, fromMinor, isOldPocketShare, isShareRule, isTakenFromAccount, monthRange, paysExpenses, poolIdOf, poolRef, resolveRules, scaleMoney, toMinor,
+  accountIdOf, accountRef, cardIsItemized, compareMonths, fromMinor, isOldPocketShare, isShareRule, isTakenFromAccount, monthRange, paysAsExpense, paysExpenses, poolIdOf, poolRef, resolveRules, scaleMoney, toMinor,
   type Account, type Category, type Cell, type FundedBy, type Money, type MonthKey, type Row, type RuleState, type Section, type Tables,
 } from '@/model'
 import { buildFxIndex, convertMoney } from './fx'
@@ -278,12 +278,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
     if (row.kind !== 'category-estimate') continue
     const cat = row.section === 'expense' ? categoryOf(row, liveCats) : null
     // a loan's payment (and a card's, where the payment is the spending) stands in its category like any expense, so it explains its part
-    const paysOff = (r: Row): boolean => {
-      if (r.kind === 'debt-payment') return true
-      if (r.kind !== 'card-payment') return false
-      const acc = r.accountId ? accountsById.get(r.accountId) : undefined
-      return !acc || !cardIsItemized(acc)
-    }
+    const paysOff = (r: Row): boolean => paysAsExpense(r, r.accountId ? accountsById.get(r.accountId) : undefined)
     const siblings = cat ? rows.filter((r) => r.id !== row.id && r.section === 'expense' && (r.kind === 'plain' || r.kind === 'salary' || paysOff(r)) && categoryOf(r, liveCats)?.id === cat.id) : []
     for (const m of months) {
       const c = cells[cellKey(row.id, m)]

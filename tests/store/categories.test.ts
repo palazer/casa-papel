@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { computeEngine } from '@/engine'
-import { DEFAULT_CATEGORIES, monthRange, newId } from '@/model'
+import { buildStatement, computeEngine } from '@/engine'
+import { DEFAULT_CATEGORIES, monthRange, newId, paysAsExpense } from '@/model'
 import {
-  CasaDb, Store, addCategory, addRow, buildSetupMutations, deleteCategory, loadTables, moveCategory, moveRow, quickCreateHousehold, renameCategory,
-  seedDefaultCategories, setRowCategory,
+  CasaDb, Store, addAccountWithRow, addCategory, addRow, buildSetupMutations, deleteCategory, loadTables, moveCategory, moveRow, quickCreateHousehold, renameCategory,
+  seedDefaultCategories, setCellValue, setRowCategory,
 } from '@/store'
 
 const months = monthRange('2026-01', '2026-02')
@@ -55,6 +55,39 @@ describe('categories', () => {
     expect(await expenseNames(store)).toEqual(['Groceries', 'Other', 'Rent'])
     await expect(setRowCategory(store, salary.id, housing.id)).rejects.toThrow(/another section/)
     await expect(setRowCategory(store, rent.id, newId())).rejects.toThrow(/no longer exists/)
+  })
+
+  it('a loan\'s payment is an expense row: made with the loan it has no category, and it moves into one like any other', async () => {
+    const { store, rent } = await fresh()
+    const transport = await addCategory(store, { name: 'Transport', section: 'expense', rowIds: [rent.id] })
+    const { account, row } = await addAccountWithRow(
+      store, { name: 'Car loan', type: 'loan', currency: 'EUR', openingMonth: '2026-01', openingBalance: 5000_00 }, { kind: 'pay-off' },
+    )
+    expect(row).toMatchObject({ section: 'expense', kind: 'debt-payment', categoryId: null, accountId: account.id })
+    await setCellValue(store, row.id, '2026-01', 250_00, 'from-now-on')
+    const expenses = async () => {
+      const t = await loadTables(store)
+      return buildStatement(t, computeEngine({ tables: t, months }), '2026-01')!.flow.right.lines[0].children.map((c) => [c.label, c.children.map((l) => l.label)])
+    }
+    expect(await expenses()).toEqual([['Transport', ['Rent']], ['No category', expect.arrayContaining(['Car loan – Payment'])]])
+
+    await setRowCategory(store, row.id, transport.id)
+    expect((await expenses())[0]).toEqual(['Transport', ['Rent', 'Car loan – Payment']])
+    expect((await expenses()).flatMap(([, rows]) => rows).filter((n) => n === 'Car loan – Payment')).toHaveLength(1)
+    // one step back
+    await store.undo()
+    expect((await loadTables(store)).rows.find((r) => r.id === row.id)?.categoryId).toBeNull()
+  })
+
+  it('says which payments count as spending: a loan\'s, and a card\'s unless its purchases are expense rows', () => {
+    const card = (cardMode: 'itemized' | 'lump') => ({ type: 'credit-card' as const, card: { cardMode } })
+    expect(paysAsExpense({ kind: 'debt-payment' }, { type: 'loan', card: null })).toBe(true)
+    expect(paysAsExpense({ kind: 'debt-payment' }, undefined)).toBe(true)
+    expect(paysAsExpense({ kind: 'card-payment' }, card('lump'))).toBe(true)
+    expect(paysAsExpense({ kind: 'card-payment' }, card('itemized'))).toBe(false)
+    expect(paysAsExpense({ kind: 'card-payment' }, undefined)).toBe(true)
+    expect(paysAsExpense({ kind: 'plain' }, undefined)).toBe(false)
+    expect(paysAsExpense({ kind: 'to-savings' }, undefined)).toBe(false)
   })
 
   it('a row added after another inherits its category; moving stays inside the group', async () => {

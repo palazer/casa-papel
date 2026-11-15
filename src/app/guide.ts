@@ -242,7 +242,7 @@ export const GUIDE: GuideTopic[] = [
     ],
     steps: [
       'Statement → "Debts and net worth" → "Add a card or loan" (or Household → "Accounts" → "Add account"): "Name", "Type" ("Loan" or "Credit card") and "Owed at the start of <Month>", what you owed when that month began.',
-      'For a card answer "What do you record for this card?". "Add the row that pays it off" is ticked: "Save" makes the loan or card and its payment row together, and on the Statement the row\'s dialog opens for the amount.',
+      'For a card answer "What do you record for this card?". "Add the row that pays it off" is ticked: "Save" makes the loan or card and its payment row together, and on the Statement the row\'s dialog opens for the amount. Pick its "Category" there, "Transport" for a car loan say, and the payment stands beside the car\'s other costs.',
       'Point spending rows at a card: row menu → "Paid by card…" → the card (in the demo, "Subscriptions" is paid by "Credit card").',
       'A payment row can come later, or first. Later: the "…" of the loan or card → "Edit…" → "Add the row that pays it off". First: Statement → "Expenses" → "Add row" → "Pays off a loan or card" → the account, or "New loan…" to make both together; a category\'s "Add row to Transport" offers the same and keeps the line in that category, beside the car\'s other costs. In the Grid it is Expenses → "Add row" → "Pays off a loan or card", and Transfers → "Pays off a credit card" for a card whose purchases are expense rows; on the Statement that card\'s payment shows under "Moved elsewhere". A vehicle\'s or company\'s suggestions offer a loan row too, with "Add a loan…" while there is none.',
       'Row menu → "Pays off…" re-points a payment row at another loan or card.',

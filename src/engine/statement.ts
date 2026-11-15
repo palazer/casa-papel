@@ -18,7 +18,7 @@
  * Grid): that it brings a debt down shows in the lower half. "From what is left" is how the rest is shared out:
  * pocket money, savings, investments, virtual accounts, and the figure that closes the month.
  */
-import { accountGroup, addMonths, canCarryRule, cardIsItemized, describeCadence, isTakenFromAccount, nextDue, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
+import { accountGroup, addMonths, canCarryRule, describeCadence, isTakenFromAccount, nextDue, paysAsExpense, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
 import { computeGoals, type GoalProgress } from './goals'
 import { currentAccountsIn, mainAccountLabel } from './mainAccount'
 import { cellKey, fundingTotal, type AccountSeries, type CellResult, type CellStatus, type EngineOutput } from './types'
@@ -171,11 +171,8 @@ function bucketOf(row: Row, accountsById: Map<string, Account>): Bucket {
     case 'to-investment':
     case 'pool-allocation': return 'set-aside'
     case 'pocket-money': return 'pocket'
-    case 'debt-payment': return 'pay-off'
-    case 'card-payment': {
-      const acc = row.accountId ? accountsById.get(row.accountId) : undefined
-      return acc && cardIsItemized(acc) ? 'memo' : 'pay-off'
-    }
+    case 'debt-payment':
+    case 'card-payment': return paysAsExpense(row, row.accountId ? accountsById.get(row.accountId) : undefined) ? 'pay-off' : 'memo'
     default: return row.section === 'expense' ? 'expense' : 'moved'
   }
 }
