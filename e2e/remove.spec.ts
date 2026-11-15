@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
 /** The one dialog for removing things: what deleting loses, archive-only for closed history, blockers, Restore. */
 test.describe('archive or delete', () => {

@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from './test'
 
 const WIDE = { width: 1440, height: 900 }
 const PHONE = { width: 390, height: 844 }

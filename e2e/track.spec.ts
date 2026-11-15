@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
 /** Working the month on the Statement from the phone: ticks, the progress line, the real amount, items, automatic rows, a closed month. */
 test.describe('tracking the month on a phone', () => {

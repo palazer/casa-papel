@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
 /** The app shell (DESIGN.md §2): the rail on desktop with its Settings group, the bottom tabs on phones, the page header's toolbar. */
 test.describe('shell', () => {

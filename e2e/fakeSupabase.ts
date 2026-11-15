@@ -1,4 +1,4 @@
-import type { Page, Route } from '@playwright/test'
+import { TODAY, type Page, type Route } from './test'
 
 /** Must match .env.e2e. The browser never reaches it: every request is answered here. */
 export const SUPABASE_URL = 'https://sync.e2e.test'
@@ -198,7 +198,8 @@ export class FakeSupabase {
   }
 
   private session(u: User) {
-    const now = Math.floor(Date.now() / 1000)
+    // the pages' clocks start at TODAY, and a session is valid for an hour from then, whatever the real date is
+    const now = Math.floor(TODAY.getTime() / 1000)
     const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url')
     const token = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: u.id, email: u.email, role: 'authenticated', aud: 'authenticated', iat: now, exp: now + 3600, session_id: `s-${u.id}` })}.e2e`
     return { access_token: token, token_type: 'bearer', expires_in: 3600, expires_at: now + 3600, refresh_token: `r-${u.id}`, user: this.userJson(u) }

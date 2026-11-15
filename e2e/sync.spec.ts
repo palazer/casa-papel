@@ -1,10 +1,12 @@
-import { expect, test, type Browser, type Page } from '@playwright/test'
+import { expect, fixDate, test, type Browser, type Page } from './test'
 import { FakeSupabase } from './fakeSupabase'
 
 const PW = 'correct horse battery staple'
 
 async function device(browser: Browser, server: FakeSupabase): Promise<Page> {
   const context = await browser.newContext({ viewport: { width: 1400, height: 900 } })
+  // a context made by hand does not get the shared setup's date
+  await fixDate(context)
   const page = await context.newPage()
   await server.install(page)
   return page

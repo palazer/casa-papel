@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './test'
 
 async function loadDemo(page: Page) {
   await page.goto('?demo=1&screen=grid')

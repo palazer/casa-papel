@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { newId } from '@/model'
+import { restoreToday, setToday } from '../today'
 import { CasaDb, Store, addAccount, fetchEcbRates, fetchRatesFor, loadTables, monthRates, monthRatesWithDates, neededPairs, pairsWithoutRates, quickCreateHousehold, restoreEcbRate, setManualRate } from '@/store'
 
 async function fresh() {
@@ -7,6 +8,10 @@ async function fresh() {
   await quickCreateHousehold(store, { name: 'T', baseCurrency: 'EUR', locale: 'en-IE', startMonth: '2026-01' })
   return store
 }
+
+// What is fetched depends on today (nothing after today, a year back at least), so every test here has its day.
+beforeEach(() => setToday('2026-11-15'))
+afterEach(restoreToday)
 
 describe('currency rates', () => {
   it('turns daily rates into month rates by policy', () => {
@@ -32,13 +37,17 @@ describe('currency rates', () => {
       calls.push(url)
       return new Response(JSON.stringify({ rates: { '2026-01-02': { USD: 1.1 } } }), { status: 200 })
     }) as unknown as typeof fetch
+    // the household starts in January 2026; in November 2026 thirteen months before today reaches further back
     const res = await fetchRatesFor(store, ['USD'], fetchFn)
     expect(res.written).toBe(1)
-    // the household starts in January 2026; thirteen months before today reaches further back
-    expect(calls[0]).toMatch(/\/v1\/2025-\d\d-01\.\.\d{4}-\d\d-\d\d\?base=EUR&symbols=USD$/)
+    expect(calls[0]).toMatch(/\/v1\/2025-10-01\.\.2026-11-15\?base=EUR&symbols=USD$/)
     expect(pairsWithoutRates(await loadTables(store))).toEqual([])
     expect((await fetchRatesFor(store, [], fetchFn)).written).toBe(0)
     expect(calls).toHaveLength(1)
+    // once the household is older than that, its own first month is where the fetch starts
+    setToday('2027-03-15')
+    await fetchRatesFor(store, ['USD'], fetchFn)
+    expect(calls[1]).toMatch(/\/v1\/2026-01-01\.\.2027-03-15\?base=EUR&symbols=USD$/)
   })
   it('fetches, stores api rates, keeps manual ones, and reports unsupported symbols', async () => {
     const store = await fresh()

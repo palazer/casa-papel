@@ -1,9 +1,9 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from './test'
 
 // service workers are blocked so page.route can stand in for the rate service
 test.use({ viewport: { width: 1400, height: 900 }, serviceWorkers: 'block' })
 
-async function loadDemo(page: import('@playwright/test').Page) {
+async function loadDemo(page: Page) {
   await page.goto('?demo=1&screen=grid')
   await page.getByRole('button', { name: 'Load the demo household' }).click()
   await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()

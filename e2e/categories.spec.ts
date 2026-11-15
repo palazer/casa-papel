@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './test'
 
 /** Categories: label lines and faint bands on the grid, a row's category from its menu, the card under Household. */
 test.describe('categories', () => {

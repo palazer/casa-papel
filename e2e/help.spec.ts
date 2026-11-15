@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
 /** The help system (DESIGN.md §8): (i) icons that open on hover or tap, and the legend behind one toolbar button. */
 test.describe('help', () => {

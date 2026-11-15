@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './test'
 
 test.describe('archiving people and things', () => {
   test.use({ viewport: { width: 1400, height: 900 } })
