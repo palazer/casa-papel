@@ -239,4 +239,11 @@ What ran without a fault. Every scenario also ran the nine checks after each of 
 - The demo household is fixed to autumn 2026 and ages with the calendar (the browser tests now run on a fixed day,
   so they no longer depend on it).
 - Sync between two devices (see F9).
-- Whole stories in the browser.
+
+## The same stories in the browser
+
+`e2e/stories.spec.ts` runs five of the scenarios through the screens, with the same household and the same numbers:
+what a month leaves, an exception and undo, a real balance, an account that takes the rest, and percentage rules.
+They check that the dialogs save what the scenarios' steps save. One difference showed and is not a fault: the
+account form starts a new investment account at 5 % growth a year, where a scenario's investment account grows only
+when the scenario says so.

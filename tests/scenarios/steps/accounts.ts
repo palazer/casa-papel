@@ -17,6 +17,8 @@ step('a savings account {string} holding {money}', (world: World, name: string, 
 step('a savings account {string} holding {money}, opened in {month}', (world: World, name: string, holding: number, month: string) => account(world, 'savings', name, holding, { openingMonth: month }))
 step('a savings account {string} in {ccy} holding {money}', (world: World, name: string, currency: string, holding: number) => account(world, 'savings', name, holding, { currency }))
 
+// An investment account grows only when the scenario says by how much. (The account form starts a new one at 5 % a
+// year; a scenario that wants what the form gives says "that grows 5% a year".)
 const grows = (annualRate: number): Pick<Account, 'investment'> => ({ investment: { projectionMode: 'fixed-rate', annualRate, depositTiming: 'start', depositFxMode: 'monthly-rate', fixedRate: null } })
 step('a cash account {string} holding {money}', (world: World, name: string, holding: number) => account(world, 'cash', name, holding))
 step('an other asset {string} worth {money}', (world: World, name: string, holding: number) => account(world, 'other-asset', name, holding))

@@ -51,6 +51,13 @@ Feature: Rules: how much goes where
     And "Holiday fund" ends January 2026 with 750.00
     And "Current account" ends January 2026 with 1,750.00
 
+  @R2 @B3
+  Scenario: What a rule pays into an investment grows with it from the first month
+    Given an investment account "Index fund" holding 0.00 that grows 5% a year
+    When "Index fund" gets 10% of the income from January 2026
+    Then the Statement of January 2026 shows "To Index fund" at 300.00
+    And "Index fund" ends January 2026 with 301.22
+
   @R3
   Scenario: A month that overruns leaves nothing to take a percentage of
     Given a savings account "Holiday fund" holding 0.00
