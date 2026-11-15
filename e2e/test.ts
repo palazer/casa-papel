@@ -7,9 +7,31 @@ import { test as base, type BrowserContext } from '@playwright/test'
  */
 export const TODAY = new Date('2026-11-15T12:00:00')
 
-/** Start the clock of every page in the context at `TODAY`. Time runs on from there, so what is saved later is later. */
+/** From the real clock to the tests' clock: fixed when the tests start, so every page and the fake server share one time. */
+const SHIFT = TODAY.getTime() - Date.now()
+
+/** The tests' "now": `TODAY` when the run began, and running on from there. For the Node side (the fake server). */
+export const now = (): Date => new Date(Date.now() + SHIFT)
+
+/**
+ * Give every page of the context the tests' date. Only `Date` is moved, by a fixed amount: time still runs, two
+ * devices of one test agree on it, and timers stay the browser's own. (Playwright's `clock.install` also replaces the
+ * timers, which made the two-device sync test lose a race now and then.)
+ */
 export async function fixDate(context: BrowserContext): Promise<void> {
-  await context.clock.install({ time: TODAY })
+  await context.addInitScript(`(() => {
+    const shift = ${SHIFT}
+    const Real = Date
+    function Shifted(...args) {
+      if (!new.target) return new Real(Real.now() + shift).toString()
+      return args.length === 0 ? new Real(Real.now() + shift) : new Real(...args)
+    }
+    Shifted.prototype = Real.prototype
+    Shifted.now = () => Real.now() + shift
+    Shifted.parse = Real.parse
+    Shifted.UTC = Real.UTC
+    globalThis.Date = Shifted
+  })()`)
 }
 
 /** Playwright's `test` with the date fixed. Every spec imports `test` and `expect` from here, not from Playwright. */

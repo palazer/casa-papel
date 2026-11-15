@@ -64,10 +64,14 @@ test.describe('cloud sync', () => {
     await expect(utilB).toContainText('210', { timeout: 15_000 })
 
     // B edits, A syncs and sees it
+    const pushed = () => [...server.snapshots.values()][0]?.version ?? 0
+    const before = pushed()
     await utilB.click()
     await b.getByLabel('Amount in EUR').fill('333')
     await b.getByRole('button', { name: 'Save' }).click()
     await expect(b.getByRole('dialog')).toBeHidden()
+    // "Synced" may still stand there from before the edit: the edit has left B once the server holds a newer copy
+    await expect.poll(pushed, { timeout: 15_000 }).toBeGreaterThan(before)
     await expect(b.getByRole('button', { name: /^Sync: Synced/ })).toBeVisible({ timeout: 15_000 })
     await a.getByRole('button', { name: 'Sync now' }).click()
     await a.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Grid' }).click()

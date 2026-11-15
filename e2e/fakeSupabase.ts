@@ -1,4 +1,4 @@
-import { TODAY, type Page, type Route } from './test'
+import { now, type Page, type Route } from './test'
 
 /** Must match .env.e2e. The browser never reaches it: every request is answered here. */
 export const SUPABASE_URL = 'https://sync.e2e.test'
@@ -80,12 +80,12 @@ export class FakeSupabase {
     if (path === '/functions/v1/account' && method === 'POST') {
       try {
         if (body.action === 'redeem') {
-          const inv = this.invites.find((i) => i.code === body.code && !i.used_at && Date.parse(i.expires_at) > Date.now())
+          const inv = this.invites.find((i) => i.code === body.code && !i.used_at && Date.parse(i.expires_at) > now().getTime())
           if (!inv) throw new Error('This invite link is not valid any more.')
           const email = String(body.email).toLowerCase()
           if (this.users.some((u) => u.email === email)) throw new Error('An account with this email already exists. Sign in instead.')
           const u = this.addUser(email, String(body.authKey))
-          inv.used_at = new Date().toISOString()
+          inv.used_at = now().toISOString()
           inv.used_by = u.id
           return json({ ok: true })
         }
@@ -109,7 +109,7 @@ export class FakeSupabase {
       const fail = (message: string) => json({ code: 'P0001', message, details: null, hint: null }, 400)
       switch (name) {
         case 'ping': return json('pong')
-        case 'invite_valid': return json(this.invites.some((i) => i.code === body.p_code && !i.used_at && Date.parse(i.expires_at) > Date.now()))
+        case 'invite_valid': return json(this.invites.some((i) => i.code === body.p_code && !i.used_at && Date.parse(i.expires_at) > now().getTime()))
         case 'is_admin': return json(!!auth && this.admins.has(auth.id))
         case 'create_household': {
           if (!auth) return fail('not signed in')
@@ -126,7 +126,7 @@ export class FakeSupabase {
           if ((cur?.version ?? 0) !== Number(body.p_expected)) return fail('conflict')
           if (cur && Number(body.p_schema_version) < cur.schema_version) return fail('stale_schema')
           const version = (cur?.version ?? 0) + 1
-          this.snapshots.set(hid, { version, schema_version: Number(body.p_schema_version), cipher: String(body.p_cipher), device_id: String(body.p_device_id), updated_at: new Date().toISOString() })
+          this.snapshots.set(hid, { version, schema_version: Number(body.p_schema_version), cipher: String(body.p_cipher), device_id: String(body.p_device_id), updated_at: now().toISOString() })
           return json(version)
         }
         case 'delete_household': {
@@ -172,7 +172,7 @@ export class FakeSupabase {
         if (!this.admins.has(auth.id)) return json([], 200)
         if (method === 'GET') return reply(this.invites.filter((i) => matches(i as unknown as Record<string, unknown>)))
         if (method === 'POST') {
-          const inv: Invite = { code: String(body.code), created_by: auth.id, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 7 * 86_400_000).toISOString(), used_by: null, used_at: null }
+          const inv: Invite = { code: String(body.code), created_by: auth.id, created_at: now().toISOString(), expires_at: new Date(now().getTime() + 7 * 86_400_000).toISOString(), used_by: null, used_at: null }
           this.invites.push(inv)
           return reply([inv])
         }
@@ -198,15 +198,15 @@ export class FakeSupabase {
   }
 
   private session(u: User) {
-    // the pages' clocks start at TODAY, and a session is valid for an hour from then, whatever the real date is
-    const now = Math.floor(TODAY.getTime() / 1000)
+    // on the tests' clock, which the pages share: a session is valid for an hour whatever the real date is
+    const issued = Math.floor(now().getTime() / 1000)
     const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url')
-    const token = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: u.id, email: u.email, role: 'authenticated', aud: 'authenticated', iat: now, exp: now + 3600, session_id: `s-${u.id}` })}.e2e`
-    return { access_token: token, token_type: 'bearer', expires_in: 3600, expires_at: now + 3600, refresh_token: `r-${u.id}`, user: this.userJson(u) }
+    const token = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: u.id, email: u.email, role: 'authenticated', aud: 'authenticated', iat: issued, exp: issued + 3600, session_id: `s-${u.id}` })}.e2e`
+    return { access_token: token, token_type: 'bearer', expires_in: 3600, expires_at: issued + 3600, refresh_token: `r-${u.id}`, user: this.userJson(u) }
   }
 
   private userJson(u: User) {
-    const t = new Date().toISOString()
+    const t = now().toISOString()
     return { id: u.id, aud: 'authenticated', role: 'authenticated', email: u.email, email_confirmed_at: t, app_metadata: { provider: 'email', providers: ['email'] }, user_metadata: {}, identities: [], created_at: t, updated_at: t }
   }
 }
