@@ -1,5 +1,5 @@
 /**
- * The main account, read as what stays behind. The month's money passes through the current, joint and cash accounts:
+ * The main account, read as what stays behind. The month's money passes through the current and joint accounts:
  * the Statement's upper half is their month. The engine keeps no balance of their own for them, so this works one out
  * from what it already knows, for all of them together:
  *
@@ -16,11 +16,12 @@ import { cardIsItemized, compareMonths, type Account, type AccountMonth, type Mo
 import { convertMoney, type FxIndex } from './fx'
 import { cellKey, type CellResult, type MainAccountSeries, type MonthTotals } from './types'
 
-const CURRENT_TYPES: ReadonlySet<string> = new Set(['checking', 'joint', 'cash'])
+/** A cash account is not one of them: it has a balance of its own, like any other asset (see `compute.ts`). */
+const CURRENT_TYPES: ReadonlySet<string> = new Set(['checking', 'joint'])
 const byOrder = (a: Account, b: Account) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0)
 
 /**
- * The current, joint and cash accounts that exist in a month, in their own order: opened by then, not archived yet.
+ * The current and joint accounts that exist in a month, in their own order: opened by then, not archived yet.
  * These are the accounts whose real balances are asked for, and all of them are needed for the month to count as entered.
  */
 export function currentAccountsIn(accounts: Account[], month: MonthKey): Account[] {
@@ -81,6 +82,7 @@ export function mainAccountSeries(input: {
     // the real balances, when every account open this month has one
     const open = currentAccountsIn(current, m)
     let real: Money | null = open.length > 0 ? 0 : null
+    const each: Record<string, { own: Money; base: Money }> = {}
     for (const acc of open) {
       const typed = actuals.get(`${acc.id}|${m}`)?.actualBalance
       if (typed == null) {
@@ -90,9 +92,10 @@ export function mainAccountSeries(input: {
       const conv = convertMoney(fx, typed, acc.currency, base, m)
       if (conv.missingRate) series.missingRate = true
       real = (real ?? 0) + conv.value
+      each[acc.id] = { own: typed, base: conv.value }
     }
     balance = real ?? computed
-    series.months[m] = { start, kept, cardBought, cardPaid, computed, entered: real != null, adjustment: real != null ? real - computed : 0, balance }
+    series.months[m] = { start, kept, cardBought, cardPaid, computed, entered: real != null, adjustment: real != null ? real - computed : 0, balance, ...(real != null ? { real: each } : {}) }
   }
   return series
 }

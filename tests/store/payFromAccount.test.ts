@@ -29,16 +29,19 @@ describe('"Comes out of" an account: the list', () => {
     const { store, savings, rainy } = await fresh()
     const fund = await addAccount(store, { name: 'Index fund', type: 'investment', currency: 'EUR', openingMonth: '2026-01' })
     const deposit = await addAccount(store, { name: 'Rental deposit', type: 'other-asset', currency: 'EUR', openingMonth: '2026-01' })
+    const wallet = await addAccount(store, { name: 'Wallet', type: 'cash', currency: 'EUR', openingMonth: '2026-01' })
     await addAccount(store, { name: 'Visa', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01' })
     await addAccount(store, { name: 'Car loan', type: 'loan', currency: 'EUR', openingMonth: '2026-01' })
     const travel = await addPool(store, { name: 'Travel', accountId: savings.id })
     const t = await loadTables(store)
+    // cash stands with the other assets and is named as what it is; a current account, a card and a loan pay nothing here
     expect(fundingOptions(t)).toEqual([
       { value: 'cash', label: "This month's income" },
       { value: accountRef(savings.id), label: `Savings account: ${savings.name}` },
       { value: accountRef(rainy.id), label: 'Savings account: Rainy day' },
       { value: accountRef(fund.id), label: 'Investment account: Index fund' },
       { value: accountRef(deposit.id), label: 'Other asset: Rental deposit' },
+      { value: accountRef(wallet.id), label: 'Cash: Wallet' },
       { value: poolRef(travel.id), label: 'Virtual account: Travel' },
     ])
   })

@@ -177,11 +177,13 @@ export interface MainAccountMonth {
   /** With `entered`: the real balances together minus `computed`. Zero otherwise. */
   adjustment: Money
   balance: Money
+  /** With `entered`: what each account really held, in its own currency and in the base currency. The only month figures the plan has per account. */
+  real?: Record<string, { own: Money; base: Money }>
 }
 
-/** The current, joint and cash accounts together, as one calculated balance (see `mainAccount.ts`). */
+/** The current and joint accounts together, as one calculated balance (see `mainAccount.ts`). */
 export interface MainAccountSeries {
-  /** The current, joint and cash accounts counted, in their own order. */
+  /** The current and joint accounts counted, in their own order. */
   accountIds: string[]
   /** An opening balance in another currency had no rate and was taken 1:1. */
   missingRate: boolean
@@ -199,7 +201,7 @@ export interface EngineOutput {
   rowTotals: Record<string, RowTotals>
   incomeTotal: Money
   /**
-   * What stays in the main account (the current, joint and cash accounts together), worked out from the household's
+   * What stays in the main account (the current and joint accounts together), worked out from the household's
    * first month on. Null only when there is no household or no month.
    */
   main: MainAccountSeries | null

@@ -288,7 +288,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   when it comes to the group's step. **Assets stand under a heading per kind of account** (`accountGroup` in
   `src/model/accountGroup.ts`): the current accounts' one calculated line first, then `Savings accounts`,
   `Investment accounts` and `Other assets` in the `worth` hue, each with the sum and the change of its accounts and
-  only while it has one; the accounts keep their columns under it. The first line carries a muted `current account`
+  only while it has one; the accounts keep their columns under it. Cash is one of the other assets: money held, with
+  a balance of its own, never part of the current accounts. The first line carries a muted `current account`
   after its name when it is named after its one account, so every line of the side says what kind it is. Tags follow the name and wrap under it
   when there is no room: a zinc chip with the currency code and the original amount in muted `text-[11px]` for a
   line in another currency (the amount column is always the household currency), a rose `no rate` chip, `net €…`
@@ -431,6 +432,13 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   Once the real balances are typed for a month the chip goes, the amount is underlined like any entered balance, the
   line says `entered, -€120.00 against the plan`, and its parts (At the start of the month, Kept this month, the card
   lines) gain `Not in the plan`, so they still add up. The month after is `calculated` again, from the real number.
+  **Several current accounts each stand under that line**, before its parts, so they can be seen and edited where
+  the money is counted: the account's name in `font-medium`, its own `…` menu, and no amount of its own while the
+  plan only knows them together (a faint `·` and the zinc chip `counted together`). In a month whose real balances
+  are typed each shows what it really held, underlined like any entered balance. They are listed, not added up
+  (`memo`): the parts after them explain the line's figure, and the accounts are the same money seen another way.
+  An account's amount opens `CurrentBalanceDialog`, since they are entered together; such a line has no goal button.
+  One current account alone needs no line under its own: the line is that account.
   **Accounts are added in the lower half too**, in the same ghost `+` buttons as rows: the foot of the Assets side
   holds `Add account` (current, joint, savings, investments, other asset, cash) and, once a savings account exists,
   `Add virtual account`; `Add a card or loan` sits at the foot of the Debts group, and at the foot of that side while
@@ -449,8 +457,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   those of their savings account; disabled at the ends; `moveAccount`, `movePool`: the two that swap trade their
   `order`, which every list of accounts sorts by), and `Archive or delete…` (`Delete` while the household is being
   set up; how removing behaves is in §8). So every `…` on the page opens a menu, never a dialog directly;
-  the calculated line for the current accounts lists them (`Edit a current account`: `Edit <account>…`), one or
-  several. So that a line can hold these beside its own action, every row line that opens
+  a single current account's line carries the same menu, and several carry it on their own lines under
+  `Current accounts`, whose heading then has none. So that a line can hold these beside its own action, every row line that opens
   something is built the way a line with a rule symbol is: its button is its name, stretched over the whole line,
   and the symbol and the menu sit above it. A menu behind an icon is as wide as its longest entry (`w-max`), never
   as narrow as the icon. A closed month shows none of this.
@@ -556,8 +564,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   **"Comes out of" names an account, never a kind of money.** The list (`fundingOptions` in
   `src/features/grid/funding.ts`, the same in the cell editor, the row menu's "Comes out of…" and the schedule form)
   runs `This month's income`, then every account an expense can come straight out of, each under its kind and in the
-  accounts' own order (`Savings account: <name>`, `Investment account: <name>`, `Other asset: <name>`), then
-  `Virtual account: <name>`. Current accounts are the month's income and are not listed; a card or a loan is not a
+  accounts' own order (`Savings account: <name>`, `Investment account: <name>`, `Other asset: <name>`, and
+  `Cash: <name>` for a cash account, which stands with the other assets), then `Virtual account: <name>`. Current accounts are the month's income and are not listed; a card or a loan is not a
   source. What was set to the old `Savings balance` reads under the name of the account it has always come out of
   (the first savings account) and is rewritten only when another entry is picked; an archived account stays listed
   only while the row or an item still names it. The account that pays falls by the amount and the month's leftover does not.

@@ -138,12 +138,12 @@ export const RULE_KIND_INFO: Array<{ value: RowRule; label: string; help: string
 ]
 
 export const ACCOUNT_TYPE_INFO: Array<{ value: AccountType; label: string; help: string }> = [
-  { value: 'checking', label: 'Current account', help: 'Where salary lands and bills leave. Day-to-day money; its balance is worked out, and you can type what the bank says.' },
-  { value: 'joint', label: 'Joint account', help: 'A shared account partners pay into for shared bills. Pick this when a fixed amount moves there every month.' },
+  { value: 'checking', label: 'Current account', help: 'Where salary lands and bills leave. All current accounts are counted together as one worked-out figure, so one is enough; you can type what the bank says for each.' },
+  { value: 'joint', label: 'Joint account', help: 'A shared account partners pay into for shared bills. It is counted together with the current accounts, not on its own.' },
   { value: 'savings', label: 'Savings', help: 'Where the month\'s leftover goes. The balance is tracked month by month, and virtual accounts live inside it.' },
   { value: 'investment', label: 'Investments', help: 'Broker, fund or pension account. Deposits and value are tracked.' },
   { value: 'credit-card', label: 'Credit card', help: 'Spend now, pay later. The open balance is tracked.' },
   { value: 'loan', label: 'Loan', help: 'Money you owe. Payments bring the outstanding amount down.' },
   { value: 'other-asset', label: 'Other asset', help: 'Something you own with a value, like a rental deposit. Counts towards net worth.' },
-  { value: 'cash', label: 'Cash', help: 'Wallet money. Only if you want to track it separately.' },
+  { value: 'cash', label: 'Cash', help: 'Money you hold as cash, at home or in a wallet. It has a balance of its own under Other assets, and an expense can come out of it.' },
 ]

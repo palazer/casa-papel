@@ -6,7 +6,7 @@ const byOrder = (a: Account, b: Account) => (a.order < b.order ? -1 : a.order > 
 
 /**
  * The choices for "Comes out of": this month's income, then every account an expense can come straight out of
- * (savings accounts, investment accounts, other assets, each in its own order), then the virtual accounts. An
+ * (savings accounts, investment accounts, other assets and cash, each in its own order), then the virtual accounts. An
  * archived one stays only while `keep` (what the row and its items say now) still names it.
  *
  * The old "Savings balance" has always meant the first savings account. While something in `keep` still says it,
@@ -25,7 +25,8 @@ export function fundingOptions(tables: Pick<Tables, 'accounts' | 'pools' | 'rows
     for (const a of accounts) {
       if (accountGroup(a) !== kind) continue
       const ref = accountRef(a.id)
-      const label = `${said}: ${a.name}`
+      // cash stands with the other assets and is named as what it is
+      const label = `${a.type === 'cash' ? 'Cash' : said}: ${a.name}`
       if (a.id !== first) options.push({ value: ref, label })
       else {
         // both ways of saying the same account in one dialog: each keeps an entry, so neither choice is lost

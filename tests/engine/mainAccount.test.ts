@@ -69,7 +69,7 @@ describe('the main account: what stays behind', () => {
 
   it('lets an account opened later join in its own month, converted at that month\'s rate', () => {
     const main = account({ name: 'Main', type: 'checking', openingBalance: 100_00, tracked: false })
-    const usd = account({ name: 'Dollars', type: 'cash', currency: 'USD', openingBalance: 200_00, openingMonth: '2026-02', tracked: false, order: 'a1' })
+    const usd = account({ name: 'Dollars', type: 'checking', currency: 'USD', openingBalance: 200_00, openingMonth: '2026-02', tracked: false, order: 'a1' })
     const t = tables({ household: [household()], accounts: [main, usd], fxRates: [fx('USD/EUR', '2026-01', 0.9)] })
     const s = computeEngine({ tables: t, months }).main!
     expect(months.map((m) => s.months[m].balance)).toEqual([100_00, 280_00, 280_00])
@@ -120,7 +120,7 @@ describe('the main account: what the bank says', () => {
     const out = computeEngine({ tables: t, months })
     const s = out.main!
     // the plan says 1,500 + 300; the bank says 1,650
-    expect(s.months['2026-01']).toEqual({ start: 1500_00, kept: 300_00, cardBought: 0, cardPaid: 0, computed: 1800_00, entered: true, adjustment: -150_00, balance: 1650_00 })
+    expect(s.months['2026-01']).toEqual({ start: 1500_00, kept: 300_00, cardBought: 0, cardPaid: 0, computed: 1800_00, entered: true, adjustment: -150_00, balance: 1650_00, real: { [main.id]: { own: 1400_00, base: 1400_00 }, [joint.id]: { own: 250_00, base: 250_00 } } })
     expect(s.months['2026-02']).toEqual({ start: 1650_00, kept: 300_00, cardBought: 0, cardPaid: 0, computed: 1950_00, entered: false, adjustment: 0, balance: 1950_00 })
     expect(s.months['2026-03'].balance).toBe(2250_00)
     // net worth is the same figure
@@ -138,26 +138,26 @@ describe('the main account: what the bank says', () => {
   })
 
   it('asks for an account only in the months it exists: opened later, archived from a month on', () => {
-    const cash = account({ name: 'Wallet', type: 'cash', openingBalance: 50_00, openingMonth: '2026-02', tracked: false, order: 'a2' })
+    const cash = account({ name: 'Second', type: 'checking', openingBalance: 50_00, openingMonth: '2026-02', tracked: false, order: 'a2' })
     const { t, main, joint } = world({ accounts: [cash] })
     Object.assign(t.accounts.find((a) => a.id === joint.id)!, { archivedMonth: '2026-03' })
-    expect(months.map((m) => currentAccountsIn(t.accounts, m).map((a) => a.name))).toEqual([['Main', 'Joint'], ['Main', 'Joint', 'Wallet'], ['Main', 'Wallet']])
-    // a savings account, a card and a deleted account are never asked for
-    expect(currentAccountsIn([account({ name: 'S', type: 'savings' }), account({ name: 'V', type: 'credit-card' }), { ...main, deletedAt: T0 }], '2026-02')).toEqual([])
+    expect(months.map((m) => currentAccountsIn(t.accounts, m).map((a) => a.name))).toEqual([['Main', 'Joint'], ['Main', 'Joint', 'Second'], ['Main', 'Second']])
+    // a savings account, a card, cash (an asset with a balance of its own) and a deleted account are never asked for
+    expect(currentAccountsIn([account({ name: 'S', type: 'savings' }), account({ name: 'V', type: 'credit-card' }), account({ name: 'Wallet', type: 'cash' }), { ...main, deletedAt: T0 }], '2026-02')).toEqual([])
     t.accountMonths = [
       actual(main.id, '2026-01', 1400_00), actual(joint.id, '2026-01', 250_00), // January: both there
-      actual(main.id, '2026-02', 1500_00), actual(joint.id, '2026-02', 250_00), // February: the wallet is missing
+      actual(main.id, '2026-02', 1500_00), actual(joint.id, '2026-02', 250_00), // February: the second account is missing
       actual(main.id, '2026-03', 1900_00), actual(cash.id, '2026-03', 20_00), // March: the joint account is gone
     ]
     const s = computeEngine({ tables: t, months }).main!
     expect(months.map((m) => s.months[m].entered)).toEqual([true, false, true])
-    // February is worked out from January's real 1,650: 300 kept and the wallet's 50 joining
+    // February is worked out from January's real 1,650: 300 kept and the second account's 50 joining
     expect(s.months['2026-02'].balance).toBe(2000_00)
     expect(s.months['2026-03']).toMatchObject({ computed: 2300_00, balance: 1920_00, adjustment: -380_00 })
   })
 
   it('counts a balance in another currency at that month\'s rate', () => {
-    const usd = account({ name: 'Dollars', type: 'cash', currency: 'USD', openingBalance: 0, tracked: false, order: 'a2' })
+    const usd = account({ name: 'Dollars', type: 'checking', currency: 'USD', openingBalance: 0, tracked: false, order: 'a2' })
     const { t, main, joint } = world({ accounts: [usd], fxRates: [fx('USD/EUR', '2026-01', 0.9)] })
     t.accountMonths = [actual(main.id, '2026-01', 1500_00), actual(joint.id, '2026-01', 300_00), actual(usd.id, '2026-01', 200_00)]
     const s = computeEngine({ tables: t, months }).main!
@@ -171,6 +171,11 @@ describe('the main account: what the bank says', () => {
     const before = buildStatement(t, computeEngine({ tables: t, months }), '2026-01')!
     expect(find(before.position.left.lines, 'main')).toMatchObject({ label: 'Current accounts', amount: 1800_00, calculated: true, chip: 'calculated', currentAccountIds: [main.id, joint.id] })
     expect(find(before.position.left.lines, 'main').entered).toBeUndefined()
+    // each account stands under the line: listed, in no sum, and without an amount while the plan only knows them together
+    expect(find(before.position.left.lines, 'main').children.map((c) => [c.label, c.kind, c.accountId, c.memo, c.empty, c.chip])).toEqual([
+      ['Main', 'account', main.id, true, true, 'counted together'], ['Joint', 'account', joint.id, true, true, 'counted together'],
+      ['At the start of the month', 'note', undefined, undefined, undefined, undefined], ['Kept this month', 'note', undefined, undefined, undefined, undefined],
+    ])
 
     t.accountMonths = [actual(main.id, '2026-01', 1400_00), actual(joint.id, '2026-01', 250_00)]
     const out = computeEngine({ tables: t, months })
@@ -179,14 +184,18 @@ describe('the main account: what the bank says', () => {
       expect(s.flow.difference, `${m} month`).toBe(0)
       expect(s.position.difference, `${m} position`).toBe(0)
       const line = find(s.position.left.lines, 'main')
-      expect(line.children.reduce((sum, c) => sum + c.amount, 0), m).toBe(line.amount)
+      // the lines that explain the figure add up to it; the accounts are listed beside them and counted once
+      expect(line.children.reduce((sum, c) => (c.memo ? sum : sum + c.amount), 0), m).toBe(line.amount)
       expect(find(s.position.right.lines, 'net-worth').amount).toBe(out.netWorth[m])
     }
     const jan = find(buildStatement(t, out, '2026-01')!.position.left.lines, 'main')
     expect(jan).toMatchObject({ amount: 1650_00, change: 150_00, entered: true, adjustment: -150_00 })
     expect(jan.chip).toBeUndefined()
     expect(jan.calculated).toBeUndefined()
-    expect(jan.children.map((c) => [c.label, c.amount])).toEqual([['At the start of the month', 1500_00], ['Kept this month', 300_00], ['Not in the plan', -150_00]])
+    // typed, each account shows what it really held, and together they are the line's figure
+    expect(jan.children.map((c) => [c.label, c.amount])).toEqual([['Main', 1400_00], ['Joint', 250_00], ['At the start of the month', 1500_00], ['Kept this month', 300_00], ['Not in the plan', -150_00]])
+    expect(jan.children.filter((c) => c.memo).map((c) => [c.entered, c.empty, c.chip])).toEqual([[true, undefined, undefined], [true, undefined, undefined]])
+    expect(jan.children.filter((c) => c.memo).reduce((sum, c) => sum + c.amount, 0)).toBe(jan.amount)
     // the month after is worked out again, from the real number
     expect(find(buildStatement(t, out, '2026-02')!.position.left.lines, 'main')).toMatchObject({ amount: 1950_00, calculated: true, chip: 'calculated' })
   })

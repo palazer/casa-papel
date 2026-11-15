@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
-import { Lock, MoreHorizontal, Plus, X } from 'lucide-react'
+import { Lock, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { InfoTip } from '@/components/InfoTip'
 import { MarksLegend } from '@/components/MarksLegend'
 import { MonthPicker } from '@/components/MonthPicker'
@@ -14,7 +13,7 @@ import { clearHandedMonth, handedOverMonth } from '@/app/screens'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { useStoreVersion } from '@/app/useStoreVersion'
 import { buildStatement, cellKey, currentAccountsIn, type GoalProgress, type Statement, type StatementLine, type StatementSide } from '@/engine'
-import { isPocketRow, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type MonthKey, type Row, type Section } from '@/model'
+import { accountGroup, isPocketRow, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type MonthKey, type Row, type Section } from '@/model'
 import { accountSuggestions, addPayOffRow, addPlanYear, closeMonth, monthBalances, moveAccount, movePool, removeIfFree, reopenMonth, ruleRowOf, setCellDone, setDerivedDone, setItemStatus, setupFocus, setupSteps, shownRowSuggestions, stepSuggestions, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupSide, type SetupStepKey } from '@/store'
 import { GoalDialog } from '@/features/goals/GoalDialog'
 import { goalStatusLine } from '@/features/goals/goalText'
@@ -266,6 +265,12 @@ export function StatementScreen() {
   const goalText = (g: GoalProgress) => goalStatusLine(g, locale, horizon)
   const editing = editor ? engine.rows.find((r) => r.id === editor.rowId) : undefined
   const balanceAccount = balanceFor ? tables.accounts.find((a) => a.id === balanceFor) : undefined
+  /** An account's amount was pressed. The current accounts are entered together, so one of them opens the dialog of all. */
+  const openBalance = (accountId: string) => {
+    const account = tables.accounts.find((a) => a.id === accountId)
+    if (account && accountGroup(account) === 'current') setCurrentBalance(true)
+    else setBalanceFor(accountId)
+  }
   const mainLine = statement.position.left.lines.find((l) => l.id === 'main')
   const balanceResult = balanceFor ? engine.accounts[balanceFor]?.months[m] : undefined
   // closing asks what the accounts really held; a household without an account that has a balance has nothing to ask
@@ -504,17 +509,17 @@ export function StatementScreen() {
         />
       )
     }
-    // the calculated line stands for the current accounts: its menu lists them, one or several
+    // the calculated line stands for the current accounts. One account: the line is that account and carries its
+    // menu. Several: each stands under the line with a menu of its own, so the line has none
     if (line.id === 'main') {
       const current = (engine!.main?.accountIds ?? []).map((id) => tables!.accounts.find((a) => a.id === id && !a.deletedAt)).filter((a): a is Account => !!a)
-      if (current.length === 0) return null
+      if (current.length !== 1) return null
+      const only = current[0]
       return (
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className={LINE_MENU} aria-label="Edit a current account" />}><MoreHorizontal /></DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-max">
-            {current.map((a) => <DropdownMenuItem key={a.id} onClick={() => setAccountEdit(a.id)}>Edit {a.name}…</DropdownMenuItem>)}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <AccountMenu
+          what="Account" name={only.name} at={0} count={1} removeLabel={removeLabel} triggerClassName={LINE_MENU}
+          onEdit={() => setAccountEdit(only.id)} onMove={() => undefined} onRemove={() => removeFrom({ kind: 'account', id: only.id })}
+        />
       )
     }
     return null
@@ -532,7 +537,7 @@ export function StatementScreen() {
   // a card or a loan is added under Debts; while the household owes nothing, at the foot of that side
   const hasDebts = statement.position.right.lines.some((l) => l.id === 'debts')
   const debtsFoot = <Button variant="ghost" size="sm" className={cn(ADD, LEAD_BUTTON)} onClick={() => setAccountNew({ types: DEBT_TYPES })}><AddLead ticks={false} /> <span data-lead="text">Add a card or loan</span></Button>
-  const positionCtx: LineContext = { ...base, withChange: true, onGoal, onBalance: setBalanceFor, onCurrentBalance: () => setCurrentBalance(true), footer: (line) => (line.id === 'debts' ? debtsFoot : null), menu: lineMenu }
+  const positionCtx: LineContext = { ...base, withChange: true, onGoal, onBalance: openBalance, onCurrentBalance: () => setCurrentBalance(true), footer: (line) => (line.id === 'debts' ? debtsFoot : null), menu: lineMenu }
   const day = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${lastDayOfMonth(m)}T00:00:00Z`))
   const foldable = walk([...statement.flow.left.lines, ...statement.flow.right.lines, ...statement.position.left.lines, ...statement.position.right.lines])
     .filter((l) => l.kind === 'group' || l.children.length > 0 || !!l.goals?.length || autoOpen.has(l.id))

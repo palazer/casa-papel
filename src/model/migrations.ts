@@ -41,6 +41,10 @@ const STEPS: Record<number, Step> = {
   // Nothing to rewrite: `savings` keeps meaning the first savings account. The version keeps an older app from
   // reading a source it does not know.
   10: (raw) => raw,
+  // 11 → 12: an account of type 'cash' has a balance of its own, as another asset, and no longer counts with the
+  // current accounts. Nothing to rewrite: its opening amount and its real balances are read as its own. The version
+  // keeps an older app from counting it in the main account.
+  11: (raw) => raw,
 }
 
 export function migrateExport(raw: unknown): unknown {

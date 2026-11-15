@@ -483,10 +483,20 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
     if (mm.cardPaid !== 0) parts.push({ id: 'main:paid', kind: 'note', label: 'Paid to the card', amount: -mm.cardPaid, children: [] })
     // what the bank says beyond what the plan explains, so the parts still add up to the balance
     if (mm.adjustment !== 0) parts.push({ id: 'main:adjustment', kind: 'note', label: 'Not in the plan', amount: mm.adjustment, children: [] })
-    const open = currentAccountsIn(accounts, month).map((a) => a.id)
+    const openAccounts = currentAccountsIn(accounts, month)
+    const open = openAccounts.map((a) => a.id)
+    // Several current accounts each stand under the line that counts them together, so they can be seen and edited.
+    // They are listed, not added up: the lines after them explain the figure. The plan knows what one of them holds
+    // only in a month whose real balances were typed; until then the line says it is counted together.
+    const listed: StatementLine[] = main.accountIds.length > 1 ? openAccounts.map((a): StatementLine => {
+      const real = mm.real?.[a.id]
+      const own: StatementLine = { id: `cur:${a.id}`, kind: 'account', label: a.name, amount: real?.base ?? 0, children: [], accountId: a.id, memo: true }
+      if (!real) return { ...own, empty: true, chip: 'counted together' }
+      return { ...own, entered: true, native: a.currency !== base ? { amount: real.own, currency: a.currency } : undefined }
+    }) : []
     const line: StatementLine = {
       id: 'main', kind: 'account', label: mainAccountLabel(main, accounts), amount: mm.balance, change: mm.balance - mm.start,
-      children: parts, missingRate: main.missingRate || undefined,
+      children: [...listed, ...parts], missingRate: main.missingRate || undefined,
     }
     // named after its one account, the line says what kind of account that is, as the headings under it do for theirs
     if (main.accountIds.length === 1) line.accountKind = 'current account'

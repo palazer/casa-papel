@@ -646,10 +646,13 @@ export function computeEngine(input: EngineInput): EngineOutput {
     accountSeries[acc.id] = series
   }
 
-  // ---------- cards, loans, other assets ----------
+  // ---------- cards, loans, other assets, cash ----------
   for (const acc of accounts) {
-    if (!acc.tracked || !['credit-card', 'loan', 'other-asset'].includes(acc.type)) continue
-    const liability = acc.type !== 'other-asset'
+    const liability = acc.type === 'credit-card' || acc.type === 'loan'
+    if (!liability && acc.type !== 'other-asset' && acc.type !== 'cash') continue
+    // Cash always has a balance: while it counted with the current accounts it was stored as untracked, with no say
+    // in it, so the flag of a cash account says nothing.
+    if (!acc.tracked && acc.type !== 'cash') continue
     const series: AccountSeries = { accountId: acc.id, currency: acc.currency, liability, months: {} }
     let prevBalance: Money | null = null
     for (const m of months) {

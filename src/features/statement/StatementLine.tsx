@@ -115,12 +115,14 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
   // a group and a category open even while they are empty: the first row is added inside them
   const expandable = line.children.length > 0 || !!line.goals?.length || !!foot
   // a goal is not started on something that is archived: the goal dialog would have nothing to attach it to
-  const canGoal = !!ctx.onGoal && !line.archived && (line.kind === 'pool' || (line.kind === 'account' && !!line.accountId) || line.id === 'net-worth')
+  // a current account listed under the line that counts them together has no balance of its own to set a goal for
+  const canGoal = !!ctx.onGoal && !line.archived && (line.kind === 'pool' || (line.kind === 'account' && !!line.accountId && !line.memo) || line.id === 'net-worth')
   const open = expandable && ctx.isOpen(line)
   const listId = `st-${line.id}`
   const hue = line.hue ? HUE[line.hue] : undefined
   // grey: a note, what is left out of the sums, a skipped item, and what is on a schedule and does not land this month
-  const quiet = line.kind === 'note' || line.memo || line.skipped || !!line.resting
+  // what is in no sum is grey, except an account: it is listed under its heading as what it is
+  const quiet = line.kind === 'note' || (line.memo && line.kind !== 'account') || line.skipped || !!line.resting
   const tip = TIP[line.id]
   const marked = !!ctx.marked?.has(line.id)
   // only a top line is asked: what is under it is locked with it
@@ -314,8 +316,9 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
         {ctx.withChange && <span className={cn(CHANGE_COL, 'text-muted-foreground', group && 'font-medium')}>{line.change != null ? changeText(line.change, ccy, locale) : ''}</span>}
         {(ctx.onBalance && line.accountId) || (ctx.onCurrentBalance && line.currentAccountIds?.length) ? (
           <button
-            type="button" aria-label={`${line.label} balance: ${amountText}${line.entered ? ', entered' : ''}`} onClick={() => (line.accountId ? ctx.onBalance!(line.accountId) : ctx.onCurrentBalance!())}
-            className={cn(AMOUNT_COL, ABOVE, '-my-1 rounded py-1 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring', line.amount < 0 && 'text-expense', line.entered && 'underline decoration-dotted underline-offset-4')}
+            // a current account that is counted with the others has no amount of its own to read out
+            type="button" aria-label={`${line.label} balance: ${line.empty ? line.chip ?? 'none' : amountText}${line.entered ? ', entered' : ''}`} onClick={() => (line.accountId ? ctx.onBalance!(line.accountId) : ctx.onCurrentBalance!())}
+            className={cn(AMOUNT_COL, ABOVE, '-my-1 rounded py-1 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring', line.empty && 'text-muted-foreground/40', line.amount < 0 && 'text-expense', line.entered && 'underline decoration-dotted underline-offset-4')}
           >
             {amountText}
           </button>

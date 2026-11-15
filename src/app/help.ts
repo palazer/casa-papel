@@ -43,7 +43,7 @@ export const HELP = {
   'balance.return': { title: 'Return', text: 'Total growth so far as a share of what was deposited. Negative when the value fell below the deposits.' },
   'balance.cardOwed': { title: 'Owed on the card', text: 'What is on the card at month end: last month\'s amount plus purchases on the card minus the payment. Depends on how you record card spending in the account\'s settings.' },
   'balance.loanOutstanding': { title: 'Loan outstanding', text: 'What is still owed. Each instalment brings it down; interest is not modelled, so enter the real balance now and then to keep it honest.' },
-  'balance.otherAsset': { title: 'Other asset', text: 'Something you own with a value, like a rental deposit. The balance only changes when you enter a new value; it counts towards net worth.' },
+  'balance.otherAsset': { title: 'Other asset', text: 'Something you own with a value, like a rental deposit or cash. It falls by what an expense takes straight out of it and otherwise keeps its value until you type a new one; it counts towards net worth.' },
   'balance.pool': { title: 'Virtual account', text: 'Money set aside inside a savings account for one purpose: what goes in every month minus the spending that comes out of it. The savings balance already includes it. It never goes below zero: when more comes out than it holds, the rest comes out of the unassigned savings and the virtual account shows as short until you top it up on the Statement.' },
   'balance.inBase': { title: 'In the household currency', text: 'The balance converted at the month\'s rate, so it can be compared with the other balances and counted in net worth. The line above is in the account\'s own currency.' },
 
@@ -74,7 +74,7 @@ export const HELP = {
   'statement.position': { title: 'At the end of the month', text: 'What you have on the left, under a heading per kind of account. On the right, whose it is: debts first, then your net worth, split into what is set aside in virtual accounts and what is free. The change column shows how the month moved each figure.' },
   'statement.expenses': { title: 'Expenses', text: 'What the month costs: everything that is paid to someone else. A loan payment is here too, in its row\'s category: it has to be paid, even though it brings the debt down and not your net worth. Pocket money is not here; it is shared out of what is left.' },
   'statement.setAside': { title: 'From what is left', text: 'How the rest of the month is shared out, once what it costs is paid: pocket money for each adult, and what goes into savings, investments and virtual accounts. A line can be a fixed amount or follow a rule, and one account can take the rest. Press a line to change the amount or how it is set.' },
-  'statement.mainAccount': { title: 'Current accounts', text: 'What stays in your current accounts. Worked out: what they started with, plus what each month kept or fell short, plus money waiting for a card bill. Press the amount to type what the bank says: later months continue from it, and the line shows how far the plan was off.' },
+  'statement.mainAccount': { title: 'Current accounts', text: 'What stays in your current accounts, worked out for all of them together: what they started with, plus what each month kept or fell short, plus money waiting for a card bill. With several, each stands under the line. Press an amount to type what the bank says for each: later months continue from it, and the line shows how far the plan was off.' },
   'statement.netWorth': { title: 'Net worth', text: 'Assets minus debts, the same figure on every screen. It counts what stays in the main account, so its change is the month\'s result: income minus spending, plus what investments earned.' },
   'statement.fromAccounts': { title: 'From accounts', text: 'Money that came out of your own accounts this month; each line names the account. "calculated": what expenses took straight out of that account, written by the app. "to cover the month": what fills a month that overran. No tag: a row you add yourself, to fill a gap or top up a virtual account. Add a row here and type its amount.' },
   'statement.free': { title: 'Free', text: 'The part of your net worth that no virtual account has set aside. It closes the right side, which is why both sides agree.' },
@@ -93,7 +93,8 @@ export function balanceHelp(type: AccountType | undefined): HelpKey {
     case 'investment': return 'balance.investmentValue'
     case 'credit-card': return 'balance.cardOwed'
     case 'loan': return 'balance.loanOutstanding'
-    case 'other-asset': return 'balance.otherAsset'
+    case 'other-asset':
+    case 'cash': return 'balance.otherAsset'
     default: return 'balance.savings'
   }
 }
