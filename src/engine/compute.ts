@@ -1,5 +1,5 @@
 import {
-  accountIdOf, accountRef, cardIsItemized, compareMonths, fromMinor, isOldPocketShare, isShareRule, isTakenFromAccount, monthRange, paysAsExpense, paysExpenses, poolIdOf, poolRef, resolveRules, scaleMoney, toMinor,
+  accountIdOf, accountRef, cardIsItemized, compareMonths, fromMinor, isOldPocketShare, isOutsideNetWorth, isShareRule, isTakenFromAccount, monthRange, paysAsExpense, paysExpenses, pocketLandsIn, poolIdOf, poolRef, resolveRules, scaleMoney, toMinor,
   type Account, type Category, type Cell, type FundedBy, type Money, type MonthKey, type Row, type RuleState, type Section, type Tables,
 } from '@/model'
 import { buildFxIndex, convertMoney } from './fx'
@@ -86,9 +86,11 @@ function addFunding(f: Funding, fundedBy: FundedBy, amount: Money, paying: Reado
  * spending between accounts. `rows` in display order, both lists without what was deleted.
  */
 function firstSavingsAccount(rows: Row[], accounts: Account[]): string | null {
-  const savings = new Set(accounts.filter((a) => a.type === 'savings').map((a) => a.id))
+  // the household's own savings: an account left out of net worth is a person's, and never stands for them
+  const own = accounts.filter((a) => a.type === 'savings' && !isOutsideNetWorth(a))
+  const savings = new Set(own.map((a) => a.id))
   return rows.filter((r) => r.kind === 'to-savings').map((r) => r.accountId).find((id) => id != null && savings.has(id))
-    ?? accounts.find((a) => a.type === 'savings')?.id ?? null
+    ?? own[0]?.id ?? null
 }
 
 /** The same for the screens that offer "Comes out of" (`EngineOutput.primarySavingsId` when the engine's output is at hand). */
@@ -533,6 +535,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
 
   // ---------- savings accounts ----------
   const accountSeries: Record<string, AccountSeries> = {}
+  /** The mark of an account that net worth leaves out, for its series. */
+  const outsideOf = (acc: Account): { outside?: true } => (isOutsideNetWorth(acc) ? { outside: true } : {})
   const primarySavingsId = firstSavingsAccount(rows, accounts)
   /** What a month puts into a savings account: its "to savings" rows and what its virtual accounts set aside. */
   const savingsInflow = (acc: Account, m: MonthKey): Money => {
@@ -541,7 +545,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
     for (const row of rows) {
       const c = cells[cellKey(row.id, m)]
       if (!c) continue
-      if (row.kind === 'to-savings' && row.accountId === acc.id) inflow += home ? c.valueBase : inAccountCurrency(acc, c, m)
+      // pocket money that lands here counts like a deposit: the account is its adult's own, outside net worth
+      if ((row.kind === 'to-savings' && row.accountId === acc.id) || pocketLandsIn(row, acc)) inflow += home ? c.valueBase : inAccountCurrency(acc, c, m)
       // a virtual account is kept in the base currency; the account that holds it receives the row's own amount
       else if (!home && row.kind === 'pool-allocation' && c.source !== 'archived' && poolByAllocationRow.get(row.id)?.accountId === acc.id) inflow += inAccountCurrency(acc, c, m)
     }
@@ -566,7 +571,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
   }
   for (const acc of accounts) {
     if (acc.type !== 'savings' || !acc.tracked) continue
-    const series: AccountSeries = { accountId: acc.id, currency: acc.currency, liability: false, months: {} }
+    const series: AccountSeries = { accountId: acc.id, currency: acc.currency, liability: false, ...outsideOf(acc), months: {} }
     let prevBalance: Money | null = null
     for (const m of months) {
       if (compareMonths(m, acc.openingMonth) < 0) continue
@@ -587,7 +592,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
   for (const acc of accounts) {
     if (acc.type !== 'investment' || !acc.tracked) continue
     const inv = acc.investment ?? { projectionMode: 'fixed-rate' as const, annualRate: 0, depositTiming: 'start' as const, depositFxMode: 'monthly-rate' as const, fixedRate: null }
-    const series: AccountSeries = { accountId: acc.id, currency: acc.currency, liability: false, months: {} }
+    const series: AccountSeries = { accountId: acc.id, currency: acc.currency, liability: false, ...outsideOf(acc), months: {} }
     const fixedMonthly = Math.pow(1 + (inv.annualRate ?? 0), 1 / 12) - 1
     const realised: number[] = []
     let prevValue: Money | null = null
@@ -610,7 +615,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
         if (row.accountId !== acc.id) continue
         const c = cells[cellKey(row.id, m)]
         if (!c || c.value === 0) continue
-        if (row.kind === 'to-investment') {
+        // pocket money that lands here is a deposit like any other
+        if (row.kind === 'to-investment' || pocketLandsIn(row, acc)) {
           // a negative deposit is money taken out: the rest in a month that overran, or a typed correction
           const v = toAccountCurrency(c, m)
           if (v >= 0) deposit += v
@@ -648,7 +654,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
     // Cash always has a balance: while it counted with the current accounts it was stored as untracked, with no say
     // in it, so the flag of a cash account says nothing.
     if (!acc.tracked && acc.type !== 'cash') continue
-    const series: AccountSeries = { accountId: acc.id, currency: acc.currency, liability, months: {} }
+    const series: AccountSeries = { accountId: acc.id, currency: acc.currency, liability, ...outsideOf(acc), months: {} }
     let prevBalance: Money | null = null
     for (const m of months) {
       if (compareMonths(m, acc.openingMonth) < 0) continue
@@ -673,10 +679,17 @@ export function computeEngine(input: EngineInput): EngineOutput {
           outflow += inAccountCurrency(acc, c, m)
         }
       }
-      // an other asset falls by what expenses took straight out of it
-      if (!liability) outflow += paidFrom(acc, m)
-      // owed grows with spending and shrinks with payments; an asset carries, less what was paid from it, until a real value is entered
-      const computed: Money = liability ? prev + inflow - outflow : prev - outflow
+      // an other asset falls by what expenses took straight out of it, and rises by pocket money that lands in it
+      if (!liability) {
+        outflow += paidFrom(acc, m)
+        for (const row of rows) {
+          if (!pocketLandsIn(row, acc)) continue
+          const c = cells[cellKey(row.id, m)]
+          if (c && c.source !== 'archived') inflow += inAccountCurrency(acc, c, m)
+        }
+      }
+      // owed grows with spending and shrinks with payments; an asset carries, plus what landed in it and less what was paid from it, until a real value is entered
+      const computed: Money = prev + inflow - outflow
       const actual = actuals.get(`${acc.id}|${m}`)?.actualBalance ?? null
       const balance: Money = actual ?? computed
       series.months[m] = { start: prev, computed, entered: actual != null, balance, adjustment: actual != null ? actual - computed : 0, inflow, outflow, projected: actual == null, ...inBase(acc, balance, m) }
@@ -694,7 +707,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
     let nw = main.months[m]?.balance ?? 0
     for (const s of Object.values(accountSeries)) {
       const r = s.months[m]
-      if (!r) continue
+      // an account left out of net worth has its balance and is counted nowhere
+      if (!r || s.outside) continue
       nw += s.liability ? -r.balanceBase : r.balanceBase
     }
     netWorth[m] = nw

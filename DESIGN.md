@@ -304,7 +304,15 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   on an income with deductions, and a zinc chip for what the line is (`automatic`, `calculated`,
   `counted when bought` on a card payment that is shown muted and left out of the sum). Virtual accounts sit by name
   under the savings account that holds them, with `Not set aside` for the rest of it; the right side sums them in
-  one `Set aside` line. A line a goal watches carries the goal mark: a 12 px `Target` icon in the goal hue and the
+  one `Set aside` line. Below zero, `Not set aside` says why beside its red figure, in the muted note every line
+  has: `more is set aside than the account holds`. **An account left out of net worth** (`isOutsideNetWorth`:
+  money that is a person's own, like saved pocket money) keeps its line where its kind stands, never under a heading
+  of its own: after its name a 12 px muted `CircleSlash` (`data-outside`, named `Not in net worth`, with a title that
+  says no total counts it), its balance in `text-muted-foreground` as a figure in no sum is, the line a `memo` so
+  that the heading above it, the side's total, `Net worth` and `Set aside` all pass it by. It still takes its real
+  balances, a goal, its menu and its dialog. It carries a rule symbol only when a row of its own fills it. A pocket
+  money row that lands in it is linked to it like any row that fills an account (`Lands in <account>`, and
+  `Filled by <row>` on the account). The Grid says ` · not in net worth` after the name of its balance row. A line a goal watches carries the goal mark: a 12 px `Target` icon in the goal hue and the
   percentage in muted `text-[11px]`, the income hue once reached, a rose `late` chip when late; opening the line
   shows the goal's name, its bar and the sentence that says how far the plan gets (`goalStatusLine`), with `Edit`
   beside the name; there is no list of all goals. The toolbar holds the `MonthPicker`, `Expand all` / `Collapse all`
@@ -770,10 +778,22 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   …` for a card or loan, `Worth at the start of …` for another asset. A card adds "What do you record for this
   card?" as a `Segmented` (`Everything I buy with it` / `Only what I pay to it`) with the chosen answer's sentence.
   Everything that has a usual default sits behind a `More options` disclosure (a chevron button that names what it
-  holds while closed): currency (a `NativeSelect`), opening month, owner, tracking, and for investments growth, projection and when
-  deposits count. It is closed for a new account and open when editing. Opened from a place that says what the
+  holds while closed): currency (a `NativeSelect`), opening month, owner, tracking, net worth, and for investments growth, projection and when
+  deposits count. It is closed for a new account and open when editing. **`Leave out of net worth`** is a `Check`
+  there, for an account that holds money and has a balance (savings, investment, other asset, cash; not a current
+  account, a card or a loan), with a muted sentence under it that says what it does, another one once it is ticked
+  (`acc-outside`). It cannot be unticked while a pocket money row lands in the account: the dialog's error names the
+  row. Such an account is not asked "How much goes to …?" after it is made on the Statement. Opened from a place that says what the
   account is (Assets, Debts, a suggestion), the type list holds only the types that belong there. Errors show in the
   dialog. Footer: a ghost `Archive or delete…` on the left when editing, Cancel, Save.
+  **Where pocket money lands.** A pocket money row's menu item for its account reads `Lands in…` (never `Paid
+  from…`): the same small dialog as for any row's account, listing only the accounts left out of net worth that have
+  a balance (`landingAccounts`), with `Nowhere` first and a sentence that says what landing does. With none to
+  offer it says where the box is (`no-landing`). The store refuses any other account with a sentence that names it.
+  **A virtual account is a part of its savings account.** Under `Already in it` the form says so in muted `text-xs`
+  (`pool-open-note`), with what the account has free this month where the screen knows it (`notSetAside`); more than
+  that brings an amber sentence (`pool-open-warning`, `role="status"`) and still saves, since a balance can be
+  corrected afterwards.
   An account and the row that moves it are made together, never left to be matched up afterwards. A new loan or card
   carries a ticked `Check`, `Add the row that pays it off`, with the row's name under it (`"Car loan – Payment". Each
   payment brings down what is owed.`); one Save makes both in one step, one Undo takes both away, and on the

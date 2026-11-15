@@ -139,6 +139,8 @@ export interface AccountSeries {
   currency: string
   /** Cards and loans: the balance is money owed. */
   liability: boolean
+  /** Left out of net worth (`isOutsideNetWorth`): it has its balance, and no sum of what the household has counts it. */
+  outside?: boolean
   months: Record<MonthKey, AccountMonthResult>
 }
 

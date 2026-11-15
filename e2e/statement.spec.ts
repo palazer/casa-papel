@@ -584,6 +584,132 @@ test.describe('working the month in the Statement', () => {
     await expect(pools).toHaveCount(0)
   })
 
+  test('an account can be left out of net worth: it keeps its line, marked and grey, no total counts it, and pocket money lands in it', async ({ page }) => {
+    await openStatement(page)
+    await goToMonth(page, 'November 2026')
+    const assets = page.getByRole('region', { name: 'Assets' })
+    const claims = page.getByRole('region', { name: 'Debts and net worth' })
+    const moneyIn = page.getByRole('region', { name: 'Money in' })
+    const moneyOut = page.getByRole('region', { name: 'Money out' })
+    const dlg = page.getByRole('dialog')
+    const menu = page.getByRole('menu')
+    const group = assets.locator('[data-line="savings-accounts"]')
+    const netWorth = claims.locator('[data-line="net-worth"]')
+    await expect(group).toContainText('€14,236.00')
+    await expect(total(page, 'assets')).toContainText('€28,043.16')
+    await expect(netWorth).toContainText('€27,965.16')
+
+    // the box is with the account's other options, and says what it does before and after it is ticked
+    await assets.getByRole('button', { name: 'Add account' }).click()
+    await dlg.getByLabel('Name', { exact: true }).fill('Pocket savings')
+    await dlg.getByLabel('Type').selectOption('savings')
+    await dlg.getByLabel(/^Holds at the start of/).fill('2000')
+    await expect(dlg.getByRole('button', { name: /^More options/ })).toContainText('net worth')
+    await dlg.getByRole('button', { name: /^More options/ }).click()
+    const box = dlg.getByRole('checkbox', { name: 'Leave out of net worth' })
+    await expect(box).not.toBeChecked()
+    await expect(dlg.getByTestId('acc-outside')).toHaveText('For money that is a person\'s own, like saved pocket money. The account keeps its balance, and net worth does not count it.')
+    await box.check()
+    await expect(dlg.getByTestId('acc-outside')).toHaveText('It keeps its balance and can still pay into the month, but no total counts it, and net worth does not either. Pocket money can land in it.')
+    await settled(dlg)
+    await dlg.screenshot({ path: 'e2e/output/account-outside-net-worth.png' })
+    // a current account is the month's own money: it has no such box
+    await dlg.getByLabel('Type').selectOption('checking')
+    await expect(box).toHaveCount(0)
+    await dlg.getByLabel('Type').selectOption('savings')
+    await expect(box).toBeChecked()
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    // it is a person's own, so it is not asked how much of the household's money goes to it
+    await expect(dlg).toBeHidden()
+
+    // it stands under its own heading with the mark, and the heading, the total and net worth pass it by
+    const line = assets.locator('[data-line^="acc:"]').filter({ hasText: 'Pocket savings' })
+    await expect(line).toContainText('€2,000.00')
+    await expect(line.getByRole('img', { name: 'Not in net worth' })).toBeVisible()
+    await expect(assets.locator('[data-outside]')).toHaveCount(1)
+    await expect(group).toContainText('€14,236.00')
+    await expect(total(page, 'assets')).toContainText('€28,043.16')
+    await expect(netWorth).toContainText('€27,965.16')
+    // its figure is grey, as a figure in no sum is; the account above it is not
+    const grey = await line.getByRole('button', { name: 'Pocket savings balance: €2,000.00' }).evaluate((el) => getComputedStyle(el).color)
+    const plain = await assets.getByRole('button', { name: /^Index fund balance:/ }).evaluate((el) => getComputedStyle(el).color)
+    expect(grey).not.toBe(plain)
+
+    // pocket money lands in it: the row menu offers the accounts left out of net worth, and nothing else
+    await moneyOut.getByRole('button', { name: 'Row menu for Sam – Pocket' }).click()
+    await expect(menu.getByRole('menuitem', { name: 'Paid from…' })).toHaveCount(0)
+    await menu.getByRole('menuitem', { name: 'Lands in…' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Lands in' })).toBeVisible()
+    await expect(dlg.getByLabel('Lands in').locator('option')).toHaveText(['Nowhere', 'Pocket savings'])
+    await dlg.getByLabel('Lands in').selectOption({ label: 'Pocket savings' })
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    // September and October brought 500 each, and so does November; the month and net worth are what they were
+    await expect(line).toContainText('€3,500.00')
+    await expect(moneyOut.getByRole('button', { name: 'Sam – Pocket: €500.00' })).toBeVisible()
+    await expect(netWorth).toContainText('€27,965.16')
+    // the row and the account point at each other
+    await moneyOut.getByRole('button', { name: 'Lands in Pocket savings: go there' }).click()
+    await expect(line).toHaveAttribute('data-marked', 'true')
+    await expect(assets.getByRole('button', { name: 'Filled by Sam – Pocket: go there' })).toBeVisible()
+
+    // money taken from it comes into the month under "From accounts", never as income, and net worth rises by it
+    await expect(moneyIn.locator('[data-line="income"]')).toContainText('€7,405.00')
+    await moneyIn.getByRole('button', { name: 'Add transfer row' }).click()
+    await moneyIn.getByLabel('What the new transfer row does').selectOption({ label: 'Taken from a savings account' })
+    // the form says what such a row takes from, since a virtual account cannot be picked here
+    await expect(moneyIn.getByText('It comes out of what is not set aside there: a virtual account\'s money is used through an expense\'s "Comes out of".')).toBeVisible()
+    await moneyIn.getByLabel('Account for the new transfer row').selectOption({ label: 'Pocket savings' })
+    await moneyIn.getByRole('button', { name: 'Add', exact: true }).click()
+    await expect(dlg.getByRole('heading', { name: 'From Pocket savings · November 2026' })).toBeVisible()
+    await expect(dlg.getByRole('radio', { name: 'Only this month' })).toBeChecked()
+    await dlg.getByLabel('Amount in EUR').fill('60')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(moneyIn.getByRole('button', { name: /^From Pocket savings: €60\.00/ })).toBeVisible()
+    await expect(moneyIn.locator('[data-line="income"]')).toContainText('€7,405.00')
+    await expect(line).toContainText('€3,440.00')
+    await expect(netWorth).toContainText('€28,025.16')
+    await page.screenshot({ path: 'e2e/output/statement-outside-net-worth.png', fullPage: true })
+
+    // the box cannot be unticked while the pocket money lands there: the form says which row, and nothing changes
+    await assets.getByRole('button', { name: 'Edit Pocket savings' }).click()
+    await dlg.getByRole('checkbox', { name: 'Leave out of net worth' }).uncheck()
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg.getByRole('alert')).toHaveText('"Sam – Pocket" lands in "Pocket savings", and pocket money can only land in an account that is left out of net worth. Change "Lands in…" in the row\'s menu first.')
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+    await expect(line.getByRole('img', { name: 'Not in net worth' })).toBeVisible()
+
+    // the legend names the mark
+    await page.getByRole('button', { name: 'What the colours and marks mean' }).click()
+    await expect(page.getByText('Not in net worth, on the Statement: an account that is a person\'s own. Its figures are grey, and no total counts it')).toBeVisible()
+    await page.keyboard.press('Escape')
+  })
+
+  test('a virtual account is a part of what its savings account holds: the form says how much is free and warns beyond it', async ({ page }) => {
+    await openStatement(page)
+    await goToMonth(page, 'November 2026')
+    const assets = page.getByRole('region', { name: 'Assets' })
+    const dlg = page.getByRole('dialog')
+    await assets.getByRole('button', { name: 'Add virtual account' }).click()
+    await dlg.getByLabel('Name').fill('Pocket')
+    // what "Already in it" means is said under the field, with what the account has free this month
+    await expect(dlg.getByTestId('pool-open-note')).toHaveText('A part of what "Savings" already holds: it adds no money to the account. "Savings" has €13,726.00 that is not set aside.')
+    await dlg.getByLabel('Already in it (EUR)').fill('500')
+    await expect(dlg.getByTestId('pool-open-warning')).toHaveCount(0)
+    // more than that is said at once, and can still be saved
+    await dlg.getByLabel('Already in it (EUR)').fill('20000')
+    await expect(dlg.getByTestId('pool-open-warning')).toHaveText('That is more than "Savings" has free, so its "Not set aside" will go below zero. For money that is kept somewhere else, add an account instead.')
+    await settled(dlg)
+    await dlg.screenshot({ path: 'e2e/output/pool-already-in-it.png' })
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    // the red figure says why it is red
+    const free = assets.locator('[data-line^="free:"]')
+    await expect(free).toContainText('more is set aside than the account holds')
+    await expect(free).toContainText('-€6,274.00')
+  })
+
   test('the current accounts take their real balances: the difference shows, the next month continues, and it can be taken back', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'November 2026')

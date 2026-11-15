@@ -13,7 +13,7 @@ import { Segmented } from '@/components/Segmented'
 import { currencyChoices, currencyLabel } from '@/app/currencies'
 import { amountToInput, formatMonth, parseAmount, unreadableAmount } from '@/app/format'
 import { useStore } from '@/app/store'
-import { ACCOUNT_TYPE_INFO, type Account, type AccountType, type Entity, type Row } from '@/model'
+import { ACCOUNT_TYPE_INFO, paysExpenses, type Account, type AccountType, type Entity, type Row } from '@/model'
 import { addAccount, addAccountWithRow, addPayOffRow, payOffRowsOf, rowNameFor, updateAccount, type AccountRowInput } from '@/store'
 import { cn } from '@/lib/utils'
 
@@ -70,6 +70,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
   const [openingMonth, setOpeningMonth] = useState(account?.openingMonth ?? startMonth)
   const [owner, setOwner] = useState(account?.ownerEntityId ?? '')
   const [tracked, setTracked] = useState(account?.tracked ?? true)
+  const [outside, setOutside] = useState(account?.outsideNetWorth ?? false)
   const inv0 = account?.investment
   const [annual, setAnnual] = useState(inv0 ? String(Math.round(inv0.annualRate * 10000) / 100) : '5')
   const [projection, setProjection] = useState<'fixed-rate' | 'historical-average'>(inv0?.projectionMode ?? 'fixed-rate')
@@ -85,6 +86,8 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
   // a child can own an account too: their long-term savings row goes into it
   const children = entities.filter((e) => e.kind === 'child' && !e.deletedAt)
   const trackable = TRACKABLE.includes(type)
+  // an account that holds money, and has a balance to leave out, can be kept out of net worth
+  const canLeaveOut = paysExpenses({ type }) && (!trackable || tracked)
   const ccy = currency.toUpperCase()
   const foreign = ccy !== baseCurrency && ccy.length === 3
   const info = ACCOUNT_TYPE_INFO.find((t) => t.value === type)
@@ -120,6 +123,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
     if (type === 'investment' && foreign && fxMode === 'fixed' && !(fixed > 0)) return setError('Give the fixed rate as a positive number.')
     const patch = {
       name: name.trim(), type, currency: ccy, openingBalance, openingMonth, ownerEntityId: owner || null, tracked: trackable ? tracked : false,
+      outsideNetWorth: canLeaveOut && outside,
       investment: type === 'investment'
         ? { projectionMode: projection, annualRate, depositTiming: timing, depositFxMode: foreign ? fxMode : 'monthly-rate' as const, fixedRate: fxMode === 'fixed' && foreign ? fixed : null }
         : undefined,
@@ -205,7 +209,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
             >
               <ChevronRight className={cn('size-3.5 transition-transform', more && 'rotate-90')} aria-hidden />
               More options
-              {!more && <span className="text-muted-foreground/80">: currency, owner, opening month{trackable ? ', tracking' : ''}{type === 'investment' ? ', growth' : ''}</span>}
+              {!more && <span className="text-muted-foreground/80">: currency, owner, opening month{trackable ? ', tracking' : ''}{canLeaveOut ? ', net worth' : ''}{type === 'investment' ? ', growth' : ''}</span>}
             </button>
           </div>
           {more && (
@@ -225,6 +229,16 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
                 <div className="flex items-center gap-1 sm:col-span-2">
                   <Check label="Track the balance month by month in the grid" checked={tracked} onChange={(e) => setTracked(e.target.checked)} />
                   <InfoTip help="household.tracked" />
+                </div>
+              )}
+              {canLeaveOut && (
+                <div className="space-y-1 sm:col-span-2">
+                  <Check label="Leave out of net worth" checked={outside} onChange={(e) => setOutside(e.target.checked)} />
+                  <p className="pl-6 text-xs text-muted-foreground" data-testid="acc-outside">
+                    {outside
+                      ? 'It keeps its balance and can still pay into the month, but no total counts it, and net worth does not either. Pocket money can land in it.'
+                      : 'For money that is a person\'s own, like saved pocket money. The account keeps its balance, and net worth does not count it.'}
+                  </p>
                 </div>
               )}
               {type === 'investment' && (

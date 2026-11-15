@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useStore } from '@/app/store'
-import { cardIsItemized, type Account, type AccountType, type Category, type Household, type MonthKey, type Row, type Section, type Tables } from '@/model'
+import { cardIsItemized, type Account, type AccountType, type Category, type Household, type Money, type MonthKey, type Row, type Section, type Tables } from '@/model'
 import { addRow, addRowOfKind, payOffKind, rowNameFor, rowTargets, type AccountRowInput, type ExpenseRowKind, type TransferRowKind } from '@/store'
 import { NativeSelect } from '@/components/NativeSelect'
 import { cn } from '@/lib/utils'
@@ -50,7 +50,7 @@ const K = {
   toInvestment: { key: 'to-investment', section: 'transfer', label: 'Deposits into an investment account', text: 'The account\'s value, deposited total and return under Balances follow this row.', targets: (t) => t.investments, targetLabel: 'Account', field: 'accountId', create: [NEW.investment], empty: () => '' },
   pool: { key: 'pool-allocation', section: 'transfer', label: 'Fills a virtual account', text: 'For a virtual account that lost its row: the amount lands in the virtual account every month.', targets: (t) => t.orphanPools, targetLabel: 'Virtual account', field: 'poolId', empty: () => '', offered: (t) => t.orphanPools.length > 0 },
   pocket: { key: 'pocket-money', section: 'transfer', label: 'Pocket money for an adult', text: 'Money that adult spends freely each month: an amount you type, or a percentage through its rule.', targets: (t) => t.adults, targetLabel: 'Adult', field: 'adultId', empty: () => 'Add an adult under Household first.' },
-  fromSavings: { key: 'from-savings', section: 'transfer', label: 'Taken from a savings account', text: 'Money you move out of that savings account into the month, to fill a gap or to top up a virtual account. Its balance falls by the amount, and the month has that much more.', targets: (t) => t.savings, targetLabel: 'Account', field: 'accountId', create: [NEW.savings], empty: () => '' },
+  fromSavings: { key: 'from-savings', section: 'transfer', label: 'Taken from a savings account', text: 'Money you move out of that savings account into the month, to fill a gap or to top up a virtual account. Its balance falls by the amount, and the month has that much more. It comes out of what is not set aside there: a virtual account\'s money is used through an expense\'s "Comes out of".', targets: (t) => t.savings, targetLabel: 'Account', field: 'accountId', create: [NEW.savings], empty: () => '' },
   fromInvestment: { key: 'from-investment', section: 'transfer', label: 'Taken from an investment account', text: 'Money you take out of that investment account into the month. Its value falls by the amount, and the month has that much more.', targets: (t) => t.investments, targetLabel: 'Account', field: 'accountId', create: [NEW.investment], empty: () => '' },
   cardPayment: { key: 'card-payment', section: 'transfer', label: 'Pays off a credit card', text: 'For a card whose purchases are expense rows: the payment only moves money, and what is owed on the card falls by it.', targets: (t) => t.cardsItemized, targetLabel: 'Account', field: 'accountId', empty: () => '', offered: (t) => t.cardsItemized.length > 0 },
   expense: { key: 'plain', section: 'expense', label: 'A normal expense', text: 'Spending you type each month, as one amount or a list of items.', targets: null, targetLabel: 'Account', field: 'accountId', empty: () => '' },
@@ -93,13 +93,15 @@ const newValue = (n: New) => `new:${n.type}`
  * On the Statement the control stands on the rows' own columns: `lead` takes the place of the button's "+" (it carries
  * the columns a row has before its name), and `formClassName` starts the open form on the names' column.
  */
-export function AddRowInline({ section, categories, tables, household, onError, defaultCategoryId = '', label, onAdded, only, without, place, month, lead, leadClassName, formClassName, payOffNote }: {
+export function AddRowInline({ section, categories, tables, household, onError, defaultCategoryId = '', label, onAdded, only, without, place, month, lead, leadClassName, formClassName, payOffNote, freeOf }: {
   section: Section; categories: Category[]; tables: Tables; household: Household; onError: (msg: string) => void
   defaultCategoryId?: string; label?: string; onAdded?: (row: Row) => void
   only?: Choice[]; without?: Choice[]
   place?: 'set-aside'
   /** The month a new virtual account's monthly amount starts in; this month when left out. */
   month?: MonthKey
+  /** For a virtual account made from here: what a savings account holds that is not set aside yet. */
+  freeOf?: (accountId: string) => Money | null
   lead?: ReactNode
   /** The button's classes when it carries a `lead`: its gap, and no padding of its own before the lead. */
   leadClassName?: string
@@ -255,7 +257,7 @@ export function AddRowInline({ section, categories, tables, household, onError, 
         />
       )}
       {making === 'pool' && (
-        <PoolDialog pool={null} savings={t.savings} baseCurrency={household.baseCurrency} locale={household.locale} fromMonth={month} onClose={() => setMaking(null)} onSaved={reset} />
+        <PoolDialog pool={null} savings={t.savings} baseCurrency={household.baseCurrency} locale={household.locale} fromMonth={month} freeOf={freeOf} onClose={() => setMaking(null)} onSaved={reset} />
       )}
     </div>
   )

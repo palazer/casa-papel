@@ -259,15 +259,17 @@ export function GridScreen() {
               if (!acc) return []
               const open = (m: MonthKey) => { if (s.months[m]) setBalanceSel({ accountId: acc.id, month: m }) }
               const marked = (m: MonthKey) => s.months[m]?.entered ?? false
+              // an account left out of net worth says so after its name: the "Net worth" row does not count its balance
+              const apart = s.outside ? ' · not in net worth' : ''
               if (acc.type === 'investment') {
                 return [
-                  derivedRow(`${acc.name} · value`, 'in', (m) => s.months[m]?.balance ?? null, { strong: true, currency: s.currency, onClick: open, mark: marked, hue: HUES.worth, help: 'balance.investmentValue' }),
+                  derivedRow(`${acc.name} · value${apart}`, 'in', (m) => s.months[m]?.balance ?? null, { strong: true, currency: s.currency, onClick: open, mark: marked, hue: HUES.worth, help: 'balance.investmentValue' }),
                   ...(s.currency !== ccy ? [derivedRow(`in ${ccy}`, 'in', (m) => s.months[m]?.balanceBase ?? null, { muted: true, sub: acc.name, help: 'balance.inBase' })] : []),
                   derivedRow('Deposited', 'in', (m) => s.months[m]?.capital ?? null, { muted: true, sub: acc.name, currency: s.currency, help: 'balance.deposited' }),
                   derivedRow('Return', 'in', (m) => (s.months[m] ? Math.round((s.months[m].totalReturn ?? 0) * 10000) : null), { muted: true, sub: acc.name, format: (v) => (v === 0 ? '' : formatPercent(v / 10000, locale)), help: 'balance.return' }),
                 ]
               }
-              const label = acc.type === 'credit-card' ? `${acc.name} · owed` : acc.type === 'loan' ? `${acc.name} · outstanding` : acc.name
+              const label = acc.type === 'credit-card' ? `${acc.name} · owed` : acc.type === 'loan' ? `${acc.name} · outstanding` : `${acc.name}${apart}`
               return [
                 derivedRow(label, s.liability ? 'out' : 'in', (m) => s.months[m]?.balance ?? null, { strong: true, currency: s.currency, onClick: open, mark: marked, hue: HUES.worth, help: balanceHelp(acc.type) }),
                 ...(s.currency !== ccy ? [derivedRow(`in ${ccy}`, s.liability ? 'out' : 'in', (m) => s.months[m]?.balanceBase ?? null, { muted: true, sub: acc.name, help: 'balance.inBase' })] : []),

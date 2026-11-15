@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { ArrowDownToLine, Banknote, ChevronRight, Equal, Link2, Link2Off, Repeat, Target, UserRound } from 'lucide-react'
+import { ArrowDownToLine, Banknote, ChevronRight, CircleSlash, Equal, Link2, Link2Off, Repeat, Target, UserRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { InfoTip } from '@/components/InfoTip'
@@ -122,8 +122,9 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
   // a group and a category open even while they are empty: the first row is added inside them
   const expandable = line.children.length > 0 || !!line.goals?.length || !!foot
   // a goal is not started on something that is archived: the goal dialog would have nothing to attach it to
-  // a current account listed under the line that counts them together has no balance of its own to set a goal for
-  const canGoal = !!ctx.onGoal && !line.archived && (line.kind === 'pool' || (line.kind === 'account' && !!line.accountId && !line.memo) || line.id === 'net-worth')
+  // a current account listed under the line that counts them together has no balance of its own to set a goal for;
+  // an account left out of net worth is in no sum too, but its balance is its own
+  const canGoal = !!ctx.onGoal && !line.archived && (line.kind === 'pool' || (line.kind === 'account' && !!line.accountId && (!line.memo || !!line.outside)) || line.id === 'net-worth')
   const open = expandable && ctx.isOpen(line)
   const listId = `st-${line.id}`
   const hue = line.hue ? HUE[line.hue] : undefined
@@ -164,6 +165,12 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
   const name = <span className={nameLook}>{line.label}</span>
   const tags = (
     <>
+      {/* left out of net worth: the mark says why the figures are grey and why the sums above pass the line by */}
+      {line.outside && (
+        <span role="img" aria-label="Not in net worth" title="Not in net worth: no total counts this account" className="inline-flex shrink-0" data-outside>
+          <CircleSlash className="size-3 text-muted-foreground" aria-hidden />
+        </span>
+      )}
       {/* on a schedule: an item a schedule posted, and the row that has one, also in a month where nothing lands */}
       {line.scheduled && (
         <span role="img" aria-label={line.repeats ? `Repeats: ${line.repeats}` : 'Repeats'} title={line.repeats ? `Repeats: ${line.repeats}` : 'Repeats'} className="inline-flex shrink-0" data-repeats>
@@ -338,7 +345,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
           <button
             // a current account that is counted with the others has no amount of its own to read out
             type="button" aria-label={`${line.label} balance: ${line.empty ? line.chip ?? 'none' : amountText}${line.entered ? ', entered' : ''}`} onClick={() => (line.accountId ? ctx.onBalance!(line.accountId) : ctx.onCurrentBalance!())}
-            className={cn(AMOUNT_COL, ABOVE, '-my-1 rounded py-1 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring', line.empty && 'text-muted-foreground/40', line.amount < 0 && 'text-expense', line.entered && 'underline decoration-dotted underline-offset-4')}
+            className={cn(AMOUNT_COL, ABOVE, '-my-1 rounded py-1 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring', line.empty && 'text-muted-foreground/40', line.outside && 'text-muted-foreground', line.amount < 0 && 'text-expense', line.entered && 'underline decoration-dotted underline-offset-4')}
           >
             {amountText}
           </button>

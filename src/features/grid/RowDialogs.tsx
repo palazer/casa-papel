@@ -14,7 +14,7 @@ import { fundingOptions } from './funding'
 import { currencyChoices, currencyLabel } from '@/app/currencies'
 import { HELP } from '@/app/help'
 import { TipLabel } from '@/components/InfoTip'
-import { accountHelp, accountVerb, paysByCard } from './rowAccount'
+import { accountHelp, accountVerb, landingAccounts, paysByCard } from './rowAccount'
 
 interface Base {
   row: Row
@@ -109,10 +109,12 @@ export function RowAccountDialog({ row, tables, onClose }: Base) {
   const need = accountTypeForRow(row)
   // an ordinary expense names the card it is bought on; an account of another kind stays listed only while the row still names it
   const byCard = paysByCard(row)
+  // pocket money lands only in an account that net worth leaves out; any other account the row still names is not offered
+  const pocket = row.kind === 'pocket-money'
   const fits = (a: Account) => (need ? a.type === need : !byCard || a.type === 'credit-card' || a.id === row.accountId)
   // archived accounts are offered only while the row still points at one
-  const accounts = tables.accounts.filter((a) => !a.deletedAt && fits(a) && (!a.archivedMonth || a.id === row.accountId))
-  const [accountId, setAccountId] = useState(row.accountId ?? '')
+  const accounts = pocket ? landingAccounts(tables.accounts) : tables.accounts.filter((a) => !a.deletedAt && fits(a) && (!a.archivedMonth || a.id === row.accountId))
+  const [accountId, setAccountId] = useState(() => (pocket && !accounts.some((a) => a.id === row.accountId) ? '' : row.accountId ?? ''))
   const { error, busy, save } = useSave(onClose)
   const verb = accountVerb(row)
 
@@ -127,13 +129,14 @@ export function RowAccountDialog({ row, tables, onClose }: Base) {
           <div className="space-y-1.5">
             <Label htmlFor="row-account">{byCard ? 'Card' : verb}</Label>
             <NativeSelect id="row-account" className="w-full" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-              {!need && <option value="">{byCard ? 'Not by card' : '—'}</option>}
+              {!need && <option value="">{byCard ? 'Not by card' : pocket ? 'Nowhere' : '—'}</option>}
               {need && !accountId && <option value="">Pick an account</option>}
               {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}{need && !a.tracked ? ' (not tracked)' : ''}{byCard && a.type !== 'credit-card' ? ' (not a card)' : ''}</option>)}
             </NativeSelect>
             <p className="text-xs text-muted-foreground">{accountHelp(row)}</p>
             {byCard && !accounts.some((a) => a.type === 'credit-card') && <p className="text-xs text-muted-foreground">No credit card yet: add one on the Statement under "Debts and net worth".</p>}
             {need && accounts.length === 0 && <p className="text-xs text-muted-foreground">No account of the right kind yet. Add one under Household first.</p>}
+            {pocket && accounts.length === 0 && <p className="text-xs text-muted-foreground" data-testid="no-landing">No account is left out of net worth yet. Open an account, or add one, and tick "Leave out of net worth" under "More options".</p>}
           </div>
           <p className="text-xs text-muted-foreground">Applies to every month, past ones included. To switch from a month on, archive this row and add a new one.</p>
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}

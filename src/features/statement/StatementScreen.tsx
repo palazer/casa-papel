@@ -12,8 +12,8 @@ import { useStore } from '@/app/store'
 import { clearHandedMonth, handedOverMonth } from '@/app/screens'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { useStoreVersion } from '@/app/useStoreVersion'
-import { buildStatement, cellKey, currentAccountsIn, type GoalProgress, type Statement, type StatementLine, type StatementSide } from '@/engine'
-import { accountGroup, isPocketRow, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type MonthKey, type Row, type Section } from '@/model'
+import { buildStatement, cellKey, currentAccountsIn, notSetAside, type GoalProgress, type Statement, type StatementLine, type StatementSide } from '@/engine'
+import { accountGroup, isOutsideNetWorth, isPocketRow, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type Money, type MonthKey, type Row, type Section } from '@/model'
 import { accountSuggestions, addPayOffRow, addPlanYear, closeMonth, monthBalances, moveAccount, movePool, removeIfFree, reopenMonth, ruleRowOf, setCellDone, setDerivedDone, setItemStatus, setupFocus, setupSteps, shownRowSuggestions, stepSuggestions, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupSide, type SetupStepKey } from '@/store'
 import { GoalDialog } from '@/features/goals/GoalDialog'
 import { goalStatusLine } from '@/features/goals/goalText'
@@ -380,7 +380,8 @@ export function StatementScreen() {
    */
   function onAccountSaved(account: Account, row?: Row) {
     if (row) return onAdded(row)
-    if (statement!.closed || (account.type !== 'savings' && account.type !== 'investment')) return
+    // an account left out of net worth is a person's own: it is not offered the household's rest, nor asked for a rule
+    if (statement!.closed || isOutsideNetWorth(account) || (account.type !== 'savings' && account.type !== 'investment')) return
     const restTaken = resolveRules(engine!.rows, household!.closingRule).restRowId !== null
     askRule({ accountId: account.id }, account.type === 'savings' && !restTaken ? 'rest' : undefined)
   }
@@ -405,10 +406,12 @@ export function StatementScreen() {
   const categoriesOf = (section: Section) => tables!.categories.filter((c) => !c.deletedAt && c.section === section)
   // a loan payment belongs with the expenses (the car loan under Transport) and is added there; only the payment to a
   // card whose purchases are expense rows shows elsewhere: the form says so, and the page goes there once it is added
+  /** What a savings account holds this month that no virtual account has set aside: said in the form of a new one. */
+  const freeOf = (accountId: string): Money | null => notSetAside(tables!, engine!, accountId, m)
   const addRow = (line: StatementLine, section: Section, over: Pick<ComponentProps<typeof AddRowInline>, 'label' | 'defaultCategoryId' | 'only' | 'place'> = {}) => (
     <AddRowInline
       section={section} categories={categoriesOf(section)} tables={tables!} household={household!} onError={setError} onAdded={onAdded}
-      month={statement!.closed ? undefined : m} payOffNote={PAY_OFF_NOTE}
+      month={statement!.closed ? undefined : m} payOffNote={PAY_OFF_NOTE} freeOf={freeOf}
       // on the columns of the lines above it: the "+" where their tick is (or their arrow), the words where their names are
       lead={<AddLead ticks={tickedUnder(line)} />} leadClassName={LEAD_BUTTON} formClassName={cn('min-w-0 basis-full', LEAD_PAD[tickedUnder(line) ? 'ticks' : 'plain'])} {...over}
     />
@@ -686,7 +689,7 @@ export function StatementScreen() {
           onClose={() => setAccountNew(null)} onSaved={onAccountSaved}
         />
       )}
-      {poolNew && <PoolDialog pool={null} savings={savingsAccounts} baseCurrency={ccy} locale={locale} fromMonth={statement.closed ? undefined : m} onClose={() => setPoolNew(false)} />}
+      {poolNew && <PoolDialog pool={null} savings={savingsAccounts} baseCurrency={ccy} locale={locale} fromMonth={statement.closed ? undefined : m} freeOf={freeOf} onClose={() => setPoolNew(false)} />}
       {topUpFor && <TopUpDialog key={`${topUpFor}:${m}`} tables={tables} engine={engine} household={household} poolId={topUpFor} month={m} onClose={() => setTopUpFor(null)} />}
       {accountEditing && (
         <HouseholdAccountDialog

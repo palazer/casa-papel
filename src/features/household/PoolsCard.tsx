@@ -9,8 +9,8 @@ import { Check } from '@/components/Check'
 import { NativeSelect } from '@/components/NativeSelect'
 import { amountToInput, formatAmount, formatMonth, parseAmount, unreadableAmount } from '@/app/format'
 import { useStore } from '@/app/store'
-import type { EngineOutput } from '@/engine'
-import { monthOfDate, type Account, type Household, type MonthKey, type Pool, type Tables } from '@/model'
+import { notSetAside, type EngineOutput } from '@/engine'
+import { monthOfDate, type Account, type Household, type Money, type MonthKey, type Pool, type Tables } from '@/model'
 import { addPool, restorePool, updatePool } from '@/store'
 import { HUES } from '@/app/hues'
 import { InfoTip } from '@/components/InfoTip'
@@ -71,6 +71,7 @@ export function PoolsCard({ household, tables, engine, onError }: { household: H
         {editing && (
           <PoolDialog
             pool={editing === 'new' ? null : editing} savings={savings} baseCurrency={baseCurrency} locale={locale} onClose={() => setEditing(null)}
+            freeOf={engine ? (accountId) => notSetAside(tables, engine, accountId, m) : undefined}
             onRemove={editing !== 'new' ? () => { setRemoving(editing); setEditing(null) } : undefined}
           />
         )}
@@ -84,8 +85,10 @@ export function PoolsCard({ household, tables, engine, onError }: { household: H
  * A virtual account: its name, the savings account that holds it, what is already in it, and for a new one what is set
  * aside each month. The Statement opens it too, with the month on screen as the month the set-aside starts in.
  */
-export function PoolDialog({ pool, savings, baseCurrency, locale, fromMonth, onClose, onRemove, onSaved, removeLabel = 'Archive or delete…' }: {
+export function PoolDialog({ pool, savings, baseCurrency, locale, fromMonth, freeOf, onClose, onRemove, onSaved, removeLabel = 'Archive or delete…' }: {
   pool: Pool | null; savings: Account[]; baseCurrency: string; locale: string
+  /** What a savings account holds that is not set aside yet (`notSetAside`): the form says it, and warns when "Already in it" asks for more. */
+  freeOf?: (accountId: string) => Money | null
   /** A new virtual account: the month its monthly amount starts in; this month when left out. */
   fromMonth?: MonthKey
   onClose: () => void; onRemove?: () => void
@@ -103,6 +106,12 @@ export function PoolDialog({ pool, savings, baseCurrency, locale, fromMonth, onC
   const [error, setError] = useState<string | null>(null)
   /** A save is on its way: a second press must not add the virtual account twice. */
   const [busy, setBusy] = useState(false)
+  // "Already in it" is a part of what the account holds, never money of its own: the form says how much is still
+  // free there, and says so when more is asked for (it does not refuse: a balance can be corrected afterwards)
+  const holder = savings.find((a) => a.id === accountId)
+  const free = !pool && holder ? freeOf?.(holder.id) ?? null : null
+  const asked = opening.trim() ? parseAmount(opening, baseCurrency, locale) : null
+  const tooMuch = free != null && asked != null && asked > Math.max(free, 0)
   function save() {
     if (busy) return
     const openingBalance = opening.trim() ? parseAmount(opening, baseCurrency, locale) : 0
@@ -126,7 +135,17 @@ export function PoolDialog({ pool, savings, baseCurrency, locale, fromMonth, onC
         <div className="grid gap-3">
           <div className="space-y-1.5"><Label htmlFor="pool-name">Name</Label><Input id="pool-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Gifts" /></div>
           <div className="space-y-1.5"><Label htmlFor="pool-acc">Held in</Label><NativeSelect id="pool-acc" className="w-full" value={accountId} onChange={(e) => setAccountId(e.target.value)}>{savings.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</NativeSelect></div>
-          <div className="space-y-1.5"><Label htmlFor="pool-open">Already in it ({baseCurrency})</Label><Input id="pool-open" inputMode="decimal" value={opening} onChange={(e) => setOpening(e.target.value)} placeholder="0" /><AmountHint text={opening} currency={baseCurrency} locale={locale} /></div>
+          <div className="space-y-1.5"><Label htmlFor="pool-open">Already in it ({baseCurrency})</Label><Input id="pool-open" inputMode="decimal" value={opening} onChange={(e) => setOpening(e.target.value)} placeholder="0" /><AmountHint text={opening} currency={baseCurrency} locale={locale} />
+            <p className="text-xs text-muted-foreground" data-testid="pool-open-note">
+              A part of what {holder ? `"${holder.name}"` : 'the account'} already holds: it adds no money to the account.
+              {free != null && holder && ` "${holder.name}" has ${formatAmount(free, baseCurrency, locale)} that is not set aside.`}
+            </p>
+            {tooMuch && holder && (
+              <p className="text-xs text-amber-700 dark:text-amber-400" role="status" data-testid="pool-open-warning">
+                That is more than "{holder.name}" has free, so its "Not set aside" will go below zero. For money that is kept somewhere else, add an account instead.
+              </p>
+            )}
+          </div>
           {!pool && (
             <>
               <div className="space-y-1.5"><Label htmlFor="pool-monthly">Set aside each month ({baseCurrency})</Label><Input id="pool-monthly" inputMode="decimal" value={monthly} onChange={(e) => setMonthly(e.target.value)} placeholder={fromMonth ? `optional, from ${formatMonth(fromMonth, locale)} on` : 'optional, from this month on'} /><AmountHint text={monthly} currency={baseCurrency} locale={locale} /></div>

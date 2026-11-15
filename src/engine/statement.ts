@@ -18,7 +18,7 @@
  * Grid): that it brings a debt down shows in the lower half. "From what is left" is how the rest is shared out:
  * pocket money, savings, investments, virtual accounts, and the figure that closes the month.
  */
-import { accountGroup, addMonths, canCarryRule, describeCadence, isTakenFromAccount, nextDue, paysAsExpense, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
+import { accountGroup, addMonths, canCarryRule, describeCadence, isTakenFromAccount, nextDue, paysAsExpense, pocketLandsIn, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
 import { computeGoals, type GoalProgress } from './goals'
 import { currentAccountsIn, mainAccountLabel } from './mainAccount'
 import { cellKey, fundingTotal, type AccountSeries, type CellResult, type CellStatus, type EngineOutput } from './types'
@@ -87,6 +87,8 @@ export interface StatementLine {
   estimateFor?: string
   /** Shown for the record and left out of every sum. */
   memo?: boolean
+  /** An account that net worth leaves out ("Leave out of net worth"): it stands under its heading, marked, in no sum. */
+  outside?: boolean
   /** A short lowercase tag beside the name: `automatic`, `the rest`, `calculated`, `to cover the month`. */
   chip?: string
   /** A calculated line of "From accounts": the expenses it paid for, by name. */
@@ -157,6 +159,18 @@ export interface Statement {
   flow: StatementBand
   position: StatementBand
   warnings: string[]
+}
+
+/**
+ * What an account holds in a month that no virtual account has set aside, in the household currency; null when the
+ * account has no balance that month. Below zero when its virtual accounts claim more than it holds.
+ */
+export function notSetAside(tables: Tables, engine: EngineOutput, accountId: string, month: MonthKey): Money | null {
+  const balance = engine.accounts[accountId]?.months[month]?.balanceBase
+  if (balance == null) return null
+  let inPools: Money = 0
+  for (const p of tables.pools) if (!p.deletedAt && p.accountId === accountId) inPools += engine.pools[p.id]?.months[month]?.balance ?? 0
+  return balance - inPools
 }
 
 type Bucket = 'income' | 'from-account' | 'expense' | 'pocket' | 'moved' | 'set-aside' | 'pay-off' | 'to-savings' | 'memo'
@@ -510,10 +524,16 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
     if (!s || !r) continue
     const change = changeOf(s, acc)
     const line: StatementLine = { id: `acc:${acc.id}`, kind: 'account', label: acc.name, amount: r.balanceBase, change, children: [], accountId: acc.id, missingRate: r.missingRate || undefined, native: s.currency !== base ? { amount: r.balance, currency: s.currency } : undefined }
-    if ((acc.type === 'savings' || acc.type === 'investment') && !acc.archivedMonth) line.rule = ruleOfRows(rowsFeeding(engine.rows, acc))
+    if ((acc.type === 'savings' || acc.type === 'investment') && !acc.archivedMonth) {
+      const feeding = rowsFeeding(engine.rows, acc)
+      // an account left out of net worth is not asked for a rule: it shows one only when a row of its own fills it
+      if (!s.outside || feeding.length) line.rule = ruleOfRows(feeding)
+    }
     if (acc.archivedMonth) line.archived = true
     if (r.entered) line.entered = true
     if (r.adjustment !== 0) line.adjustment = s.currency !== base && r.balance !== 0 ? Math.round(r.adjustment * (r.balanceBase / r.balance)) : r.adjustment
+    // left out of net worth: the line stays where its kind stands, and no sum above it counts it
+    if (s.outside) Object.assign(line, { memo: true, outside: true })
     accountLines.set(acc.id, line)
     if (s.liability) {
       debts.push(line)
@@ -534,10 +554,15 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
         inPools += pm.balance
         poolsChange += pm.allocation - pm.spend
       }
-      line.children.push({ id: `free:${acc.id}`, kind: 'figure', label: 'Not set aside', amount: r.balanceBase - inPools, change: change - poolsChange, children: [] })
+      const free = r.balanceBase - inPools
+      // below zero the virtual accounts claim more than the account holds: said on the line, where the red figure is
+      line.children.push({ id: `free:${acc.id}`, kind: 'figure', label: 'Not set aside', amount: free, change: change - poolsChange, children: [], note: free < 0 ? 'more is set aside than the account holds' : undefined })
       line.open = true
-      setAsideTotal += inPools
-      setAsideChange += poolsChange
+      // "Set aside" is a part of net worth, so the virtual accounts of an account left out of it are not in it either
+      if (!s.outside) {
+        setAsideTotal += inPools
+        setAsideChange += poolsChange
+      }
     }
     const kind = accountGroup(acc)
     assetsOf[kind === 'savings' || kind === 'investment' ? kind : 'other'].push(line)
@@ -546,7 +571,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   for (const [id, label, lines] of [
     ['savings-accounts', 'Savings accounts', assetsOf.savings], ['investment-accounts', 'Investment accounts', assetsOf.investment], ['other-assets', 'Other assets', assetsOf.other],
   ] as const) {
-    if (lines.length) assets.push({ ...group(id, label, 'worth', lines), change: lines.reduce((s, l) => s + (l.change ?? 0), 0) })
+    if (lines.length) assets.push({ ...group(id, label, 'worth', lines), change: lines.reduce((s, l) => (l.memo ? s : s + (l.change ?? 0)), 0) })
   }
 
   const assetsSide = side('assets', 'Assets', assets)
@@ -581,13 +606,15 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
       const row = line.kind === 'row' && line.rowId ? rowsById.get(line.rowId) : undefined
       if (!row) continue
       const pool = poolOfRow.get(row.id)
+      // pocket money is linked to the account it lands in, which is one that net worth leaves out
+      const lands = row.accountId ? pocketLandsIn(row, accountsById.get(row.accountId)) : false
       const target = row.kind === 'pool-allocation' ? (pool ? poolLines.get(pool.id) : undefined)
-        : fills.includes(row.kind) || takes.includes(row.kind) || pays.includes(row.kind) ? (row.accountId ? accountLines.get(row.accountId) : undefined)
+        : fills.includes(row.kind) || takes.includes(row.kind) || pays.includes(row.kind) || lands ? (row.accountId ? accountLines.get(row.accountId) : undefined)
         : undefined
       if (!target) continue
       // a month that overruns takes money back out of the account the row usually fills
       const way = pays.includes(row.kind) ? 'pays' : incoming || takes.includes(row.kind) ? 'takes' : 'fills'
-      line.link = { to: [target.id], text: `${way === 'pays' ? 'Pays off' : way === 'takes' ? 'Comes from' : row.kind === 'pool-allocation' ? 'Fills' : 'Goes into'} ${target.label}` }
+      line.link = { to: [target.id], text: `${way === 'pays' ? 'Pays off' : way === 'takes' ? 'Comes from' : row.kind === 'pool-allocation' ? 'Fills' : lands ? 'Lands in' : 'Goes into'} ${target.label}` }
       ends.set(target, [...(ends.get(target) ?? []), { line, way }])
     }
   }

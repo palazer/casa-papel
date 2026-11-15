@@ -174,12 +174,12 @@ export const GUIDE: GuideTopic[] = [
     title: 'Virtual accounts',
     summary: 'Set money aside inside a savings account for one purpose and spend from it without touching the month\'s leftover.',
     what: [
-      'A virtual account lives inside a savings account. A transfer row fills it every month, and spending that "comes out of" it draws it down; the savings balance already includes it. In the demo, "To Travel" moves €200 a month into "Travel", held in "Savings", and "Weekend in Lisbon" takes €480 out of it in October.',
+      'A virtual account lives inside a savings account. A transfer row fills it every month, and spending that "comes out of" it draws it down; the savings balance already includes it. So "Already in it" is a part of what that account holds and adds no money: ask for more than the account has, and its "Not set aside" line goes below zero and says so. Money that is kept somewhere else is an account of its own. In the demo, "To Travel" moves €200 a month into "Travel", held in "Savings", and "Weekend in Lisbon" takes €480 out of it in October.',
       'It shows as "Virtual account · Travel" under Balances in the Grid, on a line of its own under its savings account on the Statement, and as "€… now" under Household. It never goes below zero: when an expense takes more than it holds, its line on the Statement says "short" and offers "Top up…". A virtual account that lost its row can be filled again from "Add row" under Transfers with "Fills a virtual account".',
     ],
     steps: [
       'Statement → "Assets" → "Add virtual account", or Household → "Virtual accounts" → "Add virtual account" (it needs a savings account: "Add a savings account first; virtual accounts live inside one.").',
-      'Fill "Name", "Held in", "Already in it (EUR)", "Set aside each month (EUR)"; keep "Also add a spending row "Gifts" that comes out of it" ticked, then "Save".',
+      'Fill "Name", "Held in", "Already in it (EUR)", "Set aside each month (EUR)"; keep "Also add a spending row "Gifts" that comes out of it" ticked, then "Save". Under "Already in it" the form says how much of the account is not set aside yet, and warns when you ask for more.',
       'The row "To Gifts" appears under Transfers; type what goes in each month.',
       'In any spending cell, "Comes out of" → "Virtual account: Gifts" draws from it.',
       'Read it under its savings account on the Statement, or as "Virtual account · Gifts" under Balances in the Grid; a "short" chip means an expense took more than it held, and "Top up…" fills the gap.',
@@ -276,12 +276,14 @@ export const GUIDE: GuideTopic[] = [
     what: [
       'Pocket money is a line per adult at the top of "From what is left" on the Statement: "Sam – Pocket", "Alex – Pocket". It is shared out of what the month leaves, so it is not counted among the expenses. Each line has its own amount or its own rule, so two adults can take different amounts, and nothing is set for the household as a whole. How much each adult puts into the household is what their income lines say.',
       'With two or more adults, the Statement ends with "Per person": "Income", "Own spending", "Pocket money" and "Leaves for the household" for each. A row counts for an adult when it belongs to them ("Belongs to…" in the row menu); rows for Robin, Biscuit, The car or The flat are the household\'s.',
+      'Pocket money is the adult\'s own, so the plan does not follow it once it is given. To follow it anyway, keep it in an account that is left out of net worth: such an account has a balance like any other, an expense can come out of it and a row under "From accounts" can take money from it into the month, but no total counts it, and net worth does not either. On the Statement it stands under its own heading with a crossed circle after its name and its figures in grey. A pocket money line can land in it.',
     ],
     steps: [
       'Statement → "Suggestions" → under "From what is left", type an amount beside "Sam – Pocket" and press Enter; or press "Add" with the field empty to be asked for a rule.',
       'To change it, press "Sam – Pocket" (or Grid → row menu → "Rule…"). "How the amount is set" offers "A fixed amount", "A percentage of income", "A percentage of Sam\'s income", "A percentage of one income" and "A percentage of what is left".',
       'A fixed amount is typed with "Repeats": "Every month" or "Only this month". For a percentage, "Counts from" is the month the rule starts in; earlier months keep what they showed.',
       'For a line of your own: "Add row" under Transfers → "Pocket money for an adult" → pick the "Adult".',
+      'To follow saved pocket money: add an account for it, "Savings" say, and tick "Leave out of net worth" under "More options". Then row menu of "Sam – Pocket" → "Lands in…" → that account: every month\'s pocket money raises its balance. Press its amount to type what it really holds once you have spent from it, and Statement → "From accounts" → "Add row" → "Taken from a savings account" brings money back into the month.',
       'Say whose a row is: row menu → "Belongs to…" → "This row is for". A percentage of Sam\'s income counts the income lines that belong to Sam.',
       'Read "Per person" under the Statement\'s two halves to see what each adult leaves for the household this month.',
     ],
@@ -353,7 +355,7 @@ export const GUIDE: GuideTopic[] = [
     summary: 'Every kind of money has one colour and every mark one meaning; the keyboard moves you around the grid.',
     what: [
       '"What the colours and marks mean" in the Statement and Grid toolbars is the legend. Kinds of money: "Income", "Expenses", "Transfers", "Balances and net worth", "Virtual accounts", "Goals". Marks: an estimate sits on a light yellow shade, certain is plain, done has a green dot; in the current month a red ring means nothing done yet and an amber half-dot partly done.',
-      'Spending shows as a red negative number when "Show expenses as negative red numbers" is on; an amber "+€…" is money drawn from savings this month; a dotted underline is a balance you entered yourself; a lock is a closed month; a faint band is one category\'s rows. On the Statement two chain rings mark a row and the account it fills, takes from or pays off: press them to go to the other end, which is marked for a moment. Faint, open rings on a loan or card mean no row pays it off yet; pressing them adds the row. Two arrows in a loop mark a row or an item that is on a schedule; in a month where it does not land the line is grey and says when it lands next and with how much, "next Jan 2027" say.',
+      'Spending shows as a red negative number when "Show expenses as negative red numbers" is on; an amber "+€…" is money drawn from savings this month; a dotted underline is a balance you entered yourself; a lock is a closed month; a faint band is one category\'s rows. A crossed circle after an account\'s name on the Statement means it is not in net worth: its figures are grey and no total counts it. On the Statement two chain rings mark a row and the account it fills, takes from or pays off: press them to go to the other end, which is marked for a moment. Faint, open rings on a loan or card mean no row pays it off yet; pressing them adds the row. Two arrows in a loop mark a row or an item that is on a schedule; in a month where it does not land the line is grey and says when it lands next and with how much, "next Jan 2027" say.',
       'In the grid the arrow keys move between cells, Enter or Space opens one, Escape closes the editor. Cmd/Ctrl+Z undoes and Shift redoes, like the two arrows at the left of every toolbar.',
     ],
     steps: [

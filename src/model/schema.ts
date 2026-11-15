@@ -8,7 +8,7 @@ import { FUNDED_BY_PATTERN, type FundedBy } from './fundedBy'
 z.config({ jitless: true })
 
 /** Bump when the shape of stored data changes; add a migration in migrations.ts. */
-export const SCHEMA_VERSION = 12
+export const SCHEMA_VERSION = 13
 
 // ---------- primitives ----------
 export const IdSchema = z.string().regex(ID_PATTERN, 'expected ULID')
@@ -115,6 +115,12 @@ export const AccountSchema = BaseRecord.extend({
   openingMonth: MonthKeySchema,
   /** Balance computed month by month by the engine. */
   tracked: z.boolean().default(false),
+  /**
+   * Left out of net worth: money that is a person's own, like saved pocket money. The account keeps its balance and
+   * can pay into the month, but no sum of what the household has counts it. Read it through `isOutsideNetWorth`:
+   * it only means something on an account that holds money.
+   */
+  outsideNetWorth: z.boolean().default(false),
   investment: InvestmentSettingsSchema.optional(),
   card: CardSettingsSchema.optional(),
   archivedMonth: MonthKeySchema.nullable().default(null),

@@ -45,6 +45,9 @@ const STEPS: Record<number, Step> = {
   // current accounts. Nothing to rewrite: its opening amount and its real balances are read as its own. The version
   // keeps an older app from counting it in the main account.
   11: (raw) => raw,
+  // 12 → 13: `Account.outsideNetWorth` (an account left out of net worth) and a pocket money row that lands in such
+  // an account. Both fill in from their defaults; the version keeps an older app from counting the account.
+  12: (raw) => raw,
 }
 
 export function migrateExport(raw: unknown): unknown {

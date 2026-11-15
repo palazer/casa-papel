@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Link2, Lock, Repeat } from 'lucide-react'
+import { CircleSlash, Link2, Lock, Repeat } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { HUES } from '@/app/hues'
@@ -65,6 +65,7 @@ export function MarksLegend({ neg }: { neg: boolean }) {
             <Mark sample={<span className="flex items-center gap-1 rounded bg-muted/60 px-1.5 py-0.5 text-muted-foreground"><Lock className="size-3" aria-hidden />Sept</span>}>A closed month: locked, all of it counts as done</Mark>
             <Mark sample={<span className={cn('block h-4 w-14 rounded-sm ring-1 ring-border', HUES.expense.band)} aria-hidden />}>A faint band: the rows of one category</Mark>
             <Mark sample={<Repeat className="size-3.5 text-muted-foreground" aria-hidden />}>On a schedule: it lands in its months by itself. In the months between, the line is grey and says when it lands next, and with how much</Mark>
+            <Mark sample={<CircleSlash className="size-3.5 text-muted-foreground" aria-hidden />}>Not in net worth, on the Statement: an account that is a person's own. Its figures are grey, and no total counts it</Mark>
             <Mark sample={<Link2 className="size-3.5 text-muted-foreground" aria-hidden />}>Linked, on the Statement: a row and the account it fills, takes from or pays off. Press it to go to the other end; faint and open, no row pays that loan or card off yet</Mark>
           </ul>
         </section>

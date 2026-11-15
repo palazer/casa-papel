@@ -1,7 +1,7 @@
 import { generateKeyBetween } from 'fractional-indexing'
 import { computeEngine, cellKey, sortRows, type EngineOutput } from '@/engine'
 import {
-  ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RowSchema, accountIdOf, addMonths, canCarryRule, canTakeRest, cardIsItemized, compareMonths, isOldPocketShare, isShareRule, monthKey, monthOfDate, monthRange, newId, parseMonth, paysExpenses, poolIdOf, resolveRules, sharePercent,
+  ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RowSchema, accountIdOf, addMonths, canCarryRule, canTakeRest, cardIsItemized, compareMonths, isOldPocketShare, isOutsideNetWorth, isShareRule, monthKey, monthOfDate, monthRange, newId, parseMonth, paysExpenses, poolIdOf, resolveRules, sharePercent,
   type Account, type Category, type Cell, type CellInput, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Pool, type Row, type RowKind, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
@@ -776,5 +776,10 @@ function checkAccountForRow(tables: Tables, row: Pick<Row, 'kind' | 'name'>, acc
   if (!acc) throw new Error('That account no longer exists.')
   if (acc.archivedMonth) throw new Error(`"${acc.name}" is archived.`)
   if (need && acc.type !== need) throw new Error(`"${row.name}" needs an account of type ${label(need)}, and "${acc.name}" is of type ${label(acc.type)}.`)
+  // pocket money is the adult's own: it lands only in an account that net worth leaves out, and one with a balance
+  if (row.kind === 'pocket-money') {
+    if (!isOutsideNetWorth(acc)) throw new Error(`Pocket money can only land in an account that is left out of net worth. Tick "Leave out of net worth" in the form of "${acc.name}" first.`)
+    if (!acc.tracked && acc.type !== 'cash') throw new Error(`"${acc.name}" has no balance of its own for the pocket money to land in. Tick "Track the balance" in its form first.`)
+  }
   return acc
 }

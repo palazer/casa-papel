@@ -1,4 +1,4 @@
-import type { Account } from './schema'
+import type { Account, Row } from './schema'
 
 /**
  * Which part of the Statement's lower half an account belongs to: the current accounts are one calculated line, the
@@ -32,4 +32,21 @@ export function accountGroup(account: Pick<Account, 'type'>): AccountGroup {
 export function paysExpenses(account: Pick<Account, 'type'>): boolean {
   const group = accountGroup(account)
   return group === 'savings' || group === 'investment' || group === 'other'
+}
+
+/**
+ * Whether net worth leaves the account out ("Leave out of net worth" in its form): money that is a person's own. Only
+ * an account that holds money with a balance of its own can be left out; the current accounts are the month's own
+ * money, and a debt is owed whoever it is counted for. A record stored before the setting existed has none.
+ */
+export function isOutsideNetWorth(account: Pick<Account, 'type' | 'outsideNetWorth'>): boolean {
+  return (account.outsideNetWorth ?? false) && paysExpenses(account)
+}
+
+/**
+ * Whether a pocket money row's amount lands in the account it names ("Lands in"). Pocket money is the adult's own, so
+ * it lands only where net worth does not count it; any other account a pocket money row names is for the overview.
+ */
+export function pocketLandsIn(row: Pick<Row, 'kind' | 'accountId'>, account: Pick<Account, 'id' | 'type' | 'outsideNetWorth'> | undefined): boolean {
+  return row.kind === 'pocket-money' && !!account && row.accountId === account.id && isOutsideNetWorth(account)
 }

@@ -2,7 +2,7 @@ import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing'
 import { buildDefaultCategoryMutations } from './categoryActions'
 import {
   AccountMonthSchema, AccountSchema, CellSchema, EntitySchema, HouseholdSchema, PoolSchema, RowSchema,
-  ENTITY_TEMPLATES, HOUSEHOLD_TEMPLATES, monthOfDate, newId, poolRef, poolRowName, templateTitle,
+  ENTITY_TEMPLATES, HOUSEHOLD_TEMPLATES, isOutsideNetWorth, monthOfDate, newId, pocketLandsIn, poolRef, poolRowName, templateTitle,
   type Account, type Entity, type EntityKind, type Household, type MonthKey, type Pool, type Row, type RowTemplate, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
@@ -128,7 +128,15 @@ export async function updateAccount(store: Store, id: string, patch: Partial<Omi
   const tables = await loadTables(store)
   const a = tables.accounts.find((x) => x.id === id)
   if (!a) throw new Error('Not found')
-  await store.commit([{ op: 'put', table: 'accounts', record: AccountSchema.parse({ ...a, ...patch, updatedAt: now() }) }])
+  const next = AccountSchema.parse({ ...a, ...patch, updatedAt: now() })
+  // pocket money lands only where net worth does not count it: while a row lands here the account stays left out
+  if (isOutsideNetWorth(a) && !isOutsideNetWorth(next)) {
+    const landing = tables.rows.filter((r) => !r.deletedAt && !r.archivedMonth && pocketLandsIn(r, a))
+    if (landing.length) {
+      throw new Error(`${landing.map((r) => `"${r.name}"`).join(', ')} ${landing.length === 1 ? 'lands' : 'land'} in "${a.name}", and pocket money can only land in an account that is left out of net worth. Change "Lands in…" in the row's menu first.`)
+    }
+  }
+  await store.commit([{ op: 'put', table: 'accounts', record: next }])
 }
 
 /** Record (or clear with null) the real balance of an account at the end of a month. */
