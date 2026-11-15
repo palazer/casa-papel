@@ -14,10 +14,10 @@ Three kinds of rule stand here:
 
 Amounts are kept in cents. Nothing is rounded except where a rule says so.
 
-Covered so far (first delivery): amounts over the months, balances from month to month, real balances, net worth,
-the months of the plan, other currencies, the past. Still to come: the month's sums, rules and the rest, virtual
-accounts, cards and loans, accounts left out of net worth and pocket money, schedules, people and goals, the data
-round trip.
+The rules are grouped by letter: A amounts over the months, B balances, N net worth, P the months of the plan,
+X other currencies, T the past, M the sums of a month, R rules, C loans and cards, V virtual accounts, O accounts
+left out of net worth and pocket money, H schedules, K archiving, G people and goals, E the data. F and D are not
+rules: they number the findings and the open decisions in `scenarios/FINDINGS.md`.
 
 ## A. An amount over the months
 
@@ -233,6 +233,157 @@ unless a real balance stands in between (B5).
 > "Cancel" and "Save anyway". Where a setting can have a date (the growth of an investment), it also offers "only
 > from the current month on". A change in the current month or later is saved without a question. The app never
 > changes the past by itself.
+
+## M. The sums of a month
+
+**M1. What comes in is what goes out plus what is left.**
+
+    what is left = income − expenses paid from the month − what goes to savings, investments, virtual accounts,
+                   pocket money and loans
+
+Both sides of the Statement's upper half show the same total. "Leftover" is what stays in the current accounts.
+
+> Income 3,000.00, rent 1,200.00, groceries 450.00: 1,350.00 is left. With 500.00 to savings: 1,300.00 is left, and
+> "From what is left" shows 1,800.00.
+
+**M2. Money taken out of an account by hand comes in, and is not income.** It stands under "From accounts". A
+percentage of the income (R2) does not count it. Net worth does not change: the account falls, the month has more.
+
+**M3. What is deducted from an income lowers what it brings home.** The deduction (a tax, a contribution) is an
+expense row of its own, and the income still shows in full. What the income "brings home" is the income minus its
+deductions: that is what a percentage of the income and each person's income count.
+
+> Salary 3,000.00, tax 600.00 deducted from it: income 3,000.00, brought home 2,400.00, and 10 % of the income is
+> 240.00.
+
+**M4. A row that follows another shows that row's amount times its share, every month.**
+
+**M5. A category with an estimate counts the estimate, or its rows when they come to more.**
+
+    not broken down yet = estimate − the category's rows, never below zero
+
+> "Home" is estimated at 1,500.00 and holds rent of 1,200.00: the category counts 1,500.00. Estimated at 1,000.00,
+> it counts 1,200.00.
+
+**M6. An expense that comes out of an account is spending, and leaves the month's income alone.** It counts under
+"Expenses", and the same amount stands under "From accounts". The account falls by it (B2), and net worth with it.
+
+## R. Rules: how much goes where
+
+The transfer to a savings account, an investment account or a virtual account, and an adult's pocket money, each
+follow one rule.
+
+**R1. A typed amount.** It carries from month to month like any amount (A2).
+
+**R2. A percentage of the income.** Of what the month's income brings home (M3), rounded to the cent.
+
+> 10 % of 3,333.33 is 333.33.
+
+**R3. A percentage of what is left.** What is left for these percentages is the income minus the expenses, the typed
+amounts and the percentages of income (and minus what is kept in the current account, R5); never below zero.
+
+> Income 3,000.00, rent 1,200.00, 10 % of the income to the index fund (300.00): 1,500.00 is left, and 50 % of it is
+> 750.00. In a month that overruns, nothing is left to take a percentage of.
+
+**R4. The rest.** One account takes whatever is left after everything else. In a month that overruns, the
+difference comes back out of it. Giving the rest to another account takes it from the first.
+
+**R5. What the household keeps in the current account every month comes off the rest.** It counts only while an
+account takes the rest.
+
+**R6. An amount typed into a month counts instead of the rule, for that month.** A rule starts in a month: the months
+before it keep what they showed.
+
+The order within a month: percentages of the income, what is kept, percentages of what is left, the rest.
+
+## C. Loans and credit cards
+
+**C1. A payment brings a loan down, and counts as an expense of the month.**
+
+    owed at the end = owed at the start − paid
+
+Net worth does not change: the current accounts and the debt fall by the same amount. The plan works out no
+interest: a real balance says what is really owed (B5). Finding F4 belongs here.
+
+**C2. A card whose purchases are expense rows.** A purchase is an expense of its month and raises what is owed. The
+cash stays in the current accounts until the card is paid. The payment moves money and is no expense: the current
+accounts and what is owed fall by it.
+
+**C3. A card that records only its payments.** The payment is the month's expense. Finding F5 belongs here: what the
+payment does to what is owed, and to net worth.
+
+## V. Virtual accounts
+
+**V1. A virtual account is a part of its savings account.** What is set aside goes from the month into the savings
+account and is marked as the virtual account's.
+
+    virtual account at the end = at the start + set aside − paid out
+    not set aside              = the savings account's balance − its virtual accounts
+
+Net worth counts the savings account once.
+
+**V2. An expense that comes out of a virtual account lowers it and its savings account** (M6).
+
+**V3. A virtual account is never below zero.** Asked for more than it holds, it stops at nothing; what is missing
+comes out of the part of its savings account that is not set aside. Finding F6 belongs here.
+
+**V4. A top-up.** From its savings account, money moves inside the account: the month takes it in and sets it aside
+again, and what is left does not change. From the month's income, less is left.
+
+## O. Accounts left out of net worth, and pocket money
+
+**O1. An account left out of net worth keeps its balance, and no sum counts it.**
+
+**O2. Pocket money leaves the household's net worth.** It is the part "pocket money" in N2.
+
+**O3. Pocket money can land in an account that is left out of net worth, and only there.** Such an account cannot be
+counted again while pocket money lands in it.
+
+**O4. An expense paid out of an account that is left out costs the household's net worth nothing.** It is spending
+of the month (M6); the part "accounts left out of net worth" in N2 is the same amount the other way.
+
+**O5. Pocket money can be a percentage of what its adult brings home** (M3).
+
+## H. Schedules
+
+**H1. A row on a schedule gets its amount in the months the schedule lands in.** The months between are empty: a
+scheduled row does not carry its amount forward (A2 does not apply to it).
+
+> 300.00 every 3 months from February: February, May, August and November show 300.00, the other months nothing.
+
+**H2. A row's first schedule keeps the amounts of the months before it.** They are written down, so they stay.
+
+**H3. A scheduled amount can be changed for one month, or for that month and the following ones.**
+
+**H4. A schedule that is stopped lands for the last time in that month.**
+
+**H5. A new year of the plan gets the schedule's amounts**, whether the calendar or "Add a year" brought it.
+
+**H6. Items that repeat and items that do not can share a month.** The month shows their sum.
+
+## K. Archiving and restoring
+
+**K1. Something archived stops in a month and keeps its past.** An archived row shows nothing from that month on.
+An archived account leaves net worth with what it held: the part "accounts starting or ending" in N2.
+
+**K2. Restoring brings the thing back as it was.**
+
+**K3. Restoring also brings back what archiving changed with it.** The app does not do this today: finding F7.
+
+## G. People and goals
+
+**G1. Each adult brings home their own income, less what is deducted from it** (M3).
+
+**G2. A goal is reached in the first month the plan meets its amount.** A goal the plan does not reach says so.
+
+## E. The data
+
+**E1. A file carries everything.** An empty app that imports it shows the same figures (check 9).
+
+**E2. Merging the same file again changes nothing.**
+
+**E3. Merging an older file brings nothing old back.** The newer change wins. Finding F9 is the one case where it
+does not.
 
 ## The checks that always hold
 

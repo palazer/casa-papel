@@ -7,6 +7,18 @@ fixed on the side: you decide each one, and a fix is its own step.
 To close a finding: write the decision under it, change the app or the rule, and take `@open` off its scenario. The
 run fails the day an `@open` scenario passes, so a finding cannot stay listed by mistake.
 
+| | Finding | Weighs | Recommendation |
+| --- | --- | --- | --- |
+| F1 | An exception in the plan's last month lengthens the plan by a year | small | with step 3 |
+| F2 | Money "moved between your accounts" lowers net worth | net worth is wrong | the row names the account that receives it |
+| F3 | The month after an exception holds an amount nobody typed | amounts can change by surprise | with step 3 |
+| F4 | A loan that is paid off keeps taking payments | net worth is right, the debt reads below zero | the payment stops at what is owed |
+| F5 | A card that records only its payments never lowers net worth | net worth is wrong | payments do not move what is owed |
+| F6 | The Statement's change for a virtual account that ran short | one figure on the Statement | show the change of the balance |
+| F7 | Restoring does not bring back what archiving changed with it | amounts stay changed | restore puts it back |
+| F8 | Undo of a schedule added from the list empties the row's months | amounts are lost | save the schedule and its months as one step |
+| F9 | Merging an older file brings back what was taken back | an undone change returns | the merge respects what this app removed |
+
 ## Open findings
 
 ### F1. An exception in the plan's last month lengthens the plan by a year
@@ -59,6 +71,102 @@ run fails the day an `@open` scenario passes, so a finding cannot stay listed by
 - **Recommendation.** (a).
 - **Decision.**
 
+### F4. A loan that is paid off keeps taking payments
+
+- **What the app does.** A loan of 600.00 with a payment of 250.00 a month owes 100.00 after February, −150.00 after
+  March and −2,400.00 after December. The payment row runs on, and the debt reads as money the household has.
+- **What still holds.** Net worth is right in total: the current accounts are lower by exactly what the "debt" is
+  below zero. What is wrong is where the money shows, and that the month's expenses include a payment nobody makes.
+- **What the rule says.** A debt is paid down to nothing, not below (rule C1).
+- **Scenario.** `09-loans-and-cards.feature`: "A loan that is paid off owes nothing, and not less than nothing".
+- **Options.** (a) The payment stops at what is owed: the last payment is what is left of the debt, and the months
+  after it show no payment. (b) The payment stays as typed and the app warns in the month the loan is paid off.
+  (c) Leave it.
+- **Recommendation.** (a).
+- **Decision.**
+
+### F5. A card that records only its payments never lowers net worth
+
+- **What the app does.** For such a card the payment is the month's expense, and the Statement shows it under
+  "Expenses": that part is right. But every payment also brings down what is owed, and nothing ever raises it,
+  because purchases are not recorded. A card that owed 500.00 and is paid 300.00 a month owes −3,100.00 after a
+  year. And since the current accounts and the "debt" fall together, the spending never reaches net worth: it is
+  300.00 a month too high.
+- **What the rule says.** What is spent lowers net worth (rule N2), and a debt is not below zero (rule C3).
+- **Scenarios.** `09-loans-and-cards.feature`: "What is spent through a card that records only its payments lowers
+  net worth", "What is owed on a card that records only its payments does not fall below zero".
+- **Options.** (a) A payment to such a card does not move what is owed: it pays for what was bought since the last
+  payment. What is owed stays as it is until a real balance says otherwise, and net worth falls by the payment.
+  (b) Leave it, and rely on real balances to correct the card.
+- **Recommendation.** (a).
+- **Decision.**
+
+### F6. The Statement's change for a virtual account that ran short
+
+- **What the app does.** A virtual account holds 200.00 and is asked for 500.00. It ends with nothing, and the
+  missing 300.00 comes out of the rest of its savings account: all of that is right (rule V3). But its line on the
+  Statement says it changed by −500.00, and "Not set aside" under the same account is off by 300.00 the other way.
+  The two cancel, so every sum above them is right.
+- **What the rule says.** A line's change is what its balance changed by (check "carried").
+- **Scenario.** `10-virtual-accounts.feature`: "A virtual account that is asked for more than it holds stops at
+  nothing". Its steps pass; it fails at the check.
+- **Options.** (a) Show the change of the balance (−200.00), and the 300.00 on "Not set aside". (b) Leave it.
+- **Recommendation.** (a).
+- **Decision.**
+
+### F7. Restoring does not bring back what archiving changed with it
+
+- **What the app does.** Archiving something also settles what depended on it. Restoring puts only the thing itself
+  back:
+  - A row on a schedule: archiving ends its schedule. After restoring, the row is there and empty from the archive
+    month on.
+  - A virtual account: archiving also archives its "To …" row. After restoring, nothing is set aside any more.
+  - An account that an expense came out of: archiving makes that expense come out of the month's income. After
+    restoring, it still does.
+- **What still works.** A plain row, and an account that took the rest of the month, come back exactly as they were.
+- **What the rule says.** Restoring brings back what archiving changed with it (rule K3).
+- **Scenarios.** `13-archive-and-restore.feature`: "A restored row gets its schedule back", "A restored virtual
+  account is filled again", "A restored account pays again what came out of it".
+- **Options.** (a) Archiving remembers what it changed, and restoring puts it back. (b) Restoring stays as it is,
+  and its dialog lists what does not come back. (c) Leave it.
+- **Recommendation.** (a).
+- **Decision.**
+
+### F8. Undo of a schedule added from the list empties the row's months
+
+- **What the app does.** "Rent" is 1,200.00 a month. In the list of schedules, "Add schedule…" puts 1,300.00 a month
+  on it from March. Undo: "Rent" shows nothing from March on, where it should show 1,200.00 again.
+- **Why.** Adding the schedule is the step that undo takes back. Putting its amounts into the months is done by the
+  app right after, and is not part of that step. After the undo the app empties the months it had filled, and an
+  emptied month does not follow the month before any more.
+- **What still works.** The same schedule made in the row's own dialog ("Repeats") is undone correctly: there the
+  months are part of the step.
+- **What the rule says.** Undo gives back the figures from before the last action (check "undo").
+- **Scenario.** `12-schedules.feature`: "Taking back a schedule that was added from the list of schedules restores
+  the row".
+- **Options.** (a) "Add schedule…" in the list saves the schedule and its months as one step, as the row's dialog
+  does. (b) Take "Add schedule…" out of the list: schedules are made in the row's dialog. (c) Leave it.
+- **Recommendation.** (a); (b) if the list is no longer where you make schedules.
+- **Decision.**
+
+### F9. Merging an older file brings back what was taken back
+
+- **What the app does.** Type 1,300.00 for "Rent" in March, export a file, undo. "Rent" is 1,200.00 again. Merge the
+  file: "Rent" is 1,300.00 in March.
+- **Why.** Undo of something new removes it. The merge keeps the newer of two versions, but for something this app
+  no longer holds it has nothing to compare with, and takes the file's. It does not look at its own record of having
+  removed it.
+- **What still works.** An amount that was changed (not newly typed) and then merged with an older file keeps the
+  newer amount. Merging the same file twice changes nothing.
+- **Where else this may matter.** The same merge brings in the cloud copy of a household that syncs. This review did
+  not try it there.
+- **What the rule says.** Merging an older file brings nothing old back (rule E3).
+- **Scenario.** `14-people-goals-data.feature`: "Merging an older file does not bring back what was taken back".
+- **Options.** (a) The merge respects what this app removed: something removed here after the incoming version was
+  written stays removed. (b) Leave it.
+- **Recommendation.** (a), and then a scenario with two devices for the cloud copy.
+- **Decision.**
+
 ## Decided, not built yet
 
 These are rule changes you decided in November 2026. Their scenarios are tagged `@planned`; the run lists each one
@@ -80,7 +188,7 @@ Cases where no rule is decided yet. A scenario tagged `@parked` shows what the a
 has something to change.
 
 - **D1. A virtual account inside a savings account in another currency.** The virtual account is kept in the
-  household's currency while its account is not. No scenario yet (virtual accounts come with the second delivery).
+  household's currency while its account is not. No scenario yet.
 - **D2. A current account in another currency.** The plan knows the current accounts only together, in the
   household's currency. Today its opening amount is converted once, when it opens, and a later rate does not move
   it; a real balance is converted at its own month's rate, and the difference shows as "not in the plan".
@@ -92,8 +200,8 @@ has something to change.
 
 ## Looked at and found sound
 
-What the first delivery ran and found no fault with. Every scenario also ran the nine checks after each of its steps
-(the list is at the end of `docs/calculations.md`), and none of them failed.
+What ran without a fault. Every scenario also ran the nine checks after each of its steps (the list is at the end of
+`docs/calculations.md`); apart from the findings above, none of them failed.
 
 - An amount over the months: typed, carried, an exception, an exception typed twice, two in a row, zero, a negative
   amount, clearing, items, undo.
@@ -101,21 +209,34 @@ What the first delivery ran and found no fault with. Every scenario also ran the
   from a later month, and in a month that overruns), an investment's growth with and without deposits, an account
   that opens later.
 - Real balances: above and below the plan, at the start and at the end of a month, cleared, of the current account,
-  of an investment, in another currency, with two current accounts, taken back, exported and imported.
+  of an investment, of a loan, in another currency, with two current accounts, taken back, exported and imported.
 - The plan: its last month through the year, "Add a year" once and twice and from October on, the calendar moving
   into a new month and into a new plan year.
 - Rates: an amount at its month's rate, rounding, a month without a rate, the months after the last known rate, a
   rate you set and remove, an account in another currency, money moved into one, two other currencies.
-- Net worth: its change is explained to the cent in every month of every scenario, apart from F2.
+- The month's sums: income, expenses and what is left, money taken out of an account by hand, deductions, a row that
+  follows another, a category's estimate under and over its rows, an expense straight out of savings.
+- Rules: a typed amount, a percentage of the income and its rounding, a percentage of what is left, the rest, the
+  rest moving to another account, what is kept in the current account, a typed month beside a rule, a rule that
+  starts later.
+- Loans and cards: a loan paid down, a card whose purchases are expense rows, its payment.
+- Virtual accounts: setting aside, spending from one, a top-up from the account and from the income, a percentage
+  of the income.
+- Accounts left out of net worth and pocket money: leaving out and counting again, pocket money, where it lands and
+  where it may not, an expense out of an account that is left out, a percentage of an adult's own income.
+- Schedules: every three months, once a year, on a row that carried an amount, changed for one month and from a
+  month on, stopped, in a new plan year, beside a one-off item, undone when made in the row's dialog.
+- Archiving: a row, an account, a plain row and an account that takes the rest restored.
+- People, goals and data: what each adult brings home, a goal reached and not reached, export and import of a
+  household with a virtual account, a schedule, a real balance and a rule, merging the same file, merging an older
+  one.
+- Net worth: its change is explained to the cent in every month of every scenario; a transfer to an account that is
+  only named shows as "money without an account".
 
-## Still to look at
+## Not looked at yet
 
-The second delivery covers the month's sums, rules and the rest, virtual accounts, cards and loans, accounts left out
-of net worth and pocket money, schedules, people and goals, and the data round trip. The research pointed at these,
-which are not proven yet:
-
-- A card that records only its payments falls with each payment and never rises.
-- Restoring something archived does not bring back what archiving changed.
-- Undoing a schedule added from the list may leave later months at 0.
-- A virtual account that was short: the Statement's change for it may not match its balances.
-- The demo household is fixed to autumn 2026 and ages with the calendar.
+- D1 and D3 have no scenario.
+- The demo household is fixed to autumn 2026 and ages with the calendar (the browser tests now run on a fixed day,
+  so they no longer depend on it).
+- Sync between two devices (see F9).
+- Whole stories in the browser.

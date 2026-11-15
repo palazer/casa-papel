@@ -35,6 +35,7 @@ Feature: The runner
     Then "Mortgage" is 1,200.00 in March 2026
 
   Scenario: a refusal nobody expected
+    Given a savings account "Savings" holding 0.00
     When "Savings" takes the rest of the month from January 2025
     Then "Rent" is 1,200.00 in March 2026
 
@@ -107,7 +108,7 @@ describe('the scenario runner', () => {
   it('fails when the app refuses an action, unless the next step expects it', async () => {
     const v = await verdictOf('a refusal nobody expected')
     expect(v.outcome).toBe('fail')
-    expect(v.note).toContain('There is no account called "Savings"')
+    expect(v.note).toContain('the app refused it: The household starts in 2026-01; a rule cannot start before that.')
     expect(await verdictOf('a refusal that is expected')).toMatchObject({ outcome: 'pass' })
   })
 

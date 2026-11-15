@@ -34,7 +34,8 @@ export function expectSums(s: Statement, m: MonthKey = s.month): void {
     // a row's children are its items, in the row's own currency
     if (l.children.length === 0 || l.kind === 'row') continue
     expect(l.amount, `${m} ${l.label}`).toBe(l.children.reduce((a, c) => (c.memo ? a : a + c.amount), 0))
-    if (l.change != null && l.kind !== 'account') expect(l.change, `${m} ${l.label} change`).toBe(l.children.reduce((a, c) => a + (c.change ?? 0), 0))
+    // a line that is shown for the record (an account left out of net worth) is in no sum: neither its amount nor its change
+    if (l.change != null && l.kind !== 'account') expect(l.change, `${m} ${l.label} change`).toBe(l.children.reduce((a, c) => (c.memo ? a : a + (c.change ?? 0)), 0))
   }
 }
 

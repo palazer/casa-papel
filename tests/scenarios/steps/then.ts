@@ -1,5 +1,5 @@
 import { expect } from 'vitest'
-import { buildFxIndex, cellKey, rateFor } from '@/engine'
+import { buildFxIndex, cellKey, computeGoals, notSetAside, rateFor } from '@/engine'
 import type { MonthKey } from '@/model'
 import { monthRange } from '@/model'
 import { all } from '../../engine/sound'
@@ -141,4 +141,53 @@ step('the rate for {pair} in {month} is {rate}', async (world: World, pair: stri
   const [from, to] = pair.split('/')
   const got = rateFor(fx, from, to, month)
   expect(got == null ? 'no rate' : got.toFixed(4), `${pair} in ${monthName(month)}`).toBe(rate.toFixed(4))
+})
+
+// ---------- virtual accounts, per person, warnings, goals ----------
+
+step('the virtual account {string} holds {money} at the end of {month}', async (world: World, name: string, amount: number, month: string) => {
+  const pool = await world.pool(name)
+  const r = (await world.view()).engine.pools[pool.id]?.months[month]
+  if (!r) throw new ScenarioError(`"${name}" has no balance in ${monthName(month)}.`)
+  same(r.balance, amount, `the virtual account "${name}" at the end of ${monthName(month)}`)
+})
+
+step('the virtual account {string} is short by {money} in {month}', async (world: World, name: string, amount: number, month: string) => {
+  const pool = await world.pool(name)
+  same((await world.view()).engine.pools[pool.id]?.months[month]?.short ?? NaN, amount, `what "${name}" was short of in ${monthName(month)}`)
+})
+
+// what the account holds that no virtual account has set aside ("Not set aside")
+step('{string} has {money} not set aside at the end of {month}', async (world: World, name: string, amount: number, month: string) => {
+  const acc = await world.account(name)
+  const { tables, engine } = await world.view()
+  same(notSetAside(tables, engine, acc.id, month) ?? NaN, amount, `what is not set aside in "${name}" at the end of ${monthName(month)}`)
+})
+
+// take-home income of one person: income that belongs to them, less what is deducted from it
+step('{string} brings home {money} in {month}', async (world: World, name: string, amount: number, month: string) => {
+  const entity = await world.entity(name)
+  same((await world.view()).engine.totals[month]?.takeHomeBy[entity.id] ?? 0, amount, `what ${name} brings home in ${monthName(month)}`)
+})
+
+step('the app warns {string}', async (world: World, text: string) => {
+  expect((await world.view()).engine.warnings.join(' | '), 'the warnings').toContain(text)
+})
+
+step('the app warns about nothing', async (world: World) => {
+  expect((await world.view()).engine.warnings, 'the warnings').toEqual([])
+})
+
+step('the goal {string} is reached in {month}', async (world: World, name: string, month: string) => {
+  const { tables, engine } = await world.view()
+  const goal = computeGoals(tables, engine, world.thisMonth).find((g) => g.goal.name === name)
+  if (!goal) throw new ScenarioError(`There is no goal called "${name}".`)
+  expect(goal.reachedMonth ? monthName(goal.reachedMonth) : `not reached (${goal.status})`, `when "${name}" is reached`).toBe(monthName(month))
+})
+
+step('the goal {string} is not reached in the plan', async (world: World, name: string) => {
+  const { tables, engine } = await world.view()
+  const goal = computeGoals(tables, engine, world.thisMonth).find((g) => g.goal.name === name)
+  if (!goal) throw new ScenarioError(`There is no goal called "${name}".`)
+  expect(goal.reachedMonth ? monthName(goal.reachedMonth) : 'not reached', `when "${name}" is reached`).toBe('not reached')
 })

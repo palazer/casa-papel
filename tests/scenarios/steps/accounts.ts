@@ -1,4 +1,4 @@
-import { addAccount, setMonthBalances, setRule, updateAccount } from '@/store'
+import { addAccount, setMonthBalances, updateAccount } from '@/store'
 import type { Account, MonthKey } from '@/model'
 import { step } from '../registry'
 import { ScenarioError, type World } from '../world'
@@ -18,6 +18,11 @@ step('a savings account {string} holding {money}, opened in {month}', (world: Wo
 step('a savings account {string} in {ccy} holding {money}', (world: World, name: string, currency: string, holding: number) => account(world, 'savings', name, holding, { currency }))
 
 const grows = (annualRate: number): Pick<Account, 'investment'> => ({ investment: { projectionMode: 'fixed-rate', annualRate, depositTiming: 'start', depositFxMode: 'monthly-rate', fixedRate: null } })
+step('a cash account {string} holding {money}', (world: World, name: string, holding: number) => account(world, 'cash', name, holding))
+step('an other asset {string} worth {money}', (world: World, name: string, holding: number) => account(world, 'other-asset', name, holding))
+// "Only name it": the account has no balance in the plan
+step('a savings account {string} that is only named', (world: World, name: string) => account(world, 'savings', name, 0, { tracked: false }))
+
 step('an investment account {string} holding {money}', (world: World, name: string, holding: number) => account(world, 'investment', name, holding))
 step('an investment account {string} holding {money} that grows {percent} a year', (world: World, name: string, holding: number, rate: number) => account(world, 'investment', name, holding, grows(rate)))
 step('an investment account {string} in {ccy} holding {money}', (world: World, name: string, currency: string, holding: number) => account(world, 'investment', name, holding, { currency }))
@@ -28,11 +33,6 @@ step('I change the yearly growth of {string} to {percent}', async (world: World,
   const acc = await world.account(name)
   if (acc.type !== 'investment') throw new ScenarioError(`"${name}" is not an investment account.`)
   await updateAccount(world.store, acc.id, { investment: { ...grows(rate).investment!, ...acc.investment, annualRate: rate } })
-})
-
-// the rule dialog: "The rest of the month", counting from a month
-step('{string} takes the rest of the month from {month}', async (world: World, name: string, from: string) => {
-  await setRule(world.store, { accountId: (await world.account(name)).id }, { kind: 'rest' }, from)
 })
 
 // ---------- real balances: "Balances for <Month>…" ----------

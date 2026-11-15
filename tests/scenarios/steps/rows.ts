@@ -35,3 +35,14 @@ step('a transfer {string} of {money} to {string} from {month}', async (world: Wo
   const row = await addRowOfKind(world.store, { section: 'transfer', name, categoryId: null, kind, accountId: account.id })
   await setCellValue(world.store, row.id, from, amount, 'from-now-on')
 })
+
+// "Takes money out of a savings account" or "… an investment account": money into the month by hand, for one month
+step('I take {money} out of {string} in {month}', async (world: World, amount: number, accountName: string, month: string) => {
+  const account = await world.account(accountName)
+  const kind = account.type === 'savings' ? 'from-savings' : account.type === 'investment' ? 'from-investment' : null
+  if (!kind) throw new ScenarioError(`Money is taken by hand out of a savings or an investment account; "${accountName}" is neither.`)
+  const { tables } = await world.view()
+  const row = tables.rows.find((r) => !r.deletedAt && r.kind === kind && r.accountId === account.id)
+    ?? await addRowOfKind(world.store, { section: 'transfer', name: '', categoryId: null, kind, accountId: account.id })
+  await setCellValue(world.store, row.id, month, amount, 'this-month')
+})

@@ -38,6 +38,8 @@ export class World {
   /** How many undoable saves the step that is running has made so far. */
   commits = 0
   private stores: Store[] = []
+  /** Counts what was written past the store's own saves (a merged file): see `touch`. */
+  private touched = 0
   private cache = new Map<Store, { key: string; view: View }>()
 
   constructor() {
@@ -64,7 +66,12 @@ export class World {
 
   /** What the app's state is, to tell whether a step changed anything: what is stored, and the date. */
   get stamp(): string {
-    return `${this.stores.indexOf(this.store)}|${this.store.getVersion()}|${this.day}`
+    return `${this.stores.indexOf(this.store)}|${this.store.getVersion()}|${this.touched}|${this.day}`
+  }
+
+  /** Say that the stored data changed without a save of the store: merging a file writes straight into the database. */
+  touch(): void {
+    this.touched += 1
   }
 
   /** Give the scenario its day. Only the date is replaced (and it stands still); timers stay real for the database. */
@@ -85,7 +92,7 @@ export class World {
 
   /** What the app shows; of another store when one is given (the empty app an export was imported into). */
   async view(store: Store = this.store): Promise<View> {
-    const key = `${store.getVersion()}|${this.today}`
+    const key = `${store.getVersion()}|${this.touched}|${this.today}`
     const cached = this.cache.get(store)
     if (cached?.key === key) return cached.view
     const tables = await loadTables(store)
