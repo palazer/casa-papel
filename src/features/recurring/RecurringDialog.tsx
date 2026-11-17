@@ -11,7 +11,7 @@ import { amountToInput, parseAmount, unreadableAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import { sortRows } from '@/engine'
 import type { Household, MonthKey, RecurringItem, Row, Section, Tables } from '@/model'
-import { addRecurringItem, addRow, updateRecurringItem, type RecurringInput } from '@/store'
+import { addRecurringItem, updateRecurringItem, type RecurringInput } from '@/store'
 import { fundingOptions } from '@/features/grid/funding'
 
 const MONTH_NAMES = Array.from({ length: 12 }, (_, i) => new Intl.DateTimeFormat('en', { month: 'short' }).format(new Date(2026, i, 1)))
@@ -63,20 +63,17 @@ export function RecurringDialog({ tables, household, item, defaultMonth, onClose
     setBusy(true)
     setError(null)
     try {
-      let targetRow = rowId
-      if (rowId === '__new__') {
-        const r = await addRow(store, { name: newRowName.trim(), section: newRowSection, defaultStatus: 'committed' })
-        targetRow = r.id
-      }
+      // a row made here is saved with the schedule and its months, as one step: one undo takes back the whole form
+      const newRow = rowId === '__new__' ? { name: newRowName.trim(), section: newRowSection, defaultStatus: 'committed' as const } : undefined
       const base: Partial<RecurringInput> = {
-        name: name.trim(), rowId: targetRow, amount: minor, currency: null,
+        name: name.trim(), rowId, amount: minor, currency: null,
         cadence: cadence === 'months' ? null : { intervalMonths: Number(cadence) as 1 | 2 | 3 | 6 | 12, anchorMonth: cadence === '1' ? 1 : anchor },
         dueMonths: cadence === 'months' ? [...dueMonths] : null,
         accountId: accountId || null, scope, fundedBy: section === 'expense' ? (fundedBy as RecurringInput['fundedBy']) : 'cash',
         startMonth, endMonth: endMonth || null, notes,
       }
-      if (item) await updateRecurringItem(store, item.id, base)
-      else await addRecurringItem(store, base as Parameters<typeof addRecurringItem>[1])
+      if (item) await updateRecurringItem(store, item.id, base, newRow)
+      else await addRecurringItem(store, base as Parameters<typeof addRecurringItem>[1], newRow)
       onClose()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save.')

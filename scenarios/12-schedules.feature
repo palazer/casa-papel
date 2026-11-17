@@ -82,7 +82,7 @@ Feature: Schedules: amounts that repeat by themselves
     When I undo
     Then "Rent" is 1,200.00 in every month from January 2026 to December 2026
 
-  @H2 @open @F8
+  @H2 @F8
   Scenario: Taking back a schedule that was added from the list of schedules restores the row
     Given I add the schedule "Rent" of 1,300.00 every month to "Rent" from March 2026
     When I undo

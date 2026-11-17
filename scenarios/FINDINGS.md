@@ -17,7 +17,7 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
 | F5 | A card that records only its payments never lowers net worth | net worth is wrong | payments do not move what is owed | open |
 | F6 | The Statement's change for a virtual account that ran short | one figure on the Statement | show the change of the balance | closed |
 | F7 | Restoring does not bring back what archiving changed with it | amounts stay changed | restore puts it back | open |
-| F8 | Undo of a schedule added from the list empties the row's months | amounts are lost | save the schedule and its months as one step | open |
+| F8 | Undo of a schedule added from the list empties the row's months | amounts are lost | save the schedule and its months as one step | closed |
 | F9 | Merging an older copy (a file, or the other device's) brings back what was taken back | an undone change returns | the merge respects what this device removed | open |
 
 ## The findings
@@ -152,6 +152,9 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
   does. (b) Take "Add schedule…" out of the list: schedules are made in the row's dialog. (c) Leave it.
 - **Recommendation.** (a); (b) if the list is no longer where you make schedules.
 - **Decision.** Yes (17 November 2026): the list saves the schedule and its months as one step.
+- **Closed** (17 November 2026). A schedule that is added, changed, ended or reactivated in the list is saved together
+  with what it lands in the row's months, so one undo takes back both. A row made in the same form ("New row…") is
+  part of the step too.
 
 ### F9. Merging an older copy brings back what was taken back
 

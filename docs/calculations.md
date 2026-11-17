@@ -367,6 +367,8 @@ scheduled row does not carry its amount forward (A2 does not apply to it).
 > 300.00 every 3 months from February: February, May, August and November show 300.00, the other months nothing.
 
 **H2. A row's first schedule keeps the amounts of the months before it.** They are written down, so they stay.
+A schedule and what it lands in the months are saved as one step, wherever the schedule is made or changed: one undo
+takes back both (finding F8, closed).
 
 **H3. A scheduled amount can be changed for one month, or for that month and the following ones.**
 

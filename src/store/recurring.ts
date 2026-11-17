@@ -4,7 +4,8 @@ import {
   type Cell, type CellItem, type MonthKey, type RecurringItem, type Row, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
-import { loadTables } from './actions'
+import { loadTables, newRowMutation } from './actions'
+import { applyMutations } from './impact'
 import { defaultMonths } from './months'
 
 const now = () => Date.now()
@@ -121,19 +122,61 @@ export function pinCarriedMonths(tables: Tables, rowId: string, before: MonthKey
   return out
 }
 
-export async function addRecurringItem(store: Store, input: Partial<RecurringInput> & Pick<RecurringInput, 'name' | 'rowId' | 'amount' | 'startMonth'>): Promise<RecurringItem> {
+/**
+ * A change to schedules, with what it lands in the open months of the rows it touches. Saved together they are one
+ * step: one undo takes the schedule and its months back. Left to the app's own pass afterwards, the months would be a
+ * second step that undo does not reach, and the rows would be left with what that pass made of them.
+ */
+function withPosts(tables: Tables, mutations: Mutation[], rowIds: string[]): Mutation[] {
+  const after = applyMutations(tables, mutations)
+  const household = after.household.find((h) => !h.deletedAt)
+  if (!household) return mutations
+  const posts = planRecurringPosts(after, defaultMonths(household, after)).filter((m) => m.op === 'put' && m.table === 'cells' && rowIds.includes(m.record.rowId))
+  return [...mutations, ...posts]
+}
+
+/** A row that a schedule's form makes together with the schedule. */
+export type RecurringNewRow = Partial<Row> & { name: string; section: Row['section'] }
+
+/**
+ * Add a schedule to a row. With `newRow` the row is made in the same step, and `input.rowId` is not read: the form
+ * that offers "New row…" saves the row, the schedule and its months as one thing.
+ */
+export async function addRecurringItem(
+  store: Store, input: Partial<RecurringInput> & Pick<RecurringInput, 'name' | 'rowId' | 'amount' | 'startMonth'>, newRow?: RecurringNewRow,
+): Promise<RecurringItem> {
   const ts = now()
-  const item = RecurringItemSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, ...input })
   const tables = await loadTables(store)
-  await store.commit([...pinCarriedMonths(tables, item.rowId, item.startMonth, ts), { op: 'put', table: 'recurringItems', record: item }])
+  const mutations: Mutation[] = []
+  let rowId = input.rowId
+  if (newRow) {
+    const made = newRowMutation(tables, newRow)
+    mutations.push(made.mutation)
+    rowId = made.row.id
+  }
+  const item = RecurringItemSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, ...input, rowId })
+  // a row that is made here has carried nothing yet, so there is nothing of it to write down
+  if (!newRow) mutations.push(...pinCarriedMonths(tables, item.rowId, item.startMonth, ts))
+  mutations.push({ op: 'put', table: 'recurringItems', record: item })
+  await store.commit(withPosts(tables, mutations, [item.rowId]))
   return item
 }
 
-export async function updateRecurringItem(store: Store, id: string, patch: Partial<RecurringInput>): Promise<void> {
+/** Change a schedule; with `newRow` it moves to a row that is made in the same step. */
+export async function updateRecurringItem(store: Store, id: string, patch: Partial<RecurringInput>, newRow?: RecurringNewRow): Promise<void> {
   const tables = await loadTables(store)
   const item = tables.recurringItems.find((r) => r.id === id)
   if (!item) throw new Error('Recurring item not found')
-  await store.commit([{ op: 'put', table: 'recurringItems', record: RecurringItemSchema.parse({ ...item, ...patch, updatedAt: now() }) }])
+  const mutations: Mutation[] = []
+  let next = { ...item, ...patch }
+  if (newRow) {
+    const made = newRowMutation(tables, newRow)
+    mutations.push(made.mutation)
+    next = { ...next, rowId: made.row.id }
+  }
+  mutations.push({ op: 'put', table: 'recurringItems', record: RecurringItemSchema.parse({ ...next, updatedAt: now() }) })
+  // the row it was on too, when it moved: its months lose what the schedule had landed there
+  await store.commit(withPosts(tables, mutations, [...new Set([item.rowId, next.rowId])]))
 }
 
 /** Stop an item after `endMonth` (null = active again). */

@@ -26,7 +26,9 @@ describe('recurring posting', () => {
   it('posts due months only, is idempotent, and the row no longer carries forward', async () => {
     const { store, rent } = await fresh()
     await addRecurringItem(store, { name: 'Car insurance', rowId: rent.id, amount: 21000, cadence: { intervalMonths: 3, anchorMonth: 1 }, startMonth: '2026-01' })
-    expect(await postRecurring(store, months)).toBe(4)
+    // the save lands the schedule in its months itself: nothing is left for the app's own pass
+    const posted = (await loadTables(store)).cells.filter((c) => c.rowId === rent.id && months.includes(c.month) && c.items.some((i) => i.recurringItemId))
+    expect(posted.map((c) => c.month).sort()).toEqual(['2026-01', '2026-04', '2026-07', '2026-10'])
     expect(await postRecurring(store, months)).toBe(0)
     expect(await valuesOf(store, rent.id)).toEqual([21000, 0, 0, 21000, 0, 0, 21000, 0, 0, 21000, 0, 0])
     const out = computeEngine({ tables: await loadTables(store), months })
@@ -117,7 +119,7 @@ describe('recurring managed from the grid', () => {
 
     // end from October: later months empty out, September stays
     await endRecurringFrom(store, fromJune, '2026-10')
-    expect(await postRecurring(store, months)).toBeGreaterThan(0)
+    expect(await postRecurring(store, months)).toBe(0)
     const x = await valuesOf(store, rent.id)
     expect(x[8]).toBe(110000)
     expect(x[9]).toBe(0)
@@ -128,5 +130,65 @@ describe('recurring managed from the grid', () => {
     expect(same).toBe(item.id)
     expect(await postRecurring(store, months)).toBe(0)
     expect((await valuesOf(store, rent.id))[0]).toBe(90000)
+  })
+})
+
+describe('a schedule saved from the list of schedules is one step', () => {
+  const posts = (store: Store) => postRecurring(store, months)
+
+  it('undo takes the schedule and its months back, and the row is as it was', async () => {
+    const { store, rent } = await fresh()
+    await setCellValue(store, rent.id, '2026-01', 120000, 'from-now-on')
+    const before = await valuesOf(store, rent.id)
+    expect(before).toEqual(months.map(() => 120000))
+
+    await addRecurringItem(store, { name: 'Rent', rowId: rent.id, amount: 130000, startMonth: '2026-03' })
+    expect(await valuesOf(store, rent.id)).toEqual([120000, 120000, ...months.slice(2).map(() => 130000)])
+    expect(await posts(store)).toBe(0)
+
+    await store.undo()
+    expect((await loadTables(store)).recurringItems.filter((r) => !r.deletedAt)).toEqual([])
+    expect(await valuesOf(store, rent.id)).toEqual(before)
+    // and the app's own pass finds nothing to tidy up afterwards
+    expect(await posts(store)).toBe(0)
+    expect(await valuesOf(store, rent.id)).toEqual(before)
+
+    await store.redo()
+    expect(await valuesOf(store, rent.id)).toEqual([120000, 120000, ...months.slice(2).map(() => 130000)])
+  })
+
+  it('ending a schedule, a new amount and reactivating are each one step', async () => {
+    const { store, rent } = await fresh()
+    const item = await addRecurringItem(store, { name: 'Rent', rowId: rent.id, amount: 100000, startMonth: '2026-01' })
+    const all = months.map(() => 100000)
+
+    await endRecurringItem(store, item.id, '2026-06')
+    expect(await valuesOf(store, rent.id)).toEqual([...all.slice(0, 6), 0, 0, 0, 0, 0, 0])
+    expect(await posts(store)).toBe(0)
+    await store.undo()
+    expect(await valuesOf(store, rent.id)).toEqual(all)
+    expect(await posts(store)).toBe(0)
+
+    await updateRecurringItem(store, item.id, { amount: 110000 })
+    expect(await valuesOf(store, rent.id)).toEqual(months.map(() => 110000))
+    await store.undo()
+    expect(await valuesOf(store, rent.id)).toEqual(all)
+    expect(await posts(store)).toBe(0)
+  })
+
+  it('a row made in the same form is part of the step', async () => {
+    const { store } = await fresh()
+    const rows = (await loadTables(store)).rows.length
+    const item = await addRecurringItem(store, { name: 'Car insurance', rowId: '__new__', amount: 21000, startMonth: '2026-02' }, { name: 'Car', section: 'expense', defaultStatus: 'committed' })
+    let t = await loadTables(store)
+    const car = t.rows.find((r) => r.name === 'Car')!
+    expect(item.rowId).toBe(car.id)
+    expect(await valuesOf(store, car.id)).toEqual([0, ...months.slice(1).map(() => 21000)])
+
+    await store.undo()
+    t = await loadTables(store)
+    expect(t.rows.length).toBe(rows)
+    expect(t.recurringItems).toEqual([])
+    expect(t.cells.filter((c) => c.rowId === car.id)).toEqual([])
   })
 })

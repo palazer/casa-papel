@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cellKey, computeEngine } from '@/engine'
 import { accountRef, monthRange, newId, poolRef, type CellItem } from '@/model'
 import {
@@ -6,6 +6,7 @@ import {
   removeAccount, removeIfFree, setCellItems, setCellValue, setRowAccount, setRowFundedBy,
 } from '@/store'
 import { fundingOptions } from '@/features/grid/funding'
+import { restoreToday, setToday } from '../today'
 
 const months = monthRange('2026-01', '2026-04')
 const OPTS = { today: '2026-03', locale: 'en-IE' }
@@ -102,6 +103,10 @@ describe('"Comes out of" an account: the row\'s default', () => {
 })
 
 describe('"Comes out of" an account: removing the account', () => {
+  // a schedule lands in every month of the plan when it is saved, and the plan's end depends on today
+  beforeEach(() => setToday('2026-03-15'))
+  afterEach(restoreToday)
+
   it('deleting it moves what came out of it to the month\'s income, in one write per row and schedule', async () => {
     const { store, rainy, school } = await fresh()
     // the row both names the account and comes out of it
@@ -119,7 +124,7 @@ describe('"Comes out of" an account: removing the account', () => {
       '"School" no longer names it as the paying account',
       '1 schedule no longer names it',
       '"School" comes out of the month\'s income instead',
-      'What came out of it in 4 months counts as spent from that month\'s income, so the leftover there falls',
+      'What came out of it in 12 months counts as spent from that month\'s income, so the leftover there falls',
       '1 schedule comes out of the month\'s income instead',
     ])
     // more than the account itself changes, so it is never removed without the dialog
