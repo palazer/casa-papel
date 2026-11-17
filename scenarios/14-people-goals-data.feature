@@ -63,7 +63,7 @@ Feature: People, goals, and the data itself
 
   # Two devices of one household. The second one has the new amount before the first takes it back, and its copy is
   # the one the first takes in next.
-  @E3 @open @F9
+  @E3 @F9
   Scenario: On two devices, an amount that was taken back does not return through the other device
     Given a second device that has synced
     And I type 1,300.00 for "Rent" in March 2026, every month
@@ -93,10 +93,24 @@ Feature: People, goals, and the data itself
 
   # The file was made before the change was taken back. Undo removed the amount; the file still holds it, and the
   # merge takes it for something this app has never seen.
-  @E3 @open @F9
+  @E3 @F9
   Scenario: Merging an older file does not bring back what was taken back
     Given I type 1,300.00 for "Rent" in March 2026, every month
     And I export the data to a file
     And I undo
     When I merge that file into the app
     Then "Rent" is 1,200.00 in March 2026
+
+  # Taken back and then put back again: the amount is new once more, and newer than its removal, so the other
+  # device takes it in although it has seen it removed.
+  @E3 @F9
+  Scenario: On two devices, an amount that was taken back and put back reaches the other device
+    Given a second device that has synced
+    And I type 1,300.00 for "Rent" in March 2026, every month
+    And the second device takes in what this one has
+    And I undo
+    And the second device takes in what this one has
+    When I redo
+    And the second device takes in what this one has
+    Then on the second device, "Rent" is 1,300.00 in March 2026
+    And "Rent" is 1,300.00 in March 2026

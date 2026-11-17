@@ -400,7 +400,8 @@ An archived account leaves net worth with what it held: the part "accounts start
 **E2. Merging the same file again changes nothing.**
 
 **E3. Merging an older copy brings nothing old back.** The newer change wins, whether the copy is a file or the
-other device's. Finding F9 is the one case where it does not.
+other device's. That holds for what was removed too: something this device took back stays removed when a copy that
+still holds it comes in, unless that copy was changed after the removal (finding F9, closed).
 
 ## The checks that always hold
 

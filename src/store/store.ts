@@ -134,6 +134,8 @@ export class Store {
       const meta = await this.meta()
       /** Never behind what this device has merged from elsewhere, so a local change always counts as later. */
       const ts = Math.max(Date.now(), meta.clockFloor + 1)
+      /** What every write from here on is later than: what was merged in, and what this device removed. */
+      let floor = meta.clockFloor
       for (const m of mutations) {
         const table = this.db.table(m.table)
         if (m.op === 'put') {
@@ -141,22 +143,27 @@ export class Store {
           const key = primaryKeyOf(m.table, parsed)
           const inverse = (await table.get(key) as { updatedAt?: number } | undefined) ?? null
           // A write is newer than the version it replaces and than anything merged in, so undo and redo count as new edits.
-          const record = { ...parsed, updatedAt: Math.max(parsed.updatedAt, (inverse?.updatedAt ?? -1) + 1, meta.clockFloor + 1) }
+          const record = { ...parsed, updatedAt: Math.max(parsed.updatedAt, (inverse?.updatedAt ?? -1) + 1, floor + 1) }
           await table.put(record)
           await this.db.events.add({
             id: newId(), ts, deviceId: meta.deviceId, schemaVersion: SCHEMA_VERSION, txId,
             type: 'put', table: m.table, key, record, inverse,
           })
         } else {
-          const inverse = (await table.get(m.key)) ?? null
+          const inverse = ((await table.get(m.key)) as { updatedAt?: number } | undefined) ?? null
           await table.delete(m.key)
+          // A removal is never older than the record it removes, and whatever this device writes afterwards is later
+          // than the removal. A merge compares the two: a copy of the record that another device still holds stays
+          // out, and the record made again here (a redo) comes in everywhere.
+          const at = Math.max(ts, inverse?.updatedAt ?? 0)
+          floor = Math.max(floor, at)
           await this.db.events.add({
-            id: newId(), ts, deviceId: meta.deviceId, schemaVersion: SCHEMA_VERSION, txId,
+            id: newId(), ts: at, deviceId: meta.deviceId, schemaVersion: SCHEMA_VERSION, txId,
             type: 'delete', table: m.table, key: m.key, record: null, inverse,
           })
         }
       }
-      await this.db.meta.update('meta', { eventsSinceExport: meta.eventsSinceExport + mutations.length, localRevision: meta.localRevision + 1 })
+      await this.db.meta.update('meta', { eventsSinceExport: meta.eventsSinceExport + mutations.length, localRevision: meta.localRevision + 1, clockFloor: floor })
     })
     return txId
   }

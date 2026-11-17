@@ -92,6 +92,84 @@ describe('export / import', () => {
     expect((await c.db.rows.get(r.id))?.name).toBe('Gym kept')
   })
 
+  it('what this device took back stays removed when a copy that still holds it comes in', async () => {
+    const a = fresh()
+    const b = fresh()
+    const r = makeRow('Gym')
+    await a.commit([{ op: 'put', table: 'rows', record: r }])
+    await importReplace(b, await exportSnapshot(a))
+    const old = await exportSnapshot(a)
+
+    // undo of something new removes its record
+    await a.undo()
+    expect(await a.db.rows.get(r.id)).toBeUndefined()
+
+    // the other device's copy, and a file from before the undo: neither brings it back
+    expect(await importMerge(a, await exportSnapshot(b))).toMatchObject({ applied: 0 })
+    expect(await a.db.rows.get(r.id)).toBeUndefined()
+    await importMerge(a, old)
+    expect(await a.db.rows.get(r.id)).toBeUndefined()
+
+    // and the removal reaches the other device
+    await importMerge(b, await exportSnapshot(a))
+    expect(await b.db.rows.get(r.id)).toBeUndefined()
+
+    // a third device that still holds it does not bring it back to one that only heard of the removal
+    const c = fresh()
+    await importReplace(c, old)
+    await importMerge(b, await exportSnapshot(c))
+    expect(await b.db.rows.get(r.id)).toBeUndefined()
+  })
+
+  it('a copy that was changed after the removal comes in: the newest wins', async () => {
+    const a = fresh()
+    const b = fresh()
+    const r = makeRow('Gym')
+    await a.commit([{ op: 'put', table: 'rows', record: r }])
+    await importReplace(b, await exportSnapshot(a))
+    await a.undo()
+    await b.commit([{ op: 'put', table: 'rows', record: { ...r, name: 'Gym, kept on the other device', updatedAt: Date.now() + 100_000 } }])
+    await importMerge(a, await exportSnapshot(b))
+    expect((await a.db.rows.get(r.id))?.name).toBe('Gym, kept on the other device')
+  })
+
+  it('what was taken back and made again is newer than its removal, and comes in on the other device', async () => {
+    const a = fresh()
+    const b = fresh()
+    const r = makeRow('Gym')
+    await a.commit([{ op: 'put', table: 'rows', record: r }])
+    await importReplace(b, await exportSnapshot(a))
+    await a.undo()
+    await importMerge(b, await exportSnapshot(a))
+    expect(await b.db.rows.get(r.id)).toBeUndefined()
+
+    await a.redo()
+    const again = await a.db.rows.get(r.id)
+    const removal = (await a.db.events.toArray()).filter((e) => e.type === 'delete' && e.key === r.id).map((e) => e.ts)
+    expect(again!.updatedAt).toBeGreaterThan(Math.max(...removal))
+    await importMerge(b, await exportSnapshot(a))
+    expect((await b.db.rows.get(r.id))?.name).toBe('Gym')
+    // and a fresh record with a new key is taken in as always
+    const other = makeRow('Pool')
+    await a.commit([{ op: 'put', table: 'rows', record: other }])
+    await importMerge(b, await exportSnapshot(a))
+    expect((await b.db.rows.get(other.id))?.name).toBe('Pool')
+  })
+
+  it('a removal is never older than the record it removes', async () => {
+    const a = fresh()
+    // a record stamped ahead of this device's clock, as one edited several times in the same instant is
+    const r = makeRow('Gym', Date.now() + 60_000)
+    await a.commit([{ op: 'put', table: 'rows', record: r }])
+    await a.undo()
+    const removal = (await a.db.events.toArray()).find((e) => e.type === 'delete')!
+    expect(removal.ts).toBeGreaterThanOrEqual(r.updatedAt)
+    // whatever this device writes next is later than the removal
+    const next = makeRow('Pool')
+    await a.commit([{ op: 'put', table: 'rows', record: next }])
+    expect((await a.db.rows.get(next.id))!.updatedAt).toBeGreaterThan(removal.ts)
+  })
+
   it('rejects foreign files and newer schemas', () => {
     expect(() => parseExportFile({ hello: 1 })).toThrow(/not a Casa Papel/)
     expect(() => parseExportFile({ format: 'casa-papel', schemaVersion: 99 })).toThrow(/newer/)

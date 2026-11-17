@@ -78,8 +78,10 @@ export interface MergeResult {
  * Records: last write wins by `updatedAt`; on an exact tie the side with the larger canonical JSON wins,
  * so two devices converge instead of each keeping its own. Tombstones are ordinary records with
  * `deletedAt`, so they take part in the same rule. Events: unseen ids are appended; delete events
- * apply when the local record is not newer than the deletion. Raises the clock floor to the newest
- * timestamp seen, so later local writes stay later.
+ * apply when the local record is not newer than the deletion. The same holds the other way round: a
+ * record that comes in and is not here stays out when this device's own log says it was removed
+ * (an undo of something new removes its record) and the copy is not newer than that removal.
+ * Raises the clock floor to the newest timestamp seen, so later local writes stay later.
  * `synced`: the incoming copy is the cloud state, so when nothing of ours was waiting the result counts
  * as pushed. Decided inside the transaction, so a commit landing at the same moment stays pending.
  */
@@ -88,6 +90,8 @@ export async function mergeTables(store: Store, tables: Tables, events: StoreEve
   const result: MergeResult = { applied: 0, kept: 0, newEvents: 0 }
   let newest = 0
   await db.transaction('rw', db.tables, async () => {
+    /** Records that come in and are not here: new ones, and ones this device removed. Settled after the others. */
+    const absent: Array<{ table: (typeof db.dataTables)[number]; key: PrimaryKey; rec: { updatedAt: number } }> = []
     for (const t of db.dataTables) {
       const table = db.table(t)
       const schema = TABLE_SCHEMAS[t]
@@ -96,13 +100,38 @@ export async function mergeTables(store: Store, tables: Tables, events: StoreEve
         newest = Math.max(newest, rec.updatedAt)
         const key = keyOf(t, rec)
         const local = (await table.get(key)) as { updatedAt: number } | undefined
-        const wins = !local || local.updatedAt < rec.updatedAt || (local.updatedAt === rec.updatedAt && canonical(rec) > canonical(local))
+        if (!local) {
+          absent.push({ table: t, key, rec })
+          continue
+        }
+        const wins = local.updatedAt < rec.updatedAt || (local.updatedAt === rec.updatedAt && canonical(rec) > canonical(local))
         if (wins) {
           await table.put(rec)
           result.applied++
         } else {
           result.kept++
         }
+      }
+    }
+    if (absent.length) {
+      // What this device's log says was removed, and when. Only removals that could matter are read: those not older
+      // than the oldest record in question (the log is indexed by time, and removals are never pruned).
+      const since = absent.reduce((min, a) => Math.min(min, a.rec.updatedAt), Infinity)
+      const removed = new Map<string, number>()
+      const mark = (table: string, key: unknown) => `${table}|${JSON.stringify(key)}`
+      await db.events.where('ts').aboveOrEqual(since).each((e) => {
+        if (e.type === 'delete') removed.set(mark(e.table, e.key), Math.max(removed.get(mark(e.table, e.key)) ?? 0, e.ts))
+      })
+      for (const a of absent) {
+        const at = removed.get(mark(a.table, a.key))
+        // removed here, and the copy was not changed since: it stays removed. A copy changed after the removal is
+        // the newer of the two and comes in.
+        if (at != null && a.rec.updatedAt <= at) {
+          result.kept++
+          continue
+        }
+        await db.table(a.table).put(a.rec)
+        result.applied++
       }
     }
     const incoming = [...events].sort((a, b) => a.ts - b.ts || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))

@@ -18,7 +18,7 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
 | F6 | The Statement's change for a virtual account that ran short | one figure on the Statement | show the change of the balance | closed |
 | F7 | Restoring does not bring back what archiving changed with it | amounts stay changed | restore puts it back | open |
 | F8 | Undo of a schedule added from the list empties the row's months | amounts are lost | save the schedule and its months as one step | closed |
-| F9 | Merging an older copy (a file, or the other device's) brings back what was taken back | an undone change returns | the merge respects what this device removed | open |
+| F9 | Merging an older copy (a file, or the other device's) brings back what was taken back | an undone change returns | the merge respects what this device removed | closed; the file comparison comes with step 5 |
 
 ## The findings
 
@@ -179,6 +179,12 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
 - **Recommendation.** (a) now; (b) once step 5 has the list of what a change alters, which is the same list.
 - **Decision.** Fix now, compare later (17 November 2026): the merge respects what this device removed, for files
   and for sync. When step 5 has its list of what a change alters, a file shows that list before it is merged.
+- **Closed** (17 November 2026), for the merge. A record that comes in and is not on this device is looked up in the
+  device's own history: if it was removed here and the copy was not changed after that, it stays removed. A copy that
+  was changed after the removal comes in, because the newest still wins. Two things make the comparison hold: a
+  removal is never dated before the record it removes, and whatever a device writes after a removal is dated after
+  it (so an amount taken back and put back again reaches the other device). Still to come, with step 5: a file shows
+  what it would change before it is merged (scenario "A file shows what it would change before it is merged").
 
 ## Decided, not built yet
 
