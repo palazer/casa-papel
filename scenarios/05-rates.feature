@@ -100,9 +100,9 @@ Feature: Amounts and accounts in another currency
     And of that, 220.00 is "real balances"
     And of that, -120.00 is "rates"
 
-  # A current account in another currency is an open decision (D2 in scenarios/FINDINGS.md): the plan knows the
-  # current accounts only together, in the household's currency. This is what the app does today: the opening amount
-  # is converted once, and a later rate does not move it.
+  # Decided (D2 in scenarios/FINDINGS.md, rule B9): there will be one main account, in the household's currency, and
+  # this will be refused. Until that is built, this is what the app does: the opening amount is converted once, and a
+  # later rate does not move it.
   @X6 @parked @D2
   Scenario: A current account in another currency is converted when it opens, and not again
     Given a current account "Dollar account" in USD holding 1,100.00

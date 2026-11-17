@@ -102,6 +102,12 @@ of February. In an account's first month, the start is its opening amount.
 
 **B8. Clearing a real balance brings the calculated one back.** The months after it follow.
 
+> **Decided, not built (its own step).**
+>
+> **B9. A household has one main account, in the household's currency.** The month's money runs through it, and its
+> real balance is one number. Any other everyday account is an account with a balance of its own that money is moved
+> to. B6 goes away with it.
+
 ## N. Net worth
 
 **N1. Net worth is what the household has, less what it owes.**
@@ -239,7 +245,7 @@ unless a real balance stands in between (B5).
 > **T4. A change that alters a past month asks first.** It lists the months and what changes in them, and offers
 > "Cancel" and "Save anyway". Where a setting can have a date (the growth of an investment), it also offers "only
 > from the current month on". A change in the current month or later is saved without a question. The app never
-> changes the past by itself.
+> changes the past by itself. A file that is merged shows the same list first: what it would change on this device.
 
 ## M. The sums of a month
 

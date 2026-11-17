@@ -83,6 +83,14 @@ Feature: People, goals, and the data itself
     And the second device takes in what this one has
     Then on the second device, "Rent" is 1,200.00 in March 2026
 
+  @T4 @planned
+  Scenario: A file shows what it would change before it is merged
+    Given I export the data to a file
+    And I type 1,300.00 for "Rent" in March 2026, every month
+    When I choose that file to merge
+    Then I am shown what it would change here: "Rent" from March 2026, 1,300.00 to 1,200.00
+    And nothing has changed
+
   # The file was made before the change was taken back. Undo removed the amount; the file still holds it, and the
   # merge takes it for something this app has never seen.
   @E3 @open @F9

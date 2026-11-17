@@ -170,7 +170,8 @@ run fails the day an `@open` scenario passes, so a finding cannot stay listed by
   change before it is merged, and you merge or cancel. (c) A file only restores: "Merge into this device" goes, and
   devices share through sync. (d) Leave it.
 - **Recommendation.** (a) now; (b) once step 5 has the list of what a change alters, which is the same list.
-- **Decision.** Being talked through (17 November 2026).
+- **Decision.** Fix now, compare later (17 November 2026): the merge respects what this device removed, for files
+  and for sync. When step 5 has its list of what a change alters, a file shows that list before it is merged.
 
 ## Decided, not built yet
 
@@ -181,26 +182,28 @@ with the place it fails today.
 | --- | --- | --- |
 | 2. Closing replaced by the calendar | T2, T3 | `06-the-past.feature`: 3 |
 | 3. "This and following months" | A3 | `01-amounts-over-months.feature`: 2 |
-| 4. The currency model | X10 to X13 | `05-rates.feature`: 9 |
-| 5. The question before a change alters the past | T4 | `06-the-past.feature`: 7 |
+| 4. The currency model | X10 to X15 | `05-rates.feature`: 12 |
+| 5. The question before a change alters the past | T4 | `06-the-past.feature`: 7, `14-people-goals-data.feature`: 1 |
+| One main account (its own step) | B9 | `15-main-account.feature`: 2 |
 
 One of them already shows what the app does today: a changed growth rate of an investment changes every past month
 without a question ("A changed growth rate does not change the past without asking").
 
 ## What was open, and what you decided
 
-Decided on 17 November 2026. D1 and D3 are rules now (X14, X15 in `docs/calculations.md`), not built yet: their
-scenarios are tagged `@planned`.
+Decided on 17 November 2026. D1, D2 and D3 are rules now (X14, B9 and X15 in `docs/calculations.md`), not built
+yet: their scenarios are tagged `@planned`.
 
 - **D1. A virtual account inside a savings account in another currency.** Decided: not allowed. A virtual account is
   in the same currency as the savings account that holds it, so it is refused in a savings account in another
   currency, and the app says to make a savings account in that currency first. Moving a virtual account to another
   savings account needs the same currency too. (A virtual account is kept in the household's currency today, so this
   means: only in savings accounts in the household's currency.)
-- **D2. A current account in another currency, and several current accounts.** Open. Your direction: one current or
-  main account, always in the household's currency; that the plan knows several only together is the problem.
-  Scenario of today's behaviour: `05-rates.feature`, "A current account in another currency is converted when it
-  opens, and not again".
+- **D2. A current account in another currency, and several current accounts.** Decided: one main account, always in
+  the household's currency. The month's money runs through it, and its real balance is one number. Any other
+  everyday account is an account with a balance of its own that money is moved to. It is a step of its own, with a
+  question for households that have several current accounts today. Until it is built, `05-rates.feature` keeps the
+  scenario of today's behaviour: "A current account in another currency is converted when it opens, and not again".
 - **D3. An expense in a third currency paid from an account in another currency.** Decided: not allowed for now. An
   expense comes out of an account in the expense's own currency or in the household's; anything else is refused and
   says so. Payments across three currencies stay parked.
