@@ -669,8 +669,12 @@ export function computeEngine(input: EngineInput): EngineOutput {
           if (row.accountId !== acc.id) continue
           const c = cells[cellKey(row.id, m)]
           if (!c || c.value === 0 || c.source === 'archived') continue
+          // A card whose purchases are expense rows grows with them and shrinks with its payment. On a card that
+          // records only its payments the payment is the spending itself: nothing says what was bought, so nothing
+          // here can say what is owed. It stays as it is until a real balance is entered.
+          if (!itemized) continue
           if (row.kind === 'card-payment') outflow += inAccountCurrency(acc, c, m)
-          else if (itemized && row.section === 'expense') inflow += inAccountCurrency(acc, c, m)
+          else if (row.section === 'expense') inflow += inAccountCurrency(acc, c, m)
         }
       } else if (acc.type === 'loan') {
         for (const row of rows) {

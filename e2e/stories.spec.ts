@@ -171,4 +171,35 @@ test.describe('whole stories, as the scenarios tell them', () => {
     await expect(s.assets.locator('[data-line^="acc:"]').filter({ hasText: 'Holiday fund' })).toContainText('€750.00')
     await expect(s.assets.locator('[data-line="main"]')).toContainText('€1,750.00')
   })
+
+  // scenarios/09: "What is owed on a card that records only its payments stays until a real balance says otherwise"
+  test('a card that records only its payments: the payment is spending, and what is owed stays', async ({ page }) => {
+    const s = await household(page)
+    const claims = page.getByRole('region', { name: 'Debts and net worth' })
+    await claims.getByRole('button', { name: 'Add a card or loan' }).click()
+    await s.dlg.getByLabel('Name', { exact: true }).fill('Amex')
+    await s.dlg.getByRole('radio', { name: 'Only what I pay to it' }).click()
+    await s.dlg.getByLabel(/^Owed at the start of November 2026/).fill('500')
+    // the form says what a payment to such a card is
+    await expect(s.dlg.getByTestId('acc-row')).toHaveText('"Amex – Payment". Each payment counts as that month\'s spending; what is owed changes only with a real balance.')
+    await s.dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(s.dlg.getByRole('heading', { name: 'Amex – Payment · November 2026' })).toBeVisible()
+    await s.dlg.getByLabel('Amount in EUR').fill('300')
+    await s.dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(s.dlg).toBeHidden()
+
+    // the payment is part of what the month costs, and its link does not say that it pays the card off
+    await expect(s.moneyOut.getByRole('button', { name: /^Amex – Payment: €300\.00/ })).toBeVisible()
+    await expect(line(s.moneyOut, 'Leftover')).toContainText('€1,500.00')
+    await expect(s.moneyOut.getByRole('button', { name: 'Paid to Amex: go there' })).toBeVisible()
+    const amex = claims.locator('[data-line^="acc:"]').filter({ hasText: 'Amex' })
+    await expect(amex).toContainText('€500.00')
+    await expect(amex).toContainText('changes with real balances only')
+    await expect(claims.getByRole('button', { name: 'Payments: Amex – Payment: go there' })).toBeVisible()
+
+    // a month and a payment later, the same is owed
+    await toMonth(page, 'December 2026')
+    await expect(s.moneyOut.getByRole('button', { name: /^Amex – Payment: €300\.00/ })).toBeVisible()
+    await expect(amex).toContainText('€500.00')
+  })
 })

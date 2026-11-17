@@ -14,7 +14,7 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
 | F2 | Money "moved between your accounts" lowers net worth | net worth is wrong | the row names the account that receives it | open |
 | F3 | The month after an exception holds an amount nobody typed | amounts can change by surprise | with step 3 | open, with step 3 |
 | F4 | A loan that is paid off keeps taking payments | net worth is right, the debt reads below zero | the payment stops at what is owed | open |
-| F5 | A card that records only its payments never lowers net worth | net worth is wrong | payments do not move what is owed | open |
+| F5 | A card that records only its payments never lowers net worth | net worth is wrong | payments do not move what is owed | closed |
 | F6 | The Statement's change for a virtual account that ran short | one figure on the Statement | show the change of the balance | closed |
 | F7 | Restoring does not bring back what archiving changed with it | amounts stay changed | restore puts it back | open |
 | F8 | Undo of a schedule added from the list empties the row's months | amounts are lost | save the schedule and its months as one step | closed |
@@ -95,12 +95,18 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
   300.00 a month too high.
 - **What the rule says.** What is spent lowers net worth (rule N2), and a debt is not below zero (rule C3).
 - **Scenarios.** `09-loans-and-cards.feature`: "What is spent through a card that records only its payments lowers
-  net worth", "What is owed on a card that records only its payments does not fall below zero".
+  net worth", "What is owed on a card that records only its payments stays until a real balance says otherwise"
+  (it was called "…does not fall below zero" and expected 0.00, which is not what was decided), "A real balance
+  says what is owed on a card that records only its payments".
 - **Options.** (a) A payment to such a card does not move what is owed: it pays for what was bought since the last
   payment. What is owed stays as it is until a real balance says otherwise, and net worth falls by the payment.
   (b) Leave it, and rely on real balances to correct the card.
 - **Recommendation.** (a).
 - **Decision.** Yes (17 November 2026): a payment to such a card does not move what is owed.
+- **Closed** (17 November 2026). A payment to such a card is the month's spending and nothing else: what is owed
+  stays as it is until a real balance is typed for the card, and net worth falls by the payment. On the Statement
+  the payment's link reads "Paid to Amex", the card's line links back with "Payments: …" and carries the note
+  "changes with real balances only". The forms say the same.
 
 ### F6. The Statement's change for a virtual account that ran short
 

@@ -32,10 +32,13 @@ describe('cards, loans, other assets and net worth', () => {
     const out = computeEngine({ tables: t, months })
     expect(out.totals['2026-01'].debt).toBe(300_00)
     expect(out.totals['2026-01'].toSavings).toBe(1700_00)
+    // the payment does not bring down what is owed: nothing says what was bought, so only a real balance can say it
     const s = out.accounts[card.id]
-    expect(s.months['2026-01'].balance).toBe(200_00)
+    expect(s.months['2026-01']).toMatchObject({ balance: 500_00, inflow: 0, outflow: 0 })
     expect(s.months['2026-02']).toMatchObject({ balance: 420_00, projected: false })
-    expect(s.months['2026-03'].balance).toBe(120_00) // 420 − carried 300 payment
+    expect(s.months['2026-03'].balance).toBe(420_00) // the carried payment of 300 is March's spending, and 420 is still owed
+    // so the payment costs net worth what it is: with the 500 paid down as before, January would end 300 higher
+    expect(out.netWorth['2026-01']).toBe(-500_00)
   })
   it('loan: debt payments bring the outstanding amount down; other assets carry until pinned; net worth converts currencies', () => {
     const loan = account({ name: 'Car loan', type: 'loan', openingBalance: 5000_00 })

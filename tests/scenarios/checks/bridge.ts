@@ -78,6 +78,8 @@ export function bridgeOf(view: View, m: MonthKey): Bridge {
   }
 
   let toSavingsRows: Money = 0
+  /** Paid to a card that records only its payments: spending, and nothing that changes what is owed. */
+  let paidToLumpCards: Money = 0
   for (const row of engine.rows) {
     const c = engine.cells[cellKey(row.id, m)]
     if (!c || c.source === 'archived') continue
@@ -95,6 +97,9 @@ export function bridgeOf(view: View, m: MonthKey): Bridge {
     } else if (row.kind === 'pool-allocation') {
       const pool = [...pools.values()].find((p) => p.allocationRowId === row.id)
       route(pool?.accountId, v)
+    } else if (row.kind === 'card-payment' && account?.type === 'credit-card' && !cardIsItemized(account)) {
+      // nothing says what was bought on such a card, so its payment is what was spent; what is owed moves only with a real balance
+      paidToLumpCards += v
     } else if (row.kind === 'debt-payment' || row.kind === 'card-payment') owe(row.accountId, v)
     else if (row.section === 'expense') {
       // bought on a card whose purchases are expense rows: the money is still in the current account, and owed on the card
@@ -109,7 +114,8 @@ export function bridgeOf(view: View, m: MonthKey): Bridge {
 
   // ---------- the month's own sums ----------
   terms.income = t.income - t.fromAccounts
-  terms.spending = -(t.expensesTotal - t.debt)
+  // payments that bring a debt down are no spending; a payment to a card that records only its payments is
+  terms.spending = -(t.expensesTotal - t.debt + paidToLumpCards)
   terms['pocket money'] = -t.pocket
   terms['moved elsewhere'] = -t.moved
 

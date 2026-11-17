@@ -92,6 +92,8 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
   const foreign = ccy !== baseCurrency && ccy.length === 3
   const info = ACCOUNT_TYPE_INFO.find((t) => t.value === type)
   const debt = type === 'loan' || type === 'credit-card'
+  // a card that records only its payments is not paid down by them: the payment is the spending
+  const onlyPayments = type === 'credit-card' && cardMode === 'lump'
   // a new loan or card comes with the row that pays it off unless the box is unticked; the row form brings its own row
   const offersRow = !account && !withRow && debt && preset?.payOff !== false
   const rowInput: AccountRowInput | null = account ? null : withRow ?? (offersRow && payOff ? { kind: 'pay-off' } : null)
@@ -180,7 +182,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
               <Check label="Add the row that pays it off" checked={payOff} onChange={(e) => setPayOff(e.target.checked)} />
               <p className="pl-6 text-xs text-muted-foreground" data-testid="acc-row">
                 {payOff
-                  ? <>{rowName ? `"${rowName}"` : 'Named after the account'}. Each payment brings down what is owed.</>
+                  ? <>{rowName ? `"${rowName}"` : 'Named after the account'}. {onlyPayments ? 'Each payment counts as that month\'s spending; what is owed changes only with a real balance.' : 'Each payment brings down what is owed.'}</>
                   : 'No row yet. One can be added later from this form.'}
               </p>
             </div>
@@ -193,7 +195,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
           {paidBy && (
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:col-span-2" data-testid="acc-paid-by">
               {paidBy.length > 0
-                ? <p>Paid off by {paidBy.map((r) => `"${r.name}"`).join(', ')}.</p>
+                ? <p>{onlyPayments ? 'Payments:' : 'Paid off by'} {paidBy.map((r) => `"${r.name}"`).join(', ')}.</p>
                 : (
                   <>
                     <p>No row pays this off yet.</p>

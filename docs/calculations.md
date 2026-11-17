@@ -323,8 +323,12 @@ interest: a real balance says what is really owed (B5). Finding F4 belongs here.
 cash stays in the current accounts until the card is paid. The payment moves money and is no expense: the current
 accounts and what is owed fall by it.
 
-**C3. A card that records only its payments.** The payment is the month's expense. Finding F5 belongs here: what the
-payment does to what is owed, and to net worth.
+**C3. A card that records only its payments.** The payment is the month's expense, and nothing else: no row says
+what was bought on the card, so no row moves what is owed on it. That stays as it is until a real balance is typed
+for the card (rule B5), and net worth falls by each payment (finding F5, closed).
+
+    owes 500.00, 300.00 paid every month: still 500.00 owed in every month
+    a real balance of 200.00 in March: 200.00 from March on, and net worth is 300.00 higher that month
 
 ## V. Virtual accounts
 

@@ -66,15 +66,27 @@ Feature: Loans and credit cards
     Then the Statement of January 2026 shows "Expenses" at 1,500.00
     And "Current account" ends January 2026 with 2,500.00
 
-  @C3 @open @F5
+  @C3 @F5
   Scenario: What is spent through a card that records only its payments lowers net worth
     Given a credit card "Amex" owing 500.00, of which only the payments are recorded
     And a payment "Amex – Payment" of 300.00 to "Amex" from January 2026
     Then net worth changes by 1,500.00 in February 2026
     And of that, -1,500.00 is "spending"
 
-  @C3 @open @F5
-  Scenario: What is owed on a card that records only its payments does not fall below zero
+  @C3 @F5
+  Scenario: What is owed on a card that records only its payments stays until a real balance says otherwise
     Given a credit card "Amex" owing 500.00, of which only the payments are recorded
     And a payment "Amex – Payment" of 300.00 to "Amex" from January 2026
-    Then "Amex" ends December 2026 with 0.00
+    Then "Amex" ends January 2026 with 500.00
+    And "Amex" ends December 2026 with 500.00
+
+  @C3 @F5 @B5
+  Scenario: A real balance says what is owed on a card that records only its payments
+    Given a credit card "Amex" owing 500.00, of which only the payments are recorded
+    And a payment "Amex – Payment" of 300.00 to "Amex" from January 2026
+    When "Amex" really held 200.00 at the end of March 2026
+    Then "Amex" ends February 2026 with 500.00
+    And "Amex" ends March 2026 with 200.00
+    And "Amex" ends December 2026 with 200.00
+    And net worth changes by 1,800.00 in March 2026
+    And of that, 300.00 is "real balances"

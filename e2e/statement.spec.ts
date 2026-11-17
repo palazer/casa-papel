@@ -1587,7 +1587,7 @@ test.describe('working the month in the Statement', () => {
     await moneyOut.getByRole('button', { name: 'Add expense row' }).click()
     await does.selectOption('pay-off')
     await expect(paid.locator('option')).toHaveText(['Car loan · Loan', 'Credit card · Credit card', 'New loan…', 'New credit card…'])
-    await expect(text).toHaveText('Each payment brings down what is owed on the loan or card you pick; what is still owed shows under Balances.')
+    await expect(text).toHaveText('A payment brings down what is owed on a loan. To a card that records only its payments it is that month\'s spending, and what is owed changes only with a real balance.')
     await paid.selectOption({ label: 'Credit card · Credit card' })
     await expect(text).toHaveText('It will show under "Moved elsewhere": what was bought with this card is under Expenses already, so the payment only moves money to the card.')
     await expect(moneyOut.getByLabel('New expense row name')).toHaveAttribute('placeholder', 'Credit card – Payment')

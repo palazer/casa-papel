@@ -18,7 +18,7 @@
  * Grid): that it brings a debt down shows in the lower half. "From what is left" is how the rest is shared out:
  * pocket money, savings, investments, virtual accounts, and the figure that closes the month.
  */
-import { accountGroup, addMonths, canCarryRule, describeCadence, isTakenFromAccount, nextDue, paysAsExpense, pocketLandsIn, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
+import { accountGroup, addMonths, canCarryRule, cardIsItemized, describeCadence, isTakenFromAccount, nextDue, paysAsExpense, pocketLandsIn, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
 import { computeGoals, type GoalProgress } from './goals'
 import { currentAccountsIn, mainAccountLabel } from './mainAccount'
 import { cellKey, fundingTotal, type AccountSeries, type CellResult, type CellStatus, type EngineOutput } from './types'
@@ -172,6 +172,9 @@ export function notSetAside(tables: Tables, engine: EngineOutput, accountId: str
   for (const p of tables.pools) if (!p.deletedAt && p.accountId === accountId) inPools += engine.pools[p.id]?.months[month]?.balance ?? 0
   return balance - inPools
 }
+
+/** A credit card of which only the payments are rows: what is bought on it is recorded nowhere. */
+const recordsOnlyPayments = (acc: Account): boolean => acc.type === 'credit-card' && !cardIsItemized(acc)
 
 type Bucket = 'income' | 'from-account' | 'expense' | 'pocket' | 'moved' | 'set-aside' | 'pay-off' | 'to-savings' | 'memo'
 
@@ -531,6 +534,8 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
     }
     if (acc.archivedMonth) line.archived = true
     if (r.entered) line.entered = true
+    // a card that records only its payments: no row says what was bought on it, so no row moves what is owed
+    if (recordsOnlyPayments(acc)) line.note = 'changes with real balances only'
     if (r.adjustment !== 0) line.adjustment = s.currency !== base && r.balance !== 0 ? Math.round(r.adjustment * (r.balanceBase / r.balance)) : r.adjustment
     // left out of net worth: the line stays where its kind stands, and no sum above it counts it
     if (s.outside) Object.assign(line, { memo: true, outside: true })
@@ -600,7 +605,8 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   const pays: Row['kind'][] = ['debt-payment', 'card-payment']
   const rowsById = new Map(engine.rows.map((r) => [r.id, r]))
   const poolOfRow = new Map(tables.pools.filter((p) => !p.deletedAt && p.allocationRowId).map((p) => [p.allocationRowId!, p]))
-  const ends = new Map<StatementLine, Array<{ line: StatementLine; way: 'fills' | 'takes' | 'pays' }>>()
+  type Way = 'fills' | 'takes' | 'pays' | 'paid'
+  const ends = new Map<StatementLine, Array<{ line: StatementLine; way: Way }>>()
   const linkRows = (lines: StatementLine[], incoming: boolean) => {
     for (const line of lines) {
       linkRows(line.children, incoming)
@@ -613,9 +619,11 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
         : fills.includes(row.kind) || takes.includes(row.kind) || pays.includes(row.kind) || lands ? (row.accountId ? accountLines.get(row.accountId) : undefined)
         : undefined
       if (!target) continue
-      // a month that overruns takes money back out of the account the row usually fills
-      const way = pays.includes(row.kind) ? 'pays' : incoming || takes.includes(row.kind) ? 'takes' : 'fills'
-      line.link = { to: [target.id], text: `${way === 'pays' ? 'Pays off' : way === 'takes' ? 'Comes from' : row.kind === 'pool-allocation' ? 'Fills' : lands ? 'Lands in' : 'Goes into'} ${target.label}` }
+      // a payment brings down what is owed, except on a card that records only its payments: there it is the
+      // spending itself. A month that overruns takes money back out of the account the row usually fills.
+      const card = row.accountId ? accountsById.get(row.accountId) : undefined
+      const way: Way = pays.includes(row.kind) ? (card && recordsOnlyPayments(card) ? 'paid' : 'pays') : incoming || takes.includes(row.kind) ? 'takes' : 'fills'
+      line.link = { to: [target.id], text: `${way === 'pays' ? 'Pays off' : way === 'paid' ? 'Paid to' : way === 'takes' ? 'Comes from' : row.kind === 'pool-allocation' ? 'Fills' : lands ? 'Lands in' : 'Goes into'} ${target.label}` }
       ends.set(target, [...(ends.get(target) ?? []), { line, way }])
     }
   }
@@ -624,9 +632,10 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   // by the row's own name: under "From accounts" a line is labelled after its account
   const named = (list: StatementLine[]) => list.map((l) => rowsById.get(l.rowId ?? '')?.name ?? l.label).join(', ')
   for (const [target, list] of ends) {
-    const by = (way: 'fills' | 'takes' | 'pays') => list.filter((e) => e.way === way).map((e) => e.line)
+    const by = (way: Way) => list.filter((e) => e.way === way).map((e) => e.line)
     const parts = [
       by('pays').length ? `Paid off by ${named(by('pays'))}` : '',
+      by('paid').length ? `Payments: ${named(by('paid'))}` : '',
       by('fills').length ? `Filled by ${named(by('fills'))}` : '',
       by('takes').length ? `Money taken by ${named(by('takes'))}` : '',
     ].filter(Boolean)

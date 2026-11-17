@@ -237,7 +237,7 @@ export const GUIDE: GuideTopic[] = [
     title: 'Debts & cards',
     summary: 'Loans come down with their instalments; a card\'s balance grows with what you put on it and shrinks when you pay it.',
     what: [
-      'A "Loan" account shows "<Name> · outstanding" under Balances, and a payment row that names it brings the amount down. A "Credit card" shows "<Name> · owed". "What do you record for this card?" has two answers: "Everything I buy with it" (each purchase is an expense row that names the card, and the payment only moves money) or "Only what I pay to it" (the payment is the spending). Where the payment row lives follows from that: under Transfers for the first, under Expenses for the second.',
+      'A "Loan" account shows "<Name> · outstanding" under Balances, and a payment row that names it brings the amount down. A "Credit card" shows "<Name> · owed". "What do you record for this card?" has two answers: "Everything I buy with it" (each purchase is an expense row that names the card, and the payment only moves money) or "Only what I pay to it" (the payment is the spending, and what is owed stays as it is until you type a real balance for the card). Where the payment row lives follows from that: under Transfers for the first, under Expenses for the second.',
       'Interest is not modelled. Click a balance cell now and then to enter the real amount; later months continue from it. "Net worth" subtracts cards and loans from what you own.',
     ],
     steps: [

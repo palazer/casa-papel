@@ -210,10 +210,13 @@ describe('the Statement, the month', () => {
     expect(topLine(s, 'out', 'moved')).toMatchObject({ amount: 0 })
     expect(topLine(s, 'out', 'moved')!.children.map((c) => [c.label, c.amount, !!c.memo, c.chip])).toEqual([['Pay Visa', 200_00, true, 'counted when bought']])
     expect(topLine(s, 'out', 'set-aside')!.children.map((c) => [c.label, c.amount])).toEqual([['To savings', 1550_00]])
-    // each payment is linked to the card it pays off, wherever its line stands
-    expect(all(s).find((l) => l.label === 'Pay Amex')!.link).toMatchObject({ text: 'Pays off Amex' })
+    // each payment is linked to its card, wherever its line stands. Only the itemized card is paid off by it: on the
+    // lump card the payment is the spending, and what is owed stays until a real balance says otherwise
+    expect(all(s).find((l) => l.label === 'Pay Amex')!.link).toMatchObject({ text: 'Paid to Amex' })
     expect(all(s).find((l) => l.label === 'Pay Visa')!.link).toMatchObject({ text: 'Pays off Visa' })
-    expect(topLine(s, 'claims', 'debts')!.children.map((c) => [c.label, c.amount, c.change])).toEqual([['Visa', 150_00, -50_00], ['Amex', 200_00, -300_00]])
+    expect(topLine(s, 'claims', 'debts')!.children.map((c) => [c.label, c.amount, c.change, c.link?.text, c.note])).toEqual([
+      ['Visa', 150_00, -50_00, 'Paid off by Pay Visa', undefined], ['Amex', 500_00, 0, 'Payments: Pay Amex', 'changes with real balances only'],
+    ])
     // the main account holds the 150 still to pay and gave 200 for what was owed before
     expect(find(s, 'main')).toMatchObject({ label: 'Main account', amount: -50_00, change: -50_00 })
     expect(find(s, 'main')!.children.map((c) => [c.label, c.amount])).toEqual([['At the start of the month', 0], ['Bought on the card, not yet paid', 150_00], ['Paid to the card', -200_00]])
@@ -391,12 +394,13 @@ describe('the Statement, the position', () => {
     expect(find(s, `acc:${savings.id}`)).toMatchObject({ open: true })
     expect(find(s, `acc:${savings.id}`)!.children.map((c) => [c.kind, c.label, c.amount, c.change])).toEqual([['pool', 'Travel', 1850_00, -150_00], ['figure', 'Not set aside', 7030_00, 1030_00]])
     expect(find(s, `acc:${fund.id}`)!.children).toEqual([])
-    expect(s.position.right.lines.map((l) => [l.label, l.amount, l.change])).toEqual([['Debts', 9130_00, -470_00], ['Net worth', 6350_00, 1750_00]])
-    expect(topLine(s, 'claims', 'debts')!.children.map((c) => [c.accountId, c.amount, c.change])).toEqual([[visa.id, 1080_00, -120_00], [loan.id, 8050_00, -350_00]])
-    expect(topLine(s, 'claims', 'net-worth')!.children.map((c) => [c.label, c.amount, c.change, !!c.balancing])).toEqual([['Set aside', 1850_00, -150_00, false], ['Free', 4500_00, 1900_00, true]])
+    // the loan falls by its payment; the card records only its payments, so what is owed on it stays
+    expect(s.position.right.lines.map((l) => [l.label, l.amount, l.change])).toEqual([['Debts', 9250_00, -350_00], ['Net worth', 6230_00, 1630_00]])
+    expect(topLine(s, 'claims', 'debts')!.children.map((c) => [c.accountId, c.amount, c.change])).toEqual([[visa.id, 1200_00, 0], [loan.id, 8050_00, -350_00]])
+    expect(topLine(s, 'claims', 'net-worth')!.children.map((c) => [c.label, c.amount, c.change, !!c.balancing])).toEqual([['Set aside', 1850_00, -150_00, false], ['Free', 4380_00, 1780_00, true]])
     expect([s.position.left.total, s.position.right.total, s.position.left.change, s.position.right.change]).toEqual([15480_00, 15480_00, 1280_00, 1280_00])
-    // the month's result, 5400 in and 3650 spent, is what net worth gained
-    expect(topLine(s, 'claims', 'net-worth')!.change).toBe(5400_00 - 3650_00)
+    // the month's result is what net worth gained: 5400 in, and 3770 spent (the rent, the trip, and what was paid to the card)
+    expect(topLine(s, 'claims', 'net-worth')!.change).toBe(5400_00 - 3770_00)
     expect(find(s, `pool:${travel.id}`)!.goals).toBeUndefined()
     expectSound(t, months)
   })
@@ -408,7 +412,9 @@ describe('the Statement, the position', () => {
     const payLoan = rowNamed('Car loan payment')
     expect(find(s, payLoan.id)!.link).toEqual({ to: [`acc:${loan.id}`], text: 'Pays off Car loan' })
     expect(find(s, `acc:${loan.id}`)!.link).toEqual({ to: [payLoan.id], text: 'Paid off by Car loan payment' })
-    expect(find(s, rowNamed('Pay Visa').id)!.link).toEqual({ to: [`acc:${visa.id}`], text: 'Pays off Visa' })
+    // the card records only its payments: the row is paid to it, and does not pay it off
+    expect(find(s, rowNamed('Pay Visa').id)!.link).toEqual({ to: [`acc:${visa.id}`], text: 'Paid to Visa' })
+    expect(find(s, `acc:${visa.id}`)!.link).toEqual({ to: [rowNamed('Pay Visa').id], text: 'Payments: Pay Visa' })
     expect(find(s, rowNamed('To fund').id)!.link).toEqual({ to: [`acc:${fund.id}`], text: 'Goes into Fund' })
     expect(find(s, `acc:${fund.id}`)!.link).toEqual({ to: [rowNamed('To fund').id], text: 'Filled by To fund' })
     // a virtual account is the other end of the row that fills it, not the savings account that holds it
@@ -488,7 +494,7 @@ describe('the Statement, the position', () => {
     ]
     const { s } = statementFor({ ...w.t, goals }, '2026-01')
     expect(find(s, `pool:${w.travel.id}`)!.goals!.map((g) => [g.goal.name, g.current, g.target])).toEqual([['Trip of a lifetime', 1850_00, 10000_00]])
-    expect(find(s, `acc:${w.visa.id}`)!.goals!.map((g) => [g.goal.name, g.current, g.startValue, g.status])).toEqual([['Card cleared', 1080_00, 1200_00, 'late']])
+    expect(find(s, `acc:${w.visa.id}`)!.goals!.map((g) => [g.goal.name, g.current, g.startValue, g.status])).toEqual([['Card cleared', 1200_00, 1200_00, 'late']])
     expect(find(s, `acc:${w.savings.id}`)!.goals!.map((g) => g.goal.name)).toEqual(['Rainy day'])
     expect(topLine(s, 'claims', 'net-worth')!.goals!.map((g) => g.goal.name)).toEqual(['Comfortable'])
     expect(find(s, `acc:${w.fund.id}`)!.goals).toBeUndefined()
