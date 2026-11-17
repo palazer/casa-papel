@@ -35,8 +35,10 @@ export class World {
   lastAction: { before: Figures; after: Figures; stamp: string } | null = null
   /** The month of the last "net worth changes by …" step: what "of that, … is …" speaks of. */
   bridgeMonth: MonthKey | null = null
-  /** How many undoable saves the step that is running has made so far. */
-  commits = 0
+  /** A second device of the same household, once a scenario has one: see the steps "a second device that has synced". */
+  second: Store | null = null
+  /** How many undoable saves the step that is running has made so far, per device. */
+  private saves = new Map<Store, number>()
   private stores: Store[] = []
   /** Counts what was written past the store's own saves (a merged file): see `touch`. */
   private touched = 0
@@ -52,7 +54,7 @@ export class World {
     // count what the user could undo, without changing what a save does
     const commit = store.commit.bind(store)
     store.commit = async (mutations: Mutation[]) => {
-      this.commits += 1
+      this.saves.set(store, (this.saves.get(store) ?? 0) + 1)
       return commit(mutations)
     }
     this.stores.push(store)
@@ -62,6 +64,16 @@ export class World {
   use(store: Store): void {
     this.store = store
     this.lastAction = null
+  }
+
+  /** How many undoable saves the running step has made on the device the scenario is on. */
+  get commits(): number {
+    return this.saves.get(this.store) ?? 0
+  }
+
+  /** A new step begins: nothing saved yet. */
+  resetCommits(): void {
+    this.saves.clear()
   }
 
   /** What the app's state is, to tell whether a step changed anything: what is stored, and the date. */

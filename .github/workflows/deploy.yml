@@ -27,6 +27,10 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test -- --run
+      # the same tests on another day: one that only passes in some months shows up here, not on the first of a month
+      - run: npm test -- --run
+        env:
+          CASA_TODAY: '2027-03-15T12:00:00'
       # every push to main goes live and every device updates itself, so the e2e suite runs first.
       # It tests its own build: .env.e2e points sync at a fake server the tests intercept.
       - run: npm run build:e2e

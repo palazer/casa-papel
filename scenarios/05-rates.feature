@@ -110,13 +110,22 @@ Feature: Amounts and accounts in another currency
     And the current accounts end January 2026 with 1,000.00
     And the current accounts end February 2026 with 1,000.00
 
-  # What a month should show while a rate is missing is an open decision (D4 in scenarios/FINDINGS.md).
-  # This is what the app does today.
-  @X7 @parked @D4
-  Scenario: An amount in a currency without any rate is counted one to one
+  @X7
+  Scenario: An amount in a currency without any rate is counted one to one, and the app says so
     Given an expense "Hotel" in CHF of 500.00 from January 2026
     Then "Hotel" is 500.00 in January 2026
     And "Hotel" counts as 500.00 in January 2026
+    And the app warns "No CHF→EUR rate"
+
+  @X6
+  Scenario: An expense in the account's own currency lowers the account by exactly that amount
+    Given a savings account "Dollar savings" in USD holding 1,100.00
+    And an expense "Hosting" in USD of 110.00 from January 2026
+    When "Hosting" comes out of "Dollar savings" in every month
+    Then "Dollar savings" ends January 2026 with 990.00
+    And "Dollar savings" ends February 2026 with 880.00
+    And "Hosting" counts as 100.00 in January 2026
+    And "Hosting" counts as 88.00 in February 2026
 
   @X8
   Scenario: A changed rate of an earlier month changes that month
@@ -189,6 +198,28 @@ Feature: Amounts and accounts in another currency
     Given the EUR/USD rate has risen by 1% a month for the last 12 months, to 1.0000 in March 2026
     When I hold the forecast for EUR/USD at the last known rate
     Then the forecast rate for EUR/USD in December 2026 is 1.0000
+
+  @X14 @planned
+  Scenario: A virtual account cannot be held in a savings account in another currency
+    Given a savings account "Dollar savings" in USD holding 1,100.00
+    When a virtual account "Holidays" in "Dollar savings" holding 0.00
+    Then it is refused with "Dollar savings"
+
+  @X14 @planned
+  Scenario: A virtual account can only move to a savings account in the same currency
+    Given a savings account "Savings" holding 5,000.00
+    And a savings account "Dollar savings" in USD holding 1,100.00
+    And a virtual account "Holidays" in "Savings" holding 600.00
+    When I move the virtual account "Holidays" to "Dollar savings"
+    Then it is refused with "Dollar savings"
+
+  @X15 @planned
+  Scenario: An expense in one currency cannot come out of an account in a third one
+    Given the ECB rate for EUR/GBP in January 2026 is 0.8000
+    And a savings account "Dollar savings" in USD holding 1,100.00
+    And an expense "London hotel" in GBP of 80.00 from January 2026
+    When "London hotel" comes out of "Dollar savings" in every month
+    Then it is refused with "Dollar savings"
 
   @X13 @planned
   Scenario: Fifteen currencies are offered

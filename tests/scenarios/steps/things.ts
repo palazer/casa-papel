@@ -1,6 +1,6 @@
-import { addCategory, addGoal, archiveAccount, archivePool, archiveRow, followRow, importMerge, exportSnapshot, parseExportFile, removeAccount, removeRow, restoreAccount, restorePool, restoreRow, setCategoryEstimate, setRowCategory, setRowDeductedFrom, setRowScope } from '@/store'
+import { addCategory, addGoal, mergeTables, archiveAccount, archivePool, archiveRow, followRow, importMerge, exportSnapshot, parseExportFile, removeAccount, removeRow, restoreAccount, restorePool, restoreRow, setCategoryEstimate, setRowCategory, setRowDeductedFrom, setRowScope } from '@/store'
 import type { ExportFile } from '@/model'
-import { step } from '../registry'
+import { resolve, step } from '../registry'
 import { ScenarioError, type World } from '../world'
 
 // ---------- archive, restore, delete ----------
@@ -67,5 +67,44 @@ step('I merge that file into the app', async (world: World) => {
   const file = kept.get(world)
   if (!file) throw new ScenarioError('No file was exported in this scenario: "I export the data to a file" comes first.')
   await importMerge(world.store, file)
+  world.touch()
+})
+
+// ---------- a second device of the same household ----------
+// Sync is modelled by what it does to the data: a device takes in the other one's copy, tables and history, through
+// the same merge the sync engine calls. Versions, encryption and the network are not part of it.
+
+const copyOf = async (store: World['store']): Promise<ExportFile> => parseExportFile(JSON.parse(JSON.stringify(await exportSnapshot(store))))
+
+step('a second device that has synced', async (world: World) => {
+  const file = await copyOf(world.store)
+  world.second = world.open()
+  await mergeTables(world.second, file.tables, file.events, { synced: true })
+})
+
+const second = (world: World) => {
+  if (!world.second) throw new ScenarioError('There is no second device yet: "Given a second device that has synced" comes first.')
+  return world.second
+}
+
+// any other step, carried out on the second device
+step('on the second device, {}', async (world: World, text: string) => {
+  const first = world.store
+  world.use(second(world))
+  try {
+    await resolve(text).run(world)
+  } finally {
+    world.use(first)
+  }
+})
+
+step('the second device takes in what this one has', async (world: World) => {
+  const file = await copyOf(world.store)
+  await mergeTables(second(world), file.tables, file.events, { synced: true })
+})
+
+step('this device takes in what the second one has', async (world: World) => {
+  const file = await copyOf(second(world))
+  await mergeTables(world.store, file.tables, file.events, { synced: true })
   world.touch()
 })

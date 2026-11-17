@@ -61,6 +61,28 @@ Feature: People, goals, and the data itself
     When I merge that file into the app
     Then "Rent" is 1,300.00 in March 2026
 
+  # Two devices of one household. The second one has the new amount before the first takes it back, and its copy is
+  # the one the first takes in next.
+  @E3 @open @F9
+  Scenario: On two devices, an amount that was taken back does not return through the other device
+    Given a second device that has synced
+    And I type 1,300.00 for "Rent" in March 2026, every month
+    And the second device takes in what this one has
+    And on the second device, an expense "Gym" of 40.00 from April 2026
+    When I undo
+    And this device takes in what the second one has
+    Then "Rent" is 1,200.00 in March 2026
+    And "Gym" is 40.00 in April 2026
+
+  @E3
+  Scenario: On two devices, taking an amount back reaches the other device
+    Given a second device that has synced
+    And I type 1,300.00 for "Rent" in March 2026, every month
+    And the second device takes in what this one has
+    When I undo
+    And the second device takes in what this one has
+    Then on the second device, "Rent" is 1,200.00 in March 2026
+
   # The file was made before the change was taken back. Undo removed the amount; the file still holds it, and the
   # merge takes it for something this app has never seen.
   @E3 @open @F9

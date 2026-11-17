@@ -17,7 +17,7 @@ run fails the day an `@open` scenario passes, so a finding cannot stay listed by
 | F6 | The Statement's change for a virtual account that ran short | one figure on the Statement | show the change of the balance |
 | F7 | Restoring does not bring back what archiving changed with it | amounts stay changed | restore puts it back |
 | F8 | Undo of a schedule added from the list empties the row's months | amounts are lost | save the schedule and its months as one step |
-| F9 | Merging an older file brings back what was taken back | an undone change returns | the merge respects what this app removed |
+| F9 | Merging an older copy (a file, or the other device's) brings back what was taken back | an undone change returns | the merge respects what this device removed |
 
 ## Open findings
 
@@ -37,7 +37,7 @@ run fails the day an `@open` scenario passes, so a finding cannot stay listed by
   now: the amount an exception writes does not count for the plan's length. (c) Leave it: an extra year is shown,
   no figure is wrong.
 - **Recommendation.** (a).
-- **Decision.**
+- **Decision.** Yes (17 November 2026): settled with step 3.
 
 ### F2. Money "moved between your accounts" lowers net worth
 
@@ -54,7 +54,7 @@ run fails the day an `@open` scenario passes, so a finding cannot stay listed by
   holds. (b) Keep the row as it is and say what it does: "Leaves the plan", with a line that net worth falls by it.
   (c) Leave it.
 - **Recommendation.** (a), with (b)'s wording for a row that names no account.
-- **Decision.**
+- **Decision.** Yes (17 November 2026): the row names the account that receives the money; a row that names none says that the money leaves the plan.
 
 ### F3. The month after an exception holds an amount nobody typed
 
@@ -69,7 +69,7 @@ run fails the day an `@open` scenario passes, so a finding cannot stay listed by
 - **Options.** (a) Decide it with step 3: an exception is a mark on its own month, and the next month holds nothing.
   (b) Leave it.
 - **Recommendation.** (a).
-- **Decision.**
+- **Decision.** Yes (17 November 2026): settled with step 3.
 
 ### F4. A loan that is paid off keeps taking payments
 
@@ -83,7 +83,7 @@ run fails the day an `@open` scenario passes, so a finding cannot stay listed by
   after it show no payment. (b) The payment stays as typed and the app warns in the month the loan is paid off.
   (c) Leave it.
 - **Recommendation.** (a).
-- **Decision.**
+- **Decision.** Yes (17 November 2026): the payment stops at what is owed.
 
 ### F5. A card that records only its payments never lowers net worth
 
@@ -99,7 +99,7 @@ run fails the day an `@open` scenario passes, so a finding cannot stay listed by
   payment. What is owed stays as it is until a real balance says otherwise, and net worth falls by the payment.
   (b) Leave it, and rely on real balances to correct the card.
 - **Recommendation.** (a).
-- **Decision.**
+- **Decision.** Yes (17 November 2026): a payment to such a card does not move what is owed.
 
 ### F6. The Statement's change for a virtual account that ran short
 
@@ -112,7 +112,7 @@ run fails the day an `@open` scenario passes, so a finding cannot stay listed by
   nothing". Its steps pass; it fails at the check.
 - **Options.** (a) Show the change of the balance (−200.00), and the 300.00 on "Not set aside". (b) Leave it.
 - **Recommendation.** (a).
-- **Decision.**
+- **Decision.** Yes (17 November 2026): the Statement shows the change of the balance.
 
 ### F7. Restoring does not bring back what archiving changed with it
 
@@ -130,7 +130,7 @@ run fails the day an `@open` scenario passes, so a finding cannot stay listed by
 - **Options.** (a) Archiving remembers what it changed, and restoring puts it back. (b) Restoring stays as it is,
   and its dialog lists what does not come back. (c) Leave it.
 - **Recommendation.** (a).
-- **Decision.**
+- **Decision.** Yes (17 November 2026): archiving remembers what it changed, and restoring puts it back.
 
 ### F8. Undo of a schedule added from the list empties the row's months
 
@@ -147,25 +147,30 @@ run fails the day an `@open` scenario passes, so a finding cannot stay listed by
 - **Options.** (a) "Add schedule…" in the list saves the schedule and its months as one step, as the row's dialog
   does. (b) Take "Add schedule…" out of the list: schedules are made in the row's dialog. (c) Leave it.
 - **Recommendation.** (a); (b) if the list is no longer where you make schedules.
-- **Decision.**
+- **Decision.** Yes (17 November 2026): the list saves the schedule and its months as one step.
 
-### F9. Merging an older file brings back what was taken back
+### F9. Merging an older copy brings back what was taken back
 
-- **What the app does.** Type 1,300.00 for "Rent" in March, export a file, undo. "Rent" is 1,200.00 again. Merge the
-  file: "Rent" is 1,300.00 in March.
-- **Why.** Undo of something new removes it. The merge keeps the newer of two versions, but for something this app
-  no longer holds it has nothing to compare with, and takes the file's. It does not look at its own record of having
-  removed it.
-- **What still works.** An amount that was changed (not newly typed) and then merged with an older file keeps the
-  newer amount. Merging the same file twice changes nothing.
-- **Where else this may matter.** The same merge brings in the cloud copy of a household that syncs. This review did
-  not try it there.
-- **What the rule says.** Merging an older file brings nothing old back (rule E3).
-- **Scenario.** `14-people-goals-data.feature`: "Merging an older file does not bring back what was taken back".
-- **Options.** (a) The merge respects what this app removed: something removed here after the incoming version was
-  written stays removed. (b) Leave it.
-- **Recommendation.** (a), and then a scenario with two devices for the cloud copy.
-- **Decision.**
+- **What the app does.** Type 1,300.00 for "Rent" in March, export a file, undo. "Rent" is 1,200.00 again. Choose
+  the file and "Merge into this device": "Rent" is 1,300.00 in March.
+- **The same with two devices that sync.** Device A types the amount, device B receives it and changes something of
+  its own. A takes its amount back before it has taken in B's copy. At the next sync A takes in B's copy, and the
+  amount is back, on both devices. Tried on the merge the sync engine calls; when A's undo reaches B first, all is
+  well.
+- **Why.** Undo of something new removes it. The merge keeps the newer of two versions, but for something this
+  device no longer holds it has nothing to compare with, and takes the incoming one. It does not look at its own
+  record of having removed it.
+- **What still works.** An amount that was changed (not newly typed) keeps the newer version. Merging the same file
+  twice changes nothing. "Replace everything here" restores a file exactly as it was exported.
+- **What the rule says.** Merging an older copy brings nothing old back (rule E3).
+- **Scenarios.** `14-people-goals-data.feature`: "Merging an older file does not bring back what was taken back",
+  "On two devices, an amount that was taken back does not return through the other device".
+- **Options.** (a) The merge respects what this device removed: something removed here after the incoming version
+  was written stays removed. Needed for sync whatever happens to files. (b) Besides (a), a file shows what it would
+  change before it is merged, and you merge or cancel. (c) A file only restores: "Merge into this device" goes, and
+  devices share through sync. (d) Leave it.
+- **Recommendation.** (a) now; (b) once step 5 has the list of what a change alters, which is the same list.
+- **Decision.** Being talked through (17 November 2026).
 
 ## Decided, not built yet
 
@@ -182,21 +187,27 @@ with the place it fails today.
 One of them already shows what the app does today: a changed growth rate of an investment changes every past month
 without a question ("A changed growth rate does not change the past without asking").
 
-## Open decisions
+## What was open, and what you decided
 
-Cases where no rule is decided yet. A scenario tagged `@parked` shows what the app does today, so a later decision
-has something to change.
+Decided on 17 November 2026. D1 and D3 are rules now (X14, X15 in `docs/calculations.md`), not built yet: their
+scenarios are tagged `@planned`.
 
-- **D1. A virtual account inside a savings account in another currency.** The virtual account is kept in the
-  household's currency while its account is not. No scenario yet.
-- **D2. A current account in another currency.** The plan knows the current accounts only together, in the
-  household's currency. Today its opening amount is converted once, when it opens, and a later rate does not move
-  it; a real balance is converted at its own month's rate, and the difference shows as "not in the plan".
-  Scenario: `05-rates.feature`, "A current account in another currency is converted when it opens, and not again".
-- **D3. An expense in a third currency paid from an account in another currency.** No scenario yet.
-- **D4. A month whose rate is missing.** Today the amount counts one to one, with a warning.
-  Scenario: `05-rates.feature`, "An amount in a currency without any rate is counted one to one".
-- **D5. Changing the household's own currency.** Not possible today.
+- **D1. A virtual account inside a savings account in another currency.** Decided: not allowed. A virtual account is
+  in the same currency as the savings account that holds it, so it is refused in a savings account in another
+  currency, and the app says to make a savings account in that currency first. Moving a virtual account to another
+  savings account needs the same currency too. (A virtual account is kept in the household's currency today, so this
+  means: only in savings accounts in the household's currency.)
+- **D2. A current account in another currency, and several current accounts.** Open. Your direction: one current or
+  main account, always in the household's currency; that the plan knows several only together is the problem.
+  Scenario of today's behaviour: `05-rates.feature`, "A current account in another currency is converted when it
+  opens, and not again".
+- **D3. An expense in a third currency paid from an account in another currency.** Decided: not allowed for now. An
+  expense comes out of an account in the expense's own currency or in the household's; anything else is refused and
+  says so. Payments across three currencies stay parked.
+- **D4. A month whose rate is missing.** Decided: as today. The amount counts one to one, and the app warns that no
+  rate is set. With the fifteen currencies of X13 every one has a rate. It is rule X7 now, no open decision.
+- **D5. Changing the household's own currency.** Decided: stays impossible for now. Later perhaps a way to move a
+  household to another currency.
 
 ## Looked at and found sound
 
@@ -235,7 +246,6 @@ What ran without a fault. Every scenario also ran the nine checks after each of 
 
 ## Not looked at yet
 
-- D1 and D3 have no scenario.
 - The demo household is fixed to autumn 2026 and ages with the calendar (the browser tests now run on a fixed day,
   so they no longer depend on it).
 - Sync between two devices (see F9).

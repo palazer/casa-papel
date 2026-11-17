@@ -1,5 +1,5 @@
 import { accountRef, poolRef, type FundedBy } from '@/model'
-import { addPool, setRowFundedBy, topUpPool } from '@/store'
+import { addPool, setRowFundedBy, topUpPool, updatePool } from '@/store'
 import { step } from '../registry'
 import { ScenarioError, type World } from '../world'
 
@@ -12,6 +12,11 @@ step('a virtual account {string} in {string} holding {money}', async (world: Wor
 // with "Set aside every month": its row "To <name>" gets the amount from that month on
 step('a virtual account {string} in {string} holding {money}, with {money} set aside every month from {month}', async (world: World, name: string, accountName: string, holding: number, monthly: number, from: string) => {
   await addPool(world.store, { name, accountId: (await world.account(accountName)).id, openingBalance: holding, monthlyAllocation: monthly, fromMonth: from })
+})
+
+// "Held in" in the virtual account's form
+step('I move the virtual account {string} to {string}', async (world: World, name: string, accountName: string) => {
+  await updatePool(world.store, (await world.pool(name)).id, { accountId: (await world.account(accountName)).id })
 })
 
 // "Top up…": from an account, or from the month's income

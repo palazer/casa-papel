@@ -189,7 +189,8 @@ Money moved into it arrives at the month's rate. A real balance is typed in the 
 
 > 1,100.00 USD: worth 1,000.00 EUR at 1.1000 and 880.00 at 1.2500. Net worth changes by −120.00, all of it "rates".
 
-**X7. Without any rate, an amount counts one to one.** The app warns. Whether that is right is open decision D4.
+**X7. Without any rate, an amount counts one to one, and the app warns that no rate is set.** With the currencies of
+X13 that should not happen: each of them has a rate.
 
 **X8. A changed rate of an earlier month changes that month and every balance after it.** Today without a question;
 rule T4 will ask first.
@@ -214,6 +215,12 @@ rule T4 will ask first.
 >     +1 % a month on average, last known 1.0000: 1.0100, then 1.0181 (+0.8 %), then 1.0246 (+0.64 %)
 >
 > **X13. Fifteen currencies are offered:** EUR, USD, GBP, TRY, CAD, AUD, CHF, SEK, NOK, DKK, PLN, CZK, HUF, RON, ISK.
+>
+> **X14. A virtual account is in the same currency as the savings account that holds it.** It cannot be made in, or
+> moved to, a savings account in another currency: the app says to make a savings account in that currency first.
+>
+> **X15. No payment across three currencies.** An expense comes out of an account in the expense's own currency or
+> in the household's. Anything else is refused, and the app says which two it accepts.
 
 ## T. The past
 
@@ -382,8 +389,8 @@ An archived account leaves net worth with what it held: the part "accounts start
 
 **E2. Merging the same file again changes nothing.**
 
-**E3. Merging an older file brings nothing old back.** The newer change wins. Finding F9 is the one case where it
-does not.
+**E3. Merging an older copy brings nothing old back.** The newer change wins, whether the copy is a file or the
+other device's. Finding F9 is the one case where it does not.
 
 ## The checks that always hold
 
@@ -417,5 +424,7 @@ scenarios run with the unit tests, so every commit is checked against them.
   says so: the finding is closed and the tag comes off.
 - A `@planned` scenario is expected to fail. The day it passes, the run fails and says the tag can come off.
 - A `@parked` scenario shows what the app does today in a case where the rule is still an open decision.
+
+The scenario code is type-checked with the app (`npx tsc -b`).
 
 Scenarios are written in the app's own words, for a made-up household: Sam and Alex.

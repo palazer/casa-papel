@@ -48,7 +48,7 @@ export async function runScenario(scenario: Scenario): Promise<Failure[]> {
       const pending = world.refusal
       const stamp = world.day ? world.stamp : ''
       const before = await world.figures()
-      world.commits = 0
+      world.resetCommits()
       if (s.kind === 'when') world.mark = before
       try {
         await run(world, s.table)
