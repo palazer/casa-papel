@@ -200,10 +200,11 @@ Feature: Amounts and accounts in another currency
     Then the forecast rate for EUR/USD in December 2026 is 1.0000
 
   @X14 @planned
-  Scenario: A virtual account cannot be held in a savings account in another currency
+  Scenario: A virtual account in a dollar savings account is kept in dollars
     Given a savings account "Dollar savings" in USD holding 1,100.00
-    When a virtual account "Holidays" in "Dollar savings" holding 0.00
-    Then it is refused with "Dollar savings"
+    And a virtual account "Holidays" in "Dollar savings" holding 110.00
+    Then the virtual account "Holidays" holds 110.00 USD at the end of January 2026
+    And the virtual account "Holidays" holds 110.00 USD at the end of February 2026
 
   @X14 @planned
   Scenario: A virtual account can only move to a savings account in the same currency

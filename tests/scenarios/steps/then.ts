@@ -152,6 +152,19 @@ step('the virtual account {string} holds {money} at the end of {month}', async (
   same(r.balance, amount, `the virtual account "${name}" at the end of ${monthName(month)}`)
 })
 
+// rule X14, decided and not built: a virtual account is kept in its savings account's currency. Today its balance is
+// always in the household's currency, which is what this step says until the currency model is built.
+step('the virtual account {string} holds {money} {ccy} at the end of {month}', async (world: World, name: string, amount: number, ccy: string, month: string) => {
+  const pool = await world.pool(name)
+  const view = await world.view()
+  const series = view.engine.pools[pool.id] as { currency?: string; months: Record<string, { balance: number }> } | undefined
+  const r = series?.months[month]
+  if (!series || !r) throw new ScenarioError(`"${name}" has no balance in ${monthName(month)}.`)
+  const kept = series.currency ?? view.household.baseCurrency
+  if (kept !== ccy) throw new Error(`the virtual account "${name}" is kept in ${kept}, not in ${ccy}`)
+  same(r.balance, amount, `the virtual account "${name}" at the end of ${monthName(month)}`)
+})
+
 step('the virtual account {string} is short by {money} in {month}', async (world: World, name: string, amount: number, month: string) => {
   const pool = await world.pool(name)
   same((await world.view()).engine.pools[pool.id]?.months[month]?.short ?? NaN, amount, `what "${name}" was short of in ${monthName(month)}`)

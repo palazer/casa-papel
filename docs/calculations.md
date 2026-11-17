@@ -222,8 +222,9 @@ rule T4 will ask first.
 >
 > **X13. Fifteen currencies are offered:** EUR, USD, GBP, TRY, CAD, AUD, CHF, SEK, NOK, DKK, PLN, CZK, HUF, RON, ISK.
 >
-> **X14. A virtual account is in the same currency as the savings account that holds it.** It cannot be made in, or
-> moved to, a savings account in another currency: the app says to make a savings account in that currency first.
+> **X14. A virtual account is kept in the currency of the savings account that holds it.** In a dollar savings
+> account it is a dollar balance: what is set aside arrives in dollars at the month's rate, and what is paid out of
+> it leaves in dollars. It can only be moved to a savings account in the same currency.
 >
 > **X15. No payment across three currencies.** An expense comes out of an account in the expense's own currency or
 > in the household's. Anything else is refused, and the app says which two it accepts.

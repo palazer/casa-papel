@@ -194,11 +194,12 @@ without a question ("A changed growth rate does not change the past without aski
 Decided on 17 November 2026. D1, D2 and D3 are rules now (X14, B9 and X15 in `docs/calculations.md`), not built
 yet: their scenarios are tagged `@planned`.
 
-- **D1. A virtual account inside a savings account in another currency.** Decided: not allowed. A virtual account is
-  in the same currency as the savings account that holds it, so it is refused in a savings account in another
-  currency, and the app says to make a savings account in that currency first. Moving a virtual account to another
-  savings account needs the same currency too. (A virtual account is kept in the household's currency today, so this
-  means: only in savings accounts in the household's currency.)
+- **D1. A virtual account inside a savings account in another currency.** Decided: allowed, and kept in that
+  currency. A virtual account takes the currency of the savings account that holds it: in a dollar savings account
+  it is a dollar balance. What is set aside arrives in dollars at the month's rate, and what is paid out of it
+  leaves in dollars. Moving a virtual account to another savings account needs the same currency. (Today every
+  virtual account is kept in the household's currency, whatever its savings account is in.) Corrected on
+  17 November 2026: it was first written down here as "not allowed", which was not what you said.
 - **D2. A current account in another currency, and several current accounts.** Decided: one main account, always in
   the household's currency. The month's money runs through it, and its real balance is one number. Any other
   everyday account is an account with a balance of its own that money is moved to. It is a step of its own, with a
