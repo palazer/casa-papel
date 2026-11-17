@@ -339,7 +339,8 @@ Net worth counts the savings account once.
 **V2. An expense that comes out of a virtual account lowers it and its savings account** (M6).
 
 **V3. A virtual account is never below zero.** Asked for more than it holds, it stops at nothing; what is missing
-comes out of the part of its savings account that is not set aside. Finding F6 belongs here.
+comes out of the part of its savings account that is not set aside. Its line on the Statement changes by what its
+balance changed by, which in such a month is less than what was asked of it (finding F6, closed).
 
 **V4. A top-up.** From its savings account, money moves inside the account: the month takes it in and sets it aside
 again, and what is left does not change. From the month's income, less is left.

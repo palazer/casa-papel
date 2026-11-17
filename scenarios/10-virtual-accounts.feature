@@ -38,7 +38,7 @@ Feature: Virtual accounts
   # Every balance here is right, and the steps pass. What fails is the check "carried": the Statement's line for the
   # virtual account says it changed by -500.00, though it fell from 200.00 to nothing, and "Not set aside" is off by
   # the same 300.00 the other way.
-  @V3 @open @F6 @breaks-carried
+  @V3 @F6
   Scenario: A virtual account that is asked for more than it holds stops at nothing
     Given a virtual account "Holidays" in "Savings" holding 200.00
     And an expense "Trip" with no amount yet

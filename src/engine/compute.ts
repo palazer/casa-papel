@@ -494,10 +494,11 @@ export function computeEngine(input: EngineInput): EngineOutput {
       // A virtual account never holds less than nothing. What is taken beyond what it holds comes out of the unassigned
       // part of its savings account: that account's balance already falls by the whole amount, so only the split
       // inside it changes. `short` names the month's shortfall until a top-up covers it.
+      const start = bal
       const after: Money = bal + allocation - spend
       const short: Money = after < 0 ? -after : 0
       bal = after < 0 ? 0 : after
-      series.months[m] = { balance: bal, allocation, spend, short }
+      series.months[m] = { start, balance: bal, allocation, spend, short }
     }
     poolSeries[pool.id] = series
   }

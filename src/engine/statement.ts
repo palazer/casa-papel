@@ -545,14 +545,15 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
       let poolsChange: Money = 0
       for (const p of held) {
         const pm = engine.pools[p.id].months[month]
-        const poolLine: StatementLine = { id: `pool:${p.id}`, kind: 'pool', label: p.name, amount: pm.balance, change: pm.allocation - pm.spend, children: [], poolId: p.id }
+        const poolLine: StatementLine = { id: `pool:${p.id}`, kind: 'pool', label: p.name, amount: pm.balance, change: pm.balance - pm.start, children: [], poolId: p.id }
         if (!p.archivedMonth) poolLine.rule = ruleOfRows(engine.rows.filter((row) => row.id === p.allocationRowId && !row.archivedMonth))
         else poolLine.archived = true
         if (pm.short > 0) Object.assign(poolLine, { short: pm.short, shortFrom: acc.name })
         poolLines.set(p.id, poolLine)
         line.children.push(poolLine)
         inPools += pm.balance
-        poolsChange += pm.allocation - pm.spend
+        // what the balance changed by: in a month that ran short, less than what was asked of it
+        poolsChange += pm.balance - pm.start
       }
       const free = r.balanceBase - inPools
       // below zero the virtual accounts claim more than the account holds: said on the line, where the red figure is

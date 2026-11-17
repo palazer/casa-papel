@@ -39,10 +39,17 @@ describe('a virtual account that is short', () => {
     const t = await loadTables(store)
     const s = buildStatement(t, out, '2026-02')!
     const lines = walk([...s.flow.left.lines, ...s.position.left.lines])
-    expect(lines.find((l) => l.id === `pool:${pool.id}`)).toMatchObject({ amount: 0, short: 30000, shortFrom: 'Savings' })
+    // its change is what its balance changed by (it held 100 and holds nothing), not what was asked of it
+    expect(lines.find((l) => l.id === `pool:${pool.id}`)).toMatchObject({ amount: 0, change: -10000, short: 30000, shortFrom: 'Savings' })
     expect(lines.find((l) => l.id === `src:${pool.id}`)).toMatchObject({ amount: 50000, short: 30000, shortFrom: 'Savings', paidFor: ['Clothing'] })
     // the unassigned part of Savings is what paid: it holds everything the virtual account does not
-    expect(lines.find((l) => l.id === `free:${savings.id}`)?.amount).toBe(750000)
+    expect(lines.find((l) => l.id === `free:${savings.id}`)).toMatchObject({ amount: 750000, change: 750000 - 390000 })
+    // every line's change leads back to what it showed the month before
+    const before = walk(buildStatement(t, out, '2026-01')!.position.left.lines)
+    for (const id of [`pool:${pool.id}`, `free:${savings.id}`, `acc:${savings.id}`]) {
+      const now = lines.find((l) => l.id === id)!
+      expect(now.amount - (now.change ?? 0), id).toBe(before.find((l) => l.id === id)!.amount)
+    }
     expect(s.flow.difference).toBe(0)
     expect(s.position.difference).toBe(0)
   })

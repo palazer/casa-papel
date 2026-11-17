@@ -5,21 +5,22 @@ Where the app's numbers differ from a rule of `docs/calculations.md`. Each findi
 fixed on the side: you decide each one, and a fix is its own step.
 
 To close a finding: write the decision under it, change the app or the rule, and take `@open` off its scenario. The
-run fails the day an `@open` scenario passes, so a finding cannot stay listed by mistake.
+run fails the day an `@open` scenario passes, so a finding cannot stay listed by mistake. A closed finding keeps its
+text and its scenario keeps the finding's number: the scenario is what stops it from coming back.
 
-| | Finding | Weighs | Recommendation |
-| --- | --- | --- | --- |
-| F1 | An exception in the plan's last month lengthens the plan by a year | small | with step 3 |
-| F2 | Money "moved between your accounts" lowers net worth | net worth is wrong | the row names the account that receives it |
-| F3 | The month after an exception holds an amount nobody typed | amounts can change by surprise | with step 3 |
-| F4 | A loan that is paid off keeps taking payments | net worth is right, the debt reads below zero | the payment stops at what is owed |
-| F5 | A card that records only its payments never lowers net worth | net worth is wrong | payments do not move what is owed |
-| F6 | The Statement's change for a virtual account that ran short | one figure on the Statement | show the change of the balance |
-| F7 | Restoring does not bring back what archiving changed with it | amounts stay changed | restore puts it back |
-| F8 | Undo of a schedule added from the list empties the row's months | amounts are lost | save the schedule and its months as one step |
-| F9 | Merging an older copy (a file, or the other device's) brings back what was taken back | an undone change returns | the merge respects what this device removed |
+| | Finding | Weighs | Recommendation | State |
+| --- | --- | --- | --- | --- |
+| F1 | An exception in the plan's last month lengthens the plan by a year | small | with step 3 | open, with step 3 |
+| F2 | Money "moved between your accounts" lowers net worth | net worth is wrong | the row names the account that receives it | open |
+| F3 | The month after an exception holds an amount nobody typed | amounts can change by surprise | with step 3 | open, with step 3 |
+| F4 | A loan that is paid off keeps taking payments | net worth is right, the debt reads below zero | the payment stops at what is owed | open |
+| F5 | A card that records only its payments never lowers net worth | net worth is wrong | payments do not move what is owed | open |
+| F6 | The Statement's change for a virtual account that ran short | one figure on the Statement | show the change of the balance | closed |
+| F7 | Restoring does not bring back what archiving changed with it | amounts stay changed | restore puts it back | open |
+| F8 | Undo of a schedule added from the list empties the row's months | amounts are lost | save the schedule and its months as one step | open |
+| F9 | Merging an older copy (a file, or the other device's) brings back what was taken back | an undone change returns | the merge respects what this device removed | open |
 
-## Open findings
+## The findings
 
 ### F1. An exception in the plan's last month lengthens the plan by a year
 
@@ -113,6 +114,9 @@ run fails the day an `@open` scenario passes, so a finding cannot stay listed by
 - **Options.** (a) Show the change of the balance (−200.00), and the 300.00 on "Not set aside". (b) Leave it.
 - **Recommendation.** (a).
 - **Decision.** Yes (17 November 2026): the Statement shows the change of the balance.
+- **Closed** (17 November 2026). A virtual account's line changes by its balance at the end of the month minus its
+  balance at the start. "Not set aside", "Set aside" and "Free" are worked out from it and follow. In the example
+  the line now says −200.00 and "Not set aside" takes the other 300.00.
 
 ### F7. Restoring does not bring back what archiving changed with it
 

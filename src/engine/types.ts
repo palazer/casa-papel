@@ -145,6 +145,8 @@ export interface AccountSeries {
 }
 
 export interface PoolMonthResult {
+  /** What it held when the month began: the month before's balance, or what it was opened with. */
+  start: Money
   /** Never below zero: a virtual account that is asked for more than it holds stops at nothing. */
   balance: Money
   allocation: Money
