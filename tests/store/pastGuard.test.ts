@@ -244,8 +244,19 @@ describe('the list', () => {
     // the rows as the plan lists them: the expenses before what goes to savings
     expect(changeLineText(changes.lines[2], 'en-IE')).toBe('"Thing 0", Apr 2026: nothing → €10.00')
     expect(changes.lines).toHaveLength(8)
-    // the other three things, "To savings" in four runs, and the savings account
-    expect(changes.more).toBe(8)
+    // the other three things, "To savings" (four runs, so one line) and the savings account
+    expect(changes.more).toBe(5)
+  })
+
+  it('an amount that changes in more than two runs is one line: by how much in each month, where that is the same', async () => {
+    const { store, rent, salary } = await fresh()
+    // a salary that is different every month makes what is left, and so "To savings", different every month
+    for (const [m, v] of [['2026-02', 3100_00], ['2026-03', 3050_00], ['2026-04', 3200_00], ['2026-05', 3150_00]] as const) await setCellValue(store, salary.id, m, v, 'this-month')
+    const { asked } = answering(store, 'cancel')
+    await expect(setCellValue(store, rent.id, '2026-01', 1300_00, 'from-now-on')).rejects.toBeInstanceOf(PastChangeCancelled)
+    const lines = asked[0].changes.lines.map((l) => changeLineText(l, 'en-IE'))
+    expect(lines).toContain('"Rent", Jan–May 2026: €1,200.00 → €1,300.00')
+    expect(lines).toContain('"To savings", Jan–May 2026: €100.00 less in each of 5 months')
   })
 
   it('a run that reaches the plan\'s last month reads "from" when the list covers the whole plan', () => {

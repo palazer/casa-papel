@@ -1,6 +1,7 @@
-import { addCategory, addGoal, mergeTables, archiveAccount, archivePool, archiveRow, followRow, importMerge, exportSnapshot, parseExportFile, removeAccount, removeRow, restoreAccount, restorePool, restoreRow, restoredText, setCategoryEstimate, setRowCategory, setRowDeductedFrom, setRowScope } from '@/store'
+import { addCategory, addGoal, checkFile, mergeTables, archiveAccount, archivePool, archiveRow, followRow, importMerge, exportSnapshot, parseExportFile, removeAccount, removeRow, restoreAccount, restorePool, restoreRow, restoredText, setCategoryEstimate, setRowCategory, setRowDeductedFrom, setRowScope } from '@/store'
 import type { ExportFile } from '@/model'
-import { resolve, step } from '../registry'
+import type { FileCheck } from '@/store'
+import { moneyText, monthName, resolve, step } from '../registry'
 import { ScenarioError, type World } from '../world'
 
 // ---------- archive, restore, delete ----------
@@ -70,6 +71,37 @@ step('I merge that file into the app', async (world: World) => {
   await importMerge(world.store, file)
   world.touch()
 })
+
+// ---------- what a file would change here, before it is brought in (rule T4, finding F9) ----------
+
+const checked = new WeakMap<World, FileCheck>()
+step('I choose that file to bring in', async (world: World) => {
+  const file = kept.get(world)
+  if (!file) throw new ScenarioError('No file was exported in this scenario: "I export the data to a file" comes first.')
+  checked.set(world, await checkFile(world.store, file))
+})
+function choiceOf(world: World, way: 'merge' | 'replace') {
+  const check = checked.get(world)
+  if (!check) throw new ScenarioError('No file was chosen: "I choose that file to bring in" comes first.')
+  return { check, choice: check[way] }
+}
+const said = (v: number | null) => (v == null ? 'nothing' : moneyText(v))
+/** "Rent" from March 2026, 1,300.00 to 1,200.00: an amount that changes from that month to the end of the plan. */
+function changesFrom(world: World, way: 'merge' | 'replace', name: string, month: string, before: string, after: string) {
+  const { check, choice } = choiceOf(world, way)
+  const lines = choice.changes?.lines ?? []
+  const line = lines.find((l) => l.kind === 'amount' && l.name === name && l.months[0] === month)
+  const all = lines.map((l) => `"${l.name}" ${monthName(l.months[0])}–${monthName(l.months.at(-1)!)}, ${said(l.before)} to ${said(l.after)}`).join('; ') || 'nothing'
+  if (!line) throw new Error(`No change of "${name}" from ${monthName(month)} in the list: ${all}.`)
+  if (line.months.at(-1) !== check.planEnd) throw new Error(`"${name}" changes only up to ${monthName(line.months.at(-1)!)}, not to the end of the plan.`)
+  if (said(line.before) !== before || said(line.after) !== after) throw new Error(`"${name}" from ${monthName(month)}: ${said(line.before)} to ${said(line.after)}, not ${before} to ${after}.`)
+}
+step('merging it would change nothing here', (world: World) => {
+  const { choice } = choiceOf(world, 'merge')
+  if (choice.changes || choice.other) throw new Error(`Merging it would change ${choice.changes?.lines.length ?? 0} amounts or balances and ${choice.other} other records.`)
+})
+step('merging it would change {string} from {month}, {} to {}', (world: World, name: string, month: string, before: string, after: string) => changesFrom(world, 'merge', name, month, before, after))
+step('replacing everything would change {string} from {month}, {} to {}', (world: World, name: string, month: string, before: string, after: string) => changesFrom(world, 'replace', name, month, before, after))
 
 // ---------- a second device of the same household ----------
 // Sync is modelled by what it does to the data: a device takes in the other one's copy, tables and history, through

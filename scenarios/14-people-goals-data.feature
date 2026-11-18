@@ -83,12 +83,24 @@ Feature: People, goals, and the data itself
     And the second device takes in what this one has
     Then on the second device, "Rent" is 1,200.00 in March 2026
 
-  @T4 @planned
-  Scenario: A file shows what it would change before it is merged
+  # A file shows what each way of bringing it in would change here before anything is changed. A merge keeps the
+  # newer of two copies: a file made before a change brings nothing back; only "Replace everything here" does.
+  @T4
+  Scenario: A file made before a change: merging it changes nothing, replacing everything turns the change back
     Given I export the data to a file
     And I type 1,300.00 for "Rent" in March 2026, this and following months
-    When I choose that file to merge
-    Then I am shown what it would change here: "Rent" from March 2026, 1,300.00 to 1,200.00
+    When I choose that file to bring in
+    Then merging it would change nothing here
+    And replacing everything would change "Rent" from March 2026, 1,300.00 to 1,200.00
+    And nothing has changed
+
+  @T4
+  Scenario: A file from the other device: merging it brings what is newer there
+    Given a second device that has synced
+    And on the second device, an expense "Gym" of 40.00 from April 2026
+    And on the second device, I export the data to a file
+    When I choose that file to bring in
+    Then merging it would change "Gym" from April 2026, nothing to 40.00
     And nothing has changed
 
   # The file was made before the change was taken back. Undo removed the amount; the file still holds it, and the

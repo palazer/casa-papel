@@ -99,6 +99,42 @@ test.describe('growth from a month on', () => {
   })
 })
 
+test.describe('a file shows what it would change here before it is brought in', () => {
+  test.use({ viewport: { width: 1400, height: 900 } })
+
+  test('a file made before a change: merging changes nothing, replacing everything turns it back', async ({ page }) => {
+    await page.goto('?demo=1&screen=grid')
+    await page.getByRole('button', { name: 'Load the demo household' }).click()
+    const utilities = page.getByRole('button', { name: /^The flat – Utilities Nov 2026/ })
+    await expect(utilities).toBeVisible()
+    await page.getByRole('link', { name: 'Data' }).click()
+    const downloading = page.waitForEvent('download')
+    await page.getByRole('button', { name: 'Export now' }).click()
+    const filePath = 'e2e/output/before-a-change.json'
+    await (await downloading).saveAs(filePath)
+
+    // November's utilities from now on, after the file was made
+    await page.getByRole('link', { name: 'Grid' }).click()
+    await utilities.click()
+    const editor = page.getByRole('dialog')
+    await editor.getByLabel('Amount in EUR').fill('230')
+    await editor.getByRole('button', { name: 'Save' }).click()
+    await expect(editor).toBeHidden()
+
+    await page.getByRole('link', { name: 'Data' }).click()
+    await page.locator('input[type=file]').setInputFiles(filePath)
+    const check = page.getByTestId('file-check')
+    await expect(check.getByRole('region', { name: 'Merging it would change here:' })).toContainText('Nothing.')
+    await expect(check.getByRole('region', { name: 'Replacing everything would change here:' })).toContainText('"The flat – Utilities" from Nov 2026: €230.00 → ')
+    await page.screenshot({ path: 'e2e/output/file-check.png' })
+    // nothing changed by looking
+    await page.getByRole('button', { name: 'Cancel' }).click()
+    await expect(check).toBeHidden()
+    await page.getByRole('link', { name: 'Grid' }).click()
+    await expect(utilities).toContainText('230')
+  })
+})
+
 test.describe('the question on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 

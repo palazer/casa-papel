@@ -86,77 +86,106 @@ export interface MergeResult {
  * as pushed. Decided inside the transaction, so a commit landing at the same moment stays pending.
  */
 export async function mergeTables(store: Store, tables: Tables, events: StoreEvent[], opts: { synced?: boolean } = {}): Promise<MergeResult> {
+  let result: MergeResult = { applied: 0, kept: 0, newEvents: 0 }
+  await store.db.transaction('rw', store.db.tables, async () => {
+    result = await mergeWithin(store, tables, events, opts)
+  })
+  return result
+}
+
+/** Thrown inside a merge that is only looked at, so that the database takes all of it back. */
+class LookOnly extends Error {}
+
+/**
+ * What this device would hold after merging `file` (`mergeTables`), without merging it: the merge runs with its own
+ * rules, the device's record of what it removed included, inside a transaction that is then rolled back. Nothing is
+ * written, and nothing on screen hears of it (a live query fires only for a transaction that commits).
+ */
+export async function previewMerge(store: Store, file: ExportFile): Promise<Tables> {
+  let after: Tables | null = null
+  try {
+    await store.db.transaction('rw', store.db.tables, async () => {
+      await mergeWithin(store, file.tables, file.events, {})
+      after = await readTables(store.db)
+      throw new LookOnly()
+    })
+  } catch (e) {
+    if (!(e instanceof LookOnly)) throw e
+  }
+  return after!
+}
+
+/** The body of a merge, inside a transaction that covers every table. */
+async function mergeWithin(store: Store, tables: Tables, events: StoreEvent[], opts: { synced?: boolean }): Promise<MergeResult> {
   const db = store.db
   const result: MergeResult = { applied: 0, kept: 0, newEvents: 0 }
   let newest = 0
-  await db.transaction('rw', db.tables, async () => {
-    /** Records that come in and are not here: new ones, and ones this device removed. Settled after the others. */
-    const absent: Array<{ table: (typeof db.dataTables)[number]; key: PrimaryKey; rec: { updatedAt: number } }> = []
-    for (const t of db.dataTables) {
-      const table = db.table(t)
-      const schema = TABLE_SCHEMAS[t]
-      for (const raw of (tables[t] ?? []) as unknown[]) {
-        const rec = schema.parse(raw) as { updatedAt: number }
-        newest = Math.max(newest, rec.updatedAt)
-        const key = keyOf(t, rec)
-        const local = (await table.get(key)) as { updatedAt: number } | undefined
-        if (!local) {
-          absent.push({ table: t, key, rec })
-          continue
-        }
-        const wins = local.updatedAt < rec.updatedAt || (local.updatedAt === rec.updatedAt && canonical(rec) > canonical(local))
-        if (wins) {
-          await table.put(rec)
-          result.applied++
-        } else {
-          result.kept++
-        }
+  /** Records that come in and are not here: new ones, and ones this device removed. Settled after the others. */
+  const absent: Array<{ table: (typeof db.dataTables)[number]; key: PrimaryKey; rec: { updatedAt: number } }> = []
+  for (const t of db.dataTables) {
+    const table = db.table(t)
+    const schema = TABLE_SCHEMAS[t]
+    for (const raw of (tables[t] ?? []) as unknown[]) {
+      const rec = schema.parse(raw) as { updatedAt: number }
+      newest = Math.max(newest, rec.updatedAt)
+      const key = keyOf(t, rec)
+      const local = (await table.get(key)) as { updatedAt: number } | undefined
+      if (!local) {
+        absent.push({ table: t, key, rec })
+        continue
+      }
+      const wins = local.updatedAt < rec.updatedAt || (local.updatedAt === rec.updatedAt && canonical(rec) > canonical(local))
+      if (wins) {
+        await table.put(rec)
+        result.applied++
+      } else {
+        result.kept++
       }
     }
-    if (absent.length) {
-      // What this device's log says was removed, and when. Only removals that could matter are read: those not older
-      // than the oldest record in question (the log is indexed by time, and removals are never pruned).
-      const since = absent.reduce((min, a) => Math.min(min, a.rec.updatedAt), Infinity)
-      const removed = new Map<string, number>()
-      const mark = (table: string, key: unknown) => `${table}|${JSON.stringify(key)}`
-      await db.events.where('ts').aboveOrEqual(since).each((e) => {
-        if (e.type === 'delete') removed.set(mark(e.table, e.key), Math.max(removed.get(mark(e.table, e.key)) ?? 0, e.ts))
-      })
-      for (const a of absent) {
-        const at = removed.get(mark(a.table, a.key))
-        // removed here, and the copy was not changed since: it stays removed. A copy changed after the removal is
-        // the newer of the two and comes in.
-        if (at != null && a.rec.updatedAt <= at) {
-          result.kept++
-          continue
-        }
-        await db.table(a.table).put(a.rec)
+  }
+  if (absent.length) {
+    // What this device's log says was removed, and when. Only removals that could matter are read: those not older
+    // than the oldest record in question (the log is indexed by time, and removals are never pruned).
+    const since = absent.reduce((min, a) => Math.min(min, a.rec.updatedAt), Infinity)
+    const removed = new Map<string, number>()
+    const mark = (table: string, key: unknown) => `${table}|${JSON.stringify(key)}`
+    await db.events.where('ts').aboveOrEqual(since).each((e) => {
+      if (e.type === 'delete') removed.set(mark(e.table, e.key), Math.max(removed.get(mark(e.table, e.key)) ?? 0, e.ts))
+    })
+    for (const a of absent) {
+      const at = removed.get(mark(a.table, a.key))
+      // removed here, and the copy was not changed since: it stays removed. A copy changed after the removal is
+      // the newer of the two and comes in.
+      if (at != null && a.rec.updatedAt <= at) {
+        result.kept++
+        continue
+      }
+      await db.table(a.table).put(a.rec)
+      result.applied++
+    }
+  }
+  const incoming = [...events].sort((a, b) => a.ts - b.ts || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+  for (const e of incoming) {
+    if (await db.events.get(e.id)) continue
+    await db.events.add(e)
+    newest = Math.max(newest, e.ts)
+    result.newEvents++
+    if (e.type === 'delete') {
+      const table = db.table(e.table)
+      const local = (await table.get(e.key as PrimaryKey)) as { updatedAt: number } | undefined
+      if (local && local.updatedAt <= e.ts) {
+        await table.delete(e.key as PrimaryKey)
         result.applied++
       }
     }
-    const incoming = [...events].sort((a, b) => a.ts - b.ts || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-    for (const e of incoming) {
-      if (await db.events.get(e.id)) continue
-      await db.events.add(e)
-      newest = Math.max(newest, e.ts)
-      result.newEvents++
-      if (e.type === 'delete') {
-        const table = db.table(e.table)
-        const local = (await table.get(e.key as PrimaryKey)) as { updatedAt: number } | undefined
-        if (local && local.updatedAt <= e.ts) {
-          await table.delete(e.key as PrimaryKey)
-          result.applied++
-        }
-      }
-    }
-    const meta = await store.meta()
-    const changed = result.applied > 0 || result.newEvents > 0
-    const localRevision = changed ? meta.localRevision + 1 : meta.localRevision
-    await db.meta.update('meta', {
-      clockFloor: Math.max(meta.clockFloor, newest),
-      localRevision,
-      ...(opts.synced && meta.localRevision === meta.pushedRevision ? { pushedRevision: localRevision } : {}),
-    })
+  }
+  const meta = await store.meta()
+  const changed = result.applied > 0 || result.newEvents > 0
+  const localRevision = changed ? meta.localRevision + 1 : meta.localRevision
+  await db.meta.update('meta', {
+    clockFloor: Math.max(meta.clockFloor, newest),
+    localRevision,
+    ...(opts.synced && meta.localRevision === meta.pushedRevision ? { pushedRevision: localRevision } : {}),
   })
   return result
 }

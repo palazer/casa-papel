@@ -27,6 +27,11 @@ export interface ChangeLine {
   /** null: nothing there (a row without an amount in those months). */
   before: Money | null
   after: Money | null
+  /**
+   * An amount that changes in more than two runs (what is left, month by month): one line for all of them, with the
+   * months it changes in and, where it is the same in each, by how much. `before` and `after` are null then.
+   */
+  each?: { months: number; by: Money | null }
 }
 
 export interface Changes {
@@ -136,6 +141,7 @@ export function changesBetween(before: Worked, after: Worked, months: MonthKey[]
     const currency = own ? (diffs.find((d) => d.a)?.a ?? first).currency : home
     const value = (f?: Figure) => (f ? (own ? f.own : f.base) : null)
     if (first.kind === 'amount') {
+      const runs: ChangeLine[] = []
       let run: ChangeLine | null = null
       for (const d of diffs) {
         const before = value(d.b)
@@ -144,8 +150,13 @@ export function changesBetween(before: Worked, after: Worked, months: MonthKey[]
         if (run && next) run.months.push(d.m)
         else {
           run = { kind: 'amount', name: (d.a ?? d.b)!.name, months: [d.m], currency, before, after }
-          add(run)
+          runs.push(run)
         }
+      }
+      if (runs.length <= 2) runs.forEach(add)
+      else {
+        const by = diffs.map((d) => (value(d.a) ?? 0) - (value(d.b) ?? 0))
+        add({ kind: 'amount', name: runs[0].name, months: diffs.map((d) => d.m), currency, before: null, after: null, each: { months: diffs.length, by: by.every((x) => x === by[0]) ? by[0] : null } })
       }
     } else if (first.kind === 'sums') {
       add({ kind: 'sums', name: '', months: diffs.map((d) => d.m), currency: home, before: null, after: null })
@@ -169,6 +180,11 @@ export function changeLineText(line: ChangeLine, locale: string, opts: { planEnd
   const span = monthSpan(line.months, locale)
   switch (line.kind) {
     case 'amount':
+      if (line.each) {
+        const { months, by } = line.each
+        if (by == null || by === 0) return `"${line.name}", ${span}: changes in ${months} months`
+        return `"${line.name}", ${span}: ${formatMoney(Math.abs(by), line.currency, locale)} ${by > 0 ? 'more' : 'less'} in each of ${months} months`
+      }
       return line.months.length > 1 && line.months[line.months.length - 1] === opts.planEnd
         ? `"${line.name}" from ${monthSpan([line.months[0]], locale)}: ${figures}`
         : `"${line.name}", ${span}: ${figures}`

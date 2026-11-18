@@ -1013,6 +1013,16 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   accounts live inside one.`).
 - The welcome screen reports an import or the account dialog's outcome in a `role="status"` line under its header, and an
   import that could not be read in a `role="alert"` line there.
+- **A file picked on the Data screen shows what it would change before anything is changed** (`ImportPanel`, rule T4,
+  finding F9; `checkFile` in `src/store/fileCheck.ts`). Under the file's line, two columns (one on a phone), each a
+  `region` named by its heading: `Merging it would change here:` and `Replacing everything would change here:`, then
+  the lines of the question about the past (§8) over every month of the plan, where a run that reaches the plan's end
+  reads `"Rent" from Mar 2026: €1,300.00 → €1,200.00`, then `and n other changes: names, settings, notes or schedules`;
+  `Nothing.` (muted) where it would change nothing. The merge's list comes from the merge's own rules run and rolled
+  back (`previewMerge`), so it is what the merge does. Then the buttons as before. On an empty device ("Restore this
+  file") there is nothing to compare, and no lists.
+- An amount that changes in more than two runs of months is one line in these lists: `"To savings", Nov 2026 – Dec
+  2027: €20.00 more in each of 14 months`, or `changes in 14 months` where it is not the same in each.
 
 ## 10. New-screen checklist
 
