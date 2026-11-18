@@ -12,6 +12,12 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 const MONTH_NAME = `(?:${MONTHS.join('|')})`
 const monthOf = (name: string, year: string): MonthKey => `${year}-${String(MONTHS.indexOf(name) + 1).padStart(2, '0')}`
 
+/** The month a text ends with, as the scenarios write it: "Balances for May 2026" → 2026-05. Null when it names none. */
+export function monthAtEnd(text: string): MonthKey | null {
+  const found = new RegExp(`(${MONTH_NAME}) (\\d{4})$`).exec(text)
+  return found ? monthOf(found[1], found[2]) : null
+}
+
 /** "March 2026" for a month key, as the scenarios write it. */
 export function monthName(m: MonthKey): string {
   const [year, month] = m.split('-')

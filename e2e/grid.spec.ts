@@ -84,10 +84,12 @@ test.describe('grid', () => {
 
     // close November via the month header
     await page.getByRole('button', { name: 'Nov 2026', exact: true }).click()
+    // the month's balances are typed from here too
+    await page.getByRole('menuitem', { name: 'Balances for Nov 2026…' }).click()
+    await expect(page.getByRole('heading', { name: 'Balances for November 2026' })).toBeVisible()
+    await page.getByTestId('month-balances-dialog').getByRole('button', { name: 'Cancel' }).click()
+    await page.getByRole('button', { name: 'Nov 2026', exact: true }).click()
     await page.getByRole('menuitem', { name: 'Close month' }).click()
-    // closing asks what the accounts really held first
-    await expect(page.getByRole('heading', { name: 'Close November 2026' })).toBeVisible()
-    await page.getByTestId('close-month-dialog').getByRole('button', { name: 'Close month' }).click()
     await expect(page.getByRole('button', { name: 'Nov 2026, closed', exact: true })).toBeVisible()
     await page.getByRole('button', { name: /^The flat – Utilities Nov 2026/ }).click()
     await expect(page.getByText('This month is closed.')).toBeVisible()

@@ -1,6 +1,6 @@
 import { addAccount, setMonthBalances, updateAccount } from '@/store'
 import type { Account, MonthKey } from '@/model'
-import { step } from '../registry'
+import { monthAtEnd, step } from '../registry'
 import { ScenarioError, type World } from '../world'
 
 /** A new account from the account form: in the household's currency and open from its first month unless said. */
@@ -47,4 +47,16 @@ step('{string} really held {money} at the end of {month}', real('ends'))
 
 step('I clear the real balance of {string} at the end of {month}', async (world: World, name: string, month: string) => {
   await setMonthBalances(world.store, month, { ends: { [(await world.account(name)).id]: null } })
+})
+
+// the dialog as it is opened, by its title: "Balances for May 2026" lists every account of the month
+step('I open {string} and type {money} for {string}', async (world: World, title: string, amount: number, name: string) => {
+  const month = title.startsWith('Balances for ') ? monthAtEnd(title) : null
+  if (!month) throw new ScenarioError(`"${title}" is not the title of a month's balances: it reads "Balances for May 2026".`)
+  await setMonthBalances(world.store, month, { ends: { [(await world.account(name)).id]: amount } })
+})
+
+// the tick under the month's balances: "Count everything in <Month> as done"
+step('I count everything in {month} as done', async (world: World, month: string) => {
+  await setMonthBalances(world.store, month, {}, { done: true })
 })

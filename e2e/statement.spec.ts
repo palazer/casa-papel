@@ -18,12 +18,10 @@ async function goToMonth(page: Page, name: string) {
 
 const total = (page: Page, side: 'in' | 'out' | 'assets' | 'claims') => page.getByTestId(`total-${side}`)
 
-/** "Close month" asks what the accounts really held first; with nothing typed the calculated amounts stand. */
+/** "Close month" closes at once; what the accounts really held is typed under "Balances…". */
 async function closeMonth(page: Page) {
   await page.getByRole('button', { name: 'Close month' }).click()
-  const dlg = page.getByTestId('close-month-dialog')
-  await dlg.getByRole('button', { name: 'Close month' }).click()
-  await expect(dlg).toBeHidden()
+  await expect(page.getByRole('button', { name: 'Reopen month' })).toBeVisible()
 }
 
 /** The "…" on an account's or a virtual account's line, and "Edit…" in it: the way into its dialog. */
@@ -788,16 +786,19 @@ test.describe('working the month in the Statement', () => {
     await expect(dlg.getByRole('button', { name: 'Save' })).toHaveCount(0)
   })
 
-  test('"Close month" asks what every account held at the start and at the end, and the next month starts with it', async ({ page }) => {
+  test('"Balances…" asks what every account held at the start and at the end, counts a month that is over as done, and the next month starts with it', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'November 2026')
     const assets = page.getByRole('region', { name: 'Assets' })
     const fund = assets.getByRole('button', { name: /^Index fund balance:/ })
-    const closing = page.getByTestId('close-month-dialog')
+    const closing = page.getByTestId('month-balances-dialog')
+    const progress = page.getByTestId('progress')
     const calculatedLine = await fund.getAttribute('aria-label')
+    const open = (await progress.textContent())!
+    expect(open).toMatch(/^\d+ of \d+ done/)
 
-    await page.getByRole('button', { name: 'Close month' }).click()
-    await expect(closing.getByRole('heading', { name: 'Close November 2026' })).toBeVisible()
+    await page.getByRole('button', { name: 'Balances…' }).click()
+    await expect(closing.getByRole('heading', { name: 'Balances for November 2026' })).toBeVisible()
     // every account that has a balance, under the headings of the page
     for (const heading of ['Current accounts', 'Savings accounts', 'Investment accounts', 'Debts']) await expect(closing.getByText(heading, { exact: true })).toBeVisible()
     await expect(closing.getByTestId('current-together')).toContainText('Calculated, together:')
@@ -819,22 +820,25 @@ test.describe('working the month in the Statement', () => {
     const endCell = closing.getByTestId('balance-end').filter({ has: page.getByLabel('Index fund: at the end of November 2026 (EUR)') })
     await expect(endCell.getByTestId('amount-hint')).toHaveText('= €14,000.00')
     await expect(endCell.getByTestId('balance-note')).toHaveText(/^Difference \+€[\d,]+\.\d\d$/)
+    // November is the current month: counting all of it as done is offered, and not set
+    const tick = closing.getByRole('checkbox', { name: 'Count everything in November as done' })
+    await expect(tick).not.toBeChecked()
+    await expect(closing.getByText('Ticks every line of the month. No amount changes.')).toBeVisible()
     await settled(closing)
-    await page.screenshot({ path: 'e2e/output/close-month-dialog.png' })
-    await closing.getByRole('button', { name: 'Close month' }).click()
+    await page.screenshot({ path: 'e2e/output/month-balances-dialog.png' })
+    await closing.getByRole('button', { name: 'Save' }).click()
     await expect(closing).toBeHidden()
-    await expect(page.getByText('closed', { exact: true })).toBeVisible()
     await expect(fund).toHaveAccessibleName('Index fund balance: €14,000.00, entered')
+    // nothing was ticked, and every line can still be changed
+    await expect(progress).toHaveText(open)
 
-    // the closing and its balance are one step: Undo takes both back, Redo brings both again
+    // Undo takes the balance back, Redo brings it again
     await page.getByRole('button', { name: 'Undo' }).click()
-    await expect(page.getByText('closed', { exact: true })).toHaveCount(0)
     await expect(fund).toHaveAccessibleName(calculatedLine!)
     await page.getByRole('button', { name: 'Redo' }).click()
-    await expect(page.getByText('closed', { exact: true })).toBeVisible()
     await expect(fund).toHaveAccessibleName('Index fund balance: €14,000.00, entered')
 
-    // December starts with what November closed on
+    // December starts with what November ended on
     await page.getByRole('button', { name: 'Next month' }).click()
     await expect(page.getByRole('heading', { level: 2, name: 'December 2026' })).toBeVisible()
     await fund.click()
@@ -843,7 +847,7 @@ test.describe('working the month in the Statement', () => {
     const start = dlg.getByLabel('At the start of December 2026 (EUR)')
     await expect(start).toHaveValue('14000')
     await expect(dlg.getByLabel('At the end of December 2026 (EUR)')).toHaveValue('')
-    // and the start can be corrected from here: it is November's end, closed or not
+    // and the start can be corrected from here: it is November's end
     await start.fill('14250')
     await settled(dlg)
     await page.screenshot({ path: 'e2e/output/balance-start-end-dialog.png' })
@@ -851,8 +855,30 @@ test.describe('working the month in the Statement', () => {
     await expect(dlg).toBeHidden()
     await page.getByRole('button', { name: 'Previous month' }).click()
     await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
-    await expect(page.getByText('closed', { exact: true })).toBeVisible()
     await expect(fund).toHaveAccessibleName('Index fund balance: €14,250.00, entered')
+
+    // October is over: the tick is set, and one Save keeps the balance and counts the whole month as done
+    await page.getByRole('button', { name: 'Previous month' }).click()
+    await expect(page.getByRole('heading', { level: 2, name: 'October 2026' })).toBeVisible()
+    const october = (await progress.textContent())!
+    expect(october).toMatch(/^\d+ of \d+ done/)
+    await page.getByRole('button', { name: 'Balances…' }).click()
+    await expect(closing.getByRole('heading', { name: 'Balances for October 2026' })).toBeVisible()
+    await expect(closing.getByRole('checkbox', { name: 'Count everything in October as done' })).toBeChecked()
+    await closing.getByLabel('Savings: at the end of October 2026 (EUR)').fill('9000')
+    await closing.getByRole('button', { name: 'Save' }).click()
+    await expect(closing).toBeHidden()
+    await expect(progress).toHaveText(/^All \d+ done$/)
+    const savings = assets.getByRole('button', { name: /^Savings balance:/ })
+    await expect(savings).toHaveAccessibleName('Savings balance: €9,000.00, entered')
+    // with everything ticked there is nothing left to offer
+    await page.getByRole('button', { name: 'Balances…' }).click()
+    await expect(closing.getByRole('checkbox')).toHaveCount(0)
+    await closing.getByRole('button', { name: 'Cancel' }).click()
+    // one step: Undo takes the balance and every tick back
+    await page.getByRole('button', { name: 'Undo' }).click()
+    await expect(progress).toHaveText(october)
+    await expect(savings).not.toHaveAccessibleName(/entered/)
   })
 
   test('a rule per account: a percentage from the transfer line, another from the account, and the rest follows', async ({ page }) => {

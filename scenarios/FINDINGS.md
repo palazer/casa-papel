@@ -241,7 +241,7 @@ with the place it fails today.
 
 | Step | Rule | Scenarios |
 | --- | --- | --- |
-| 2. Closing replaced by the calendar | T2, T3 | `06-the-past.feature`: 3 |
+| 2. Closing replaced by the calendar | T2 (T3 is built) | `06-the-past.feature`: 1 |
 | 3. "This and following months" | A3 | `01-amounts-over-months.feature`: 2 |
 | 4. The currency model | X10 to X15 | `05-rates.feature`: 12 |
 | 5. The question before a change alters the past | T4 | `06-the-past.feature`: 7, `14-people-goals-data.feature`: 1 |

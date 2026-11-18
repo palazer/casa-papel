@@ -34,17 +34,31 @@ Feature: The past
     Then "Rent" is 1,250.00 in March 2026
     And no month can be closed or reopened
 
-  @T3 @planned
+  @T3
   Scenario: "Count everything as done" marks a whole month done, and changes no amount
     When I count everything in May 2026 as done
     Then every amount of May 2026 is done
     And nothing has changed
 
-  @T3 @planned
+  @T3
   Scenario: Real balances are typed without closing anything
     When I open "Balances for May 2026" and type 7,650.00 for "Savings"
     Then "Savings" ends May 2026 with 7,650.00
     And "Rent" can still be changed in May 2026
+
+  @T3
+  Scenario: Counting a month as done leaves a balance that was typed for it as it is
+    Given "Savings" really held 7,650.00 at the end of April 2026
+    When I count everything in April 2026 as done
+    Then every amount of April 2026 is done
+    And nothing has changed
+
+  @T3
+  Scenario: A month that is counted as done leaves the months around it as they were
+    When I count everything in May 2026 as done
+    Then every amount of May 2026 is done
+    And "Rent" can still be changed in May 2026
+    And "Rent" is 1,200.00 in every month from January 2026 to December 2026
 
   # ---------- step 5: the question before a change alters the past ----------
 

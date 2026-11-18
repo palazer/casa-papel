@@ -238,14 +238,16 @@ rule T4 will ask first.
 **T1. A change in an earlier month carries through every balance after it.** That follows from B1: nothing is frozen
 unless a real balance stands in between (B5).
 
+**T3. "Balances for <Month>…" is a button of its own**, with a tick "Count everything in <Month> as done". The tick
+puts the done mark on every line of the month that has an amount, and changes no amount. It is set when the dialog
+opens for a month that is over, and not for the current month or a later one. The balances and the ticks are saved
+as one step.
+
 > **Decided, not built (steps 2 and 5).**
 >
 > The past is every month before the current calendar month.
 >
 > **T2. Closing and reopening a month go away.** A month that is over can still be corrected.
->
-> **T3. "Balances for <Month>…" is a button of its own**, with a tick "Count everything in <Month> as done". The
-> tick changes no amount.
 >
 > **T4. A change that alters a past month asks first.** It lists the months and what changes in them, and offers
 > "Cancel" and "Save anyway". Where a setting can have a date (the growth of an investment), it also offers "only

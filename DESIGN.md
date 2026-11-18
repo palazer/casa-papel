@@ -198,8 +198,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   months and kept per device (`grid.earlier`). Hiding columns hides nothing from the sums: the engine counts every
   month, and the Σ line stays the all-time total.
 - A month header is a menu button: the month's totals, then `Open in the Statement` (the Statement opens on that month,
-  for that visit only: `handMonth` in `src/app/screens.ts`), then `Close month` (it opens the closing dialog, §8) or
-  `Reopen month`.
+  for that visit only: `handMonth` in `src/app/screens.ts`), then `Balances for <Mon YYYY>…` (the month's balances
+  dialog, §8), then `Close month` or `Reopen month`.
 - A cell in another currency is two lines: the typed amount over a `text-[10px] leading-3` muted `≈ €3,120` in the household
   currency at that month's rate (the cell button becomes `flex-col items-end`; the certainty styling stays on the amount
   line; the `aria-label` says `, about €3,120`). The label keeps the currency code, a follower's too. A foreign account's
@@ -323,9 +323,9 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   shows the goal's name, its bar and the sentence that says how far the plan gets (`goalStatusLine`), with `Edit`
   beside the name; there is no list of all goals. The toolbar holds the `MonthPicker`, `Expand all` / `Collapse all`
   (every group and category at once; not "Open" and "Close", which would read as the month's), the `Suggestions` toggle, the
-  `MarksLegend` and, last, the month's one primary action: `Close month` (`sm`, lime) while it is open, `Reopen month`
-  (`sm outline`) once closed; `Close month` is left out while the "Setting up" guide shows. `Close month` opens the
-  closing dialog (§8), which asks what the accounts really held before it locks the month. Under the header sits the
+  `MarksLegend` and, last, `Balances…` (`sm outline`: the month's balances dialog, §8) and the month's one primary
+  action: `Close month` (`sm`, lime) while it is open, `Reopen month` (`sm outline`) once closed; both are left out
+  while the "Setting up" guide shows. Under the header sits the
   **progress line** (`monthProgress` and `progressText` in `src/features/statement/progress.ts`): a muted `text-xs`
   `role="status"` line with an (i), `7 of 21 done · €… still to pay · €… to come in`, then `All 21 done`, and `Closed ·
   all done` for a closed month; a month with nothing in it shows no line. The month is worked in its upper half: a row and each of its items
@@ -679,13 +679,16 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
     number (household currency only; another currency is converted on saving and the dialog says so). The
     difference is shown, never booked as spending: where an account takes the rest, extra spending would lower that
     transfer in the plan, not the current accounts.
-  - **The closing dialog** (`CloseMonthDialog.tsx`, `Close <Month>`, `sm:max-w-xl`): opened by `Close month` on the
-    Statement and in the Grid's month menu. Every account that has a balance in the month, under the Statement's
-    headings as `text-xs font-medium` lines (`Current accounts` when there are several, `Savings accounts`,
-    `Investment accounts`, `Other assets`, `Debts`), the column heads `At the start` and `At the end` once at the
-    top; on a phone the name stands on a line of its own above its pair. `Close month` (lime) saves what was typed
-    and closes the month in one step, so one Undo takes both back (`closeMonth` with its balances); with nothing
-    typed it is the closing it always was. A household without an account that has a balance is not asked.
+  - **The month's balances dialog** (`MonthBalancesDialog.tsx`, `Balances for <Month>`, `sm:max-w-xl`): opened by
+    `Balances…` on the Statement and `Balances for <Mon YYYY>…` in the Grid's month menu. Every account that has a
+    balance in the month, under the Statement's headings as `text-xs font-medium` lines (`Current accounts` when
+    there are several, `Savings accounts`, `Investment accounts`, `Other assets`, `Debts`), the column heads `At
+    the start` and `At the end` once at the top; on a phone the name stands on a line of its own above its pair. A
+    household without an account that has a balance reads `No account keeps a balance yet.` in their place. Under
+    the fields, while something in the month is not ticked, a `Check` `Count everything in <Month> as done` with
+    the muted line `Ticks every line of the month. No amount changes.`; it is set when the dialog opens for a month
+    that is over (`isPastMonth`) and not for the current month or a later one. Footer: Cancel, `Save`. What was
+    typed and the ticks are one step, so one Undo takes both back (`setMonthBalances` with `done`).
   A closed month disables the fields, drops `Save` and says where to correct it: `<Month> is closed. Correct what it
   ended on from the starting amount of <next month>, or reopen the month.`
 - A card whose purchases are expense rows gets, wherever its end is typed above the calculated one, a `rounded-md

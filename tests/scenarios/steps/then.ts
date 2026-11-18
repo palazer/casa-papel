@@ -7,6 +7,8 @@ import { BRIDGE_TERMS, bridgeOf, type BridgeTerm } from '../checks/bridge'
 import { diffFigures } from '../figures'
 import { moneyText, monthName, step } from '../registry'
 import { ScenarioError, type World } from '../world'
+import { itemsFromCurrent, planRowMonthSave } from '@/store'
+import { monthProgress } from '@/features/statement/progress'
 
 /** Amounts are compared as the scenario writes them, so a failure reads "expected 1,200.00, got 1,250.00". */
 const same = (got: number, expected: number, what: string) => expect(moneyText(got), what).toBe(moneyText(expected))
@@ -123,6 +125,25 @@ async function unchanged(world: World, before?: MonthKey): Promise<void> {
 // measured against the figures before the last "When"
 step('nothing has changed before {month}', (world: World, month: string) => unchanged(world, month))
 step('nothing has changed', (world: World) => unchanged(world))
+
+// ---------- done, and still open to change ----------
+
+step('every amount of {month} is done', async (world: World, month: string) => {
+  const { engine } = await world.view()
+  const p = monthProgress(engine.rows, engine.cells, month)
+  if (p.total === 0) throw new ScenarioError(`${monthName(month)} has no amounts, so there is nothing that could be done.`)
+  expect(`${p.done} of ${p.total} done`, `what is ticked in ${monthName(month)}`).toBe(`${p.total} of ${p.total} done`)
+})
+
+// asked of the app without saving anything: what the row's dialog would write for another amount in that month
+step('{string} can still be changed in {month}', async (world: World, rowName: string, month: string) => {
+  const row = await world.row(rowName)
+  const { tables, engine } = await world.view()
+  const now = itemsFromCurrent(engine.cells[cellKey(row.id, month)], row.defaultFundedBy, row.defaultStatus)
+  const items = now.length ? now.map((i, n) => (n === 0 ? { ...i, kind: 'normal' as const, amount: (engine.cells[cellKey(row.id, month)]?.value ?? 0) + 100 } : i)) : []
+  const written = planRowMonthSave(tables, engine, row.id, month, { items, scope: 'this-month' }, 1)
+  expect(written.length, `what a new amount for "${rowName}" in ${monthName(month)} would write`).toBeGreaterThan(0)
+})
 
 // ---------- what the app said ----------
 

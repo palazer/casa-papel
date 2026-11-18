@@ -17,10 +17,10 @@ import { useUndoNotice } from '@/app/useUndoNotice'
 import { UndoNotice } from '@/components/UndoNotice'
 import { cellKey, currentAccountsIn, groupRowsByCategory, mainAccountLabel, type EngineOutput } from '@/engine'
 import { isOldPocketShare, isShareRule, monthOfDate, parseMonth, repeatsText, resolveRules, runningSchedules, type Household, type Money, type MonthKey, type Row, type RuleState, type Section, type Tables } from '@/model'
-import { addPlanYear, closeMonth, derivedRowReason, monthBalances, reopenMonth } from '@/store'
+import { addPlanYear, closeMonth, derivedRowReason, reopenMonth } from '@/store'
 import { AddRowInline } from './AddRowInline'
 import { BalanceDialog } from './BalanceDialog'
-import { CloseMonthDialog } from './CloseMonthDialog'
+import { MonthBalancesDialog } from './MonthBalancesDialog'
 import { CurrentBalanceDialog } from './CurrentBalanceDialog'
 import { CellEditor } from './CellEditor'
 import { RowMenu } from './RowMenu'
@@ -48,8 +48,8 @@ export function GridScreen() {
   const [balanceSel, setBalanceSel] = useState<{ accountId: string; month: MonthKey } | null>(null)
   /** The month whose real balances of the current accounts are being typed. */
   const [currentSel, setCurrentSel] = useState<MonthKey | null>(null)
-  /** The month "Close month" was pressed for: its balances are asked for first. */
-  const [closing, setClosing] = useState<MonthKey | null>(null)
+  /** The month "Balances for <Month>…" was pressed for: every account of it, with the tick that counts it as done. */
+  const [balancesFor, setBalancesFor] = useState<MonthKey | null>(null)
   const [error, setError] = useState<string | null>(null)
   /** What a restore from a row's menu brought back, with the way back: it goes with the next change. */
   const notice = useUndoNotice(store)
@@ -157,7 +157,7 @@ export function GridScreen() {
           </Button>
         )}
         <Button size="xs" variant="outline" onClick={() => act(() => addPlanYear(store))}>Add {parseMonth(months[months.length - 1]).year + 1}</Button>
-        <span className="text-muted-foreground">Click a cell to edit · arrows move · Enter opens · click a month name to open it in the Statement, or to close or reopen it</span>
+        <span className="text-muted-foreground">Click a cell to edit · arrows move · Enter opens · click a month name to open it in the Statement, to type its balances, or to close or reopen it</span>
         <MarksLegend neg={neg} />
         {engine.warnings.length > 0 && <p role="alert" className="basis-full text-amber-700 dark:text-amber-400">{engine.warnings.join(' · ')}</p>}
         {error && (
@@ -198,7 +198,10 @@ export function GridScreen() {
                         {t?.closed ? (
                           <DropdownMenuItem onClick={() => act(() => reopenMonth(store, m))}>Reopen month</DropdownMenuItem>
                         ) : (
-                          <DropdownMenuItem onClick={() => (monthBalances(tables, engine, m).lines.length > 0 ? setClosing(m) : act(() => closeMonth(store, m)))}>Close month</DropdownMenuItem>
+                          <>
+                            <DropdownMenuItem onClick={() => setBalancesFor(m)}>Balances for {formatMonth(m, locale)}…</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => act(() => closeMonth(store, m))}>Close month</DropdownMenuItem>
+                          </>
                         )}
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -302,7 +305,7 @@ export function GridScreen() {
           closed={engine.totals[currentSel]?.closed ?? false} onClose={() => setCurrentSel(null)}
         />
       )}
-      {closing && !engine.totals[closing]?.closed && <CloseMonthDialog key={closing} month={closing} tables={tables} household={household} onClose={() => setClosing(null)} />}
+      {balancesFor && !engine.totals[balancesFor]?.closed && <MonthBalancesDialog key={balancesFor} month={balancesFor} tables={tables} engine={engine} household={household} onClose={() => setBalancesFor(null)} />}
       {selected && selectedRow && (
         <CellEditor key={`${selectedRow.id}:${selected.month}`} tables={tables} engine={engine} household={household} row={selectedRow} month={selected.month} onClose={() => setSelected(null)} />
       )}

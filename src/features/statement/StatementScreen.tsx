@@ -15,12 +15,12 @@ import { useUndoNotice } from '@/app/useUndoNotice'
 import { UndoNotice } from '@/components/UndoNotice'
 import { buildStatement, cellKey, currentAccountsIn, notSetAside, type GoalProgress, type Statement, type StatementLine, type StatementSide } from '@/engine'
 import { accountGroup, isOutsideNetWorth, isPocketRow, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type Money, type MonthKey, type Row, type Section } from '@/model'
-import { accountSuggestions, addPayOffRow, addPlanYear, closeMonth, monthBalances, moveAccount, movePool, removeIfFree, reopenMonth, ruleRowOf, setCellDone, setDerivedDone, setItemStatus, setupFocus, setupSteps, shownRowSuggestions, stepSuggestions, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupSide, type SetupStepKey } from '@/store'
+import { accountSuggestions, addPayOffRow, addPlanYear, closeMonth, moveAccount, movePool, removeIfFree, reopenMonth, ruleRowOf, setCellDone, setDerivedDone, setItemStatus, setupFocus, setupSteps, shownRowSuggestions, stepSuggestions, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupSide, type SetupStepKey } from '@/store'
 import { GoalDialog } from '@/features/goals/GoalDialog'
 import { goalStatusLine } from '@/features/goals/goalText'
 import { AddRowInline } from '@/features/grid/AddRowInline'
 import { BalanceDialog } from '@/features/grid/BalanceDialog'
-import { CloseMonthDialog } from '@/features/grid/CloseMonthDialog'
+import { MonthBalancesDialog } from '@/features/grid/MonthBalancesDialog'
 import { CurrentBalanceDialog } from '@/features/grid/CurrentBalanceDialog'
 import { CellEditor } from '@/features/grid/CellEditor'
 import { RowMenu } from '@/features/grid/RowMenu'
@@ -134,8 +134,8 @@ export function StatementScreen() {
   const [balanceFor, setBalanceFor] = useState<string | null>(null)
   /** The real balances of the current accounts are being typed. */
   const [currentBalance, setCurrentBalance] = useState(false)
-  /** "Close month" was pressed: the month's balances are asked for first. */
-  const [closing, setClosing] = useState(false)
+  /** "Balances…" was pressed: every account of the month, with the tick that counts the month as done. */
+  const [balances, setBalances] = useState(false)
   /** The expense category whose estimate is being typed. */
   const [estimateFor, setEstimateFor] = useState<string | null>(null)
   /** An account or a virtual account that no row fills yet, asked how much goes to it: the short dialog that adds the row. */
@@ -273,8 +273,6 @@ export function StatementScreen() {
   }
   const mainLine = statement.position.left.lines.find((l) => l.id === 'main')
   const balanceResult = balanceFor ? engine.accounts[balanceFor]?.months[m] : undefined
-  // closing asks what the accounts really held; a household without an account that has a balance has nothing to ask
-  const askBalances = monthBalances(tables, engine, m).lines.length > 0
 
   /** A row counts its items; an item is done or not; an empty line has nothing to tick. */
   function doneOf(line: StatementLine): { done: number; total: number; state: DoneState } | null {
@@ -622,11 +620,14 @@ export function StatementScreen() {
             {currencies.map((c) => <RateChip key={`${c}:${m}`} tables={tables} household={household} month={m} currency={c} locked={statement.closed} />)}
           </span>
         )}
-        {/* a household that is still being set up has nothing to close yet; a closed month can always be reopened */}
+        {/* a household that is still being set up has no month to look back on yet; a closed month can always be reopened */}
         {statement.closed ? (
           <Button size="sm" variant="outline" onClick={() => act(() => reopenMonth(store, m))}>Reopen month</Button>
         ) : !settingUp && (
-          <Button size="sm" onClick={() => (askBalances ? setClosing(true) : act(() => closeMonth(store, m)))}>Close month</Button>
+          <>
+            <Button size="sm" variant="outline" onClick={() => setBalances(true)}>Balances…</Button>
+            <Button size="sm" onClick={() => act(() => closeMonth(store, m))}>Close month</Button>
+          </>
         )}
         {error && <p role="alert" className="basis-full text-destructive">{error}</p>}
         {statement.warnings.map((w) => <p key={w} className="basis-full text-amber-700">{w}</p>)}
@@ -663,7 +664,7 @@ export function StatementScreen() {
           key={m} title={mainLine.label} month={m} tables={tables} household={household} closed={statement.closed} onClose={() => setCurrentBalance(false)}
         />
       )}
-      {closing && !statement.closed && <CloseMonthDialog key={m} month={m} tables={tables} household={household} onClose={() => setClosing(false)} />}
+      {balances && !statement.closed && <MonthBalancesDialog key={m} month={m} tables={tables} engine={engine} household={household} onClose={() => setBalances(false)} />}
       {estimateCategory && (
         <EstimateDialog
           key={`${estimateCategory.id}:${m}`} category={estimateCategory} month={m} household={household} closed={statement.closed}
