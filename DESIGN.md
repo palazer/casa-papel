@@ -638,7 +638,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   The cell editor's rate line (`src/features/grid/RateLine.tsx`) sits under an amount in another currency:
   `≈ €3,120.00 · 1 EUR = 1.084 USD · [ECB] 2 Nov 2026` with the table's chip tones, a ghost `xs` "Change this month's
   rate…" that reveals an inline input (one rate per currency per month), and "Use the ECB rate again" while the rate is
-  manual. The ECB day is the Month rate setting's, the first business day by default. **On the Statement the month's rate is a
+  manual. The ECB day is the latest published one while the month runs and its last working day once it is over. **On the Statement the month's rate is a
   chip in the toolbar** (`RateChip`, after the legend and before the month's primary action; `data-testid="month-rates"`),
   once for every other currency the month on screen counts in (its rows and accounts, and the current accounts): the
   rate alone, `1 EUR = 1.084 USD` (`No USD rate` while there is none), in the tone of where it came from (zinc ECB or
@@ -665,10 +665,14 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   amount.` instead (`unreadableAmount`). Percentages and rates are not amounts and take one number.
 - A currency is always chosen from a list, never typed: `currencyChoices` in `src/app/currencies.ts` (the household's
   own first, labelled `EUR (household currency)`, then the rest of the fifteen in `CURRENCIES`, rule X13; a code in
-  use that is not on the list stays selectable, also after another one is picked in the same dialog). A currency that comes into use and has no rate at all yet gets the ECB's by itself
-  (`useAutoRates` in the app shell, once per session per currency; only currency codes and dates are sent). The field
-  that brings it in says so in its inline text. Offline, or for a currency the ECB does not publish, the amounts stay
-  unconverted and the rates card under Household is where a rate is typed or fetched again.
+  use that is not on the list stays selectable, also after another one is picked in the same dialog). The official rates are kept up to date by the app itself (`useAutoRates` in the app shell, rule X11): once a day
+  per household and currency on each device, after the first sync, it fetches what is open (`refreshRates`): the
+  latest rate for the running month, the last working day's for a month that ended, every month of a currency that
+  is new. Only currency codes and dates are sent. Nothing on screen announces it; the chip and the day beside a
+  rate say what it is. A fetch that fails is tried again when the device is back online or the app is opened again;
+  the amounts stay as they are meanwhile, and "Fetch ECB rates" on the rates card under Household asks at once. For
+  a currency the ECB does not publish the amounts stay unconverted and that card is where a rate is typed. A field
+  of the rates table that is emptied takes the official rate back; it never leaves a month that is over without one.
 - A row's menu (`src/features/grid/RowMenu.tsx`) runs Rename…, Move up, Move down, Category…, Belongs to…, Currency…,
   then Treat new values as…, Comes out of…, Deducted from an income… (spending rows, followers included; it names the
   income once set), the account verb, Follow another row…, then Archive or delete… or Restore. The account verb says

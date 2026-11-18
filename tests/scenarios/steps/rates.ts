@@ -1,10 +1,10 @@
 import { FxRateSchema } from '@/model'
 import { addMonths } from '@/model'
-import { setManualRate, setPairForecast } from '@/store'
+import { refreshRates, restoreEcbRate, setManualRate, setPairForecast } from '@/store'
 import { step } from '../registry'
-import type { World } from '../world'
+import { ScenarioError, type World } from '../world'
 
-// A rate as "Fetch ECB rates" stores it. Written straight into the stored rates: a scenario never uses the network.
+// A month's rate as an earlier fetch left it, without the day it was taken on. Written straight into the stored rates.
 step('the ECB rate for {pair} in {month} is {rate}', async (world: World, pair: string, month: string, rate: number) => {
   await world.store.commitSystem([{ op: 'put', table: 'fxRates', record: FxRateSchema.parse({ pair, month, rate, source: 'api', updatedAt: Date.now() }) }])
 })
@@ -14,8 +14,23 @@ step('I set my rate for {pair} in {month} to {rate}', async (world: World, pair:
   await setManualRate(world.store, pair, month, rate)
 })
 
-step('I remove my rate for {pair} in {month}', async (world: World, pair: string, month: string) => {
-  await setManualRate(world.store, pair, month, null)
+// The field of a typed rate emptied on the rates card, or "Use the ECB rate again": the official rate of that month is
+// fetched in its place. A month to come has none, and is a forecast again.
+step('I take my rate for {pair} in {month} back', async (world: World, pair: string, month: string) => {
+  await restoreEcbRate(world.store, pair, month, world.rates)
+})
+
+// What the ECB published on a day, as the rate service will answer it. Nothing is stored until the app fetches.
+step('the official rate for {pair} on {day} is {rate}', async (world: World, pair: string, day: string, rate: number) => {
+  const [base, symbol] = pair.split('/')
+  const { household } = await world.view()
+  if (base !== household.baseCurrency) throw new ScenarioError(`Official rates are fetched against ${household.baseCurrency}: name the pair ${household.baseCurrency}/${symbol}.`)
+  ;(world.daily[day] ??= {})[symbol] = rate
+})
+
+// what the app does by itself once a day, and "Fetch ECB rates" on the rates card
+step('the app brings the rates up to date', async (world: World) => {
+  await refreshRates(world.store, world.rates)
 })
 
 // "Months to come" on the rates card, per currency: "My own change per month", and "Hold the last rate"

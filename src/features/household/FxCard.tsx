@@ -3,14 +3,13 @@ import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { Input } from '@/components/ui/input'
 import { Island } from '@/components/ui/island'
-import { Label } from '@/components/ui/label'
 import { InfoTip } from '@/components/InfoTip'
 import { NativeSelect } from '@/components/NativeSelect'
 import { formatMonth } from '@/app/format'
 import { useStore } from '@/app/store'
 import { TREND_CHANGES, historyMonths, householdFx, rateInfo, trendFor } from '@/engine'
-import { monthOfDate, type FxMonthRate, type Household, type MonthKey, type Tables } from '@/model'
-import { fetchRatesFor, neededPairs, setFxSettings, setManualRate, setPairForecast } from '@/store'
+import { monthOfDate, type Household, type MonthKey, type Tables } from '@/model'
+import { neededPairs, refreshRates, restoreEcbRate, setManualRate, setPairForecast } from '@/store'
 import { TAG_TONE, formatRate, rateTag, readableRate, toStored } from './fxDisplay'
 
 /**
@@ -30,6 +29,8 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
   const pairs = neededPairs(tables)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
+  /** Counts the fields that were emptied, so a field shows its rate again when emptying it changed nothing. */
+  const [emptied, setEmptied] = useState(0)
   /** "My own change per month" was chosen for a pair and no number is saved for it yet. */
   const [ownOpen, setOwnOpen] = useState<Record<string, boolean>>({})
   /** What is typed into a pair's % field, until it is saved. */
@@ -67,8 +68,8 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
     setBusy(true)
     setNote(null)
     try {
-      const res = await fetchRatesFor(store, pairs.map((p) => p.split('/')[1]))
-      setNote(`Stored ${res.written} month rate${res.written === 1 ? '' : 's'} from the ECB.${res.unsupported.length ? ` Not published by the ECB: ${res.unsupported.join(', ')}; enter those by hand.` : ''}`)
+      const res = await refreshRates(store)
+      setNote(`${res.written === 0 ? 'The official rates are up to date.' : `Stored ${res.written} month rate${res.written === 1 ? '' : 's'} from the ECB.`}${res.unsupported.length ? ` Not published by the ECB: ${res.unsupported.join(', ')}; enter those by hand.` : ''}`)
     } catch (e) {
       onError(e instanceof Error ? e.message : 'Could not fetch rates')
     } finally {
@@ -81,20 +82,12 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
       air title="Currency rates"
       description={pairs.length === 0
         ? `Everything is in ${base}; nothing to convert. Give a row or account another currency and the rates appear here.`
-        : `Each column is a price the way you would say it: 1 ${base} in another currency, or 1 of it in ${base}, whichever side is above one. Past months can come from the European Central Bank, taken on the day the Month rate setting picks; months to come are a forecast, set per currency under Months to come. Type a rate to override any month.`}
+        : `Each column is a price the way you would say it: 1 ${base} in another currency, or 1 of it in ${base}, whichever side is above one. The official rates are the European Central Bank's, and the app keeps them up to date by itself: the latest one while a month is running, the one of its last working day once it is over. Months to come are a forecast. Type a rate to override any month; empty it to take the official one back.`}
     >
       {pairs.length > 0 && (
         <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="fx-policy">Month rate</Label>
-              <NativeSelect id="fx-policy" className="w-full" value={household.fxMonthRate} onChange={(e) => act(() => setFxSettings(store, { fxMonthRate: e.target.value as FxMonthRate }))}>
-                <option value="first">First business day of the month</option>
-                <option value="last">Last business day of the month</option>
-                <option value="average">Average over the month</option>
-              </NativeSelect>
-            </div>
-            <div role="group" aria-labelledby="fx-forecast" className="space-y-1.5 sm:col-span-2">
+          <div>
+            <div role="group" aria-labelledby="fx-forecast" className="space-y-1.5">
               <p id="fx-forecast" className="flex items-center gap-1 text-sm font-medium leading-none">Months to come <InfoTip help="household.fxForecast" /></p>
               {forecasts.map((f) => (
                 <div key={f.pair} className="flex flex-wrap items-center gap-2" data-testid={`forecast-${f.code}`}>
@@ -154,7 +147,7 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
                         <td key={p} className="px-2 py-0.5">
                           <div className="flex items-center gap-2">
                             <Input
-                              key={`${p}|${m}|${rec?.rate ?? ''}|${rec?.source ?? ''}`}
+                              key={`${p}|${m}|${rec?.rate ?? ''}|${rec?.source ?? ''}|${emptied}`}
                               aria-label={`1 ${o.from} in ${o.to} for ${formatMonth(m, locale)}`}
                               className="h-6 w-28 text-right tabular-nums" inputMode="decimal"
                               defaultValue={rec ? shown(rec.rate) : ''}
@@ -163,7 +156,12 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
                                 const t = e.target.value.trim()
                                 // leaving the field as it was shown is not a change: tabbing through an ECB month must not make it manual
                                 if (t === (rec ? shown(rec.rate) : '')) return
-                                if (t === '') { act(() => setManualRate(store, p, m, null)); return }
+                                if (t === '') {
+                                  // emptied: your rate goes and the official one comes back; an official rate has nothing to give way to
+                                  if (rec?.source === 'manual') act(() => restoreEcbRate(store, p, m))
+                                  setEmptied((n) => n + 1)
+                                  return
+                                }
                                 const v = Number(t.replace(',', '.'))
                                 if (!(v > 0)) { onError('A rate must be a positive number.'); return }
                                 const value = toStored(o, base, v)

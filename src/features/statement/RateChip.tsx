@@ -7,17 +7,8 @@ import { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitl
 import { formatMonth } from '@/app/format'
 import { HELP } from '@/app/help'
 import type { Household, MonthKey, Tables } from '@/model'
-import { TAG_TONE, formatDay, formatRate } from '@/features/household/fxDisplay'
+import { TAG_TONE, formatRate, rateSource } from '@/features/household/fxDisplay'
 import { useMonthRate } from '@/features/grid/useMonthRate'
-
-/** Where the month's rate came from, in words. */
-const SOURCE: Record<string, string> = {
-  manual: 'Your own rate for this month.',
-  ECB: 'The European Central Bank\'s rate.',
-  forecast: 'A forecast: worked out from the last official rate, the way "Months to come" under Household says.',
-  carried: 'Carried over from the nearest month with a rate.',
-  missing: 'No rate yet: amounts in this currency cannot be counted until there is one.',
-}
 
 /**
  * The month's rate for one other currency, in the Statement's toolbar (DESIGN.md §7): a chip that says the rate
@@ -57,7 +48,7 @@ export function RateChip({ tables, household, month, currency }: {
           <PopoverTitle className="text-xs font-semibold">{currency} in {long}</PopoverTitle>
           <PopoverDescription className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs leading-4">
             <Chip tone={TAG_TONE[tag]}>{tag}</Chip>
-            <span>{SOURCE[tag]}{rec?.date ? ` Taken on ${formatDay(rec.date, locale)}.` : ''}</span>
+            <span>{rateSource(tag, rec, month, locale)}</span>
           </PopoverDescription>
         </PopoverHeader>
         <form className="flex flex-wrap items-center gap-2" onSubmit={(e) => { e.preventDefault(); save(text, close) }}>

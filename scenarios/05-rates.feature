@@ -136,12 +136,31 @@ Feature: Amounts and accounts in another currency
     And "Current account" ends January 2026 with 2,500.00
 
   @X4
-  Scenario: Removing my rate leaves the month without one of its own
+  Scenario: Taking my rate back brings the official rate of the month back
+    Given an income "Alex – Salary" in USD of 3,300.00 from January 2026
+    And the official rate for EUR/USD on 27 February 2026 is 1.2500
+    And I set my rate for EUR/USD in February 2026 to 1.2000
+    When I take my rate for EUR/USD in February 2026 back
+    Then the rate for EUR/USD in February 2026 is 1.2500
+    And "Alex – Salary" counts as 2,640.00 in February 2026, at the rate of 27 February 2026
+
+  @X4
+  Scenario: My rate stays when the official one cannot be had
+    Given an income "Alex – Salary" in USD of 3,300.00 from January 2026
+    And the official rate for EUR/USD on 13 March 2026 is 1.0000
+    And I set my rate for EUR/USD in February 2026 to 1.2000
+    When I take my rate for EUR/USD in February 2026 back
+    Then it is refused with "the one you typed stays"
+    And the rate for EUR/USD in February 2026 is 1.2000
+
+  @X4 @X11
+  Scenario: A rate I typed stays when the app brings the rates up to date
     Given an income "Alex – Salary" in USD of 3,300.00 from January 2026
     And I set my rate for EUR/USD in February 2026 to 1.2000
-    When I remove my rate for EUR/USD in February 2026
-    Then the rate for EUR/USD in February 2026 is 1.1000
-    And "Alex – Salary" counts as 3,000.00 in February 2026
+    And the official rate for EUR/USD on 27 February 2026 is 1.2500
+    When the app brings the rates up to date
+    Then the rate for EUR/USD in February 2026 is 1.2000
+    And "Alex – Salary" counts as 2,750.00 in February 2026
 
   @X9
   Scenario: Two other currencies are converted through the household's
@@ -177,15 +196,64 @@ Feature: Amounts and accounts in another currency
     When I correct the foreign amount of "Alex – Salary" in January 2026 to 3,520.00
     Then the conversion of "Alex – Salary" in January 2026 is 3,520.00 USD = 3,200.00 EUR at 1.1000
 
-  @X11 @planned
+  # A month that is over counts at the rate of its last working day, the running month at the latest one. The
+  # first days of each month are there to show that it is the last one that counts.
+  @X11
   Scenario: An amount without a recorded conversion uses the official rate of its month
     Given an income "Alex – Salary" in USD of 3,300.00 from January 2026
+    And the official rate for EUR/USD on 2 January 2026 is 1.3000
     And the official rate for EUR/USD on 30 January 2026 is 1.1000
+    And the official rate for EUR/USD on 2 February 2026 is 1.4000
     And the official rate for EUR/USD on 27 February 2026 is 1.2500
+    And the official rate for EUR/USD on 2 March 2026 is 1.5000
     And the official rate for EUR/USD on 13 March 2026 is 1.0000
+    When the app brings the rates up to date
     Then "Alex – Salary" counts as 3,000.00 in January 2026, at the rate of 30 January 2026
     And "Alex – Salary" counts as 2,640.00 in February 2026, at the rate of 27 February 2026
     And "Alex – Salary" counts as 3,300.00 in March 2026, at the rate of 13 March 2026
+
+  @X11
+  Scenario: The running month moves with the latest rate, and settles on its last working day once it is over
+    Given an income "Alex – Salary" in USD of 3,300.00 from January 2026
+    And the official rate for EUR/USD on 13 March 2026 is 1.0000
+    And the app brings the rates up to date
+    And the official rate for EUR/USD on 20 March 2026 is 1.2000
+    And today is 20 March 2026
+    When the app brings the rates up to date
+    Then "Alex – Salary" counts as 2,750.00 in March 2026, at the rate of 20 March 2026
+    When the calendar moves on to April 2026
+    And the official rate for EUR/USD on 31 March 2026 is 1.1000
+    And the official rate for EUR/USD on 14 April 2026 is 1.3200
+    And the app brings the rates up to date
+    Then "Alex – Salary" counts as 3,000.00 in March 2026, at the rate of 31 March 2026
+    And "Alex – Salary" counts as 2,500.00 in April 2026, at the rate of 14 April 2026
+
+  # 1 March 2026 is a Sunday: no rate is published yet in March, and the month runs on the latest one there is.
+  @X11
+  Scenario: In its first days, before a rate is published, a month uses the latest rate there is
+    Given an income "Alex – Salary" in USD of 3,300.00 from January 2026
+    And the official rate for EUR/USD on 27 February 2026 is 1.2500
+    And today is 1 March 2026
+    When the app brings the rates up to date
+    Then "Alex – Salary" counts as 2,640.00 in March 2026, at the rate of 27 February 2026
+    And "Alex – Salary" counts as 2,640.00 in February 2026, at the rate of 27 February 2026
+
+  # What is settled is not asked for again: a second look on the same day writes nothing.
+  @X11
+  Scenario: Bringing the rates up to date twice changes nothing the second time
+    Given an income "Alex – Salary" in USD of 3,300.00 from January 2026
+    And the official rate for EUR/USD on 30 January 2026 is 1.1000
+    And the official rate for EUR/USD on 13 March 2026 is 1.0000
+    And the app brings the rates up to date
+    When the app brings the rates up to date
+    Then nothing has changed
+
+  @X4 @X12
+  Scenario: My rate for a month to come, taken back, leaves the forecast
+    Given the EUR/USD rate has risen by 1% a month for the last 12 months, to 1.0000 in March 2026
+    And I set my rate for EUR/USD in May 2026 to 1.1000
+    When I take my rate for EUR/USD in May 2026 back
+    Then the forecast rate for EUR/USD in May 2026 is 1.0181
 
   @X12
   Scenario: The forecast follows the recent trend, and the trend fades out

@@ -332,6 +332,50 @@ describe('sync engine', () => {
     expect(await a.engine.listInvites()).toHaveLength(0)
     a.engine.stop()
   })
+
+  // What the app fetches by itself (the official rates) waits for this, so it sees another device's edits first.
+  it('says when the first exchange after a start is over: at once without a sign-in, after the pull with one, and also when it failed', async () => {
+    const settled = async (engine: SyncEngine) => {
+      let over = false
+      void engine.firstSync.then(() => { over = true })
+      await Promise.resolve()
+      await Promise.resolve()
+      return over
+    }
+    const server = new FakeServer()
+    server.addUser('sam@example.com', (await deriveKeys('sam@example.com', PW, FAST)).authKey)
+
+    // a device that is not signed in has nothing to wait for
+    const alone = await withHousehold(server)
+    expect(await settled(alone.engine)).toBe(false)
+    await alone.engine.start()
+    expect(await settled(alone.engine)).toBe(true)
+
+    // signed in: over once what another device changed meanwhile is here
+    const a = await withHousehold(server)
+    await a.engine.signIn('sam@example.com', PW)
+    const b = device(server)
+    await b.engine.signIn('sam@example.com', PW)
+    b.engine.stop()
+    const rent = (await loadTables(a.store)).rows.find((r) => r.name === 'Rent')!
+    await renameRow(a.store, rent.id, 'Rent A')
+    await a.engine.flush()
+    const again = new SyncEngine(b.store, b.remote, { debounceMs: 0, pollMs: 0, kdfIterations: FAST })
+    expect(await settled(again)).toBe(false)
+    await again.start()
+    await again.firstSync
+    expect((await loadTables(b.store)).rows.find((r) => r.id === rent.id)?.name).toBe('Rent A')
+    again.stop()
+
+    // offline: the exchange fails, and it is over all the same
+    b.remote.offline = true
+    const offline = new SyncEngine(b.store, b.remote, { debounceMs: 0, pollMs: 0, kdfIterations: FAST })
+    await offline.start()
+    await offline.firstSync
+    expect(await settled(offline)).toBe(true)
+    offline.stop()
+    a.engine.stop()
+  })
 })
 
 export const _row = (name: string): Row => RowSchema.parse({ id: newId(), createdAt: 0, updatedAt: 0, name, section: 'expense' })

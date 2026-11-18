@@ -191,6 +191,17 @@ step('the currencies offered are {ccys}', async (world: World, codes: string[]) 
   expect(currencyChoices(household.baseCurrency), 'what a currency field of this household offers').toEqual([household.baseCurrency, ...codes.filter((c) => c !== household.baseCurrency)])
 })
 
+// what an amount counts as, and which day's official rate made it so
+step('{string} counts as {money} in {month}, at the rate of {day}', async (world: World, rowName: string, amount: number, month: string, day: string) => {
+  const row = await world.row(rowName)
+  const { engine, tables, household } = await world.view()
+  const c = engine.cells[cellKey(row.id, month)]
+  if (!c) throw new ScenarioError(`"${rowName}" has no month ${monthName(month)}.`)
+  same(c.valueBase, amount, `what "${rowName}" counts as in ${monthName(month)}`)
+  const rec = tables.fxRates.find((r) => r.pair === `${household.baseCurrency}/${c.currency}` && r.month === month)
+  expect(rec ? `${rec.source === 'api' ? 'the official rate of' : 'a typed rate,'} ${rec.date ?? 'no day'}` : 'no rate of its own', `the rate of ${monthName(month)}`).toBe(`the official rate of ${day}`)
+})
+
 // the same for a month to come, where the rate is a forecast and not a stored one
 step('the forecast rate for {pair} in {month} is {rate}', async (world: World, pair: string, month: string, rate: number) => {
   const { tables, household } = await world.view()

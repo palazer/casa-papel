@@ -63,7 +63,11 @@ export const HouseholdSchema = BaseRecord.extend({
    * one is set, `planHousekeeping` copies it to each currency's own change (`fxPairDrift`) and empties it.
    */
   fxDriftDefault: z.number().default(0),
-  /** Which day's ECB rate stands for a month: the first business day by default (decided 2026-11-08), the last, or the average. */
+  /**
+   * Older versions: which day's ECB rate stood for a month (the first business day by default). Not read any more:
+   * a month uses its last working day's rate once it is over and the latest one while it runs (rule X11). A month
+   * still stored with another day is fetched again, which the app reads from the rate's own record (`rateSettled`).
+   */
   fxMonthRate: FxMonthRateSchema.default('first'),
   /** Older versions: how months to come were worked out for every currency. Not read any more (rule X12). */
   fxDriftMode: z.enum(['fixed', 'average']).default('fixed'),

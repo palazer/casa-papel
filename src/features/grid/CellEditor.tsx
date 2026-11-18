@@ -18,7 +18,7 @@ import {
   type CellItem, type Household, type ItemStatus, type MonthKey, type RepeatChoice, type Repeating, type Row, type Tables,
 } from '@/model'
 import {
-  clearCell, derivedRowReason, endRecurringFrom, fetchRatesFor, itemsFromCurrent, oneMonthValuesReplaced, planFollowing, rowInNewCurrency, saveRowMonth, setCellItems, setCellValue, skipRecurringMonth,
+  clearCell, derivedRowReason, endRecurringFrom, itemsFromCurrent, oneMonthValuesReplaced, planFollowing, refreshRates, rowInNewCurrency, saveRowMonth, setCellItems, setCellValue, skipRecurringMonth,
   type EditScope, type RuleTarget,
 } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
@@ -203,7 +203,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
     setPicked(next)
     setError(null)
     // a currency the household has no rate for yet: ask now, so the line under the amount can say what it is worth
-    if (next !== base && !tables.fxRates.some((r) => r.pair === `${base}/${next}`)) void fetchRatesFor(store, [next]).catch(() => undefined)
+    if (next !== base && !tables.fxRates.some((r) => r.pair === `${base}/${next}`)) void refreshRates(store, fetch, [next]).catch(() => undefined)
   }
 
   /** What a carried item is worth: what the month before hands to this one, as the calculation says it. */

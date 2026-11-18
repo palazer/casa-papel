@@ -2,6 +2,7 @@ import { vi } from 'vitest'
 import { buildStatement, computeEngine, type EngineOutput, type Statement } from '@/engine'
 import { newId, type Account, type Category, type Entity, type Household, type MonthKey, type Pool, type Row, type Tables } from '@/model'
 import { CasaDb, Store, defaultMonths, keepHouse, loadTables, type Mutation } from '@/store'
+import { rateService } from '../rateService'
 import { figuresOf, type Figures } from './figures'
 import { monthName } from './registry'
 
@@ -37,6 +38,10 @@ export class World {
   said: string | null = null
   /** The month of the last "net worth changes by …" step: what "of that, … is …" speaks of. */
   bridgeMonth: MonthKey | null = null
+  /** What the rate service knows: the official rate of each day a scenario named, per currency. A scenario never uses the network. */
+  daily: Record<string, Record<string, number>> = {}
+  /** The rate service as the app's fetch reaches it: a stand-in that answers from `daily` the way the real one does. */
+  readonly rates = rateService(this.daily)
   /** A second device of the same household, once a scenario has one: see the steps "a second device that has synced". */
   second: Store | null = null
   /** How many undoable saves the step that is running has made so far, per device. */

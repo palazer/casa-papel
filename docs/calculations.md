@@ -218,8 +218,9 @@ one; before the first known month, the first known rate.
 is, and the forecast goes on from it. X3 once read "the last known rate stays"; that holds now only where a currency
 has less than a year of rates, or where you hold it.
 
-**X4. A rate you set counts for its month instead of the ECB's.** A fetch does not overwrite it. Removing it leaves
-the month without a rate of its own (X2) until the ECB rate is fetched again.
+**X4. A rate you set counts for its month instead of the official one.** Bringing the rates up to date (X11) does
+not touch it. Taking it back fetches the official rate of that month in its place; when that cannot be had, your
+rate stays. A month to come has no official rate: taking yours back leaves the forecast (X12).
 
 **X5. A rate never changes an amount in its own currency.** It only changes what the amount counts as.
 
@@ -233,9 +234,25 @@ Money moved into it arrives at the month's rate. A real balance is typed in the 
 X13 that should not happen: each of them has a rate.
 
 **X8. A changed rate of an earlier month changes that month and every balance after it.** Today without a question;
-rule T4 will ask first.
+rule T4 will ask first. The app itself changes the rate of a month that is over in one case only: to settle it
+(X11), once, after the month has ended.
 
 **X9. Two other currencies are converted through the household's.** GBP to USD is GBP to EUR, then EUR to USD.
+
+**X11. An amount uses the official rate of its month.** The official rate is the European Central Bank's. While a
+month is running it is the latest one; once the month is over it is the rate of the month's last working day; for a
+month to come it is the forecast (X12). An account in another currency is shown at the same rate.
+
+The app keeps these rates up to date by itself, once a day on each device, for the currencies in use. A month's rate
+is settled when you typed it (X4), or when the month is over and the rate of its last working day was fetched after
+it ended; every other month is open and is fetched again. So the rate of a month that just ended changes once more,
+from the latest rate it ran on to that of its last working day, and then stays. In the first days of a month, before
+a rate is published in it, the month runs on the latest rate there is.
+
+> 3,300.00 USD in March: 3,300.00 EUR on the 13th (1.0000), 2,750.00 on the 20th (1.2000), and 3,000.00 for good
+> once March is over (31 March, 1.1000).
+
+Rule X10, when it is built, lets a transaction keep its own conversion instead.
 
 **X12. The forecast follows the recent trend, and the trend fades out.** A currency's history ends at its last
 official month. The first month after it moves by the average change per month of the last 12 months of that
@@ -260,10 +277,6 @@ list of the field that holds it.
 > rate; any two give the third. The rate comes from you, from the official rate of a day you choose, or from the two
 > amounts. It stays until you change it: a new month rate does not touch it. When the foreign amount is corrected,
 > the rate stays and the home amount follows.
->
-> **X11. Until a conversion is recorded, an amount uses the official rate of its month.** The latest rate while the
-> month is running, the rate of its last working day once it is over, the forecast for a month to come. An account in
-> another currency is shown at the same rate.
 >
 > **X14. A virtual account is kept in the currency of the savings account that holds it.** In a dollar savings
 > account it is a dollar balance: what is set aside arrives in dollars at the month's rate, and what is paid out of

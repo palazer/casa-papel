@@ -70,6 +70,13 @@ export class SyncEngine {
   private readonly now: () => number
   private readonly kdfIterations: number | undefined
   private readonly onVisible = () => { if (typeof document === 'undefined' || document.visibilityState === 'visible') void this.syncNow() }
+  private endFirstSync: () => void = () => undefined
+  /**
+   * Over once the first exchange with the server after `start` has ended, well or not, and at once on a device that
+   * is not signed in. What the app writes by itself and could collide with another device's edit (a fetched rate
+   * against a typed one) waits for this, so it sees what the other device did first.
+   */
+  readonly firstSync: Promise<void> = new Promise((resolve) => { this.endFirstSync = resolve })
 
   readonly store: Store
   readonly remote: SyncRemote
@@ -127,10 +134,22 @@ export class SyncEngine {
 
   /** Resume from the stored sync state (app start). Does nothing when this device is not signed in. */
   async start(): Promise<void> {
+    try {
+      await this.resume()
+    } catch (e) {
+      this.endFirstSync()
+      throw e
+    }
+  }
+
+  private async resume(): Promise<void> {
     const meta = await this.store.meta()
     this.deviceId = meta.deviceId
     this.sync = meta.sync
-    if (!this.sync) return void (await this.refreshView())
+    if (!this.sync) {
+      this.endFirstSync()
+      return void (await this.refreshView())
+    }
     let user: Awaited<ReturnType<SyncRemote['currentUser']>> | undefined
     try {
       user = await this.remote.currentUser()
@@ -141,6 +160,7 @@ export class SyncEngine {
     if (user === null) {
       // no session stored any more: keep the data, forget the link
       await this.saveSync(null)
+      this.endFirstSync()
       return void (await this.refreshView())
     }
     this.key = this.sync.keyB64 ? await importHouseholdKey(this.sync.keyB64) : null
@@ -166,7 +186,7 @@ export class SyncEngine {
       if (this.pollMs > 0) this.pollTimer = setInterval(() => void this.syncNow(), this.pollMs)
     }
     await this.refreshView()
-    void this.syncNow()
+    void this.syncNow().finally(() => this.endFirstSync())
   }
 
   stop(): void {

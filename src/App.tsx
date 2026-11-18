@@ -55,10 +55,17 @@ function Shell() {
     setAccount(step)
   }, [])
 
+  /** The first exchange with the server is over (or there is none to wait for): what the app fetches by itself may run. */
+  const [synced, setSynced] = useState(!sync)
   useEffect(() => {
     if (!sync) return
-    void sync.start()
-    return () => sync.stop()
+    let here = true
+    void sync.firstSync.then(() => { if (here) setSynced(true) })
+    void sync.start().catch(() => undefined)
+    return () => {
+      here = false
+      sync.stop()
+    }
   }, [sync])
   // housekeeping at start: logged edits older than a year go; a failure here costs nothing and the next start tries again
   useEffect(() => {
@@ -72,8 +79,8 @@ function Shell() {
     const mutations = planHousekeeping(tables)
     if (mutations.length) void store.commitSystem(mutations)
   }, [tables, household, months, store])
-  // a currency that has no rate yet gets the ECB's by itself
-  useAutoRates(store, tables)
+  // the official rates of the currencies in use are kept up to date, once a day, after the first sync
+  useAutoRates(store, tables, synced)
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {

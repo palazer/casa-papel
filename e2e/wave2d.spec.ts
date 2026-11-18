@@ -192,6 +192,27 @@ test('months to come: a currency follows its trend, holds its last rate, or move
   await expect(usd.getByLabel('Change per month for USD in %')).toHaveCount(0)
   // January is the second month after the last official rate: its step is 80% of the trend
   await expect(january).toHaveAttribute('placeholder', '1.3104')
+
+  // an emptied field takes the official rate back. A month to come has none: it is a forecast again
+  await december.fill('')
+  await december.press('Tab')
+  await expect(page.getByRole('row', { name: /^Dec 2026/ }).getByText('forecast', { exact: true })).toBeVisible()
+  await expect(december).toHaveAttribute('placeholder', '1.212')
+  // an official rate has nothing to give way to: emptied, the field shows it again
+  const november = page.getByLabel('1 EUR in USD for Nov 2026')
+  await november.fill('')
+  await november.press('Tab')
+  await expect(november).toHaveValue('1.20')
+  await expect(page.getByRole('row', { name: /^Nov 2026/ }).getByText('ECB', { exact: true })).toBeVisible()
+  // a rate typed for a month that is over, emptied: the official one is fetched in its place
+  const october = page.getByLabel('1 EUR in USD for Oct 2026')
+  await october.fill('1.50')
+  await october.press('Tab')
+  await expect(page.getByRole('row', { name: /^Oct 2026/ }).getByText('manual', { exact: true })).toBeVisible()
+  await october.fill('')
+  await october.press('Tab')
+  await expect(page.getByRole('row', { name: /^Oct 2026/ }).getByText('ECB', { exact: true })).toBeVisible()
+  await expect(october).toHaveValue('1.1881')
 })
 
 test('the Statement shows the month\'s rate as a chip in its toolbar: pressed, it takes a rate of one\'s own and gives the ECB\'s back', async ({ page }) => {
@@ -232,7 +253,7 @@ test('the Statement shows the month\'s rate as a chip in its toolbar: pressed, i
   // pressed, it says where the rate is from and takes a rate of one's own: every dollar amount of the month follows
   await chip.click()
   await expect(pop).toContainText('USD in November 2026')
-  await expect(pop).toContainText('The European Central Bank\'s rate. Taken on 2 Nov 2026.')
+  await expect(pop).toContainText('The European Central Bank\'s latest rate, of 2 Nov 2026. It moves until the month is over.')
   await expect(pop.getByRole('button', { name: 'Use the ECB rate again' })).toHaveCount(0)
   await expect(pop.getByLabel('1 EUR =')).toHaveValue('1.25')
   await pop.getByLabel('1 EUR =').fill('0')
@@ -361,7 +382,21 @@ test('a currency that comes into use gets its rates by itself', async ({ page })
   expect(asked[0]).toContain('base=EUR&symbols=USD')
   await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
   await expect(page.getByText(/No USD→EUR rate/)).toHaveCount(0)
-  await expect(page.getByRole('region', { name: 'Assets' }).locator('[data-line^="acc:"]').filter({ hasText: 'Broker' })).toContainText('€8,000.00')
+  const broker = page.getByRole('region', { name: 'Assets' }).locator('[data-line^="acc:"]').filter({ hasText: 'Broker' })
+  await expect(broker).toContainText('€8,000.00')
+
+  // opened again on the same day, the app asks nothing more: the device remembers that the day's rates are in
+  await page.reload()
+  await expect(broker).toContainText('€8,000.00')
+  await page.waitForTimeout(600)
+  expect(asked).toHaveLength(1)
+  // the next day it asks once more (here: the device has forgotten that it asked)
+  await page.evaluate(() => { for (const key of Object.keys(localStorage)) if (key.startsWith('casa.ratesAsked.')) localStorage.removeItem(key) })
+  await page.reload()
+  await expect(broker).toContainText('€8,000.00')
+  await expect.poll(() => asked.length).toBe(2)
+  await page.waitForTimeout(600)
+  expect(asked).toHaveLength(2)
 })
 
 test('a foreign-currency account shows its household-currency value beneath', async ({ page }) => {
