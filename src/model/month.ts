@@ -49,6 +49,14 @@ export function monthOfDate(d: Date = new Date()): MonthKey {
   return monthKey(d.getFullYear(), d.getMonth() + 1)
 }
 
+/**
+ * A month that is over: every month before the current calendar month. The calculation never asks (it does not read
+ * the clock); the screens and the store's own passes do.
+ */
+export function isPastMonth(m: MonthKey, today: MonthKey = monthOfDate()): boolean {
+  return compareMonths(m, today) < 0
+}
+
 /** Today as an ISO date (YYYY-MM-DD) from the local calendar, the way the Paid sheet prefills its date. */
 export function isoDateOfToday(d: Date = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`

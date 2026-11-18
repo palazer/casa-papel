@@ -548,30 +548,59 @@ export async function addPlanYear(store: Store, today: MonthKey = monthOfDate())
 }
 
 /** Mark a whole cell done (or back to the row default). Plain values become a single item. */
-export async function setCellDone(store: Store, rowId: string, month: MonthKey, done: boolean): Promise<void> {
-  const { tables, engine } = await engineUpTo(store, month)
-  assertOpen(tables, month)
-  const row = tables.rows.find((r) => r.id === rowId)
-  if (!row) throw new Error('Row not found')
-  const current = engine.cells[cellKey(rowId, month)]
-  if (!current || current.source === 'archived') return
-  if (current.source === 'derived') return setDerivedDone(store, rowId, month, done)
-  const existing = cellOf(tables, rowId, month)
+/**
+ * What ticking one line of a month as done (or as not done) writes; nothing for a line that is archived there, or
+ * that reads so already. An amount the app works out keeps its tick beside it (`markedDone`). A typed or carried
+ * amount becomes one item that carries the tick, and an itemized line gets it on every item that counts. No amount
+ * changes. Pure; `ts` stamps the writes.
+ */
+export function lineDoneMutations(tables: Tables, engine: EngineOutput, row: Row, month: MonthKey, done: boolean, ts: number): Mutation[] {
+  const current = engine.cells[cellKey(row.id, month)]
+  if (!current || current.source === 'archived') return []
+  const existing = cellOf(tables, row.id, month)
+  const put = (cell: CellInput): Mutation => ({ op: 'put', table: 'cells', record: CellSchema.parse({ ...cell, updatedAt: ts }) })
+  if (current.source === 'derived') {
+    if ((existing?.markedDone ?? false) === done) return []
+    return [put({
+      rowId: row.id, month, mode: existing?.mode ?? 'inherit', value: existing?.value ?? null, items: existing?.items ?? [],
+      note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, markedDone: done, updatedAt: ts,
+    })]
+  }
   const status = done ? 'done' : row.defaultStatus
+  if (existing?.mode === 'items' && existing.items.every((it) => it.skipped || it.status === status)) return []
   const items: CellItem[] =
     existing?.mode === 'items'
       ? existing.items.map((it) => (it.skipped ? it : { ...it, status }))
       : typedAmount(current) === 0
         ? []
         : [{ id: newId(), label: '', amount: typedAmount(current), status, fundedBy: row.defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }]
-  if (items.length === 0 && !existing) return
-  await store.commit([putCell({ rowId, month, mode: 'items', value: null, items, note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, updatedAt: now() })])
+  if (items.length === 0 && !existing) return []
+  return [put({ rowId: row.id, month, mode: 'items', value: null, items, note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, updatedAt: ts })]
 }
 
 /**
- * Tick an automatic row (the savings plug, a pocket share, a follower) as moved this month, or back. The flag lives on
- * the cell record; the engine keeps working the amount out and only reads the flag for the status.
+ * "Count everything in <Month> as done": the tick on every line of the month that has an amount and does not carry it
+ * yet. No amount changes. Pure; `ts` stamps the writes.
  */
+export function countDoneMutations(tables: Tables, engine: EngineOutput, month: MonthKey, ts: number): Mutation[] {
+  const out: Mutation[] = []
+  for (const row of engine.rows) {
+    const c = engine.cells[cellKey(row.id, month)]
+    // a line with nothing in the month has nothing to tick; a payment that was cut to nothing still has its plan
+    if (!c || c.source === 'archived' || c.source === 'empty' || (c.value === 0 && typedAmount(c) === 0)) continue
+    out.push(...lineDoneMutations(tables, engine, row, month, true, ts))
+  }
+  return out
+}
+
+export async function setCellDone(store: Store, rowId: string, month: MonthKey, done: boolean): Promise<void> {
+  const { tables, engine } = await engineUpTo(store, month)
+  assertOpen(tables, month)
+  const row = tables.rows.find((r) => r.id === rowId)
+  if (!row) throw new Error('Row not found')
+  const mutations = lineDoneMutations(tables, engine, row, month, done, now())
+  if (mutations.length) await store.commit(mutations)
+}
 export async function setDerivedDone(store: Store, rowId: string, month: MonthKey, done: boolean): Promise<void> {
   const tables = await loadTables(store)
   assertOpen(tables, month)

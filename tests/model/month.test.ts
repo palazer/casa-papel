@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addMonths, compareMonths, lastDayOfMonth, monthDiff, monthKey, monthRange, parseMonth } from '@/model'
+import { addMonths, compareMonths, isPastMonth, lastDayOfMonth, monthDiff, monthKey, monthOfDate, monthRange, parseMonth } from '@/model'
 
 describe('month keys', () => {
   it('builds and parses', () => {
@@ -17,6 +17,15 @@ describe('month keys', () => {
     expect(monthRange('2026-11', '2026-10')).toEqual([])
     expect(monthDiff('2026-10', '2027-12')).toBe(14)
     expect(compareMonths('2026-01', '2026-02')).toBe(-1)
+  })
+  it('a month is over when it lies before the current one', () => {
+    expect(isPastMonth('2026-10', '2026-11')).toBe(true)
+    expect(isPastMonth('2026-11', '2026-11')).toBe(false)
+    expect(isPastMonth('2026-12', '2026-11')).toBe(false)
+    expect(isPastMonth('2025-12', '2026-01')).toBe(true)
+    // left out, today is the calendar's
+    expect(isPastMonth(addMonths(monthOfDate(), -1))).toBe(true)
+    expect(isPastMonth(monthOfDate())).toBe(false)
   })
   it('last day of month', () => {
     expect(lastDayOfMonth('2026-02')).toBe('2026-02-28')

@@ -11,7 +11,7 @@ import {
   AccountMonthSchema, AccountSchema, accountGroup, addMonths, cardIsItemized, compareMonths,
   type Account, type AccountGroup, type Household, type Money, type MonthKey, type Tables,
 } from '@/model'
-import { cardBookingMutations, closeMonthMutations, engineFor, engineUpTo, loadTables } from './actions'
+import { cardBookingMutations, closeMonthMutations, countDoneMutations, engineFor, engineUpTo, loadTables } from './actions'
 import { applyMutations } from './impact'
 import type { Mutation, Store } from './store'
 
@@ -195,12 +195,19 @@ export function previewMonthBalances(tables: Tables, household: Household, month
   return monthBalances(after, engineFor(after, household, month), month)
 }
 
-/** Save a month's typed balances. One undoable step. */
-export async function setMonthBalances(store: Store, month: MonthKey, entry: BalanceEntry): Promise<void> {
+/**
+ * Save a month's typed balances. With `done`, every line of the month is ticked as done in the same step ("Count
+ * everything in <Month> as done"), as the month reads with those balances. One undoable step.
+ */
+export async function setMonthBalances(store: Store, month: MonthKey, entry: BalanceEntry, opts: { done?: boolean } = {}): Promise<void> {
   const tables = await loadTables(store)
   const household = tables.household.find((h) => !h.deletedAt)
   if (!household) throw new Error('No household yet')
   const mutations = monthBalanceMutations(tables, household, month, entry)
+  if (opts.done) {
+    const after = mutations.length ? applyMutations(tables, mutations) : tables
+    mutations.push(...countDoneMutations(after, engineFor(after, household, month), month, Date.now()))
+  }
   if (mutations.length) await store.commit(mutations)
 }
 
