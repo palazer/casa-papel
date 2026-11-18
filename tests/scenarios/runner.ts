@@ -2,6 +2,7 @@ import { CHECKS, closingChecks, standingChecks, type CheckName } from './checks'
 import type { Scenario, ScenarioStep } from './gherkin'
 import { UnknownStep, resolve } from './registry'
 import './steps'
+import { isQuestionStep } from './steps/past'
 import { ScenarioError, World } from './world'
 
 /**
@@ -13,6 +14,9 @@ import { ScenarioError, World } from './world'
  *   @planned   a decided rule that is not built yet: expected to fail, anywhere; it fails the run the day it passes.
  * Neither tag excuses a mistake in the scenario of an open finding: a step the vocabulary does not know, a name that
  * does not exist, a "Given" that fails.
+ *   @T4        the app asks before a change alters a month that is over, as it does on screen (`steps/past.ts`). A
+ *              save that asks waits for the step that answers; a "Given" the next step does not ask about is
+ *              answered "Save anyway" by itself. Without the tag nothing asks: every save is written at once.
  */
 
 export type Failure =
@@ -27,6 +31,7 @@ const said = (e: unknown): string => (e instanceof Error ? e.message : String(e)
 
 export async function runScenario(scenario: Scenario): Promise<Failure[]> {
   const world = new World()
+  if (scenario.tags.includes('T4')) world.askAboutThePast()
   const failures: Failure[] = []
   const seen = new Set<string>()
   const add = (f: Failure) => {
@@ -37,7 +42,7 @@ export async function runScenario(scenario: Scenario): Promise<Failure[]> {
   }
   try {
     let refusedBy: ScenarioStep | null = null
-    for (const s of scenario.steps) {
+    for (const [i, s] of scenario.steps.entries()) {
       let run: ReturnType<typeof resolve>['run']
       try {
         run = resolve(s.text).run
@@ -49,9 +54,14 @@ export async function runScenario(scenario: Scenario): Promise<Failure[]> {
       const stamp = world.day ? world.stamp : ''
       const before = await world.figures()
       world.resetCommits()
-      if (s.kind === 'when') world.mark = before
+      if (s.kind === 'when') {
+        world.mark = before
+        world.asked = null
+      }
+      // a "Given" only sets the scene: a question it raises is answered "Save anyway", unless the next step is about it
+      world.autoAnswer = s.kind === 'given' && !isQuestionStep(scenario.steps[i + 1]?.text ?? '') ? 'save' : null
       try {
-        await run(world, s.table)
+        await world.untilAsked((async () => run(world, s.table))())
       } catch (e) {
         if (e instanceof ScenarioError || e instanceof UnknownStep || s.kind === 'given') {
           add({ type: 'scenario', message: `${at(s)}: ${said(e)}` })
@@ -76,9 +86,13 @@ export async function runScenario(scenario: Scenario): Promise<Failure[]> {
       }
     }
     if (world.refusal != null) add({ type: 'then', message: `${at(refusedBy!)}: the app refused it: ${world.refusal}` })
+    // a question nobody answered is cancelled: the save that waited on it is not written
+    await world.cancelOpenQuestion()
+    world.autoAnswer = 'save'
     for (const p of await closingChecks(world)) add({ type: 'check', check: p.check, message: `at the end: ${p.message}` })
     return failures
   } finally {
+    await world.cancelOpenQuestion().catch(() => undefined)
     world.dispose()
   }
 }

@@ -1,7 +1,7 @@
 import { vi } from 'vitest'
 import { buildStatement, computeEngine, type EngineOutput, type Statement } from '@/engine'
 import { newId, type Account, type Category, type Entity, type Household, type MonthKey, type Pool, type Row, type Tables } from '@/model'
-import { CasaDb, Store, defaultMonths, keepHouse, loadTables, type CommitOptions, type Mutation } from '@/store'
+import { CasaDb, PastChangeCancelled, Store, defaultMonths, keepHouse, loadTables, pastGuard, type CommitOptions, type Mutation, type PastAnswer, type PastQuestion } from '@/store'
 import { rateService } from '../rateService'
 import { figuresOf, type Figures } from './figures'
 import { monthName } from './registry'
@@ -44,6 +44,17 @@ export class World {
   readonly rates = rateService(this.daily)
   /** A second device of the same household, once a scenario has one: see the steps "a second device that has synced". */
   second: Store | null = null
+  /** The question about the past that a save waits on (rule T4), and how to answer it; null while none is open. */
+  asking: { question: PastQuestion; answer: (a: PastAnswer) => void } | null = null
+  /** The question the last "When" (or the "Given" before an answer) raised, answered or not; for "I am not asked anything". */
+  asked: PastQuestion | null = null
+  /** How the question is answered as soon as it is asked; null: it stays open for a step to answer. */
+  autoAnswer: PastAnswer | null = null
+  /** The step whose save waits on the question: it ends once the question is answered. */
+  private waiting: Promise<unknown> | null = null
+  /** Whether the app asks (a scenario tagged @T4); every device of the scenario does. */
+  private asks = false
+  private raised: (() => void) | null = null
   /** How many undoable saves the step that is running has made so far, per device. */
   private saves = new Map<Store, number>()
   private stores: Store[] = []
@@ -66,8 +77,58 @@ export class World {
       this.saves.set(store, (this.saves.get(store) ?? 0) + 1)
       return tx
     }
+    if (this.asks) store.setGuard(pastGuard(store, (q) => this.ask(q)))
     this.stores.push(store)
     return store
+  }
+
+  /** From now on every device of the scenario asks before a change alters a month that is over, as the app does. */
+  askAboutThePast(): void {
+    this.asks = true
+    for (const s of this.stores) s.setGuard(pastGuard(s, (q) => this.ask(q)))
+  }
+
+  private ask(question: PastQuestion): Promise<PastAnswer> {
+    this.asked = question
+    if (this.autoAnswer) return Promise.resolve(this.autoAnswer)
+    return new Promise((resolve) => {
+      this.asking = { question, answer: resolve }
+      this.raised?.()
+    })
+  }
+
+  /**
+   * Run a step until it ends, or until a save in it asks the question about the past: the step then waits for the
+   * answer, and the scenario goes on.
+   */
+  async untilAsked(running: Promise<unknown>): Promise<void> {
+    const asked = new Promise<'asked'>((resolve) => { this.raised = () => resolve('asked') })
+    try {
+      const first = await Promise.race([running.then(() => 'done' as const), asked])
+      if (first === 'asked') this.waiting = running
+    } finally {
+      this.raised = null
+    }
+  }
+
+  /** Answer the open question; the save that waited on it is written, or not, before this returns. */
+  async answer(answer: PastAnswer): Promise<void> {
+    const open = this.asking
+    if (!open) throw new Error(this.asked ? 'The question was answered already.' : 'Nothing was asked: it was saved at once.')
+    this.asking = null
+    const waiting = this.waiting
+    this.waiting = null
+    open.answer(answer)
+    try {
+      await waiting
+    } catch (e) {
+      if (!(e instanceof PastChangeCancelled)) throw e
+    }
+  }
+
+  /** A question still open when the scenario ends is cancelled, so that nothing waits. */
+  async cancelOpenQuestion(): Promise<void> {
+    if (this.asking) await this.answer('cancel')
   }
 
   use(store: Store): void {

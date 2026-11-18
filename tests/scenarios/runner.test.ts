@@ -65,6 +65,24 @@ Feature: The runner
   Scenario: a planned rule that passes
     Then "Rent" is 1,200.00 in March 2026
 
+  @T4
+  Scenario: a question about the past nobody answers
+    Given today is 15 June 2026
+    When I type 1,300.00 for "Rent" in March 2026, this and following months
+    Then "Rent" is 1,200.00 in March 2026
+
+  @T4
+  Scenario: a Given that asks only sets the scene
+    Given today is 15 June 2026
+    And I type 1,300.00 for "Rent" in March 2026, this and following months
+    Then "Rent" is 1,300.00 in March 2026
+
+  Scenario: without the tag nothing asks
+    Given today is 15 June 2026
+    When I type 1,300.00 for "Rent" in March 2026, this and following months
+    Then I am not asked anything
+    And "Rent" is 1,300.00 in March 2026
+
   Scenario Outline: an outline runs once per example
     Then "Rent" is <amount> in <month>
 
@@ -129,6 +147,13 @@ describe('the scenario runner', () => {
   it('lists a planned rule until it is built, and fails the run the day it passes', async () => {
     expect(await verdictOf('a planned rule with a step nobody wrote')).toMatchObject({ outcome: 'planned' })
     expect((await verdictOf('a planned rule that passes')).note).toContain('Remove @planned')
+  })
+
+  it('in a scenario tagged @T4, a save that alters the past waits for an answer; a Given is answered "Save anyway"', async () => {
+    // left open: nothing is written, and the scenario ends without waiting
+    expect(await verdictOf('a question about the past nobody answers')).toMatchObject({ outcome: 'pass', failures: [] })
+    expect(await verdictOf('a Given that asks only sets the scene')).toMatchObject({ outcome: 'pass', failures: [] })
+    expect(await verdictOf('without the tag nothing asks')).toMatchObject({ outcome: 'pass', failures: [] })
   })
 
   it('reads an outline as one scenario per example, with the Background first', () => {
