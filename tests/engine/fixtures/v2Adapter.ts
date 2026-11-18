@@ -23,7 +23,8 @@ export function v2ToTables(fx: RawFixture) {
   const household = HouseholdSchema.parse({
     ...base(), name: 'Template', baseCurrency: 'TRY', locale: 'tr-TR', startMonth: months[0],
     closingRule: 'savings-plug', cashBuffer: 0, pocketTotal: 0,
-    fxDriftMode: 'fixed', fxDriftDefault: num(fxRow?.a),
+    // the sheet's one change per month, as the app says it since rule X12: the pair's own change
+    fxPairDrift: { 'USD/TRY': num(fxRow?.a) },
   })
   const adultA = EntitySchema.parse({ ...base(), kind: 'adult', name: 'Adult A' })
   const adultB = EntitySchema.parse({ ...base(), kind: 'adult', name: 'Adult B' })

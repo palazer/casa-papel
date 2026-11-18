@@ -176,4 +176,18 @@ export async function restoreEcbRate(store: Store, pair: string, month: MonthKey
   return res
 }
 
-export const setFxSettings = (store: Store, patch: Partial<Pick<Household, 'fxDriftMode' | 'fxDriftDefault' | 'fxPairDrift' | 'fxMonthRate'>>) => updateHousehold(store, patch)
+export const setFxSettings = (store: Store, patch: Partial<Pick<Household, 'fxMonthRate'>>) => updateHousehold(store, patch)
+
+/**
+ * How one currency pair goes on after its last official rate (rule X12): its own change per month as a fraction (0
+ * holds the last rate), or null to follow its trend again.
+ */
+export async function setPairForecast(store: Store, pair: string, change: number | null): Promise<void> {
+  const household = (await loadTables(store)).household.find((h) => !h.deletedAt)
+  if (!household) throw new Error('No household yet')
+  if (change != null && !Number.isFinite(change)) throw new Error('The change per month is not a number.')
+  const own = { ...(household.fxPairDrift ?? {}) }
+  if (change == null) delete own[pair]
+  else own[pair] = change
+  await updateHousehold(store, { fxPairDrift: own })
+}

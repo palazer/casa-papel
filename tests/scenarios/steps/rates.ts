@@ -1,5 +1,6 @@
 import { FxRateSchema } from '@/model'
-import { setFxSettings, setManualRate } from '@/store'
+import { addMonths } from '@/model'
+import { setManualRate, setPairForecast } from '@/store'
 import { step } from '../registry'
 import type { World } from '../world'
 
@@ -17,11 +18,19 @@ step('I remove my rate for {pair} in {month}', async (world: World, pair: string
   await setManualRate(world.store, pair, month, null)
 })
 
-// "Rates after the last known month": a fixed change per month, or the average change of the last year
-step('rates after the last known month change by {percent} a month', async (world: World, drift: number) => {
-  await setFxSettings(world.store, { fxDriftMode: 'fixed', fxDriftDefault: drift })
+// "Months to come" on the rates card, per currency: "My own change per month", and "Hold the last rate"
+step('my own change for {pair} is {percent} a month', async (world: World, pair: string, change: number) => {
+  await setPairForecast(world.store, pair, change)
 })
 
-step('rates after the last known month follow the average change of the last year', async (world: World) => {
-  await setFxSettings(world.store, { fxDriftMode: 'average' })
+step('I hold the forecast for {pair} at the last known rate', async (world: World, pair: string) => {
+  await setPairForecast(world.store, pair, 0)
+})
+
+// A year of official rates behind a month: thirteen months, each the given change above the one before. They take
+// the place of whatever the scenario held for those months.
+step('the {pair} rate has risen by {percent} a month for the last 12 months, to {rate} in {month}', async (world: World, pair: string, change: number, rate: number, month: string) => {
+  const records = Array.from({ length: 13 }, (_, back) =>
+    FxRateSchema.parse({ pair, month: addMonths(month, -back), rate: rate / Math.pow(1 + change, back), source: 'api', updatedAt: Date.now() }))
+  await world.store.commitSystem(records.map((record) => ({ op: 'put' as const, table: 'fxRates' as const, record })))
 })

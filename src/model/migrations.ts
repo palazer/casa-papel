@@ -61,6 +61,11 @@ const STEPS: Record<number, Step> = {
   // month after. The version keeps an older app, which would count such a month as an amount that runs on, from
   // syncing.
   15: (raw) => raw,
+  // 16 → 17: the months to come of a currency follow its trend, fading out (rule X12), where versions up to 16 held
+  // the last rate or applied one % to all. No field changes: a pair's own change stays in `fxPairDrift`, and the app
+  // copies an old % for all currencies to each pair when it opens the data (`planHousekeeping`). The version keeps an
+  // older app, which would show other amounts for every month to come, from syncing.
+  16: (raw) => raw,
 }
 
 export function migrateExport(raw: unknown): unknown {

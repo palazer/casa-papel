@@ -1,8 +1,9 @@
 import { computeEngine } from '@/engine'
-import { MonthStateSchema, addMonths, compareMonths, isDue, monthOfDate, monthRange, type Household, type MonthKey, type MonthState, type Tables } from '@/model'
+import { HouseholdSchema, MonthStateSchema, addMonths, compareMonths, isDue, monthOfDate, monthRange, type Household, type MonthKey, type MonthState, type Tables } from '@/model'
 import { countDoneMutations, loadTables } from './actions'
 import { cellPut } from './cells'
 import { applyMutations } from './impact'
+import { neededPairs } from './fx'
 import { defaultMonths } from './months'
 import { managedItem, planRecurringPosts, scheduleLive } from './recurring'
 import type { Mutation, Store } from './store'
@@ -44,6 +45,21 @@ function planOpenClosedMonths(tables: Tables, household: Household, closed: Mont
 }
 
 /**
+ * A change per month that an older version applied to every currency ("Change by a fixed % each month") becomes each
+ * currency's own change, once: the rates of the months to come stay what they were. Since rule X12 a currency without
+ * a change of its own follows its trend, so the one % for all would otherwise be lost. Every pair that has a rate or
+ * is in use gets it, unless it had its own already; the old setting is emptied, so a second run finds nothing. The
+ * record keeps its stamp: this is no edit, and must not overrule what another device changed on the household since.
+ */
+function planOldRateChange(tables: Tables, household: Household): Mutation[] {
+  const all = household.fxDriftDefault ?? 0
+  if (all === 0 || (household.fxDriftMode ?? 'fixed') !== 'fixed') return []
+  const own = { ...(household.fxPairDrift ?? {}) }
+  for (const pair of new Set([...tables.fxRates.map((r) => r.pair), ...neededPairs(tables)])) if (own[pair] == null) own[pair] = all
+  return [{ op: 'put', table: 'household', record: HouseholdSchema.parse({ ...household, fxPairDrift: own, fxDriftDefault: 0 }) }]
+}
+
+/**
  * The last month that holds anything of a schedule: an item one posted, or the note that an occurrence was left out.
  * Every month up to it has been in front of the schedules once. Null when no schedule ever landed.
  */
@@ -62,7 +78,8 @@ function lastReached(tables: Tables): MonthKey | null {
  *   the app was not opened from before the plan grew to it until after it ended. Nobody has seen such a month, so
  *   there is nothing in it to keep, and without its schedules it would show a rent that stops and starts again;
  * - a month that an older version had closed is opened (`planOpenClosedMonths`). That happens once per month, and
- *   again whenever such a month arrives: from another device, or from a file.
+ *   again whenever such a month arrives: from another device, or from a file;
+ * - a change per month that an older version applied to every currency is copied to each (`planOldRateChange`).
  *
  * Pure, and idempotent: a second run on its own result writes nothing.
  */
@@ -74,7 +91,7 @@ export function planHousekeeping(tables: Tables, today: MonthKey = monthOfDate()
   const work = opened.length ? applyMutations(tables, opened) : tables
   const reached = lastReached(work)
   const months = defaultMonths(household, work, today).filter((m) => compareMonths(m, today) >= 0 || (reached != null && compareMonths(m, reached) > 0))
-  return [...opened, ...planRecurringPosts(work, months)]
+  return [...opened, ...planRecurringPosts(work, months), ...planOldRateChange(tables, household)]
 }
 
 /** `planHousekeeping` as a system commit (not undoable). Returns how many records it wrote. */

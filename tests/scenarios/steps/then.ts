@@ -1,5 +1,5 @@
 import { expect } from 'vitest'
-import { cellKey, computeGoals, householdFx, notSetAside, rateFor } from '@/engine'
+import { cellKey, computeGoals, householdFx, notSetAside, rateFor, rateInfo } from '@/engine'
 import type { MonthKey } from '@/model'
 import { monthRange } from '@/model'
 import { all } from '../../engine/sound'
@@ -189,6 +189,15 @@ step('the currencies offered are {ccys}', async (world: World, codes: string[]) 
   const { household } = await world.view()
   expect(CURRENCIES, 'the currencies offered').toEqual(codes)
   expect(currencyChoices(household.baseCurrency), 'what a currency field of this household offers').toEqual([household.baseCurrency, ...codes.filter((c) => c !== household.baseCurrency)])
+})
+
+// the same for a month to come, where the rate is a forecast and not a stored one
+step('the forecast rate for {pair} in {month} is {rate}', async (world: World, pair: string, month: string, rate: number) => {
+  const { tables, household } = await world.view()
+  const [from, to] = pair.split('/')
+  const got = rateInfo(householdFx(tables.fxRates, household), from, to, month)
+  expect(got == null ? 'no rate' : got.rate.toFixed(4), `${pair} in ${monthName(month)}`).toBe(rate.toFixed(4))
+  expect(got?.projected, `${pair} in ${monthName(month)} is a forecast`).toBe(true)
 })
 
 // ---------- virtual accounts, per person, warnings, goals ----------

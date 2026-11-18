@@ -25,19 +25,20 @@ Feature: Amounts and accounts in another currency
     Then "Hosting" counts as 9.09 in January 2026
     And "Hosting" counts as 8.00 in February 2026
 
-  @X3
-  Scenario: A month after the last known rate uses the last known rate
+  # Three months of rates are no year: there is no trend to follow yet.
+  @X12
+  Scenario: With less than a year of rates, the last known rate is held
     Given an income "Alex – Salary" in USD of 3,300.00 from January 2026
-    Then the rate for EUR/USD in April 2026 is 1.0000
-    And the rate for EUR/USD in December 2026 is 1.0000
+    Then the forecast rate for EUR/USD in April 2026 is 1.0000
+    And the forecast rate for EUR/USD in December 2026 is 1.0000
     And "Alex – Salary" counts as 3,300.00 in December 2026
 
-  @X3
-  Scenario: A set change per month moves the rates after the last known one
-    Given rates after the last known month change by 1% a month
+  @X12
+  Scenario: My own change per month moves every month to come by that, without fading
+    Given my own change for EUR/USD is 1% a month
     Then the rate for EUR/USD in March 2026 is 1.0000
-    And the rate for EUR/USD in April 2026 is 1.0100
-    And the rate for EUR/USD in May 2026 is 1.0201
+    And the forecast rate for EUR/USD in April 2026 is 1.0100
+    And the forecast rate for EUR/USD in May 2026 is 1.0201
 
   @X2
   Scenario: A month without a rate of its own uses the month before it
@@ -186,18 +187,35 @@ Feature: Amounts and accounts in another currency
     And "Alex – Salary" counts as 2,640.00 in February 2026, at the rate of 27 February 2026
     And "Alex – Salary" counts as 3,300.00 in March 2026, at the rate of 13 March 2026
 
-  @X12 @planned
+  @X12
   Scenario: The forecast follows the recent trend, and the trend fades out
     Given the EUR/USD rate has risen by 1% a month for the last 12 months, to 1.0000 in March 2026
     Then the forecast rate for EUR/USD in April 2026 is 1.0100
     And the forecast rate for EUR/USD in May 2026 is 1.0181
     And the forecast rate for EUR/USD in June 2026 is 1.0246
 
-  @X12 @planned
+  @X12
   Scenario: A currency can be given its own change per month, or be held where it is
     Given the EUR/USD rate has risen by 1% a month for the last 12 months, to 1.0000 in March 2026
     When I hold the forecast for EUR/USD at the last known rate
     Then the forecast rate for EUR/USD in December 2026 is 1.0000
+
+  @X12
+  Scenario: A rate typed for a month to come is used as it is, and the forecast goes on from it
+    Given the EUR/USD rate has risen by 1% a month for the last 12 months, to 1.0000 in March 2026
+    When I set my rate for EUR/USD in May 2026 to 1.1000
+    Then the forecast rate for EUR/USD in April 2026 is 1.0100
+    And the rate for EUR/USD in May 2026 is 1.1000
+    And the forecast rate for EUR/USD in June 2026 is 1.1070
+    And the rate for EUR/USD in March 2026 is 1.0000
+
+  # The trend is read from what was: a rate I type for a month to come is no part of it.
+  @X12
+  Scenario: A typed rate for a month to come does not change the trend
+    Given the EUR/USD rate has risen by 1% a month for the last 12 months, to 1.0000 in March 2026
+    When I set my rate for EUR/USD in December 2026 to 2.0000
+    Then the forecast rate for EUR/USD in April 2026 is 1.0100
+    And the forecast rate for EUR/USD in May 2026 is 1.0181
 
   # Euros moved into a dollar account arrive as dollars at the month's rate, like what a savings row puts there.
   @X6 @N2 @F2

@@ -214,13 +214,9 @@ one euro buys 1.10 dollars.
 **X2. A month has one rate per currency.** A month without a rate of its own uses the nearest earlier month that has
 one; before the first known month, the first known rate.
 
-**X3. After the last known month, the last known rate stays.** A change per month can be set; then
-
-    rate n months after the last known = last known rate × (1 + change per month) ^ n
-
-> Last known 1.0000 in March, change 1 % a month: April 1.0100, May 1.0201.
-
-Rule X12 replaces this once it is built.
+**X3. After the last official month, the rate is a forecast (X12).** A rate typed for a month to come is used as it
+is, and the forecast goes on from it. X3 once read "the last known rate stays"; that holds now only where a currency
+has less than a year of rates, or where you hold it.
 
 **X4. A rate you set counts for its month instead of the ECB's.** A fetch does not overwrite it. Removing it leaves
 the month without a rate of its own (X2) until the ECB rate is fetched again.
@@ -241,6 +237,19 @@ rule T4 will ask first.
 
 **X9. Two other currencies are converted through the household's.** GBP to USD is GBP to EUR, then EUR to USD.
 
+**X12. The forecast follows the recent trend, and the trend fades out.** A currency's history ends at its last
+official month. The first month after it moves by the average change per month of the last 12 months of that
+history; each month after that by 80 % of the step before.
+
+    rate of a month to come = rate of the month before × (1 + trend × 0.8 ^ (months after the last official one − 1))
+
+> +1 % a month on average, last official 1.0000: 1.0100, then 1.0181 (+0.8 %), then 1.0246 (+0.64 %). However far
+> the plan runs, the rate ends less than 5.2 % above the last official one.
+
+The trend needs a year of rates: thirteen months, twelve changes. With less, the last rate is held. Per currency you
+can set your own change per month, which moves every month by that without fading (1 % a month: 1.0100, 1.0201), or
+hold the last rate. A rate typed for a month to come is not part of the history the trend is read from.
+
 **X13. Fifteen currencies are offered:** EUR, USD, GBP, TRY, CAD, AUD, CHF, SEK, NOK, DKK, PLN, CZK, HUF, RON, ISK.
 The ECB publishes a rate for each. A code that is already in use and not among them keeps working, and stays in the
 list of the field that holds it.
@@ -255,12 +264,6 @@ list of the field that holds it.
 > **X11. Until a conversion is recorded, an amount uses the official rate of its month.** The latest rate while the
 > month is running, the rate of its last working day once it is over, the forecast for a month to come. An account in
 > another currency is shown at the same rate.
->
-> **X12. The forecast follows the recent trend, and the trend fades out.** The first month to come moves by the
-> average change per month of the last 12 months; each month after that by 80 % of the step before. Per currency you
-> can set your own change per month, or hold the rate.
->
->     +1 % a month on average, last known 1.0000: 1.0100, then 1.0181 (+0.8 %), then 1.0246 (+0.64 %)
 >
 > **X14. A virtual account is kept in the currency of the savings account that holds it.** In a dollar savings
 > account it is a dollar balance: what is set aside arrives in dollars at the month's rate, and what is paid out of

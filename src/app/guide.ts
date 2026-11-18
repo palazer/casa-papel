@@ -296,8 +296,8 @@ export const GUIDE: GuideTopic[] = [
     title: 'Currencies',
     summary: 'Rows and accounts can be in another currency; the grid shows what they are worth in EUR at each month\'s rate.',
     what: [
-      '"Currency…" in the row menu sets a row\'s currency. The cell keeps the typed amount and shows "≈ €…" beneath; the row\'s name carries the code. The cell editor adds a rate line, "≈ €… · 1 EUR = 1.08 USD · ECB · 2 Nov 2026", with a chip that says where the rate came from: "ECB", "manual", "projected", "carried" or "missing".',
-      'A currency gets its rates from the European Central Bank by itself the first time it is used (only currency codes and dates leave the device). They live under Household → "Currency rates": "Fetch ECB rates" asks again, "Month rate" picks the day of the month, "Future months" how the rate drifts. Rates are always spelled with both codes in the direction whose number is at least 1.',
+      '"Currency…" in the row menu sets a row\'s currency. The cell keeps the typed amount and shows "≈ €…" beneath; the row\'s name carries the code. The cell editor adds a rate line, "≈ €… · 1 EUR = 1.08 USD · ECB · 2 Nov 2026", with a chip that says where the rate came from: "ECB", "manual", "forecast", "carried" or "missing".',
+      'A currency gets its rates from the European Central Bank by itself the first time it is used (only currency codes and dates leave the device). They live under Household → "Currency rates": "Fetch ECB rates" asks again, "Month rate" picks the day of the month, "Months to come" says how each currency\'s rate goes on. Rates are always spelled with both codes in the direction whose number is at least 1.',
       'An account can be kept in another currency too. Its balance stays in that currency, with what it is worth in EUR beside it. Money that goes into it or comes out of it is converted at the month\'s rate, and an amount typed in the account\'s own currency arrives exactly as typed. Virtual accounts are always in EUR, also inside such an account.',
     ],
     steps: [
@@ -306,10 +306,10 @@ export const GUIDE: GuideTopic[] = [
       '"Use the ECB rate again" drops a manual rate for the published one.',
       'An account\'s currency is under "More options" in its dialog. Household → "Currency rates" → "Fetch ECB rates" fills the months since the last fetch, and is the way back after being offline.',
       '"Month rate": "First business day of the month", "Last business day of the month" or "Average over the month".',
-      '"Future months": "Change by a fixed % each month" with "Change per month (%)", or "Repeat the average change of the last year"; "Use for EUR/USD" keeps a rule for one pair, "Back to the default" clears it.',
+      '"Months to come", per currency: "Follow the recent trend" (the average change per month of the last 12 months, each further month 80% of the step before), "Hold the last rate", or "My own change per month" with a %. With less than a year of rates the last rate is held. A rate typed for a month to come is used as it is, and the forecast goes on from it.',
       'Type over a month in the "1 EUR in USD" column to set it by hand; empty it to go back.',
     ],
-    tips: ['row.currency', 'cell.rate', 'statement.rate', 'balance.inBase'],
+    tips: ['row.currency', 'cell.rate', 'statement.rate', 'balance.inBase', 'household.fxForecast'],
     open: 'household',
   },
   {

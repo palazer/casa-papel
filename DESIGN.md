@@ -174,8 +174,8 @@ Truncation idiom: a `min-w-0` parent, `truncate` on the name, `shrink-0` on sibl
   red ring for nothing done and an amber half disc for partly done.
 - **Chips** (`src/components/ui/chip.tsx`, `rounded px-1.5 leading-4 text-[10px] font-medium`): zinc a neutral fact or
   idle (`past`, `automatic`, an account or entity type, `ECB`, `carried`), emerald done or good (`paid`), amber a warning
-  or an estimate (`due`, `demo`, `projected`, storage may be evicted), rose missing or late (`missing`), sky information
-  or something of yours (`manual` rate, `using +1.50%`), violet a second party. An `outline` variant exists for a
+  or an estimate (`due`, `demo`, `forecast`, storage may be evicted), rose missing or late (`missing`), sky information
+  or something of yours (`manual` rate), violet a second party. An `outline` variant exists for a
   blocker. Chip copy is lowercase.
 - **Lime** (`--primary`): the pressed control only (§1). Never a status.
 - **Months that are over** (every month before the current calendar month, `isPastMonth` in `src/model/month.ts`):
@@ -642,10 +642,18 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   chip in the toolbar** (`RateChip`, after the legend and before the month's primary action; `data-testid="month-rates"`),
   once for every other currency the month on screen counts in (its rows and accounts, and the current accounts): the
   rate alone, `1 EUR = 1.084 USD` (`No USD rate` while there is none), in the tone of where it came from (zinc ECB or
-  carried, sky yours, amber projected, rose missing), so the page carries one small tag and no line of its own. The
+  carried, sky yours, amber forecast, rose missing), so the page carries one small tag and no line of its own. The
   chip is a button: it opens a popover with the source in words, a field to type a rate for this month (`Save rate`),
   `Use the ECB rate again` once the rate is yours, and the (i) text inline. A household with one currency shows
   nothing.
+  **How the months to come run is said per currency**, on the rates card under Household: a group "Months to come"
+  with an (i), one line per currency (`data-testid="forecast-<code>"`): the code, a `w-56` select named `Months to
+  come for <code>` ("Follow the recent trend", "Hold the last rate", "My own change per month"), for the third a
+  `w-20` field named `Change per month for <code> in %` followed by "% a month", and a muted sentence that says what
+  the choice does (`+1.00% a month on average over the last 12 months; the change fades out.`, or that less than a
+  year of rates holds the last one). The two whole choices save when picked; a change of one's own saves with its
+  number, on leaving the field or with Enter. A month after the last official rate carries the amber chip
+  `forecast` unless a rate is typed for it.
 - **An amount field takes a sum.** Every field that asks for money reads what is typed through `parseAmount`
   (`src/app/format.ts`), which adds up a run of `+` and `-` (`7352.21+7.96`, `1200-150+30`, spaces allowed, each
   number in either number format). While the field holds a sum, `AmountHint` (`src/components/AmountHint.tsx`)

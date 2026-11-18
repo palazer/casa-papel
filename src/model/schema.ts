@@ -8,7 +8,7 @@ import { FUNDED_BY_PATTERN, type FundedBy } from './fundedBy'
 z.config({ jitless: true })
 
 /** Bump when the shape of stored data changes; add a migration in migrations.ts. */
-export const SCHEMA_VERSION = 16
+export const SCHEMA_VERSION = 17
 
 // ---------- primitives ----------
 export const IdSchema = z.string().regex(ID_PATTERN, 'expected ULID')
@@ -58,13 +58,19 @@ export const HouseholdSchema = BaseRecord.extend({
   shareBasis: ShareBasisSchema.default('basis-rows'),
   manualShares: z.record(IdSchema, FractionSchema).default({}),
   displayExpensesNegative: z.boolean().default(true),
-  /** Default monthly FX drift (fraction) for projected rates. */
+  /**
+   * Older versions: one change per month for every currency's months to come. Not read any more (rule X12); where
+   * one is set, `planHousekeeping` copies it to each currency's own change (`fxPairDrift`) and empties it.
+   */
   fxDriftDefault: z.number().default(0),
   /** Which day's ECB rate stands for a month: the first business day by default (decided 2026-11-08), the last, or the average. */
   fxMonthRate: FxMonthRateSchema.default('first'),
-  /** How future rates are projected: a fixed monthly drift, or the average month-over-month change of the last year. */
+  /** Older versions: how months to come were worked out for every currency. Not read any more (rule X12). */
   fxDriftMode: z.enum(['fixed', 'average']).default('fixed'),
-  /** Per-pair monthly drift overrides, e.g. { 'EUR/TRY': 0.015 }. */
+  /**
+   * A currency pair's own change per month for the months to come, as a fraction: { 'EUR/TRY': 0.015 }. 0 holds the
+   * last rate. A pair without an entry follows its trend, fading out (rule X12).
+   */
   fxPairDrift: z.record(z.string(), z.number()).default({}),
   /** "Add <year>": the plan reaches at least this December. null = the calendar rule alone decides (see store/months.ts). */
   planUntil: MonthKeySchema.nullable().default(null),

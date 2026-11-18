@@ -2,11 +2,11 @@ import type { ChipTone } from '@/components/ui/chip'
 import type { RateInfo } from '@/engine'
 import type { FxRate } from '@/model'
 
-/** Where a month's rate came from, as a chip: yours is sky, the ECB's a fact in zinc, a projection amber, a gap rose. */
-export const TAG_TONE: Record<string, ChipTone> = { manual: 'sky', ECB: 'zinc', projected: 'amber', carried: 'zinc', missing: 'rose' }
+/** Where a month's rate came from, as a chip: yours is sky, the ECB's a fact in zinc, a forecast amber, a gap rose. */
+export const TAG_TONE: Record<string, ChipTone> = { manual: 'sky', ECB: 'zinc', forecast: 'amber', carried: 'zinc', missing: 'rose' }
 
 export function rateTag(rec: Pick<FxRate, 'source'> | undefined, info: RateInfo | null): string {
-  return rec?.source === 'manual' ? 'manual' : rec?.source === 'api' ? 'ECB' : info ? (info.projected ? 'projected' : 'carried') : 'missing'
+  return rec?.source === 'manual' ? 'manual' : rec?.source === 'api' ? 'ECB' : info ? (info.projected ? 'forecast' : 'carried') : 'missing'
 }
 
 /** Two to four decimals, no grouping, so the text can go straight back into an input. */

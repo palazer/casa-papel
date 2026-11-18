@@ -137,6 +137,63 @@ test('a row in another currency: the typed amount, the household value beneath, 
   await expect(novRow.getByText('manual', { exact: true })).toHaveCount(0)
 })
 
+test('months to come: a currency follows its trend, holds its last rate, or moves by a change of your own', async ({ page }) => {
+  // a year of official rates behind November 2026: 1% up every month, to 1.20
+  const rates: Record<string, { USD: number }> = {}
+  for (let back = 0; back <= 12; back++) rates[new Date(Date.UTC(2026, 10 - back, 2)).toISOString().slice(0, 10)] = { USD: 1.2 / Math.pow(1.01, back) }
+  await page.route('https://api.frankfurter.dev/**', (r) => r.fulfill({ json: { rates } }))
+  await loadDemo(page)
+  await page.getByRole('button', { name: 'Row menu for Other income' }).click()
+  await page.getByRole('menuitem', { name: 'Currency…' }).click()
+  const dlg = page.getByRole('dialog')
+  await dlg.getByLabel('Amounts in this row are in', { exact: true }).selectOption('USD')
+  await dlg.getByRole('button', { name: 'Save' }).click()
+  await expect(dlg).toBeHidden()
+
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Household' }).click()
+  await expect(page.getByLabel('1 EUR in USD for Nov 2026')).toHaveValue('1.20')
+  const usd = page.getByTestId('forecast-USD')
+  const choice = usd.getByLabel('Months to come for USD')
+  const december = page.getByLabel('1 EUR in USD for Dec 2026')
+  const january = page.getByLabel('1 EUR in USD for Jan 2027')
+
+  // nothing chosen: the trend of the last twelve months, each further month 80% of the step before
+  await expect(choice).toHaveValue('trend')
+  await expect(usd).toContainText('+1.00% a month on average over the last 12 months; the change fades out.')
+  await expect(december).toHaveAttribute('placeholder', '1.212')
+  await expect(january).toHaveAttribute('placeholder', '1.2217')
+  await expect(page.getByRole('row', { name: /^Dec 2026/ }).getByText('forecast', { exact: true })).toBeVisible()
+  await usd.scrollIntoViewIfNeeded()
+  await page.screenshot({ path: 'e2e/output/months-to-come.png' })
+
+  await choice.selectOption('hold')
+  await expect(usd).toContainText('Every month to come uses the last official rate.')
+  await expect(december).toHaveAttribute('placeholder', '1.20')
+  await expect(january).toHaveAttribute('placeholder', '1.20')
+
+  // a change of your own is saved with its number, and moves every month by that
+  await choice.selectOption('own')
+  await expect(december).toHaveAttribute('placeholder', '1.20')
+  const own = usd.getByLabel('Change per month for USD in %')
+  await own.fill('2')
+  await own.press('Enter')
+  await expect(december).toHaveAttribute('placeholder', '1.224')
+  await expect(january).toHaveAttribute('placeholder', '1.2485')
+  await expect(choice).toHaveValue('own')
+  await expect(own).toHaveValue('2')
+
+  // a rate typed for a month to come is used as it is, and the forecast goes on from it
+  await december.fill('1.30')
+  await december.press('Tab')
+  await expect(page.getByRole('row', { name: /^Dec 2026/ }).getByText('manual', { exact: true })).toBeVisible()
+  await expect(january).toHaveAttribute('placeholder', '1.326')
+
+  await choice.selectOption('trend')
+  await expect(usd.getByLabel('Change per month for USD in %')).toHaveCount(0)
+  // January is the second month after the last official rate: its step is 80% of the trend
+  await expect(january).toHaveAttribute('placeholder', '1.3104')
+})
+
 test('the Statement shows the month\'s rate as a chip in its toolbar: pressed, it takes a rate of one\'s own and gives the ECB\'s back', async ({ page }) => {
   await page.route('https://api.frankfurter.dev/**', (r) => r.fulfill({ json: { rates: { '2026-10-01': { USD: 1.1 }, '2026-11-02': { USD: 1.25 } } } }))
   await loadDemo(page)

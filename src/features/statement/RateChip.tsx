@@ -14,7 +14,7 @@ import { useMonthRate } from '@/features/grid/useMonthRate'
 const SOURCE: Record<string, string> = {
   manual: 'Your own rate for this month.',
   ECB: 'The European Central Bank\'s rate.',
-  projected: 'An estimate: projected from the last month with a rate.',
+  forecast: 'A forecast: worked out from the last official rate, the way "Months to come" under Household says.',
   carried: 'Carried over from the nearest month with a rate.',
   missing: 'No rate yet: amounts in this currency cannot be counted until there is one.',
 }

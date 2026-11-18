@@ -356,7 +356,7 @@ with the place it fails today.
 
 | Step | Rule | Scenarios |
 | --- | --- | --- |
-| 4. The currency model | X10 to X12, X14, X15 (X13 is built) | `05-rates.feature`: 11 |
+| 4. The currency model | X10, X11, X14, X15 (X12 and X13 are built) | `05-rates.feature`: 9 |
 | 5. The question before a change alters the past | T4 | `06-the-past.feature`: 7, `14-people-goals-data.feature`: 1 |
 | One main account (its own step) | B9 | `15-main-account.feature`: 2 |
 

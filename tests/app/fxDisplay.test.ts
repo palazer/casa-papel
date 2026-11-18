@@ -21,7 +21,7 @@ describe('readable rates', () => {
     expect(formatRate(1234.56789, 'en-IE')).toBe('1234.5679')
     expect(rateTag({ source: 'manual' }, { rate: 1, projected: false })).toBe('manual')
     expect(rateTag({ source: 'api' }, null)).toBe('ECB')
-    expect(rateTag(undefined, { rate: 1, projected: true })).toBe('projected')
+    expect(rateTag(undefined, { rate: 1, projected: true })).toBe('forecast')
     expect(rateTag(undefined, { rate: 1, projected: false })).toBe('carried')
     expect(rateTag(undefined, null)).toBe('missing')
   })
