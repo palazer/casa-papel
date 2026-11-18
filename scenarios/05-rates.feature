@@ -245,3 +245,53 @@ Feature: Amounts and accounts in another currency
   @X13
   Scenario: Fifteen currencies are offered
     Then the currencies offered are EUR, USD, GBP, TRY, CAD, AUD, CHF, SEK, NOK, DKK, PLN, CZK, HUF, RON and ISK
+
+  # ---------- a currency without cents: the Icelandic króna ----------
+
+  # Found while step 4 was planned (F13): the stored amounts were read again in the new currency's smallest unit, so
+  # 1,000.00 euros became 100,000 krónur in every month the row held.
+  @X13 @F13
+  Scenario: A row moved to a currency without cents keeps its digits in every month
+    Given an expense "Summer house" of 1,000.00 from January 2026
+    And I type 1,200.50 for "Summer house" in March 2026, this and following months
+    When I change the currency of "Summer house" to ISK
+    Then "Summer house" reads "ISK 1,000" in January 2026
+    And "Summer house" reads "ISK 1,000" in February 2026
+    And "Summer house" reads "ISK 1,201" in March 2026
+    And "Summer house" reads "ISK 1,201" in December 2026
+
+  @X13 @F13
+  Scenario: The same in the row's dialog: a later month keeps its own amount
+    Given an expense "Summer house" of 1,000.00 from January 2026
+    And I type 1,200.00 for "Summer house" in March 2026, this and following months
+    When I change the currency of "Summer house" to ISK in its dialog of February 2026
+    Then "Summer house" reads "ISK 1,000" in January 2026
+    And "Summer house" reads "ISK 1,000" in February 2026
+    And "Summer house" reads "ISK 1,200" in March 2026
+
+  @X13 @F13
+  Scenario: And back to a currency with cents
+    Given an expense "Summer house" with no amount yet
+    And I change the currency of "Summer house" to ISK
+    And I type "25000" for "Summer house" in January 2026, this and following months
+    When I change the currency of "Summer house" to EUR
+    Then "Summer house" reads "€25,000.00" in January 2026
+    And "Summer house" reads "€25,000.00" in June 2026
+
+  @X13 @F13
+  Scenario: A schedule of the row keeps its digits too
+    Given an expense "Summer house" with no amount yet
+    And "Summer house" is on a schedule of 300.00 every month from January 2026
+    When I change the currency of "Summer house" to ISK
+    Then "Summer house" reads "ISK 300" in January 2026
+    And "Summer house" reads "ISK 300" in December 2026
+
+  # Found while step 4 was planned (F12): the form of the list of schedules read its amount in the household's
+  # currency, whatever the row is in: 25000 typed for a row in krónur became 2,500,000.
+  @X13 @F12
+  Scenario: A schedule made in the list of schedules is read in its row's currency
+    Given an expense "Summer house" with no amount yet
+    And I change the currency of "Summer house" to ISK
+    When I add the schedule "Caretaker" to "Summer house" in the list, typing "25000" every month from January 2026
+    Then "Summer house" reads "ISK 25,000" in January 2026
+    And "Summer house" reads "ISK 25,000" in April 2026

@@ -3,7 +3,7 @@ import {
   RecurringItemSchema, cadenceOf, compareMonths, isDue, monthOfDate, newId, repeatOf, sameRepeat,
   type CellItem, type Money, type MonthKey, type RecurringItem, type RepeatChoice, type Repeating, type Tables,
 } from '@/model'
-import { carriesForward, engineUpTo, itemsAmount, planFollowing, rowChangePut, standingMoves, type EditScope, type RowChange } from './actions'
+import { carriesForward, engineUpTo, itemsAmount, planFollowing, rowChangePut, rowInNewCurrency, standingMoves, withoutRewritten, type EditScope, type RowChange } from './actions'
 import { cellPut } from './cells'
 import { applyMutations } from './impact'
 import { defaultMonths } from './months'
@@ -35,9 +35,11 @@ const isCellPut = (m: Mutation, rowId: string, month: MonthKey) =>
  * schedule whose rhythm or amount changed is changed from this month on (`planChangeRecurringFrom`), so earlier
  * months keep what they show; "only this month" on a scheduled item ends its schedule after this month. A row that
  * gets its first schedule here keeps the amounts its earlier months carried (`pinCarriedMonths`). A scheduled item
- * whose name was typed over is renamed (`planRename`), in every month.
+ * whose name was typed over is renamed (`planRename`), in every month. A dialog that also moves the row to a currency
+ * counting other decimals is saved against the row's amounts in the new unit (`rowInNewCurrency`).
  */
-export function planRowMonthSave(tables: Tables, engine: EngineOutput, rowId: string, month: MonthKey, save: RowMonthSave, ts: number): Mutation[] {
+export function planRowMonthSave(stored: Tables, calculated: EngineOutput, rowId: string, month: MonthKey, save: RowMonthSave, ts: number): Mutation[] {
+  const { tables, engine, pre } = rowInNewCurrency(stored, calculated, rowId, save.row, ts)
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
   if (!row) throw new Error('That row is gone.')
   const existing = tables.cells.find((c) => c.rowId === rowId && c.month === month)
@@ -140,8 +142,8 @@ export function planRowMonthSave(tables: Tables, engine: EngineOutput, rowId: st
   if (items.length > 0 || !scheduled) out.push(cellPut(existing, { rowId, month, mode: 'items', value: null, items, once }, ts))
   // a row on a schedule with nothing in the month has no cell of its own there
   else if (existing && existing.mode !== 'inherit') out.push(cellPut(existing, { rowId, month, mode: 'inherit', value: null, items: [] }, ts))
-  out.push(...rowChangePut(tables, rowId, save.row))
-  return out
+  out.push(...rowChangePut(stored, rowId, save.row))
+  return [...withoutRewritten(pre, out), ...out]
 }
 
 /**

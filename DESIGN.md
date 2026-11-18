@@ -607,6 +607,11 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   "Amounts in" above the items when itemized; it is the row's currency for every month, saved with the amount as one
   step, and a muted sentence says so once it differs. A row the app works out, a follower and a month that carries
   another currency have no select; "Currency…" in the row menu stays for changing it without an amount.
+  **The digits stay, in every month**: a row moved to a currency that counts other decimals (krónur have no cents)
+  has the amounts of its months and schedules written again in the new unit, in the same step (`keepDigits`), and
+  what the dialog says before saving reads them that way (`rowInNewCurrency`). **A form that reads an amount for a
+  row reads it in the row's currency** and names the code in its label: the schedule form's `Amount (ISK)`
+  (`rowCurrencyOf`); the list of schedules shows each amount in its row's currency.
   **A row's category is shown and changed there too**: on the line of the `Single amount | Itemized` tabs, at its
   right end (under the tabs where there is no room), a muted `Category` and a `w-40` select named `Category of <row>`
   with the section's categories and `No category`. It is the row's, for every month, and is saved with the amount in

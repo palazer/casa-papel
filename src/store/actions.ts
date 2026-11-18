@@ -1,11 +1,12 @@
 import { generateKeyBetween } from 'fractional-indexing'
 import { computeEngine, cellKey, sortRows, typedAmount, type EngineOutput } from '@/engine'
 import {
-  ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RowSchema, accountIdOf, addMonths, canCarryRule, canTakeRest, cardIsItemized, compareMonths, holdsBalance, isOldPocketShare, isOutsideNetWorth, isShareRule, monthKey, monthOfDate, monthRange, newId, parseMonth, paysExpenses, poolIdOf, resolveRules, sharePercent,
+  ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RecurringItemSchema, RowSchema, accountIdOf, addMonths, canCarryRule, canTakeRest, cardIsItemized, compareMonths, currencyExponent, fromMinor, holdsBalance, isOldPocketShare, isOutsideNetWorth, isShareRule, monthKey, monthOfDate, monthRange, newId, parseMonth, paysExpenses, poolIdOf, resolveRules, sharePercent, toMinor,
   type Account, type Category, type Cell, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Pool, type Row, type RowKind, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
-import { cellPut } from './cells'
+import { cellPut, cellRecord } from './cells'
+import { primaryKeyOf } from './keys'
 import { planEnd } from './months'
 
 export type EditScope = 'this-month' | 'from-now-on'
@@ -184,6 +185,64 @@ export function planFollowing(tables: Tables, engine: EngineOutput, rowId: strin
 export const itemsAmount = (items: CellItem[], given: Money | null | undefined): Money =>
   items.reduce((sum, i) => (i.skipped ? sum : sum + (i.kind === 'carry' ? given ?? 0 : i.amount)), 0)
 
+/** The currency a row's amounts are typed in: its own, or the household's. A form that reads an amount for a row reads it in this. */
+export function rowCurrencyOf(tables: Pick<Tables, 'rows' | 'household'>, rowId: string | null | undefined): string {
+  const base = tables.household.find((h) => !h.deletedAt)?.baseCurrency ?? 'EUR'
+  return tables.rows.find((r) => r.id === rowId)?.currency ?? base
+}
+
+/**
+ * A row that moves to a currency counting other decimals (euros to Icelandic krónur, which have no cents) keeps its
+ * digits: 1,000.00 becomes 1,000, not 100,000. An amount is stored in its currency's smallest unit, so the stored
+ * amounts of the row's months and of its schedules are written again in the new unit; half a króna rounds. A month
+ * that keeps a currency of its own (`currencyOverride`) is not in the row's and stays as it is. Between two
+ * currencies that count the same decimals nothing is written: the stored numbers already read right.
+ * Returns the writes, and the tables as they are with them and with the row in its new currency. Pure.
+ */
+export function keepDigits(tables: Tables, rowId: string, to: string | null | undefined, ts: number): { tables: Tables; mutations: Mutation[] } {
+  const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
+  const base = tables.household.find((h) => !h.deletedAt)?.baseCurrency
+  if (!row || !base || to === undefined) return { tables, mutations: [] }
+  const from = row.currency ?? base
+  const next = to ?? base
+  if (currencyExponent(from) === currencyExponent(next)) return { tables, mutations: [] }
+  const inNext = (amount: Money): Money => toMinor(fromMinor(amount, from), next)
+  const mutations: Mutation[] = []
+  const cells = tables.cells.map((c) => {
+    if (c.rowId !== rowId || c.mode === 'inherit' || c.currencyOverride != null) return c
+    const record = cellRecord(c, { rowId, month: c.month, value: c.value == null ? null : inNext(c.value), items: c.items.map((it) => ({ ...it, amount: inNext(it.amount) })) }, ts)
+    mutations.push({ op: 'put', table: 'cells', record })
+    return record
+  })
+  const recurringItems = tables.recurringItems.map((r) => {
+    if (r.rowId !== rowId || r.deletedAt) return r
+    const record = RecurringItemSchema.parse({ ...r, amount: inNext(r.amount), updatedAt: ts })
+    mutations.push({ op: 'put', table: 'recurringItems', record })
+    return record
+  })
+  return { tables: { ...tables, cells, recurringItems, rows: tables.rows.map((r) => (r.id === rowId ? { ...r, currency: to } : r)) }, mutations }
+}
+
+/**
+ * What a save of the row's dialog works on when the dialog also moves the row to a currency counting other decimals:
+ * the tables with the row's stored amounts in the new unit (`keepDigits`), and the calculation over them. The dialog
+ * hands in its amounts in the new unit, so the save compares like with like; read against the old figures, a change
+ * of currency alone would look like a new amount and replace what the later months hold. `pre` is what is written for
+ * it, ahead of the save's own writes. Without such a change everything comes back as it was handed in.
+ */
+export function rowInNewCurrency(tables: Tables, engine: EngineOutput, rowId: string, change: RowChange | undefined, ts: number): { tables: Tables; engine: EngineOutput; pre: Mutation[] } {
+  const moved = change?.currency === undefined ? null : keepDigits(tables, rowId, change.currency, ts)
+  if (!moved || moved.mutations.length === 0) return { tables, engine, pre: [] }
+  return { tables: moved.tables, engine: computeEngine({ tables: moved.tables, months: engine.months }), pre: moved.mutations }
+}
+
+/** `first` without the writes that `then` makes again: where a save writes a record twice, the later write is the one that counts. */
+export function withoutRewritten(first: Mutation[], then: Mutation[]): Mutation[] {
+  const keyOf = (m: Mutation) => `${m.table}|${JSON.stringify(m.op === 'put' ? (primaryKeyOf as (t: string, r: unknown) => unknown)(m.table, m.record) : m.key)}`
+  const again = new Set(then.map(keyOf))
+  return first.filter((m) => !again.has(keyOf(m)))
+}
+
 /** What the row's dialog can change on the row itself, in the same step as the month's amount. A field left out stays as it is. */
 export interface RowChange {
   /** The currency the row is typed in; null is the household's own. */
@@ -221,26 +280,28 @@ export function rowChangePut(tables: Tables, rowId: string, change: RowChange | 
  * the amount for its month either way.
  */
 export async function setCellValue(store: Store, rowId: string, month: MonthKey, value: Money, scope: EditScope, rowChange?: RowChange): Promise<void> {
-  const { tables, engine } = await engineUpTo(store, month)
+  const loaded = await engineUpTo(store, month)
   const ts = now()
+  const { tables, engine, pre } = rowInNewCurrency(loaded.tables, loaded.engine, rowId, rowChange, ts)
   const once = scope === 'this-month' && carriesForward(tables, engine, rowId)
   const mutations: Mutation[] = once ? standingMoves(tables, engine, rowId, month, ts) : planFollowing(tables, engine, rowId, month, value, ts).mutations
   const existing = cellOf(tables, rowId, month)
   mutations.push(cellPut(existing, { rowId, month, mode: 'value', value, items: [], markedDone: false, once }, ts))
-  mutations.push(...rowChangePut(tables, rowId, rowChange))
-  await store.commit(mutations)
+  mutations.push(...rowChangePut(loaded.tables, rowId, rowChange))
+  await store.commit([...withoutRewritten(pre, mutations), ...mutations])
 }
 
 export async function setCellItems(store: Store, rowId: string, month: MonthKey, items: CellItem[], scope: EditScope = 'from-now-on', rowChange?: RowChange): Promise<void> {
-  const { tables, engine } = await engineUpTo(store, month)
+  const loaded = await engineUpTo(store, month)
   const ts = now()
+  const { tables, engine, pre } = rowInNewCurrency(loaded.tables, loaded.engine, rowId, rowChange, ts)
   const once = scope === 'this-month' && carriesForward(tables, engine, rowId)
   const total = itemsAmount(items, engine.cells[cellKey(rowId, month)]?.given)
   const mutations: Mutation[] = once ? standingMoves(tables, engine, rowId, month, ts) : planFollowing(tables, engine, rowId, month, total, ts).mutations
   const existing = cellOf(tables, rowId, month)
   mutations.push(cellPut(existing, { rowId, month, mode: 'items', value: null, items, markedDone: false, once }, ts))
-  mutations.push(...rowChangePut(tables, rowId, rowChange))
-  await store.commit(mutations)
+  mutations.push(...rowChangePut(loaded.tables, rowId, rowChange))
+  await store.commit([...withoutRewritten(pre, mutations), ...mutations])
 }
 
 /** Back to inheriting from the previous month. Stored as an inherit record (not a delete) so the change travels between devices. */
@@ -553,7 +614,10 @@ export async function updateRow(store: Store, rowId: string, patch: Partial<Omit
   const tables = await loadTables(store)
   const row = tables.rows.find((r) => r.id === rowId)
   if (!row) throw new Error('Row not found')
-  await store.commit([{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, ...patch, updatedAt: now() }) }])
+  const ts = now()
+  // another currency: the amounts the row holds keep their digits (`keepDigits`), in the same step
+  const moved = patch.currency !== undefined && (patch.currency ?? null) !== (row.currency ?? null) ? keepDigits(tables, rowId, patch.currency, ts).mutations : []
+  await store.commit([{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, ...patch, updatedAt: ts }) }, ...moved])
 }
 
 export const renameRow = (store: Store, rowId: string, name: string) => updateRow(store, rowId, { name })

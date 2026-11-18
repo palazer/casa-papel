@@ -11,7 +11,7 @@ import { amountToInput, formatMonth, parseAmount, unreadableAmount } from '@/app
 import { useStore } from '@/app/store'
 import { sortRows } from '@/engine'
 import { monthOfDate, type Household, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
-import { addRecurringItem, updateRecurringItem, type RecurringInput } from '@/store'
+import { addRecurringItem, rowCurrencyOf, updateRecurringItem, type RecurringInput } from '@/store'
 import { fundingOptions } from '@/features/grid/funding'
 
 const MONTH_NAMES = Array.from({ length: 12 }, (_, i) => new Intl.DateTimeFormat('en', { month: 'short' }).format(new Date(2026, i, 1)))
@@ -36,7 +36,7 @@ export function RecurringDialog({ tables, household, item, defaultMonth, onClose
   const [rowId, setRowId] = useState(item?.rowId ?? rows[0]?.id ?? '__new__')
   const [newRowName, setNewRowName] = useState('')
   const [newRowSection, setNewRowSection] = useState<Section>('expense')
-  const [amount, setAmount] = useState(() => (item == null ? '' : amountToInput(item.amount, item.currency ?? baseCurrency, locale)))
+  const [amount, setAmount] = useState(() => (item == null ? '' : amountToInput(item.amount, rowCurrencyOf(tables, item.rowId), locale)))
   const [cadence, setCadence] = useState<CadenceChoice>(() => (item?.dueMonths?.length ? 'months' : (String(item?.cadence?.intervalMonths ?? 1) as CadenceChoice)))
   const [anchor, setAnchor] = useState<number>(item?.cadence?.anchorMonth ?? Number(defaultMonth.slice(5)))
   const [dueMonths, setDueMonths] = useState<Set<number>>(() => new Set(item?.dueMonths ?? []))
@@ -48,13 +48,15 @@ export function RecurringDialog({ tables, household, item, defaultMonth, onClose
   const [notes, setNotes] = useState(item?.notes ?? '')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // the amount is the row's: read and shown in the currency the row is typed in (a new row starts in the household's)
+  const amountCurrency = rowId === '__new__' ? baseCurrency : rowCurrencyOf(tables, rowId)
   // wording follows the row: income arrives somewhere, spending leaves from somewhere and is funded by something
   const section: Section = rowId === '__new__' ? newRowSection : (rows.find((r) => r.id === rowId)?.section ?? 'expense')
   const accountLabel = section === 'income' ? 'Paid into' : section === 'transfer' ? 'From account' : 'Paid from'
   const accountHelp = section === 'income' ? 'Which of your accounts receives it. For your overview only; the sums do not change.' : 'Which of your accounts the money leaves. For your overview only; the sums do not change.'
 
   async function save() {
-    const minor = parseAmount(amount, baseCurrency, locale)
+    const minor = parseAmount(amount, amountCurrency, locale)
     if (minor == null) return setError(unreadableAmount(amount, 'Amount is not a number I can read.'))
     if (!name.trim()) return setError('Give it a name.')
     if (rowId === '__new__' && !newRowName.trim()) return setError('Name the new row.')
@@ -108,7 +110,7 @@ export function RecurringDialog({ tables, household, item, defaultMonth, onClose
               <div className="space-y-1.5"><Label htmlFor="rc-newsec">Section</Label><NativeSelect id="rc-newsec" className="w-full" value={newRowSection} onChange={(e) => setNewRowSection(e.target.value as Section)}><option value="expense">Expense</option><option value="income">Income</option><option value="transfer">Transfer</option></NativeSelect></div>
             </>
           )}
-          <div className="space-y-1.5"><Label htmlFor="rc-amount">Amount ({baseCurrency})</Label><Input id="rc-amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} /><AmountHint text={amount} currency={baseCurrency} locale={locale} /></div>
+          <div className="space-y-1.5"><Label htmlFor="rc-amount">Amount ({amountCurrency})</Label><Input id="rc-amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} /><AmountHint text={amount} currency={amountCurrency} locale={locale} /></div>
           <div className="space-y-1.5">
             <Label htmlFor="rc-cadence">How often</Label>
             <NativeSelect id="rc-cadence" className="w-full" value={cadence} onChange={(e) => setCadence(e.target.value as CadenceChoice)}>

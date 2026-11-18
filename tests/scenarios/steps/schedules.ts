@@ -1,6 +1,7 @@
+import { parseAmount } from '@/app/format'
 import { cellKey } from '@/engine'
 import { newId, type CellItem, type MonthKey, type RepeatChoice } from '@/model'
-import { addRecurringItem, endRecurringItem, itemsFromCurrent, loadTables, reactivateRecurringItem, removeRecurringItem, saveRowMonth, setCellDone, updateRecurringItem, type EditScope } from '@/store'
+import { addRecurringItem, endRecurringItem, itemsFromCurrent, loadTables, reactivateRecurringItem, removeRecurringItem, rowCurrencyOf, saveRowMonth, setCellDone, updateRecurringItem, type EditScope } from '@/store'
 import { monthName, step } from '../registry'
 import { ScenarioError, type World } from '../world'
 
@@ -57,6 +58,15 @@ step('I stop the item {string} of {string} after {month}', async (world: World, 
 // "Add schedule…" in the list of schedules (people & things): a schedule made outside the row's month
 step('I add the schedule {string} of {money} every month to {string} from {month}', async (world: World, name: string, amount: number, rowName: string, from: string) => {
   await addRecurringItem(world.store, { name, rowId: (await world.row(rowName)).id, amount, startMonth: from, cadence: { intervalMonths: 1, anchorMonth: monthNumber(from) } })
+})
+
+// the same form with the amount as it is typed: the form reads it in the currency of the row it is for
+step('I add the schedule {string} to {string} in the list, typing {string} every month from {month}', async (world: World, name: string, rowName: string, typed: string, from: string) => {
+  const row = await world.row(rowName)
+  const { tables, household } = await world.view()
+  const amount = parseAmount(typed, rowCurrencyOf(tables, row.id), household.locale)
+  if (amount == null) throw new ScenarioError(`"${typed}" is not an amount the form can read.`)
+  await addRecurringItem(world.store, { name, rowId: row.id, amount, startMonth: from, cadence: { intervalMonths: 1, anchorMonth: monthNumber(from) } })
 })
 
 // the list's "Edit…", "End after <Month>" and "Reactivate": the schedule is found by its name; the newest piece of it

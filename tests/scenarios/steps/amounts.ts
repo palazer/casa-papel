@@ -1,6 +1,7 @@
 import { cellKey } from '@/engine'
-import { newId, resolveRules, type CellItem, type MonthKey } from '@/model'
-import { clearCell, itemsFromCurrent, saveRowMonth, setCellItems, setCellValue, type EditScope } from '@/store'
+import { parseAmount } from '@/app/format'
+import { fromMinor, newId, resolveRules, toMinor, type CellItem, type MonthKey } from '@/model'
+import { clearCell, itemsFromCurrent, saveRowMonth, setCellItems, setCellValue, updateRow, type EditScope } from '@/store'
 import { monthName, step } from '../registry'
 import { ScenarioError, type World } from '../world'
 
@@ -30,6 +31,33 @@ async function typeAmount(world: World, amount: number, rowName: string, month: 
 
 step('I type {money} for {string} in {month}, only this month', (world: World, amount: number, row: string, month: string) => typeAmount(world, amount, row, month, 'this-month'))
 step('I type {money} for {string} in {month}, this and following months', (world: World, amount: number, row: string, month: string) => typeAmount(world, amount, row, month, 'from-now-on'))
+
+// the amount as it is typed, read in the row's currency as the dialog reads its field: for a currency without cents
+step('I type {string} for {string} in {month}, this and following months', async (world: World, typed: string, rowName: string, month: string) => {
+  const row = await world.row(rowName)
+  const { household } = await world.view()
+  const amount = parseAmount(typed, row.currency ?? household.baseCurrency, household.locale)
+  if (amount == null) throw new ScenarioError(`"${typed}" is not an amount the dialog can read.`)
+  await typeAmount(world, amount, rowName, month, 'from-now-on')
+})
+
+// "Currency…" in the row's menu
+step('I change the currency of {string} to {ccy}', async (world: World, rowName: string, ccy: string) => {
+  const row = await world.row(rowName)
+  const { household } = await world.view()
+  await updateRow(world.store, row.id, { currency: ccy === household.baseCurrency ? null : ccy })
+})
+
+// The currency field beside the amount in the row's dialog, saved with the month as it stands: the digits on screen
+// stay and are read in the new currency (`CellEditor.pickCurrency`, then `saveValue`).
+step('I change the currency of {string} to {ccy} in its dialog of {month}', async (world: World, rowName: string, ccy: string, month: string) => {
+  const row = await world.row(rowName)
+  const { engine, household } = await world.view()
+  const cell = engine.cells[cellKey(row.id, month)]
+  if (cell?.source === 'items') throw new ScenarioError(`"${rowName}" shows a list of items in ${monthName(month)}; this step is for a single amount.`)
+  const shown = toMinor(fromMinor(cell?.value ?? 0, cell?.currency ?? row.currency ?? household.baseCurrency), ccy)
+  await setCellValue(world.store, row.id, month, shown, 'from-now-on', { currency: ccy === household.baseCurrency ? null : ccy })
+})
 
 // "Clear (inherit)" in the row's dialog
 step('I clear {string} in {month}', async (world: World, rowName: string, month: string) => {

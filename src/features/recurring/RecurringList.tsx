@@ -11,7 +11,7 @@ import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useTables } from '@/app/useEngine'
 import { cellKey, type EngineOutput } from '@/engine'
 import { addMonths, describeCadence, monthOfDate, type MonthKey, type RecurringItem } from '@/model'
-import { endRecurringItem, reactivateRecurringItem, recurringStatus, setRecurringPaid } from '@/store'
+import { endRecurringItem, reactivateRecurringItem, recurringStatus, rowCurrencyOf, setRecurringPaid } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
 import { RecurringDialog } from './RecurringDialog'
 
@@ -31,7 +31,7 @@ export function RecurringList({ engine }: {
   const [error, setError] = useState<string | null>(null)
   const [removing, setRemoving] = useState<RecurringItem | null>(null)
   if (!tables || !household) return null
-  const { locale, baseCurrency } = household
+  const { locale } = household
   const m = months.includes(month) ? month : months[months.length - 1]
   const items = tables.recurringItems.filter((r) => !r.deletedAt).sort((a, b) => a.name.localeCompare(b.name))
   const rowName = (id: string) => tables.rows.find((r) => r.id === id)?.name ?? '?'
@@ -67,7 +67,7 @@ export function RecurringList({ engine }: {
                 <tr className={ended ? 'text-muted-foreground' : ''}>
                   <td className={`${TD} font-medium`}>{it.name}{ended && <span className="ml-1 text-[10px] font-normal">(ended {formatMonth(it.endMonth!, locale)})</span>}</td>
                   <td className={TD}>{rowName(it.rowId)}</td>
-                  <td className={`${TD} text-right tabular-nums`}>{formatAmount(it.amount, it.currency ?? baseCurrency, locale)}</td>
+                  <td className={`${TD} text-right tabular-nums`}>{formatAmount(it.amount, rowCurrencyOf(tables, it.rowId), locale)}</td>
                   <td className={TD}>{describeCadence(it, locale)}</td>
                   <td className={TD}>{accountName(it.accountId)}</td>
                   <td className={TD}>

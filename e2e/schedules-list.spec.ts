@@ -75,4 +75,41 @@ test.describe('the list of schedules', () => {
     await expect(page.getByRole('button', { name: /^Subscriptions Oct 2026/ })).toHaveAccessibleName('Subscriptions Oct 2026: empty')
     await expect(page.getByRole('button', { name: /^Subscriptions Nov 2026/ })).toContainText('18')
   })
+
+  // Finding F12: the form read its amount in the household's currency, so 25000 typed for a row in Icelandic
+  // krónur, which have no cents, landed as 2,500,000 kr.
+  test('a schedule for a row in a currency without cents is read and shown in that currency', async ({ page }) => {
+    // no rate service in a test: the króna simply has no rate here
+    await page.route('https://api.frankfurter.dev/**', (r) => r.abort())
+    await page.goto('?demo=1&screen=grid')
+    await page.getByRole('button', { name: 'Load the demo household' }).click()
+    await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
+    const dlg = page.getByRole('dialog')
+    await page.getByRole('button', { name: 'Row menu for Other income' }).click()
+    await page.getByRole('menuitem', { name: 'Currency…' }).click()
+    await dlg.getByLabel('Amounts in this row are in', { exact: true }).selectOption('ISK')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+
+    await page.getByRole('link', { name: 'Household' }).click()
+    await page.getByRole('button', { name: 'Add schedule' }).click()
+    await dlg.getByLabel('Name', { exact: true }).fill('Cabin rent')
+    // the amount is the row's: the field names the currency of the row that is chosen
+    await dlg.getByLabel('Grid row').selectOption({ label: 'Other income' })
+    await dlg.getByLabel('Amount (ISK)').fill('25000')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    const schedules = page.getByRole('table').filter({ has: page.getByRole('columnheader', { name: 'When' }) })
+    await expect(schedules.getByRole('row').filter({ has: page.getByRole('cell', { name: /^Cabin rent/ }) })).toContainText(/ISK\s25,000/)
+
+    // opened again, the form shows what was typed
+    await page.getByRole('button', { name: 'Menu for Cabin rent' }).click()
+    await page.getByRole('menuitem', { name: 'Edit…' }).click()
+    await expect(dlg.getByLabel('Amount (ISK)')).toHaveValue('25000')
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+
+    // the row had 150.00 in November: moved to krónur it kept its digits (150, finding F13), and the schedule lands beside it
+    await page.getByRole('link', { name: 'Grid' }).click()
+    await expect(page.getByRole('button', { name: /^Other income Nov 2026/ })).toContainText(/ISK\s25,150/)
+  })
 })

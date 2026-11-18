@@ -18,7 +18,7 @@ import {
   type CellItem, type Household, type ItemStatus, type MonthKey, type RepeatChoice, type Repeating, type Row, type Tables,
 } from '@/model'
 import {
-  clearCell, derivedRowReason, endRecurringFrom, fetchRatesFor, itemsFromCurrent, oneMonthValuesReplaced, planFollowing, saveRowMonth, setCellItems, setCellValue, skipRecurringMonth,
+  clearCell, derivedRowReason, endRecurringFrom, fetchRatesFor, itemsFromCurrent, oneMonthValuesReplaced, planFollowing, rowInNewCurrency, saveRowMonth, setCellItems, setCellValue, skipRecurringMonth,
   type EditScope, type RuleTarget,
 } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
@@ -179,16 +179,23 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   // the rule fills the months after this one: nothing carries on from a typed amount, and nothing is held for it
   const saveScope: EditScope = ruleRuns ? 'from-now-on' : scope
 
-  const itemsTotal = items.filter((i) => !i.skipped).reduce((s, i) => s + (i.kind === 'carry' ? (cell?.items.find((x) => x.id === i.id)?.effectiveAmount ?? prevValue()) : Number.isFinite(i.amount) ? i.amount : 0), 0)
+  // A currency picked here that counts other decimals (krónur have no cents): what is said before saving reads the
+  // row's amounts in the new unit, as the save will (`rowInNewCurrency`). Otherwise this is the screen's own figures.
+  const moved = useMemo(
+    () => rowInNewCurrency(tables, engine, row.id, newCurrency === undefined ? undefined : { currency: newCurrency }, 0),
+    [tables, engine, row.id, newCurrency],
+  )
+
+  const itemsTotal = items.filter((i) => !i.skipped).reduce((s, i) => s + (i.kind === 'carry' ? prevValue() : Number.isFinite(i.amount) ? i.amount : 0), 0)
 
   // ----- what the choice under the amount does to the months after this one, said before saving -----
   /** The amount as the form holds it now; null while it cannot be read. */
   const amountNow = mode === 'value' ? (text.trim() === '' ? 0 : parseAmount(text, currency, locale)) : itemsTotal
   // the same function the save runs, so the sentence and the save cannot disagree
-  const following = amountNow == null || !Number.isFinite(amountNow) ? { replaced: [], kept: [] } : planFollowing(tables, engine, row.id, month, amountNow, 0)
-  const after = engine.cells[cellKey(row.id, nextMonth)]
+  const following = amountNow == null || !Number.isFinite(amountNow) ? { replaced: [], kept: [] } : planFollowing(moved.tables, moved.engine, row.id, month, amountNow, 0)
+  const after = moved.engine.cells[cellKey(row.id, nextMonth)]
   /** What the month after goes on with when this month is this month's alone: its own amount, or what this month handed on until now. */
-  const goesOn = after?.source === 'archived' ? undefined : after?.cell && after.cell.mode !== 'inherit' ? typedAmount(after) : cell?.handsOn ?? null
+  const goesOn = after?.source === 'archived' ? undefined : after?.cell && after.cell.mode !== 'inherit' ? typedAmount(after) : moved.engine.cells[cellKey(row.id, month)]?.handsOn ?? null
 
   /** Another currency for the row: the digits on screen stay and are read in it. */
   function pickCurrency(next: string) {
@@ -201,7 +208,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
 
   /** What a carried item is worth: what the month before hands to this one, as the calculation says it. */
   function prevValue(): number {
-    return cell?.given ?? 0
+    return moved.engine.cells[cellKey(row.id, month)]?.given ?? 0
   }
 
   /** A save of the amount, and of what changed on the row with it; a row that changed category tells the screen. */
@@ -301,8 +308,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
    */
   function dropSchedule(scheduleId: string, said: string) {
     const last = !tables.recurringItems.some((r) => !r.deletedAt && r.rowId === row.id && r.id !== scheduleId)
-    const carried = (it: CellItem) => cell?.items.find((x) => x.id === it.id)?.effectiveAmount ?? prevValue()
-    setItems((list) => list.filter((x) => x.recurringItemId !== scheduleId).map((x) => (last && x.kind === 'carry' ? { ...x, kind: 'normal' as const, amount: carried(x) } : x)))
+    setItems((list) => list.filter((x) => x.recurringItemId !== scheduleId).map((x) => (last && x.kind === 'carry' ? { ...x, kind: 'normal' as const, amount: prevValue() } : x)))
     setNotice(`${said} What you typed here is still unsaved.`)
   }
 

@@ -11,6 +11,7 @@ import * as app from '@/store'
 import { itemsFromCurrent, planRowMonthSave } from '@/store'
 import { monthProgress } from '@/features/statement/progress'
 import { CURRENCIES, currencyChoices } from '@/app/currencies'
+import { formatAmount } from '@/app/format'
 
 /** Amounts are compared as the scenario writes them, so a failure reads "expected 1,200.00, got 1,250.00". */
 const same = (got: number, expected: number, what: string) => expect(moneyText(got), what).toBe(moneyText(expected))
@@ -152,6 +153,16 @@ step('no month can be closed or reopened', async (world: World) => {
   const { tables } = await world.view()
   expect(tables.monthStates.filter((s) => s.closed).map((s) => monthName(s.month)), 'the months that are closed').toEqual([])
   expect(Object.keys(app).filter((name) => /^(close|reopen)Month/.test(name)), 'what the app has to close or reopen a month').toEqual([])
+})
+
+// the amount as the app writes it, in the currency the month is in: for a currency without cents, where "1,000.00" says nothing
+step('{string} reads {string} in {month}', async (world: World, rowName: string, text: string, month: string) => {
+  const row = await world.row(rowName)
+  const { engine, household } = await world.view()
+  const c = engine.cells[cellKey(row.id, month)]
+  if (!c) throw new ScenarioError(`"${rowName}" has no month ${monthName(month)}.`)
+  // the app puts a space that does not break between a code and its number; a scenario writes a plain one
+  expect(formatAmount(c.value, c.currency, household.locale).replace(/[\u00a0\u202f]/g, ' '), `"${rowName}" in ${monthName(month)}`).toBe(text)
 })
 
 // ---------- what the app said ----------

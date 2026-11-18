@@ -21,6 +21,8 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
 | F9 | Merging an older copy (a file, or the other device's) brings back what was taken back | an undone change returns | the merge respects what this device removed | closed; the file comparison comes with step 5 |
 | F10 | A row that followed another shows amounts it never had once that row is archived | months that are over change | write the 0.00 down | closed |
 | F11 | A schedule deleted after a payment: the paid amount runs on into every later month | amounts appear that nobody planned | what was paid is that month's alone | closed |
+| F12 | A schedule made in the list of schedules is read in the household's currency | an amount 100 times too large, for a currency without cents | the form reads the amount in the row's currency | closed |
+| F13 | A row moved to a currency without cents multiplies its amounts by 100 | every month of the row is wrong | the amounts keep their digits | closed |
 
 ## The findings
 
@@ -306,6 +308,46 @@ Found on 18 November 2026 while step 3 was built; older than that step.
   later amount for the following months replaces it.
 - **What is left.** A schedule that was deleted before this fix: what it left as paid still runs on. Type 0.00 for
   the month after it, for this and the following months.
+
+### F12. A schedule made in the list of schedules is read in the household's currency
+
+Found on 18 November 2026 while step 4 was planned; older than that step.
+
+- **What the app does.** A row is in Icelandic krónur, a currency without cents. Under Household, "Add schedule"
+  for that row and type 25000: the row shows 2,500,000 kr a month. The field is labelled "Amount (EUR)" whatever the
+  row is in, and the list of schedules shows the amount with the household's currency.
+- **Why.** An amount is stored in its currency's smallest unit. The form read what was typed as euros (2,500,000
+  cents), and the row reads that number as krónur. For a currency with cents both readings give the same number,
+  so only the label and the list were wrong there.
+- **What the rule says.** An amount is typed and kept in its row's currency (X1).
+- **Scenario.** `05-rates.feature`: "A schedule made in the list of schedules is read in its row's currency"; the
+  form itself in the browser test "a schedule for a row in a currency without cents is read and shown in that
+  currency".
+- **Decision.** Fix with step 4, part 1 (18 November 2026).
+- **Closed** (19 November 2026). The form reads, labels and shows the amount in the currency of the row it is for,
+  and the list of schedules shows it in that currency.
+
+### F13. A row moved to a currency without cents multiplies its amounts by 100
+
+Found on 18 November 2026 while step 4 was planned; older than that step.
+
+- **What the app does.** "Summer house" is 1,000.00 euros a month. Change the row to ISK, in its menu or in its
+  dialog: every month it holds reads 100,000 kr, though the dialog says "numbers already typed keep their digits".
+  Changed in the dialog of a month with "This and following months", the month itself is right (1,000 kr), the
+  months before it are 100 times too large, and a later month with an amount of its own loses it.
+- **Why.** The stored number (100000 cents) was read again in the new currency's smallest unit. The dialog rescaled
+  only the month on screen, and the save then compared that month's new figure with the old ones, took the change
+  of currency for a new amount and replaced the later months.
+- **What the rule says.** A rate never changes an amount in its own currency (X5); the dialog's own sentence says
+  the digits stay.
+- **Scenarios.** `05-rates.feature`: "A row moved to a currency without cents keeps its digits in every month",
+  "The same in the row's dialog: a later month keeps its own amount", "And back to a currency with cents", "A
+  schedule of the row keeps its digits too".
+- **Decision.** Fix with step 4, part 1 (18 November 2026).
+- **Closed** (19 November 2026). When a row's currency changes to one that counts other decimals, the amounts of its
+  months and of its schedules are written again in the new unit, in the same step as the change, so one Undo takes
+  all of it back. A month that keeps a currency of its own is left alone. Half a króna rounds: 1,200.50 becomes
+  1,201 kr. Between two currencies with cents nothing is rewritten.
 
 ## Decided, not built yet
 
