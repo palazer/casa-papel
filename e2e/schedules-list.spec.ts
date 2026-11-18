@@ -1,4 +1,4 @@
-import { expect, test } from './test'
+import { expect, saveAnyway, test } from './test'
 
 /** The list of schedules under Household: a change made there names no month, so it counts from the current one. */
 test.describe('the list of schedules', () => {
@@ -56,6 +56,7 @@ test.describe('the list of schedules', () => {
     await page.getByRole('button', { name: 'Previous month' }).click()
     await page.getByRole('button', { name: 'Menu for Streaming' }).click()
     await page.getByRole('menuitem', { name: 'End after Sept 2026' }).click()
+    await saveAnyway(page)
     // back in November the list shows it as ended
     await page.getByRole('button', { name: 'Next month' }).click()
     await page.getByRole('button', { name: 'Next month' }).click()

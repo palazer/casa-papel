@@ -937,6 +937,19 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   is owed. Footer: a ghost `Delete…` on the left when editing, Cancel, Save.
 - Dialogs are shadcn `Dialog`; the confirm step lives inside the dialog, never behind it. Errors appear beside the field
   that caused them, `role="alert"`.
+- **The question before a change alters a month that is over** (rule T4; `src/features/past/PastQuestion.tsx`, the
+  store's `pastGuard` in `src/store/past.ts`). Every save goes through it: one that changes a figure of a month before
+  the current one waits, and a small dialog opens over the dialog it came from (`data-testid="past-question"`). The app's
+  dialogs are Base UI, which nests a dialog only inside another one's root, so each `Dialog` registers how deep it sits
+  (`DialogLayers` in `src/components/ui/dialog.tsx`) and the deepest open one renders the question inside itself; with
+  no dialog open (a field of the rates table, the cash buffer) it stands at the root. Title `This changes months that
+  are over` with an (i) (`past.question`), then `Oct 2026 changes:` (the months, `listMonths`), then one line per
+  figure, `"Rent", Mar–May 2026: €1,200.00 → €1,300.00` for an amount (runs of months with the same before and after,
+  `nothing` where there was none) and `"Savings" at the end of May 2026: €9,000.00 → €8,700.00` for a balance, at most
+  eight, then `and 3 more`. Footer: `Cancel` (`outline`, and Escape), `Only from <Month> on` (`outline`, only where the
+  save has a version that leaves the past alone: an investment's growth), `Save anyway`. Cancel goes back to the dialog
+  with what was typed and no message (`saveError` in `src/app/saveError.ts` says nothing for it); a field without a
+  dialog shows what is stored again. Ticks, real balances, something new, deleting and restoring never ask.
 - Removing anything goes through one `RemoveDialog` (`src/features/remove/RemoveDialog.tsx`), reached from a row's
   menu ("Archive or delete…"), the People & things list, the account, virtual account and goal dialogs' footers
   ("Archive or delete…", "Delete…"), the schedules list, the cell editor's "All occurrences" and the Categories card.

@@ -88,8 +88,9 @@ export const GUIDE: GuideTopic[] = [
       'Click a month name → "Open in the Statement" to read and tick that month there.',
       'Grow the plan with "Add <year>" in the Grid toolbar or at the last month of the Statement.',
       'Undo with the arrow in the toolbar or Cmd/Ctrl+Z; Shift redoes.',
+      'A change that reaches into a month that is over asks first: "This changes months that are over" names the months and what changes in them. "Cancel" goes back to the dialog with what you typed; "Save anyway" saves it, and Undo takes it back. A change in the current month or later, a tick, a real balance and something new never ask.',
     ],
-    tips: ['section.income', 'section.expense', 'section.transfer', 'derived.incomeTotal', 'derived.expensesTotal', 'derived.netWorth', 'cell.repeats'],
+    tips: ['section.income', 'section.expense', 'section.transfer', 'derived.incomeTotal', 'derived.expensesTotal', 'derived.netWorth', 'cell.repeats', 'past.question'],
     open: 'grid',
   },
   {

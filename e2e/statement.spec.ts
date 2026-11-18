@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from './test'
+import { expect, saveAnyway, test, type Locator, type Page } from './test'
 
 async function openStatement(page: Page) {
   await page.goto('?demo=1')
@@ -705,6 +705,7 @@ test.describe('working the month in the Statement', () => {
     await expect(dlg.getByLabel('Lands in').locator('option')).toHaveText(['Nowhere', 'Pocket savings'])
     await dlg.getByLabel('Lands in').selectOption({ label: 'Pocket savings' })
     await dlg.getByRole('button', { name: 'Save' }).click()
+    await saveAnyway(page)
     await expect(dlg).toBeHidden()
     // September and October brought 500 each, and so does November; the month and net worth are what they were
     await expect(line).toContainText('€3,500.00')

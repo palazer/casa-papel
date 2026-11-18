@@ -1,4 +1,4 @@
-import { expect, test, type Page } from './test'
+import { expect, saveAnyway, test, type Page } from './test'
 
 async function loadDemo(page: Page) {
   await page.goto('?demo=1&screen=grid')
@@ -51,6 +51,7 @@ test.describe('row sources, accounts and followers', () => {
     await expect(dlg.getByText(/Earlier months change too/)).toBeVisible()
     await page.screenshot({ path: 'e2e/output/row-source.png' })
     await dlg.getByRole('button', { name: 'Save' }).click()
+    await saveAnyway(page)
     await expect(dlg).toBeHidden()
 
     await page.getByRole('button', { name: /^Public transport Nov 2026/ }).click()
@@ -69,6 +70,7 @@ test.describe('row sources, accounts and followers', () => {
     const dlg = page.getByRole('dialog')
     await dlg.getByLabel('Same amount as').selectOption({ label: 'Robin – Child benefit' })
     await dlg.getByRole('button', { name: 'Save' }).click()
+    await saveAnyway(page)
     await expect(dlg).toBeHidden()
 
     // the row is now read-only and mirrors the benefit
@@ -82,6 +84,7 @@ test.describe('row sources, accounts and followers', () => {
     await page.getByRole('menuitem', { name: 'Follows Robin – Child benefit…' }).click()
     await dlg.getByLabel('Same amount as').selectOption('')
     await dlg.getByRole('button', { name: 'Save' }).click()
+    await saveAnyway(page)
     await expect(dlg).toBeHidden()
     await expect(page.getByRole('button', { name: /^To investments Nov 2026/ })).toContainText('500')
   })

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from './test'
+import { expect, saveAnyway, test, type Page } from './test'
 
 async function loadDemo(page: Page) {
   await page.goto('?demo=1&screen=grid')
@@ -118,6 +118,7 @@ test.describe('grid', () => {
     await page.getByLabel('Amount in EUR').fill('215')
     await page.getByRole('radio', { name: 'Only this month' }).click()
     await page.getByRole('button', { name: 'Save' }).click()
+    await saveAnyway(page)
     await expect(page.getByRole('dialog')).toBeHidden()
     await expect(utilOct).toContainText('215')
     await expect(page.getByRole('button', { name: /^The flat – Utilities Nov 2026/ })).toContainText('250')

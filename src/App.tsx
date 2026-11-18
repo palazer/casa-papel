@@ -13,6 +13,7 @@ import { GridScreen } from '@/features/grid/GridScreen'
 import { GuideScreen } from '@/features/guide/GuideScreen'
 import { HomeScreen } from '@/features/home/HomeScreen'
 import { HouseholdScreen } from '@/features/household/HouseholdScreen'
+import { PastQuestionHost } from '@/features/past/PastQuestion'
 import { StatementScreen } from '@/features/statement/StatementScreen'
 import { AccountDialog, type AccountStep } from '@/features/sync/AccountDialog'
 import { planHousekeeping } from '@/store'
@@ -25,9 +26,12 @@ export default function App() {
   return (
     <ErrorBoundary>
       <StoreProvider store={store}>
-        <SyncContext.Provider value={sync}>
-          <Shell />
-        </SyncContext.Provider>
+        {/* a change that alters a month that is over asks first, over whatever dialog it was saved from (rule T4) */}
+        <PastQuestionHost>
+          <SyncContext.Provider value={sync}>
+            <Shell />
+          </SyncContext.Provider>
+        </PastQuestionHost>
       </StoreProvider>
     </ErrorBoundary>
   )

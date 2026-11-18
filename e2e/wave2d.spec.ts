@@ -1,4 +1,4 @@
-import { expect, test, type Page } from './test'
+import { expect, saveAnyway, test, type Page } from './test'
 
 // service workers are blocked so page.route can stand in for the rate service
 test.use({ viewport: { width: 1400, height: 900 }, serviceWorkers: 'block' })
@@ -640,6 +640,7 @@ test('a row can follow a share of another row', async ({ page }) => {
   await dlg.getByLabel('Same amount as').selectOption({ label: 'Robin – Child benefit' })
   await dlg.getByLabel('Share (%)', { exact: true }).fill('50')
   await dlg.getByRole('button', { name: 'Save' }).click()
+  await saveAnyway(page)
   await expect(dlg).toBeHidden()
   const row = page.getByRole('row', { name: /^To investments/ })
   await expect(row).toContainText('= 50% of Robin – Child benefit')

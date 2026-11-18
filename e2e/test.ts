@@ -1,4 +1,4 @@
-import { test as base, type BrowserContext } from '@playwright/test'
+import { test as base, expect, type BrowserContext, type Page } from '@playwright/test'
 
 /**
  * The day every browser test runs on. The app opens on the current month, and the tests name that month ("November
@@ -45,3 +45,14 @@ export const test = base.extend({
 
 export { expect } from '@playwright/test'
 export type { Browser, BrowserContext, Locator, Page, Route } from '@playwright/test'
+
+/**
+ * Answer the question before a change alters a month that is over (rule T4) with "Save anyway": for a test whose
+ * change reaches into September or October 2026 on purpose. `e2e/past.spec.ts` tests the question itself.
+ */
+export async function saveAnyway(page: Page): Promise<void> {
+  const question = page.getByTestId('past-question')
+  await expect(question).toBeVisible()
+  await question.getByRole('button', { name: 'Save anyway' }).click()
+  await expect(question).toBeHidden()
+}
