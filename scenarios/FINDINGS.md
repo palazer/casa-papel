@@ -19,7 +19,7 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
 | F7 | Restoring does not bring back what archiving changed with it | amounts stay changed | restore puts it back | closed |
 | F8 | Undo of a schedule added from the list empties the row's months | amounts are lost | save the schedule and its months as one step | closed |
 | F9 | Merging an older copy (a file, or the other device's) brings back what was taken back | an undone change returns | the merge respects what this device removed | closed; the file comparison comes with step 5 |
-| F10 | A row that followed another shows amounts it never had once that row is archived or deleted | months that are over change | write the 0.00 down | open |
+| F10 | A row that followed another shows amounts it never had once that row is archived | months that are over change | write the 0.00 down | closed |
 | F11 | A schedule deleted after a payment: the paid amount runs on into every later month | amounts appear that nobody planned | what was paid is that month's alone | open |
 
 ## The findings
@@ -250,7 +250,7 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
   it (so an amount taken back and put back again reaches the other device). Still to come, with step 5: a file shows
   what it would change before it is merged (scenario "A file shows what it would change before it is merged").
 
-### F10. A row that followed another shows amounts it never had once that row is archived or deleted
+### F10. A row that followed another shows amounts it never had once that row is archived
 
 Found on 18 November 2026 while step 3 was built; older than that step.
 
@@ -266,6 +266,16 @@ Found on 18 November 2026 while step 3 was built; older than that step.
 - **Options.** (a) Write the 0.00 down where the row showed nothing after an amount: the row keeps exactly what it
   showed. (b) Leave it.
 - **Recommendation.** (a). A small change in one place (`pinFollowers`).
+- **Decision.** Yes (18 November 2026): as recommended.
+- **Closed** (18 November 2026). A row that stops following because the row it followed is archived keeps what it
+  showed in every month before the archive: where it showed nothing after an amount, the 0.00 is written down, and
+  so it is where the row still held an amount of its own from before it followed. From the archive on it goes on
+  with the last amount it showed, which can be nothing.
+- **Put right in this record.** The finding first said "archived or deleted". Deleting is not affected: there the
+  row stops following and keeps its *own* amounts, as the dialog says, not the ones it showed.
+- **What is left.** From the archive month on the row is its own again. An amount it held for a later month from
+  before it followed shows there again; the dialog's sentence ("keeps the last amount as its own from <Month>")
+  does not mention that case.
 
 ### F11. A schedule deleted after a payment: the paid amount runs on into every later month
 

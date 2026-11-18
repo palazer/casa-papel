@@ -459,6 +459,12 @@ month. A schedule that ended in a month that is over has nothing left to change 
 **K1. Something archived stops in a month and keeps its past.** An archived row shows nothing from that month on.
 An archived account leaves net worth with what it held: the part "accounts starting or ending" in N2.
 
+A row that followed the archived row (M4) stops following and keeps what it showed: in every month before, its
+amounts, and nothing where it showed nothing. From that month on it goes on with the last amount it showed.
+
+> "Service charge" follows "Rent" at 10%: 120.00 in January and February, nothing from March, when the rent ends.
+> "Rent" archived from June: the service charge still shows 120.00, 120.00 and then nothing.
+
 **K2. Restoring brings the thing back as it was.**
 
 **K3. Restoring also brings back what archiving changed with it.** The archived thing keeps a note of what its

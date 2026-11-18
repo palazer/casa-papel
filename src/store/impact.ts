@@ -11,7 +11,7 @@ import { computeEngine, cellKey, type CellResult, type EngineOutput } from '@/en
 import {
   AccountSchema, CategorySchema, CellSchema, EntitySchema, GoalSchema, PoolSchema, RecurringItemSchema, RowSchema,
   ENTITY_KIND_LABEL, accountIdOf, accountRef, addMonths, compareMonths, monthOfDate, monthRange, newId, parseMonth, paysExpenses, poolIdOf, poolRef,
-  type Account, type ArchiveMemo, type Category, type Cell, type CellInput, type CellItem, type Entity, type FundedBy, type Goal, type Household, type MonthKey, type Pool, type RecurringItem, type Row,
+  type Account, type ArchiveMemo, type Category, type Cell, type CellInput, type CellItem, type Entity, type FundedBy, type Goal, type Household, type Money, type MonthKey, type Pool, type RecurringItem, type Row,
   type TableName, type Tables,
 } from '@/model'
 import type { Mutation } from './store'
@@ -422,7 +422,12 @@ function unlinkDeductions(ctx: Ctx, row: Row, ts: number): Mutation[] {
   return ctx.rows.filter((d) => d.deductedFromRowId === row.id).map((d) => put('rows', RowSchema, d, { deductedFromRowId: null }, ts))
 }
 
-/** Followers keep what they mirrored before `from` as their own values, then stop following. */
+/**
+ * Followers keep what they mirrored before `from` as their own values, then stop following. Every month before
+ * `from` has to show what it showed while the row followed, so a month in which it showed nothing is written down
+ * too where it would not stay empty by itself: after an amount, which it would carry, or where the row still holds
+ * an amount of its own from before it followed (finding F10).
+ */
 function pinFollowers(ctx: Ctx, row: Row, from: MonthKey, ts: number): Mutation[] {
   const followers = ctx.rows.filter((r) => r.followsRowId === row.id)
   if (followers.length === 0) return []
@@ -431,13 +436,16 @@ function pinFollowers(ctx: Ctx, row: Row, from: MonthKey, ts: number): Mutation[
     const months = monthRange(ctx.household.startMonth, addMonths(from, -1))
     const eng = computeEngine({ tables: ctx.tables, months })
     for (const f of followers) {
+      /** What a month of the row would show with nothing written into it: the last amount written that runs on. */
+      let carried: Money = 0
       for (const m of months) {
         const c = eng.cells[cellKey(f.id, m)]
-        if (!c || c.value === 0) continue
+        if (!c) continue
         const existing = cellOf(ctx.tables, f.id, m)
+        if (c.value === 0 && carried === 0 && !(existing && existing.mode !== 'inherit')) continue
         const own = f.currency ?? ctx.household.baseCurrency
         // an amount that was ticked as moved keeps its tick: as a done item, since a typed amount carries none beside it
-        const moved = c.status === 'done'
+        const moved = c.status === 'done' && c.value !== 0
         const items: CellItem[] = moved
           ? [{ id: newId(), label: '', amount: c.value, status: 'done', fundedBy: f.defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }]
           : []
@@ -448,6 +456,7 @@ function pinFollowers(ctx: Ctx, row: Row, from: MonthKey, ts: number): Mutation[
           rowId: f.id, month: m, mode: moved ? 'items' : 'value', value: moved ? null : c.value, items,
           currencyOverride: c.currency !== own ? c.currency : existing?.currencyOverride ?? null, once,
         }, ts))
+        if (!once) carried = c.value
       }
     }
   }
