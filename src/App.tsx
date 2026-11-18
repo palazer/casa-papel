@@ -15,7 +15,7 @@ import { HomeScreen } from '@/features/home/HomeScreen'
 import { HouseholdScreen } from '@/features/household/HouseholdScreen'
 import { StatementScreen } from '@/features/statement/StatementScreen'
 import { AccountDialog, type AccountStep } from '@/features/sync/AccountDialog'
-import { planRecurringPosts } from '@/store'
+import { planHousekeeping } from '@/store'
 import { SyncContext, createSyncEngine, useSyncEngine } from '@/sync/useSync'
 
 export default function App() {
@@ -66,10 +66,10 @@ function Shell() {
   }, [store])
   const months = useMemo(() => (household && tables ? defaultMonths(household, tables) : []), [household, tables])
 
-  // keep open months in step with the recurring register
+  // what the app does by itself with the data in front of it: the schedules land in the current month and later
   useEffect(() => {
     if (!tables || !household || months.length === 0) return
-    const mutations = planRecurringPosts(tables, months)
+    const mutations = planHousekeeping(tables)
     if (mutations.length) void store.commitSystem(mutations)
   }, [tables, household, months, store])
   // a currency that has no rate yet gets the ECB's by itself

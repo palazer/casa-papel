@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { cellKey, computeEngine } from '@/engine'
 import { describeCadence, monthRange, newId, type CellItem } from '@/model'
-import { CasaDb, Store, addCategory, addRecurringItem, addRow, closeMonth, loadTables, planRecurringPosts, postRecurring, quickCreateHousehold, saveRowMonth, setCellItems, setCellValue } from '@/store'
+import { CasaDb, Store, addCategory, addRecurringItem, addRow, closeMonth, loadTables, planHousekeeping, planRecurringPosts, postRecurring, quickCreateHousehold, saveRowMonth, setCellItems, setCellValue } from '@/store'
+import { restoreToday, setToday } from '../today'
 
 const months = monthRange('2026-01', '2026-12')
 
@@ -23,7 +24,11 @@ const itemsOf = async (store: Store, rowId: string, month: string) => (await loa
 const schedulesOf = async (store: Store, rowId: string) => (await loadTables(store)).recurringItems.filter((r) => !r.deletedAt && r.rowId === rowId)
 
 describe('a row\'s month saved from its dialog', () => {
+  afterEach(restoreToday)
+
   it('an item set to repeat becomes a schedule from this month: linked, landed in its months, never twice, and one undo takes it all back', async () => {
+    // March is still to come: the months from the current one on are landed with the save
+    setToday('2026-02-15')
     const { store, row } = await fresh()
     await setCellValue(store, row.id, '2026-01', 50000, 'from-now-on')
     const before = await valuesOf(store, row.id)
@@ -43,8 +48,11 @@ describe('a row\'s month saved from its dialog', () => {
     expect(march.map((i) => [i.label, i.amount, i.recurringItemId])).toEqual([['Liability', 4500, schedules[0].id], ['Legal', 3000, schedules[1].id], ['Car wash', 1500, null]])
     // earlier months keep what they carried; from here on the row shows only what repeats
     expect(await valuesOf(store, row.id)).toEqual([50000, 50000, 9000, 4500, 4500, 7500, 4500, 4500, 7500, 4500, 4500, 7500])
-    // the other months were landed in the same step: the poster finds nothing left to do
-    expect(planRecurringPosts(await loadTables(store), months)).toEqual([])
+    // the other months were landed in the same step: the app's own pass finds nothing left to do, today or later in the year
+    expect(planHousekeeping(await loadTables(store))).toEqual([])
+    expect(planHousekeeping(await loadTables(store), '2026-06')).toEqual([])
+    // January is over and was not the dialog's month: it keeps the plain amount it carried
+    expect((await loadTables(store)).cells.find((c) => c.rowId === row.id && c.month === '2026-01')).toMatchObject({ mode: 'value', value: 50000 })
 
     await store.undo()
     expect(await schedulesOf(store, row.id)).toEqual([])

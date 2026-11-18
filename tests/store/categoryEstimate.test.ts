@@ -22,12 +22,12 @@ async function world() {
 describe('a category\'s estimate in the store', () => {
   it('makes the estimate row on first use and counts the rest from that month on', async () => {
     const { store, read } = await world()
-    // Housing in the demo: Utilities carries 210 forward; Rent is on a schedule and not posted in this test
+    // Housing in the demo: Utilities carries 210 forward and Rent lands 1,650 from its schedule, so 140 of the 2,000 is left
     const row = await setCategoryEstimate(store, DEMO_IDS.catHousing, '2026-11', 2000_00)
     expect(row).toMatchObject({ name: 'Housing – Not broken down yet', section: 'expense', kind: 'category-estimate', categoryId: DEMO_IDS.catHousing, defaultStatus: 'projected' })
     const { tables, out } = await read()
     expect(estimateRowOf(tables, DEMO_IDS.catHousing)?.id).toBe(row.id)
-    expect(['2026-10', '2026-11', '2026-12', '2027-01'].map((m) => [out.cells[cellKey(row.id, m)].estimate, out.cells[cellKey(row.id, m)].value])).toEqual([[0, 0], [2000_00, 1790_00], [2000_00, 1790_00], [2000_00, 1790_00]])
+    expect(['2026-10', '2026-11', '2026-12', '2027-01'].map((m) => [out.cells[cellKey(row.id, m)].estimate, out.cells[cellKey(row.id, m)].value])).toEqual([[0, 0], [2000_00, 140_00], [2000_00, 140_00], [2000_00, 140_00]])
     // it sorts at the end of its category
     expect(out.rows.filter((r) => r.categoryId === DEMO_IDS.catHousing).at(-1)?.id).toBe(row.id)
     expect(derivedRowReason(row, 'savings-plug')).toMatch(/what is left of its category's estimate/)
@@ -44,7 +44,7 @@ describe('a category\'s estimate in the store', () => {
     await setCategoryEstimate(store, DEMO_IDS.catHousing, '2027-02', 0)
     ;({ tables, out } = await read())
     expect(out.cells[cellKey(row.id, '2027-02')]).toMatchObject({ estimate: 0, value: 0 })
-    expect(out.cells[cellKey(row.id, '2027-01')].value).toBe(1790_00)
+    expect(out.cells[cellKey(row.id, '2027-01')].value).toBe(140_00)
   })
 
   it('a first estimate for one month only does not carry on', async () => {

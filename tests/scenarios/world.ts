@@ -1,7 +1,7 @@
 import { vi } from 'vitest'
 import { buildStatement, computeEngine, type EngineOutput, type Statement } from '@/engine'
 import { newId, type Account, type Category, type Entity, type Household, type MonthKey, type Pool, type Row, type Tables } from '@/model'
-import { CasaDb, Store, defaultMonths, loadTables, postRecurring, type Mutation } from '@/store'
+import { CasaDb, Store, defaultMonths, keepHouse, loadTables, type Mutation } from '@/store'
 import { figuresOf, type Figures } from './figures'
 import { monthName } from './registry'
 
@@ -133,14 +133,13 @@ export class World {
   }
 
   /**
-   * Let the app come to rest, as the running app does after every change: the schedules are posted into the months of
-   * the plan (`App.tsx`). Returns how many passes wrote something; more than one means it did not settle at once.
+   * Let the app come to rest, as the running app does after every change: its own pass over the data (`App.tsx`,
+   * `planHousekeeping`). Returns how many passes wrote something; more than one means it did not settle at once.
    */
   async settle(): Promise<number> {
     let passes = 0
     for (let i = 0; i < 6; i++) {
-      const { months } = await this.view()
-      if ((await postRecurring(this.store, months)) === 0) return passes
+      if ((await keepHouse(this.store)) === 0) return passes
       passes += 1
     }
     return passes

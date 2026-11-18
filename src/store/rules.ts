@@ -153,7 +153,10 @@ export function ruleMutations(tables: Tables, target: RuleTarget, choice: RuleCh
     for (const cur of stored.values()) {
       if (compareMonths(cur.month, from) < 0 || cur.mode === 'inherit') continue
       if (then !== 'rule' && cur.month === from) continue
-      put({ ...cur, mode: 'inherit', value: null, items: [] })
+      // a month whose typed amount was ticked as done stays ticked when the rule fills it
+      const live = cur.items.filter((i) => !i.skipped)
+      const ticked = then === 'rule' && cur.mode === 'items' && live.length > 0 && live.every((i) => i.status === 'done')
+      put({ ...cur, mode: 'inherit', value: null, items: [], markedDone: ticked || (cur.markedDone ?? false) })
     }
     if (then !== 'rule') {
       const cur = stored.get(from)

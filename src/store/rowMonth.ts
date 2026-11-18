@@ -1,6 +1,6 @@
 import type { EngineOutput } from '@/engine'
 import {
-  CellSchema, RecurringItemSchema, cadenceOf, compareMonths, isDue, newId, repeatOf, sameRepeat,
+  CellSchema, RecurringItemSchema, cadenceOf, compareMonths, isDue, monthOfDate, newId, repeatOf, sameRepeat,
   type CellItem, type Money, type MonthKey, type RecurringItem, type RepeatChoice, type Repeating, type Tables,
 } from '@/model'
 import { engineUpTo, freezeNext, rowChangePut, type EditScope, type RowChange } from './actions'
@@ -161,13 +161,18 @@ export function planRowMonthSave(tables: Tables, engine: EngineOutput, rowId: st
 
 /**
  * Save a row's month from its dialog: its items, and how each repeats. One step, one undo: what the schedules then
- * land in the row's other open months is part of it.
+ * land in the row's later months is part of it.
  */
 export async function saveRowMonth(store: Store, rowId: string, month: MonthKey, save: RowMonthSave): Promise<void> {
   const { tables, engine, household } = await engineUpTo(store, month)
   const muts = planRowMonthSave(tables, engine, rowId, month, save, Date.now())
   const after = applyMutations(tables, muts)
-  muts.push(...planRecurringPosts(after, defaultMonths(household, after)).filter((m) => m.op === 'put' && m.table === 'cells' && m.record.rowId === rowId))
+  // the dialog changes its row from this month on: the months before it keep what they hold. For a month that is
+  // still to come, the months from the current one on are landed too: the app's own pass would do it a moment later,
+  // as a second step that undo does not reach
+  const today = monthOfDate()
+  const from = compareMonths(month, today) < 0 ? month : today
+  muts.push(...planRecurringPosts(after, defaultMonths(household, after).filter((m) => compareMonths(m, from) >= 0), [rowId]))
   // a save that changes nothing leaves no step to undo
   if (muts.length) await store.commit(muts)
 }

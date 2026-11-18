@@ -1,4 +1,4 @@
-import { exportSnapshot, importReplace, parseExportFile, postRecurring } from '@/store'
+import { exportSnapshot, importReplace, keepHouse, parseExportFile } from '@/store'
 import { all, expectAddsUp, expectBalanced, expectSums } from '../../engine/sound'
 import { diffFigures } from '../figures'
 import { moneyText, monthName } from '../registry'
@@ -86,7 +86,7 @@ export async function closingChecks(world: World): Promise<CheckProblem[]> {
   const there = await world.view(fresh)
   const differs = diffFigures(now, there.figures)
   if (differs.length) fail('round-trip', few(differs))
-  else if ((await postRecurring(fresh, there.months)) > 0) fail('round-trip', 'The app that imported the data posted schedules again, though the exported plan was at rest.')
+  else if ((await keepHouse(fresh)) > 0) fail('round-trip', 'The app that imported the data posted schedules again, though the exported plan was at rest.')
 
   // 7: the last thing the user did, taken back and done again
   const last = world.lastAction

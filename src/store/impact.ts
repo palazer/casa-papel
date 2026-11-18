@@ -9,8 +9,8 @@
 import { computeEngine, cellKey, type CellResult, type EngineOutput } from '@/engine'
 import {
   AccountSchema, CategorySchema, CellSchema, EntitySchema, GoalSchema, PoolSchema, RecurringItemSchema, RowSchema,
-  ENTITY_KIND_LABEL, accountIdOf, accountRef, addMonths, compareMonths, monthOfDate, monthRange, parseMonth, paysExpenses, poolIdOf, poolRef,
-  type Account, type ArchiveMemo, type Category, type Cell, type CellInput, type Entity, type FundedBy, type Goal, type Household, type MonthKey, type Pool, type RecurringItem, type Row,
+  ENTITY_KIND_LABEL, accountIdOf, accountRef, addMonths, compareMonths, monthOfDate, monthRange, newId, parseMonth, paysExpenses, poolIdOf, poolRef,
+  type Account, type ArchiveMemo, type Category, type Cell, type CellInput, type CellItem, type Entity, type FundedBy, type Goal, type Household, type MonthKey, type Pool, type RecurringItem, type Row,
   type TableName, type Tables,
 } from '@/model'
 import type { Mutation } from './store'
@@ -435,8 +435,13 @@ function pinFollowers(ctx: Ctx, row: Row, from: MonthKey, ts: number): Mutation[
         if (!c || c.value === 0) continue
         const existing = cellOf(ctx.tables, f.id, m)
         const own = f.currency ?? ctx.household.baseCurrency
+        // an amount that was ticked as moved keeps its tick: as a done item, since a typed amount carries none beside it
+        const moved = c.status === 'done'
+        const items: CellItem[] = moved
+          ? [{ id: newId(), label: '', amount: c.value, status: 'done', fundedBy: f.defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }]
+          : []
         muts.push(putCell({
-          rowId: f.id, month: m, mode: 'value', value: c.value, items: [], note: existing?.note ?? null,
+          rowId: f.id, month: m, mode: moved ? 'items' : 'value', value: moved ? null : c.value, items, note: existing?.note ?? null,
           currencyOverride: c.currency !== own ? c.currency : existing?.currencyOverride ?? null, markedDone: existing?.markedDone ?? false, updatedAt: ts,
         }, ts))
       }
@@ -485,7 +490,7 @@ function rowArchive(ctx: Ctx, row: Row, from: MonthKey, ts: number): Mutation[] 
   // the ended schedules' open postings go, so the next system pass finds nothing to do
   if (schedules.length) {
     const later = ctx.months.filter((m) => compareMonths(m, from) >= 0)
-    if (later.length) muts.push(...planRecurringPosts(applyMutations(ctx.tables, muts), later))
+    if (later.length) muts.push(...planRecurringPosts(applyMutations(ctx.tables, muts), later, [row.id]))
   }
   return muts
 }
@@ -655,7 +660,12 @@ function entityRemoval(ctx: Ctx, e: Entity, ts: number): Mutation[] {
 
 function scheduleRemoval(ctx: Ctx, item: RecurringItem, ts: number): Mutation[] {
   const muts: Mutation[] = [put('recurringItems', RecurringItemSchema, item, { deletedAt: ts }, ts)]
-  muts.push(...planRecurringPosts(applyMutations(ctx.tables, muts), ctx.months))
+  // what it posted and was not paid goes with it, and nothing else: a month keeps everything else it holds
+  for (const c of ctx.tables.cells) {
+    if (c.rowId !== item.rowId || ctx.closed.has(c.month)) continue
+    if (!c.items.some((i) => i.recurringItemId === item.id && i.status !== 'done')) continue
+    muts.push(putCell({ ...c, items: c.items.filter((i) => i.recurringItemId !== item.id || i.status === 'done') }, ts))
+  }
   return muts
 }
 
@@ -740,6 +750,8 @@ export function planRestore(tables: Tables, target: RemovalTarget, ts: number, o
   /** The earliest month a restore reaches back to: from there the schedules land again. */
   let since: MonthKey | null = null
   const reach = (m: MonthKey) => { if (!since || compareMonths(m, since) < 0) since = m }
+  /** The rows that are back: their schedules land again, and no other row is looked at. */
+  const cameBack = new Set<string>()
   const liveRow = (id: string) => work.rows.find((r) => r.id === id && !r.deletedAt)
   const noMemo = (name: string) => kept.push(`"${name}" was archived before the app kept track of what archiving changes, so only "${name}" itself is back.`)
 
@@ -801,6 +813,7 @@ export function planRestore(tables: Tables, target: RemovalTarget, ts: number, o
 
   const rowBack = (row: Row, to: MonthKey | null, top: boolean) => {
     const memo = row.archiveMemo ?? null
+    cameBack.add(row.id)
     add([put('rows', RowSchema, row, { archivedMonth: to, archiveMemo: null }, ts)])
     if (!memo) return top ? void noMemo(row.name) : undefined
     reach(memo.month)
@@ -903,7 +916,7 @@ export function planRestore(tables: Tables, target: RemovalTarget, ts: number, o
   if (since) {
     const from: MonthKey = since
     const later = months.filter((m) => compareMonths(m, from) >= 0)
-    if (later.length) add(planRecurringPosts(work, later))
+    if (later.length) add(planRecurringPosts(work, later, cameBack))
   }
   if (changed) kept.push(`${plural(changed, 'thing')} you changed since ${pick(changed, 'stays as it is', 'stay as they are')}.`)
   return { mutations: muts, subject, back, kept }

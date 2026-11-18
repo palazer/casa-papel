@@ -1,6 +1,6 @@
 import { cellKey, computeEngine, typedAmount } from '@/engine'
 import {
-  CellSchema, RecurringItemSchema, addMonths, compareMonths, isDue, newId,
+  CellSchema, RecurringItemSchema, addMonths, compareMonths, isDue, monthOfDate, newId,
   type Cell, type CellItem, type MonthKey, type RecurringItem, type Row, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
@@ -22,15 +22,18 @@ const sig = (items: CellItem[]) =>
   JSON.stringify([...items].sort((a, b) => (a.id < b.id ? -1 : 1)).map((i) => [i.id, i.label, i.amount, i.status, i.fundedBy, i.recurringItemId, i.kind, i.skipped, i.pinned ?? false]))
 
 /**
- * Make every open month agree with the recurring register. Idempotent: running it
+ * Make the given months agree with the recurring register. Idempotent: running it
  * twice yields no mutations the second time. Closed months are never touched.
  * - due items missing from a cell are added as managed items
  * - managed items that are not done, skipped or pinned follow the register's amount, label and funding
  * - managed items whose register entry is no longer due are removed unless done
  * - a plain value or carried-forward cell becomes an items cell; a bare value equal
  *   to a managed amount is treated as the same payment and dropped
+ *
+ * The caller says where: the months, and with `only` the rows. A change lands in the months it speaks of and in the
+ * rows it touched; nothing else is looked at, so a month nobody named keeps what it holds, whatever the register says.
  */
-export function planRecurringPosts(tables: Tables, months: MonthKey[]): Mutation[] {
+export function planRecurringPosts(tables: Tables, months: MonthKey[], only?: Iterable<string>): Mutation[] {
   const closed = new Set(tables.monthStates.filter((s) => s.closed).map((s) => s.month))
   const items = tables.recurringItems.filter((r) => !r.deletedAt)
   const rowsById = new Map(tables.rows.filter((r) => !r.deletedAt).map((r) => [r.id, r]))
@@ -43,7 +46,8 @@ export function planRecurringPosts(tables: Tables, months: MonthKey[]): Mutation
   }
   // rows that ever had managed items also need cleanup when their register entries are deleted
   const rowsWithManaged = new Set(tables.cells.filter((c) => c.items.some((i) => i.recurringItemId)).map((c) => c.rowId))
-  const rowIds = new Set([...byRow.keys(), ...rowsWithManaged])
+  const wanted = only ? new Set(only) : null
+  const rowIds = new Set([...byRow.keys(), ...rowsWithManaged].filter((id) => !wanted || wanted.has(id)))
   const cellsByKey = new Map(tables.cells.map((c) => [`${c.rowId}|${c.month}`, c]))
   const liveIds = new Set(items.map((i) => i.id))
   const mutations: Mutation[] = []
@@ -99,6 +103,24 @@ export async function postRecurring(store: Store, months: MonthKey[]): Promise<n
   return mutations.length
 }
 
+/**
+ * What the app does by itself whenever it has the data in front of it: the schedules land in the current month and in
+ * the months after it. A month that is over is left alone: the app never changes the past by itself, and whatever
+ * reaches further back is somebody's own step, saved with its months. Pure, and idempotent like the poster.
+ */
+export function planHousekeeping(tables: Tables, today: MonthKey = monthOfDate()): Mutation[] {
+  const household = tables.household.find((h) => !h.deletedAt)
+  if (!household) return []
+  return planRecurringPosts(tables, defaultMonths(household, tables, today).filter((m) => compareMonths(m, today) >= 0))
+}
+
+/** `planHousekeeping` as a system commit (not undoable). Returns how many records it wrote. */
+export async function keepHouse(store: Store, today: MonthKey = monthOfDate()): Promise<number> {
+  const mutations = planHousekeeping(await loadTables(store), today)
+  if (mutations.length) await store.commitSystem(mutations)
+  return mutations.length
+}
+
 export type RecurringInput = Omit<RecurringItem, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>
 
 /**
@@ -131,8 +153,7 @@ function withPosts(tables: Tables, mutations: Mutation[], rowIds: string[]): Mut
   const after = applyMutations(tables, mutations)
   const household = after.household.find((h) => !h.deletedAt)
   if (!household) return mutations
-  const posts = planRecurringPosts(after, defaultMonths(household, after)).filter((m) => m.op === 'put' && m.table === 'cells' && rowIds.includes(m.record.rowId))
-  return [...mutations, ...posts]
+  return [...mutations, ...planRecurringPosts(after, defaultMonths(household, after), rowIds)]
 }
 
 /** A row that a schedule's form makes together with the schedule. */
