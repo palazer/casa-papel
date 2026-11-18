@@ -324,7 +324,7 @@ Found on 18 November 2026 while step 4 was planned; older than that step.
   form itself in the browser test "a schedule for a row in a currency without cents is read and shown in that
   currency".
 - **Decision.** Fix with step 4, part 1 (18 November 2026).
-- **Closed** (19 November 2026). The form reads, labels and shows the amount in the currency of the row it is for,
+- **Closed** (18 November 2026). The form reads, labels and shows the amount in the currency of the row it is for,
   and the list of schedules shows it in that currency.
 
 ### F13. A row moved to a currency without cents multiplies its amounts by 100
@@ -344,7 +344,7 @@ Found on 18 November 2026 while step 4 was planned; older than that step.
   "The same in the row's dialog: a later month keeps its own amount", "And back to a currency with cents", "A
   schedule of the row keeps its digits too".
 - **Decision.** Fix with step 4, part 1 (18 November 2026).
-- **Closed** (19 November 2026). When a row's currency changes to one that counts other decimals, the amounts of its
+- **Closed** (18 November 2026). When a row's currency changes to one that counts other decimals, the amounts of its
   months and of its schedules are written again in the new unit, in the same step as the change, so one Undo takes
   all of it back. A month that keeps a currency of its own is left alone. Half a króna rounds: 1,200.50 becomes
   1,201 kr. Between two currencies with cents nothing is rewritten.
@@ -401,8 +401,11 @@ What ran without a fault. Every scenario also ran the nine checks after each of 
   of an investment, of a loan, in another currency, with two current accounts, taken back, exported and imported.
 - The plan: its last month through the year, "Add a year" once and twice and from October on, the calendar moving
   into a new month and into a new plan year.
-- Rates: an amount at its month's rate, rounding, a month without a rate, the months after the last known rate, a
-  rate you set and remove, an account in another currency, money moved into one, two other currencies.
+- Rates: an amount at its month's rate, rounding, a month without a rate, a rate you set and take back, an account
+  in another currency, money moved into one, two other currencies. Since step 4, part 1: the official rate by day
+  (the latest while a month runs, its last working day once it is over, the first days of a month, a second look
+  that changes nothing), the forecast (the trend and its fading, less than a year of rates, a change of your own, a
+  rate held, a rate typed for a month to come), the fifteen currencies, and a currency without cents.
 - The month's sums: income, expenses and what is left, money taken out of an account by hand, deductions, a row that
   follows another, a category's estimate under and over its rows, an expense straight out of savings.
 - Rules: a typed amount, a percentage of the income and its rounding, a percentage of what is left, the rest, the
