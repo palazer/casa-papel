@@ -1,6 +1,6 @@
 import { cellKey, computeEngine, typedAmount } from '@/engine'
 import {
-  RecurringItemSchema, addMonths, compareMonths, isDue, monthOfDate, newId,
+  RecurringItemSchema, addMonths, compareMonths, isDue, monthOfDate, monthRange, newId,
   type Cell, type CellItem, type MonthKey, type RecurringItem, type Row, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
@@ -297,15 +297,35 @@ export async function reactivateRecurringItem(store: Store, id: string): Promise
 }
 
 /**
- * What takes a schedule away: its record, and what it posted and was not paid, in every month. Nothing else in its
- * months is looked at.
+ * What takes a schedule away: its record, and what it posted and was not paid, in every month.
+ *
+ * When it was the row's last schedule, the row is an ordinary row again, and an ordinary row carries the last amount
+ * it holds into the months after. On a schedule every month was its own, so what the row's months hold stays theirs
+ * alone (`Cell.once`): the row goes on showing what it showed, less what is taken away here, and what was paid does
+ * not start running on (finding F11). A carried item in one of those months reads what its month is given, which the
+ * marks change: it gets the amount it carried.
  */
 export function planDropSchedule(tables: Tables, item: RecurringItem, ts: number): Mutation[] {
   const muts: Mutation[] = [{ op: 'put', table: 'recurringItems', record: RecurringItemSchema.parse({ ...item, deletedAt: ts, updatedAt: ts }) }]
-  for (const c of tables.cells) {
-    if (c.rowId !== item.rowId) continue
-    if (!c.items.some((i) => i.recurringItemId === item.id && i.status !== 'done')) continue
-    muts.push(cellPut(c, { rowId: c.rowId, month: c.month, items: c.items.filter((i) => i.recurringItemId !== item.id || i.status === 'done') }, ts))
+  const cells = tables.cells.filter((c) => c.rowId === item.rowId)
+  const last = !tables.recurringItems.some((r) => !r.deletedAt && r.rowId === item.rowId && r.id !== item.id)
+  const household = tables.household.find((h) => !h.deletedAt)
+  let shown: ReturnType<typeof computeEngine> | null = null
+  if (last && household && cells.some((c) => c.items.some((i) => i.kind === 'carry'))) {
+    const stored = cells.map((c) => c.month).sort()
+    const first = compareMonths(household.startMonth, stored[0]) < 0 ? household.startMonth : stored[0]
+    shown = computeEngine({ tables, months: monthRange(first, stored[stored.length - 1]) })
+  }
+  for (const c of cells) {
+    const drops = c.items.some((i) => i.recurringItemId === item.id && i.status !== 'done')
+    const marks = last && c.mode !== 'inherit' && !c.once
+    const carries = last && c.items.some((i) => i.kind === 'carry')
+    if (!drops && !marks && !carries) continue
+    const carried = (i: CellItem) => shown?.cells[cellKey(c.rowId, c.month)]?.items.find((x) => x.id === i.id)?.effectiveAmount ?? 0
+    const items = c.items
+      .filter((i) => i.recurringItemId !== item.id || i.status === 'done')
+      .map((i): CellItem => (carries && i.kind === 'carry' ? { ...i, kind: 'normal', amount: carried(i) } : i))
+    muts.push(cellPut(c, { rowId: c.rowId, month: c.month, items, ...(marks ? { once: true } : {}) }, ts))
   }
   return muts
 }

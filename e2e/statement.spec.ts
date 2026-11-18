@@ -2102,8 +2102,15 @@ test.describe('working the month in the Statement', () => {
     await page.getByRole('dialog').last().getByRole('button', { name: 'Delete', exact: true }).click()
     await expect(dlg).toHaveCount(1)
     await expect(dlg.getByRole('status')).toHaveText('"Music" is removed. What you typed here is still unsaved.')
-    await expect(dlg.getByLabel('Item label')).toHaveCount(14)
-    await expect(dlg.getByLabel('Item label').first()).toHaveValue('Service 1')
+    // nothing repeats in the row any more, so it is an ordinary row again: what the month carried is an item of its
+    // own now, first in the list, and the fourteen follow
+    await expect(dlg.getByLabel('Item label')).toHaveCount(15)
+    await expect(dlg.getByLabel('Item label').first()).toHaveValue('')
+    await expect(dlg.getByLabel('Item label').nth(1)).toHaveValue('Service 1')
+    // the choice for the total is back, and says what the later months will show; the months the schedules had
+    // posted to hold nothing, so nothing of yours is replaced there
+    await expect(dlg.getByRole('radiogroup', { name: 'The total' }).getByRole('radio', { name: 'This and following months' })).toBeChecked()
+    await expect(dlg.getByTestId('scope-says')).toHaveText(/^Nothing here repeats by itself: later months show the total, €\d+\.00, as one amount\.$/)
 
     // saved: the fourteen are in the month (1 + 2 + … + 14 = 105), the two that were removed are not (10 each)
     await dlg.getByRole('button', { name: 'Save', exact: true }).click()

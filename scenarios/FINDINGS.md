@@ -20,7 +20,7 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
 | F8 | Undo of a schedule added from the list empties the row's months | amounts are lost | save the schedule and its months as one step | closed |
 | F9 | Merging an older copy (a file, or the other device's) brings back what was taken back | an undone change returns | the merge respects what this device removed | closed; the file comparison comes with step 5 |
 | F10 | A row that followed another shows amounts it never had once that row is archived | months that are over change | write the 0.00 down | closed |
-| F11 | A schedule deleted after a payment: the paid amount runs on into every later month | amounts appear that nobody planned | what was paid is that month's alone | open |
+| F11 | A schedule deleted after a payment: the paid amount runs on into every later month | amounts appear that nobody planned | what was paid is that month's alone | closed |
 
 ## The findings
 
@@ -294,6 +294,18 @@ Found on 18 November 2026 while step 3 was built; older than that step.
   mark step 3 added for exceptions), so nothing carries on from it. (b) Deleting a schedule that has payments is
   refused, with "End after <Month>" offered instead. (c) Leave it.
 - **Recommendation.** (a). The paid months stay as they are and no later month changes its amount by surprise.
+- **Decision.** Yes (18 November 2026): as recommended.
+- **Closed** (18 November 2026). When a row's last schedule is deleted, every month the row holds keeps what it
+  holds as that month's alone, so nothing starts running on and the row shows what it showed, less the postings
+  the deletion takes away. That is a little wider than "what it keeps as paid": an item typed beside the schedule
+  ("Late fee" 15.00 in March) ran on in the same way and is covered too, and so are the amounts the row had before
+  its first schedule. While another schedule stays on the row nothing is marked: the row still carries nothing.
+  Two things came with it: the row's dialog, when the last schedule is deleted from inside it, turns the line that
+  carried the month before's amount into an item with that amount (it would have been saved as worth nothing);
+  and a month that holds only the empty list a deleted schedule left is not named as "what you typed" when a
+  later amount for the following months replaces it.
+- **What is left.** A schedule that was deleted before this fix: what it left as paid still runs on. Type 0.00 for
+  the month after it, for this and the following months.
 
 ## Decided, not built yet
 

@@ -119,7 +119,9 @@ function ownSource(row: Row, c: Cell): FundedBy | null {
  *   changed "from June on" are stored that way) gets the new amount and keeps that source: emptied, it would take
  *   the row's source of today, and the past balance of the old account would move.
  * `replaced` names the months that showed something else than they were handed; a month that only repeated the
- * amount before it follows silently. `engine` is used when it reaches the last stored month, else one is worked out.
+ * amount before it follows silently, and so does a month that holds a list with nothing in it (what a deleted
+ * schedule leaves where it had posted): that is no amount of anybody's. `engine` is used when it reaches the last
+ * stored month, else one is worked out.
  * No guard here: `planFollowing` decides whether there is anything to replace. Pure; `ts` stamps the writes.
  */
 export function replaceFollowing(tables: Tables, rowId: string, month: MonthKey, amount: Money, ts: number, engine?: EngineOutput): Following {
@@ -148,7 +150,8 @@ export function replaceFollowing(tables: Tables, rowId: string, month: MonthKey,
       }
       continue
     }
-    if (!shown || shown.given == null || typedAmount(shown) !== shown.given) out.replaced.push(c.month)
+    const holdsNothing = c.mode === 'items' && c.items.every((i) => i.skipped)
+    if (!holdsNothing && (!shown || shown.given == null || typedAmount(shown) !== shown.given)) out.replaced.push(c.month)
     const source = ownSource(row, c)
     if (source) {
       const live = c.items.filter((i) => !i.skipped)

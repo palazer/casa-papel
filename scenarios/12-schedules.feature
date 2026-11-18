@@ -73,13 +73,31 @@ Feature: Schedules: amounts that repeat by themselves
     Then "Rent" is 1,300.00 in June 2026
     And "Rent" is 0.00 in every month from July 2026 to December 2026
 
-  # Without its last schedule the row is an ordinary row again, and carries the last amount it holds: the payment
-  # that was kept.
-  @H4 @open @F11
+  # Without its last schedule the row is an ordinary row again. What its months hold stays theirs alone, so the
+  # payment that was kept does not run on (finding F11, closed).
+  @H4 @F11
   Scenario: A schedule that is deleted leaves no amounts after what was paid
     Given "Insurance" is on a schedule of 600.00 once a year from February 2026
     And I mark "Insurance" as done in February 2026
     When I delete the schedule "Insurance" in the list
+    Then "Insurance" is 600.00 in February 2026
+    And "Insurance" is 0.00 in every month from March 2026 to December 2026
+    And nothing has changed before March 2026
+
+  @H4 @H6 @F11
+  Scenario: An item typed beside a schedule stays in its month when the schedule is deleted
+    Given I add the item "Liability" of 90.00 to "Insurance" in March 2026, repeating once a year
+    And I add the item "Late fee" of 15.00 to "Insurance" in March 2026, only this month
+    When I delete the schedule "Liability" in the list
+    Then "Insurance" is 15.00 in March 2026
+    And "Insurance" is 0.00 in every month from April 2026 to December 2026
+
+  @H4 @F11
+  Scenario: A deleted schedule can be taken back in one step
+    Given "Insurance" is on a schedule of 600.00 once a year from February 2026
+    And I mark "Insurance" as done in February 2026
+    And I delete the schedule "Insurance" in the list
+    When I undo
     Then "Insurance" is 600.00 in February 2026
     And "Insurance" is 0.00 in every month from March 2026 to December 2026
 

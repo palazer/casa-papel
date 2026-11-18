@@ -439,7 +439,13 @@ itself undoes no one-month amount.
 > "Rent" lands 1,300.00 every month; August is 1,500.00 for August alone. Changed to 1,400.00 in June, for this and
 > the following months: June to December are 1,400.00. Had August been ticked as done, it would still be 1,500.00.
 
-**H4. A schedule that is stopped lands for the last time in that month.**
+**H4. A schedule that is stopped lands for the last time in that month.** A schedule that is deleted leaves what was
+paid and takes away what it posted and was not paid. When it was the row's last schedule, the row is an ordinary row
+again (A2), and what its months hold stays theirs alone (A4): nothing that was paid, and nothing typed beside the
+schedule, starts running on into the months after.
+
+> "Insurance" lands 600.00 every February, and February is ticked as done. The schedule is deleted: February keeps
+> its 600.00, and March on shows nothing.
 
 **H5. A new year of the plan gets the schedule's amounts**, whether the calendar or "Add a year" brought it. By
 itself the app fills the current month and the months after it. A month that is over is left as it is, with one

@@ -791,6 +791,9 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
     `This and following months` or `All occurrences`; the answer is a step of its own (it does not wait for Save),
     the item leaves the list, and a muted `role="status"` line says so: `"Films" is removed from November 2026 on.
     What you typed here is still unsaved.` Everything else typed in the dialog stays as it is until Save or Cancel.
+    When the row's last schedule goes this way, the row is an ordinary row again: the line that carried the month
+    before's amount becomes an item of its own with that amount (first in the list, without a name), and "The
+    total" is asked again under the list.
   - *The line under the list.* While nothing in the row repeats by itself it is a fieldset "The total" (`This and
     following months`: later months show the total as one amount; `Only this month`). Once something does, it is one sentence
     in the foreground colour, said before saving because the row then stops carrying anything else forward: `From

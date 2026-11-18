@@ -293,9 +293,16 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
     setItems((l) => l.filter((x) => x.id !== id))
   }
 
-  /** A schedule that was stopped or removed leaves the list; everything else typed here stays, still unsaved. */
+  /**
+   * A schedule that was stopped or removed leaves the list; everything else typed here stays, still unsaved. When it
+   * was the row's last one, the row is an ordinary row again and the store has made what its months hold theirs alone
+   * (`planDropSchedule`): an item here that carried the month before's amount holds that amount itself now, as its
+   * stored twin does. Left as a carried item it would be saved as one, and be worth nothing.
+   */
   function dropSchedule(scheduleId: string, said: string) {
-    setItems((list) => list.filter((x) => x.recurringItemId !== scheduleId))
+    const last = !tables.recurringItems.some((r) => !r.deletedAt && r.rowId === row.id && r.id !== scheduleId)
+    const carried = (it: CellItem) => cell?.items.find((x) => x.id === it.id)?.effectiveAmount ?? prevValue()
+    setItems((list) => list.filter((x) => x.recurringItemId !== scheduleId).map((x) => (last && x.kind === 'carry' ? { ...x, kind: 'normal' as const, amount: carried(x) } : x)))
     setNotice(`${said} What you typed here is still unsaved.`)
   }
 

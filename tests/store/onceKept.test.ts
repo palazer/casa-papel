@@ -126,13 +126,13 @@ describe('an exception stays an exception, whatever writes its month', () => {
     await skipRecurringMonth(store, schedule.id, '2026-03', true)
     expect((await stored(store, rent.id, '2026-03'))?.once).toBe(true)
     await skipRecurringMonth(store, schedule.id, '2026-03', false)
-    // without the schedule the row carries again, and the months it had posted to are left as empty lists
+    // without its last schedule the row is an ordinary row again, and the months it had posted to are left as empty lists
     await deleteRecurringItem(store, schedule.id)
     expect(await stored(store, rent.id, '2026-03')).toMatchObject({ once: true, items: [{ amount: 1500_00 }] })
     expect(await values(store, rent.id)).toEqual([1200, 1200, 1500, 0, 0, 0])
-    // a month that is cleared carries February's 1,200.00 (written down when the schedule came), not March's
+    // every month the row holds is its own now (finding F11): a month that is cleared shows nothing, not March's amount
     await clearCell(store, rent.id, '2026-04')
-    expect(await values(store, rent.id)).toEqual([1200, 1200, 1500, 1200, 0, 0])
+    expect(await values(store, rent.id)).toEqual([1200, 1200, 1500, 0, 0, 0])
   })
 
   it('a top-up of a virtual account whose month is an exception', async () => {
