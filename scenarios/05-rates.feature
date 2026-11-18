@@ -170,16 +170,19 @@ Feature: Amounts and accounts in another currency
 
   # ---------- the currency model that is decided and not built yet (step 4) ----------
 
-  @X10 @planned
+  # ---------- a conversion that was recorded (X10) ----------
+
+  @X10
   Scenario: A recorded conversion keeps its rate when the month's rate changes
-    Given an income "Alex – Salary" with no amount yet
+    Given an income "Alex – Salary" in USD with no amount yet
     When I record 3,300.00 USD for "Alex – Salary" in January 2026, converted at 1.1000
     And the ECB rate for EUR/USD in January 2026 is 1.2000
     Then "Alex – Salary" counts as 3,000.00 in January 2026
+    And "Alex – Salary" counts as 2,640.00 in February 2026
 
-  @X10 @planned
+  @X10
   Scenario Outline: Any two of the foreign amount, the home amount and the rate give the third
-    Given an income "Alex – Salary" with no amount yet
+    Given an income "Alex – Salary" in USD with no amount yet
     When I record for "Alex – Salary" in January 2026: <typed>
     Then the conversion of "Alex – Salary" in January 2026 is 3,300.00 USD = 3,000.00 EUR at 1.1000
 
@@ -189,12 +192,69 @@ Feature: Amounts and accounts in another currency
       | 3,300.00 USD for 3,000.00 EUR   |
       | 3,000.00 EUR at 1.1000          |
 
-  @X10 @planned
-  Scenario: When the foreign amount of a conversion is corrected, its rate stays
-    Given an income "Alex – Salary" with no amount yet
+  @X10
+  Scenario: When the amount of a conversion is corrected, its rate stays
+    Given an income "Alex – Salary" in USD with no amount yet
     And I record 3,300.00 USD for "Alex – Salary" in January 2026, converted at 1.1000
-    When I correct the foreign amount of "Alex – Salary" in January 2026 to 3,520.00
+    When I correct the amount of "Alex – Salary" in January 2026 to 3,520.00
     Then the conversion of "Alex – Salary" in January 2026 is 3,520.00 USD = 3,200.00 EUR at 1.1000
+    And "Alex – Salary" counts as 3,200.00 in January 2026
+
+  # A conversion says what happened, so it counts while the amount is done. Set back, the month's rate counts again
+  # until the amount is done once more; what was recorded stays on it.
+  @X10
+  Scenario: A recorded conversion counts while its amount is done
+    Given an income "Alex – Salary" in USD with no amount yet
+    And I record 3,300.00 USD for "Alex – Salary" in January 2026, converted at 1.2000
+    When I take the tick off "Alex – Salary" in January 2026
+    Then "Alex – Salary" counts as 3,000.00 in January 2026
+    When I mark "Alex – Salary" as done in January 2026
+    Then "Alex – Salary" counts as 2,750.00 in January 2026
+
+  @X10 @X6
+  Scenario: Money moved into an account in another currency arrives as it was recorded
+    Given a savings account "Dollar savings" in USD holding 0.00
+    And a row "To dollars" that moves 1,000.00 to "Dollar savings" from January 2026
+    When I record 1,000.00 EUR for "To dollars" in January 2026 as 1,105.00 USD
+    Then "To dollars" counts as 1,000.00 in January 2026
+    And "Dollar savings" ends January 2026 with 1,105.00
+    And "Dollar savings" ends February 2026 with 2,355.00
+
+  @X10
+  Scenario: An expense paid from an account in another currency takes what was recorded
+    Given a savings account "Dollar savings" in USD holding 1,100.00
+    And an expense "Hosting" of 100.00 from January 2026
+    And "Hosting" comes out of "Dollar savings" in every month
+    When I record 100.00 EUR for "Hosting" in January 2026 as 112.00 USD
+    Then "Hosting" counts as 100.00 in January 2026
+    And "Dollar savings" ends January 2026 with 988.00
+    And "Dollar savings" ends February 2026 with 863.00
+
+  @X10 @X5 @C1
+  Scenario: A payment to a loan in another currency brings it down by what was recorded
+    Given a loan "Dollar loan" in USD of 330.00, paid off with 200.00 a month from January 2026
+    When I record 200.00 EUR for "Dollar loan – Payment" in January 2026 as 210.00 USD
+    Then "Dollar loan" ends January 2026 with 120.00
+    And "Dollar loan – Payment" is 96.00 in February 2026
+    And "Dollar loan" ends February 2026 with 0.00
+
+  @X10
+  Scenario: A purchase on a card in another currency is owed as it was recorded
+    Given a credit card "Dollar card" in USD owing 0.00, whose purchases are expense rows
+    And an expense "Hotel" of 200.00 from January 2026
+    And "Hotel" is paid with "Dollar card"
+    When I record 200.00 EUR for "Hotel" in January 2026 as 228.00 USD
+    Then "Dollar card" ends January 2026 with 228.00
+
+  # A tax that takes a quarter of a salary takes a quarter of what the salary came to, as it was recorded.
+  @X10
+  Scenario: A row that follows a recorded amount counts its share as recorded
+    Given an income "Alex – Salary" in USD with no amount yet
+    And an expense "Alex – Tax" with no amount yet
+    And "Alex – Tax" follows "Alex – Salary" at 25%
+    When I record 3,300.00 USD for "Alex – Salary" in January 2026, converted at 1.2000
+    Then "Alex – Salary" counts as 2,750.00 in January 2026
+    And "Alex – Tax" counts as 687.50 in January 2026
 
   # A month that is over counts at the rate of its last working day, the running month at the latest one. The
   # first days of each month are there to show that it is the last one that counts.

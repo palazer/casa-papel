@@ -239,6 +239,22 @@ rule T4 will ask first. The app itself changes the rate of a month that is over 
 
 **X9. Two other currencies are converted through the household's.** GBP to USD is GBP to EUR, then EUR to USD.
 
+**X10. A transaction in another currency keeps its own conversion.** It has the amount in the other currency, the
+amount in the household's and the rate; any two give the third. It is recorded for an amount that is done, and counts
+while the amount is done: a new rate for the month does not touch it. Set back from done, the amount counts at the
+month's rate again, and what was recorded stays on it for when it is done once more. When the amount is corrected,
+the rate stays and the other amount follows. Each item of a month has its own; what is not recorded is converted at
+the month's rate as before.
+
+> 3,300.00 USD recorded as 3,000.00 EUR (1.1000) counts 3,000.00 whatever January's rate becomes. Corrected to
+> 3,520.00 USD it counts 3,200.00.
+
+The conversion holds for every account the amount moves: euros moved into a dollar account arrive as the dollars that
+were recorded, an expense paid from it takes the recorded dollars, a payment to a dollar loan brings it down by them,
+a purchase on a dollar card is owed as recorded. At the month's rate those dollars are worth a little more or less
+than the euros the rows count; that difference is part of "rates" in N2. A row that follows the amount takes the same
+share of the recorded figures. A category's estimate counts what its rows leave at the month's rate.
+
 **X11. An amount uses the official rate of its month.** The official rate is the European Central Bank's. While a
 month is running it is the latest one; once the month is over it is the rate of the month's last working day; for a
 month to come it is the forecast (X12). An account in another currency is shown at the same rate.
@@ -252,7 +268,7 @@ a rate is published in it, the month runs on the latest rate there is.
 > 3,300.00 USD in March: 3,300.00 EUR on the 13th (1.0000), 2,750.00 on the 20th (1.2000), and 3,000.00 for good
 > once March is over (31 March, 1.1000).
 
-Rule X10, when it is built, lets a transaction keep its own conversion instead.
+A transaction can keep its own conversion instead (X10).
 
 **X12. The forecast follows the recent trend, and the trend fades out.** A currency's history ends at its last
 official month. The first month after it moves by the average change per month of the last 12 months of that
@@ -285,11 +301,6 @@ Amounts that counted across three currencies before the rule keep counting as th
 household's currency (X9); a change that adds no currency to them is saved.
 
 > **Decided, not built (step 4).**
->
-> **X10. A transaction in another currency keeps its own conversion.** It has a foreign amount, a home amount and a
-> rate; any two give the third. The rate comes from you, from the official rate of a day you choose, or from the two
-> amounts. It stays until you change it: a new month rate does not touch it. When the foreign amount is corrected,
-> the rate stays and the home amount follows.
 >
 > **X14. A virtual account is kept in the currency of the savings account that holds it.** In a dollar savings
 > account it is a dollar balance: what is set aside arrives in dollars at the month's rate, and what is paid out of

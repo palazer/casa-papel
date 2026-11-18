@@ -1,4 +1,4 @@
-import type { Cell, CellItem, ItemStatus, Money, MonthKey, Row, Tables } from '@/model'
+import type { Cell, CellItem, Conversion, FundedBy, ItemStatus, Money, MonthKey, Row, Tables } from '@/model'
 
 export interface EngineInput {
   tables: Tables
@@ -12,6 +12,19 @@ export type CellStatus = ItemStatus | 'derived'
 export interface ResolvedItem extends CellItem {
   /** Amount after resolving a carry item to the previous month's value. */
   effectiveAmount: Money
+}
+
+/**
+ * A part of a month's amount whose conversion was recorded (rule X10): an item that is done and carries one, or a
+ * row's share of such an item in the row it follows. It counts as recorded instead of at the month's rate.
+ */
+export interface RecordedPart {
+  /** Where the part comes out of, as its item says. */
+  source: FundedBy
+  /** The part as typed, in the cell's currency. */
+  amount: Money
+  /** The conversion as it holds for `amount` (`conversionFor`): the other currency, both amounts, the rate. */
+  conversion: Conversion
 }
 
 export interface Funding {
@@ -82,6 +95,11 @@ export interface CellResult {
    */
   handsOn: Money | null
   cell: Cell | null
+  /**
+   * The parts of the amount whose conversion was recorded (rule X10), in item order; left out where there are none.
+   * `valueBase` and every account the amount moves count these parts as recorded, and only the rest at the month's rate.
+   */
+  recorded?: RecordedPart[]
 }
 
 /**

@@ -10,14 +10,14 @@
 import { computeEngine, cellKey, type CellResult, type EngineOutput } from '@/engine'
 import {
   AccountSchema, CategorySchema, CellSchema, EntitySchema, GoalSchema, PoolSchema, RecurringItemSchema, RowSchema,
-  ENTITY_KIND_LABEL, accountIdOf, accountRef, addMonths, compareMonths, monthOfDate, monthRange, newId, parseMonth, paysExpenses, poolIdOf, poolRef,
-  type Account, type ArchiveMemo, type Category, type Cell, type CellInput, type CellItem, type Entity, type FundedBy, type Goal, type Household, type Money, type MonthKey, type Pool, type RecurringItem, type Row,
+  ENTITY_KIND_LABEL, accountIdOf, accountRef, addMonths, compareMonths, monthOfDate, monthRange, parseMonth, paysExpenses, poolIdOf, poolRef,
+  type Account, type ArchiveMemo, type Category, type Cell, type CellInput, type Entity, type FundedBy, type Goal, type Household, type Money, type MonthKey, type Pool, type RecurringItem, type Row,
   type TableName, type Tables,
 } from '@/model'
 import type { Mutation } from './store'
 import { primaryKeyOf, type PrimaryKey } from './keys'
 import { accountTypeForRow, planRowFundedBy } from './actions'
-import { cellPut } from './cells'
+import { cellPut, writtenDown } from './cells'
 import { planChangeRecurringFrom, planDropSchedule, planRecurringPosts } from './recurring'
 import { defaultMonths } from './months'
 
@@ -444,16 +444,12 @@ function pinFollowers(ctx: Ctx, row: Row, from: MonthKey, ts: number): Mutation[
         const existing = cellOf(ctx.tables, f.id, m)
         if (c.value === 0 && carried === 0 && !(existing && existing.mode !== 'inherit')) continue
         const own = f.currency ?? ctx.household.baseCurrency
-        // an amount that was ticked as moved keeps its tick: as a done item, since a typed amount carries none beside it
-        const moved = c.status === 'done' && c.value !== 0
-        const items: CellItem[] = moved
-          ? [{ id: newId(), label: '', amount: c.value, status: 'done', fundedBy: f.defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }]
-          : []
         // where the followed row's amount was that month's alone, so is what the follower keeps of it
         const followed = eng.cells[cellKey(row.id, m)]
         const once = (followed?.source === 'value' || followed?.source === 'items') && !!followed.cell?.once
+        // an amount ticked as moved keeps its tick, and a share of a recorded conversion stays recorded (`writtenDown`)
         muts.push(cellPut(existing, {
-          rowId: f.id, month: m, mode: moved ? 'items' : 'value', value: moved ? null : c.value, items,
+          rowId: f.id, month: m, ...writtenDown(c, f.defaultFundedBy, f.defaultStatus),
           currencyOverride: c.currency !== own ? c.currency : existing?.currencyOverride ?? null, once,
         }, ts))
         if (!once) carried = c.value

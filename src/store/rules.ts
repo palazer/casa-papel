@@ -1,12 +1,12 @@
 import { cellKey, computeEngine, sortRows, type EngineOutput } from '@/engine'
 import {
-  HouseholdSchema, PoolSchema, RowSchema, addMonths, canCarryRule, canTakeRest, compareMonths, isOldPocketShare, isPocketRow, isTakenFromAccount, monthRange, newId, poolRowName,
+  HouseholdSchema, PoolSchema, RowSchema, addMonths, canCarryRule, canTakeRest, compareMonths, isOldPocketShare, isPocketRow, isTakenFromAccount, monthRange, poolRowName,
   resolveRules, rowsFeeding, sharePercent,
-  type Cell, type CellItem, type Money, type MonthKey, type Pool, type Row, type RuleState, type Tables,
+  type Cell, type Money, type MonthKey, type Pool, type Row, type RuleState, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
 import { loadTables, newRowMutation, replaceFollowing } from './actions'
-import { cellPut, type CellPatch } from './cells'
+import { cellPut, writtenDown, type CellPatch } from './cells'
 import { applyMutations } from './impact'
 
 /**
@@ -137,13 +137,9 @@ export function ruleMutations(tables: Tables, target: RuleTarget, choice: RuleCh
         if (!c || c.source === 'archived' || c.source === 'value' || c.source === 'items') continue
         const cur = stored.get(m)
         const currencyOverride = c.currency === (r.currency ?? household.baseCurrency) ? null : c.currency
-        // an automatic amount ticked as moved keeps its tick as a done item
-        const moved = c.status === 'done' && c.value !== 0
-        const items: CellItem[] = moved
-          ? [{ id: newId(), label: '', amount: c.value, status: 'done', fundedBy: r.defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }]
-          : []
-        // what the month showed, written down as an amount of the usual kind: whatever its record said before was not read
-        put(cur, { rowId: r.id, month: m, mode: moved ? 'items' : 'value', value: moved ? null : c.value, items, currencyOverride, once: false })
+        // what the month showed, written down as an amount of the usual kind: whatever its record said before was not
+        // read. An automatic amount ticked as moved keeps its tick, a share of a recorded conversion stays recorded.
+        put(cur, { rowId: r.id, month: m, ...writtenDown(c, r.defaultFundedBy, r.defaultStatus), currencyOverride, once: false })
       }
     }
     if (then === 'rule') {

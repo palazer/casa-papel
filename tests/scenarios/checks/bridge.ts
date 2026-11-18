@@ -1,5 +1,5 @@
-import { cellKey, convertMoney, householdFx } from '@/engine'
-import { addMonths, cardIsItemized, isTakenFromAccount, movesInto, pocketLandsIn, type Money, type MonthKey } from '@/model'
+import { cellKey, convertMoney, householdFx, type CellResult, type RecordedPart } from '@/engine'
+import { accountRef, addMonths, cardIsItemized, isTakenFromAccount, movesInto, pocketLandsIn, poolRef, type Money, type MonthKey } from '@/model'
 import { moneyText, monthName } from '../registry'
 import type { View } from '../world'
 
@@ -77,6 +77,24 @@ export function bridgeOf(view: View, m: MonthKey): Bridge {
     else land(id!, -v)
   }
 
+  /**
+   * What recorded conversions (rule X10) did beside the month's rate, per account kept in another currency: the account
+   * moves by the recorded amount, which at the month's rate is worth a little more or less than the household's amount
+   * the rows count. `sign` is the one the money lands with: + into an asset or onto a debt, − out of it.
+   */
+  const recordedRates = new Map<string, Money>()
+  const recorded = (id: string | null | undefined, c: CellResult, sign: 1 | -1, only: (p: RecordedPart) => boolean = () => true) => {
+    const acc = id ? accounts.get(id) : undefined
+    if (!acc || acc.currency === base || !c.recorded) return
+    let diff: Money = 0
+    for (const p of c.recorded) {
+      if (!only(p)) continue
+      const inAccount = acc.currency === c.currency ? p.amount : acc.currency === p.conversion.foreign ? p.conversion.foreignAmount : convertMoney(fx, p.conversion.homeAmount, base, acc.currency, m).value
+      diff += convertMoney(fx, inAccount, acc.currency, base, m).value - p.conversion.homeAmount
+    }
+    recordedRates.set(acc.id, (recordedRates.get(acc.id) ?? 0) + sign * diff)
+  }
+
   let toSavingsRows: Money = 0
   /** Paid to a card that records only its payments: spending, and nothing that changes what is owed. */
   let paidToLumpCards: Money = 0
@@ -85,13 +103,18 @@ export function bridgeOf(view: View, m: MonthKey): Bridge {
     if (!c || c.source === 'archived') continue
     const v = c.valueBase
     const account = row.accountId ? accounts.get(row.accountId) : undefined
-    if (isTakenFromAccount(row)) route(row.accountId, -v)
-    else if (row.section === 'income') continue
+    if (isTakenFromAccount(row)) {
+      route(row.accountId, -v)
+      recorded(row.accountId, c, -1)
+    } else if (row.section === 'income') continue
     else if (row.kind === 'to-savings') {
       toSavingsRows += v
       route(row.accountId, v)
-    } else if (row.kind === 'to-investment') route(row.accountId, v)
-    else if (row.kind === 'pocket-money') {
+      recorded(row.accountId, c, 1)
+    } else if (row.kind === 'to-investment') {
+      route(row.accountId, v)
+      recorded(row.accountId, c, 1)
+    } else if (row.kind === 'pocket-money') {
       // pocket money leaves net worth whatever happens to it; where it lands is an account net worth does not count
       if (account && pocketLandsIn(row, account) && kindOf(account.id) !== 'none') land(account.id, v)
     } else if (row.kind === 'pool-allocation') {
@@ -101,16 +124,29 @@ export function bridgeOf(view: View, m: MonthKey): Bridge {
       // a row that moves money into the account it names: it arrives there. One that names none is in the month's
       // "moved elsewhere", and no account receives it.
       route(row.accountId, v)
+      recorded(row.accountId, c, 1)
     } else if (row.kind === 'card-payment' && account?.type === 'credit-card' && !cardIsItemized(account)) {
       // nothing says what was bought on such a card, so its payment is what was spent; what is owed moves only with a real balance
       paidToLumpCards += v
-    } else if (row.kind === 'debt-payment' || row.kind === 'card-payment') owe(row.accountId, v)
-    else if (row.section === 'expense') {
+    } else if (row.kind === 'debt-payment' || row.kind === 'card-payment') {
+      owe(row.accountId, v)
+      recorded(row.accountId, c, -1)
+    } else if (row.section === 'expense') {
       // bought on a card whose purchases are expense rows: the money is still in the current account, and owed on the card
-      if (account && cardIsItemized(account)) owe(account.id, -v)
+      if (account && cardIsItemized(account)) {
+        owe(account.id, -v)
+        recorded(account.id, c, 1)
+      }
       route(engine.primarySavingsId, -c.funding.savings)
-      for (const [pid, amount] of Object.entries(c.funding.pools)) route(pools.get(pid)?.accountId, -amount)
-      for (const [aid, amount] of Object.entries(c.funding.accounts)) route(aid, -amount)
+      recorded(engine.primarySavingsId, c, -1, (p) => p.source === 'savings')
+      for (const [pid, amount] of Object.entries(c.funding.pools)) {
+        route(pools.get(pid)?.accountId, -amount)
+        recorded(pools.get(pid)?.accountId, c, -1, (p) => p.source === poolRef(pid))
+      }
+      for (const [aid, amount] of Object.entries(c.funding.accounts)) {
+        route(aid, -amount)
+        recorded(aid, c, -1, (p) => p.source === accountRef(aid))
+      }
     }
   }
   // the rest of the month when no row takes it: it counts as saved, and no account receives it
@@ -159,9 +195,11 @@ export function bridgeOf(view: View, m: MonthKey): Bridge {
     const allowed = 2 * (4 + (touches.get(id) ?? 0))
     if (!series.outside) tolerance += allowed
     const byRate = before ? inBase(series.currency, r.start) - before.balanceBase : 0
+    // and what recorded conversions came to beside the month's rate
+    const byRecorded = recordedRates.get(id) ?? 0
     const fixedDeposits = acc?.investment?.depositFxMode === 'fixed' && acc.investment.fixedRate != null
-    if (!fixedDeposits && Math.abs(left - byRate) > allowed) {
-      problems.push(`"${acc?.name ?? id}" (${series.currency}) moved by ${moneyText(moved)} in ${monthName(m)}; the rows, growth and real balances explain ${moneyText(moved - left)} and the change in the rate ${moneyText(byRate)}: ${moneyText(left - byRate)} is unexplained.`)
+    if (!fixedDeposits && Math.abs(left - byRate - byRecorded) > allowed) {
+      problems.push(`"${acc?.name ?? id}" (${series.currency}) moved by ${moneyText(moved)} in ${monthName(m)}; the rows, growth and real balances explain ${moneyText(moved - left)}, the change in the rate ${moneyText(byRate)} and recorded conversions ${moneyText(byRecorded)}: ${moneyText(left - byRate - byRecorded)} is unexplained.`)
     }
   }
 

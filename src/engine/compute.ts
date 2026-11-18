@@ -1,5 +1,5 @@
 import {
-  accountIdOf, accountRef, cardIsItemized, compareMonths, fromMinor, isOldPocketShare, isOutsideNetWorth, isShareRule, isTakenFromAccount, movesInto, monthRange, paysAsExpense, paysExpenses, pocketLandsIn, poolIdOf, poolRef, resolveRules, scaleMoney, toMinor,
+  accountIdOf, accountRef, cardIsItemized, compareMonths, conversionOf, fromMinor, isOldPocketShare, isOutsideNetWorth, isShareRule, isTakenFromAccount, movesInto, monthRange, paysAsExpense, paysExpenses, pocketLandsIn, poolIdOf, poolRef, resolveRules, scaleMoney, toMinor,
   type Account, type Category, type Cell, type FundedBy, type Money, type MonthKey, type Row, type RuleState, type Section, type Tables,
 } from '@/model'
 import { convertMoney, householdFx } from './fx'
@@ -7,7 +7,7 @@ import { mainAccountSeries } from './mainAccount'
 import {
   cellKey, fundingTotal,
   type AccountSeries, type CellResult, type CellStatus, type EngineInput, type EngineOutput,
-  type Funding, type MonthTotals, type PoolSeries, type ResolvedItem, type RowTotals,
+  type Funding, type MonthTotals, type PoolSeries, type RecordedPart, type ResolvedItem, type RowTotals,
 } from './types'
 
 const SECTION_ORDER: Record<Section, number> = { income: 0, expense: 1, transfer: 2 }
@@ -62,6 +62,26 @@ export function groupRowsByCategory(rows: Row[], categories: Category[]): RowGro
 }
 
 const zeroFunding = (): Funding => ({ cash: 0, savings: 0, pools: {}, accounts: {} })
+
+/** What each source paid, less its recorded parts: what is left to convert at the month's rate. */
+function withoutRecorded(f: Funding, parts: RecordedPart[]): Funding {
+  const out: Funding = { cash: f.cash, savings: f.savings, pools: { ...f.pools }, accounts: { ...f.accounts } }
+  for (const p of parts) {
+    const pid = poolIdOf(p.source)
+    const aid = accountIdOf(p.source)
+    if (p.source === 'savings') out.savings -= p.amount
+    else if (pid && pid in out.pools) out.pools[pid] -= p.amount
+    else if (aid && aid in out.accounts) out.accounts[aid] -= p.amount
+    else out.cash -= p.amount
+  }
+  return out
+}
+
+/** A recorded part scaled by `f`: a row's share of the part in the row it follows, or a payment cut to what is owed. The rate stays. */
+function scalePart(p: RecordedPart, f: number, source: FundedBy = p.source): RecordedPart {
+  const { conversion: c } = p
+  return { source, amount: scaleMoney(p.amount, f), conversion: { ...c, foreignAmount: scaleMoney(c.foreignAmount, f), homeAmount: scaleMoney(c.homeAmount, f) } }
+}
 
 /**
  * Counts an amount under where it comes out of. `paying` are the accounts an expense can come out of: one that is
@@ -140,6 +160,32 @@ export function computeEngine(input: EngineInput): EngineOutput {
   /** Rows that follow another row mirror its cells, so they are computed after everything else. */
   const pass1Order = [...rows.filter((r) => !r.followsRowId), ...rows.filter((r) => r.followsRowId)]
   const fx = householdFx(tables.fxRates, household)
+  /**
+   * A recorded part in a currency: as typed in the cell's own, as recorded in the household's or in the conversion's
+   * other one. A third currency (an amount stored before rule X15) goes through the household's at the month's rate.
+   */
+  const partIn = (p: RecordedPart, cellCurrency: string, to: string, m: MonthKey): Money => {
+    if (to === cellCurrency) return p.amount
+    if (to === base) return p.conversion.homeAmount
+    if (to === p.conversion.foreign) return p.conversion.foreignAmount
+    return convertMoney(fx, p.conversion.homeAmount, base, to, m).value
+  }
+  /** A month's amount in a currency: its recorded parts as recorded, the rest at the month's rate. */
+  const amountIn = (c: CellResult, to: string, m: MonthKey): { value: Money; missingRate: boolean } => {
+    if (!c.recorded) {
+      const conv = convertMoney(fx, c.value, c.currency, to, m)
+      return { value: conv.value, missingRate: conv.missingRate }
+    }
+    let rest = c.value
+    let value: Money = 0
+    for (const p of c.recorded) {
+      rest -= p.amount
+      value += partIn(p, c.currency, to, m)
+    }
+    if (rest === 0) return { value, missingRate: false }
+    const conv = convertMoney(fx, rest, c.currency, to, m)
+    return { value: value + conv.value, missingRate: conv.missingRate }
+  }
   /** Rows driven by recurring items never carry forward: a month without items is 0. */
   const recurringRowIds = new Set(tables.recurringItems.filter((r) => !r.deletedAt).map((r) => r.rowId))
 
@@ -183,6 +229,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
       let baseStatus: CellStatus = row.defaultStatus
       let items: ResolvedItem[] = []
       const funding = zeroFunding()
+      /** The parts whose conversion was recorded (rule X10): done items that carry one. */
+      let recorded: RecordedPart[] | undefined
       /** The month's own amount is this month's alone (`Cell.once`): the month hands on what it was given. */
       let alone = false
       // A rule fills the month unless an amount was typed into it (the months before the rule started keep theirs
@@ -204,6 +252,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
         const target = cells[cellKey(follows, m)]
         value = scaleMoney(target?.value ?? 0, row.followShare ?? 1)
         if (target) currency = target.currency
+        // what the followed row recorded counts here as recorded too, by the same share (rule X10)
+        if (target?.recorded) recorded = target.recorded.map((p) => scalePart(p, row.followShare ?? 1, row.defaultFundedBy))
         source = 'derived'
         baseStatus = 'derived'
         addFunding(funding, row.defaultFundedBy, value, paying)
@@ -239,6 +289,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
           if (it.skipped) continue
           value += effectiveAmount
           addFunding(funding, it.fundedBy, effectiveAmount, paying)
+          const held = it.conversion ? conversionOf(it, currency, base) : null
+          if (held) (recorded ??= []).push({ source: it.fundedBy, amount: it.amount, conversion: held })
           if (it.status === 'projected') anyProjected = true
           if (it.status !== 'done') allDone = false
         }
@@ -249,21 +301,40 @@ export function computeEngine(input: EngineInput): EngineOutput {
       // an automatic amount is done once the user ticked it as moved (`markedDone`)
       const status: CellStatus = baseStatus === 'derived' ? (cell?.markedDone ? 'done' : 'derived') : archived ? 'done' : baseStatus
 
-      const conv = convertMoney(fx, value, currency, base, m)
+      // what was recorded counts as recorded; the rest is converted at the month's rate as one amount, as before
+      const recordedAmount = recorded ? recorded.reduce((sum, p) => sum + p.amount, 0) : 0
+      const conv = recorded && value === recordedAmount ? { value: 0, missingRate: false, projected: false } : convertMoney(fx, value - recordedAmount, currency, base, m)
       if (conv.missingRate) warnOnce(row.id, `No ${currency}→${base} rate for ${m} (${row.name})`)
+      const valueBase = recorded ? conv.value + recorded.reduce((sum, p) => sum + partIn(p, currency, base, m), 0) : conv.value
       // scale funding split into base currency proportionally
       const fundingBase = zeroFunding()
-      if (value !== 0) {
+      if (value !== 0 && !recorded) {
         const f = conv.value / value
         fundingBase.cash = Math.round(funding.cash * f)
         fundingBase.savings = Math.round(funding.savings * f)
         for (const [pid, amt] of Object.entries(funding.pools)) fundingBase.pools[pid] = Math.round(amt * f)
         for (const [aid, amt] of Object.entries(funding.accounts)) fundingBase.accounts[aid] = Math.round(amt * f)
+      } else if (value !== 0 && recorded) {
+        // per source: its recorded parts as recorded, what is left of it at the month's rate
+        const rest = value - recordedAmount
+        const f = rest !== 0 ? conv.value / rest : 0
+        const own = zeroFunding()
+        const inBase = zeroFunding()
+        for (const p of recorded) {
+          addFunding(own, p.source, p.amount, paying)
+          addFunding(inBase, p.source, partIn(p, currency, base, m), paying)
+        }
+        const mix = (all: Money, part: Money, partBase: Money): Money => partBase + Math.round((all - part) * f)
+        fundingBase.cash = mix(funding.cash, own.cash, inBase.cash)
+        fundingBase.savings = mix(funding.savings, own.savings, inBase.savings)
+        for (const [pid, amt] of Object.entries(funding.pools)) fundingBase.pools[pid] = mix(amt, own.pools[pid] ?? 0, inBase.pools[pid] ?? 0)
+        for (const [aid, amt] of Object.entries(funding.accounts)) fundingBase.accounts[aid] = mix(amt, own.accounts[aid] ?? 0, inBase.accounts[aid] ?? 0)
       }
 
       const result: CellResult = {
-        rowId: row.id, month: m, value, valueBase: conv.value, deductionsBase: 0, netBase: conv.value, currency, source, status, items,
+        rowId: row.id, month: m, value, valueBase, deductionsBase: 0, netBase: valueBase, currency, source, status, items,
         funding: fundingBase, fundingOwn: funding, missingRate: conv.missingRate, rateProjected: conv.projected, given, handsOn: given, cell,
+        ...(recorded ? { recorded } : {}),
       }
       cells[cellKey(row.id, m)] = result
       if (byRule && rule && rule.kind !== 'idle') {
@@ -293,7 +364,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
 
   /** A row's amount of a month in an account's currency. */
   const inAccountCurrency = (acc: Account, c: CellResult, m: MonthKey): Money => {
-    const conv = convertMoney(fx, c.value, c.currency, acc.currency, m)
+    const conv = amountIn(c, acc.currency, m)
     if (conv.missingRate) warnOnce(`${acc.id}|${c.currency}`, `No ${c.currency}→${acc.currency} rate for ${m} (${acc.name})`)
     return conv.value
   }
@@ -320,6 +391,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
       c.netBase = c.valueBase - c.deductionsBase
       c.funding = scaleFunding(c.funding)
       c.fundingOwn = scaleFunding(c.fundingOwn)
+      if (c.recorded) c.recorded = c.recorded.map((p) => scalePart(p, f))
       // the items give way in their order: the first ones count, the later ones are what no longer fits
       let left = value
       c.items = c.items.map((it) => {
@@ -414,6 +486,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
       c.netBase = restBase
       c.funding = { ...zeroFunding(), cash: restBase }
       c.fundingOwn = { ...zeroFunding(), cash: c.value }
+      // what the estimate leaves is no transaction: nothing of it was recorded
+      delete c.recorded
       if (c.source !== 'empty') {
         c.source = 'derived'
         c.status = c.cell?.markedDone ? 'done' : 'derived'
@@ -504,14 +578,23 @@ export function computeEngine(input: EngineInput): EngineOutput {
               t.accountFundedByAccount[aid] = (t.accountFundedByAccount[aid] ?? 0) + amt
             }
             // the same per source as it was typed, for the accounts kept in another currency
-            const own = (source: FundedBy, amount: Money): void => {
+            const own = (source: FundedBy, amount: Money, currency = c.currency): void => {
               if (amount === 0) return
               const by = (t.fundedOwn[source] ??= {})
-              by[c.currency] = (by[c.currency] ?? 0) + amount
+              by[currency] = (by[currency] ?? 0) + amount
             }
-            own('savings', c.fundingOwn.savings)
-            for (const [pid, amt] of Object.entries(c.fundingOwn.pools)) own(poolRef(pid), amt)
-            for (const [aid, amt] of Object.entries(c.fundingOwn.accounts)) own(accountRef(aid), amt)
+            // a recorded part is filed as recorded: in the conversion's other currency where the amount is in the
+            // household's, so an account kept in that currency moves by exactly what was recorded (rule X10)
+            const typed = c.recorded ? withoutRecorded(c.fundingOwn, c.recorded) : c.fundingOwn
+            for (const p of c.recorded ?? []) {
+              const aid = accountIdOf(p.source)
+              if (p.source !== 'savings' && !poolIdOf(p.source) && !(aid && paying.has(aid))) continue
+              if (p.conversion.foreign !== c.currency) own(p.source, p.conversion.foreignAmount, p.conversion.foreign)
+              else own(p.source, p.amount)
+            }
+            own('savings', typed.savings)
+            for (const [pid, amt] of Object.entries(typed.pools)) own(poolRef(pid), amt)
+            for (const [aid, amt] of Object.entries(typed.accounts)) own(accountRef(aid), amt)
           } else {
             // A row that moves money is an outflow the user controls, and no expense. Named an account with a
             // balance, the money arrives there; named none, it leaves the plan.
@@ -699,8 +782,18 @@ export function computeEngine(input: EngineInput): EngineOutput {
     let capital: Money = acc.openingBalance
     /** Row amount in the account's currency: at the month's rate, or at the account's fixed rate from the base currency. */
     const toAccountCurrency = (c: CellResult, m: MonthKey): Money => {
-      if (inv.depositFxMode === 'fixed' && inv.fixedRate) return toMinor(fromMinor(c.valueBase, base) * inv.fixedRate, acc.currency)
-      const conv = convertMoney(fx, c.value, c.currency, acc.currency, m)
+      if (inv.depositFxMode === 'fixed' && inv.fixedRate) {
+        // what was recorded arrived as recorded; the rest at the account's fixed rate
+        if (!c.recorded) return toMinor(fromMinor(c.valueBase, base) * inv.fixedRate, acc.currency)
+        let restBase = c.valueBase
+        let value: Money = 0
+        for (const p of c.recorded) {
+          restBase -= partIn(p, c.currency, base, m)
+          value += partIn(p, c.currency, acc.currency, m)
+        }
+        return value + toMinor(fromMinor(restBase, base) * inv.fixedRate, acc.currency)
+      }
+      const conv = amountIn(c, acc.currency, m)
       if (conv.missingRate) warnOnce(`${acc.id}|${c.currency}`, `No ${c.currency}→${acc.currency} rate for ${m} (${acc.name})`)
       return conv.value
     }
