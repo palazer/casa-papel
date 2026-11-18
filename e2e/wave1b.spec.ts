@@ -41,6 +41,10 @@ test.describe('wave 1b', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Statement' })).toBeVisible()
     await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
     const guide = page.getByTestId('setup-guide')
+    // while the guide leads, it holds the top of the page: the strip of months comes once it is done
+    const monthStrip = page.getByRole('navigation', { name: 'Months' })
+    await expect(guide).toBeVisible()
+    await expect(monthStrip).toHaveCount(0)
     const number = (n: number) => guide.locator('[data-step]').nth(n - 1)
     const title = guide.getByTestId('setup-title')
     const count = guide.getByTestId('setup-count')
@@ -388,6 +392,7 @@ test.describe('wave 1b', () => {
     // was. Undo brings the guide back, on its step, with its locks
     await guide.getByRole('button', { name: 'Leave setup' }).click()
     await expect(guide).toHaveCount(0)
+    await expect(monthStrip).toBeVisible()
     await expect(lockedParts).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Suggestions', exact: true })).toHaveAttribute('aria-pressed', 'false')
     await expect(page.getByTestId('suggestions')).toHaveCount(0)

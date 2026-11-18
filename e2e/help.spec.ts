@@ -45,7 +45,7 @@ test.describe('help on a phone', () => {
     await page.waitForTimeout(250)
     await page.screenshot({ path: 'e2e/output/help-phone.png' })
     await page.keyboard.press('Escape')
-    await page.getByRole('button', { name: 'About The month' }).tap()
+    await page.getByRole('button', { name: 'About The month', exact: true }).tap()
     await expect(page.getByRole('dialog').getByText(/Money in on the left, money out on the right/)).toBeVisible()
     await page.keyboard.press('Escape')
 

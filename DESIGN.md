@@ -81,6 +81,8 @@ Statement frame  full width, space-y-4: the progress line, then dense islands, o
   for the length of the page. A line the page goes to stops below the bar, and so does a control that takes the
   focus (`scroll-padding-top` in `index.css`). On a phone the toolbar takes three lines and scrolls with the page.
   While a household is being set up the setup guide holds the top of the window, and the bar is not sticky.
+  What a screen puts between its name and the toolbar (`above`: the Statement's strip of months, §7) scrolls away
+  with the name, 8 px under the subline.
 - **Welcome** (`src/features/home/HomeScreen.tsx`): the one screen without a toolbar (its header carries a `role="status"`
   line for the account dialog's outcome and a `role="alert"` line for an import that failed). One air island "Welcome to
   Casa Papel" lists the ways in as rows: a `sm` button (lime on the recommended path only, `outline` otherwise) and one
@@ -322,7 +324,27 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   `Filled by <row>` on the account). The Grid says ` · not in net worth` after the name of its balance row. A line a goal watches carries the goal mark: a 12 px `Target` icon in the goal hue and the
   percentage in muted `text-[11px]`, the income hue once reached, a rose `late` chip when late; opening the line
   shows the goal's name, its bar and the sentence that says how far the plan gets (`goalStatusLine`), with `Edit`
-  beside the name; there is no list of all goals. The toolbar holds the `MonthPicker`, `Expand all` / `Collapse all`
+  beside the name; there is no list of all goals.
+  **The strip of months** (`src/features/statement/MonthStrip.tsx`, its figures in `stripMonths.ts`) is the first
+  thing on the page, between the screen's name and the toolbar, and it scrolls away with the name. A `nav` "Months"
+  with one chip per month of the plan: a `rounded-md border px-2 py-1` button, `min-w-[5.5rem]`, from `md` a twelfth
+  of the strip, so that twelve are in view (on a phone about three and a half, the cut one saying there is more).
+  A chip is its month in three lines: the month (`Nov 2026`, `text-xs font-medium`), then two `text-[11px]
+  tabular-nums` lines without cents and without the currency: income + from accounts, and expenses + what is left.
+  Each figure is in the hue its group has on the page (`income`, `worth`, `expense`, `transfer`) with a muted plus
+  between them; a figure that is nothing is left out, and a line of nothing is a faint `·`. The two lines are the
+  page's "Total in" and "Total out", read from `buildStatement` itself (`stripFigures`), so a chip never says
+  something else than its month's page; what was moved elsewhere counts with what is left. A month that is over is
+  on `bg-muted/60` with its name muted; the current month's name is `font-semibold` and a `text-[10px]` `now` stands
+  at the chip's right; the month on screen is the pressed chip, in the lime, and gives up the hues for the lime's own
+  foreground (its colours are the page under it). The strip opens with the chip three months before the current one
+  at its left edge (three past months, the current one and eight to come), scrolls sideways without a scrollbar and
+  comes to rest on a chip's start (`snap-x`), and brings the pressed chip into view when the month is changed by
+  other means. It is one stop for the Tab key: Left, Right, Home and End move along the chips. A chip is named in
+  words (`November 2026, now: income €7,405, from accounts €660, expenses €3,896, from what is left €4,169`), carries
+  `aria-pressed`, and the current month `aria-current="date"`. An (i) (`statement.months`) ends the row. Not shown
+  while a household is being set up, and not in the Grid, whose columns are the months already.
+  The toolbar holds the `MonthPicker`, `Expand all` / `Collapse all`
   (every group and category at once; not "Open" and "Close", which would read as the month's), the `Suggestions` toggle, the
   `MarksLegend` and, last, `Balances…` (`sm outline`: the month's balances dialog, §8), left out
   while the "Setting up" guide shows. The toolbar has no lime button: no action of a month is more final than

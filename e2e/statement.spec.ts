@@ -118,6 +118,78 @@ test.describe('the Statement', () => {
     await expect(page.getByText('past', { exact: true })).toHaveCount(0)
   })
 
+  test('the strip of months: every month is a chip with its four figures, and the pressed chip follows the month on screen', async ({ page }) => {
+    await openStatement(page)
+    await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
+    const strip = page.getByRole('navigation', { name: 'Months' })
+    const chip = (m: string) => strip.locator(`[data-month="${m}"]`)
+    // every month of the demo's plan, September 2026 to December 2027
+    await expect(strip.locator('[data-month]')).toHaveCount(16)
+
+    // November is the page in small: income + from accounts, and expenses + what is left, both coming to the page's totals
+    await expect(total(page, 'in')).toHaveText('Total in€8,065.00')
+    await expect(total(page, 'out')).toHaveText('Total out€8,065.00')
+    await expect(chip('2026-11')).toHaveAccessibleName('November 2026, now: income €7,405, from accounts €660, expenses €3,896, from what is left €4,169')
+    await expect(chip('2026-11')).toContainText('7,405 + 660')
+    await expect(chip('2026-11')).toContainText('3,896 + 4,169')
+    // it is the current month and the one on screen: "now", and pressed
+    await expect(chip('2026-11')).toContainText('now')
+    await expect(chip('2026-11')).toHaveAttribute('aria-current', 'date')
+    await expect(chip('2026-11')).toHaveAttribute('aria-pressed', 'true')
+    await expect(strip.locator('[aria-pressed="true"]')).toHaveCount(1)
+    // each figure wears the colour of its group on the page; the pressed chip gives them up for the lime's own
+    await expect(chip('2026-12').locator('.text-income')).toHaveText('7,405')
+    await expect(chip('2026-12').locator('.text-expense')).toHaveCount(1)
+    await expect(chip('2026-12').locator('.text-transfer')).toHaveCount(1)
+    await expect(chip('2026-11').locator('.text-income')).toHaveCount(0)
+
+    // a month that is over is grey and says so; nothing came out of an account in September, so line one is the income alone
+    await expect(chip('2026-09')).toHaveAccessibleName('September 2026, past: income €7,255, expenses €3,357, from what is left €3,898')
+    await expect(chip('2026-09')).toHaveClass(/bg-muted\/60/)
+    await expect(chip('2026-09')).not.toContainText('+ 0')
+    await expect(chip('2026-12')).not.toHaveClass(/bg-muted\/60/)
+    // it opens with the months before the current one in view (the demo has two), and twelve chips across
+    await expect(chip('2026-09')).toBeInViewport({ ratio: 1 })
+    await expect(chip('2027-08')).toBeInViewport({ ratio: 1 })
+    await expect(chip('2027-12')).not.toBeInViewport()
+    await page.screenshot({ path: 'e2e/output/statement-month-strip.png' })
+
+    // pressing a chip opens its month
+    await chip('2026-10').click()
+    await expect(page.getByRole('heading', { level: 2, name: 'October 2026' })).toBeVisible()
+    await expect(chip('2026-10')).toHaveAttribute('aria-pressed', 'true')
+    await expect(chip('2026-11')).toHaveAttribute('aria-pressed', 'false')
+    await expect(page.getByText('past', { exact: true })).toBeVisible()
+    // the arrows beside the month's name move the pressed chip, and a chip that was out of view comes into it
+    await page.getByRole('button', { name: 'Next month' }).click()
+    await expect(chip('2026-11')).toHaveAttribute('aria-pressed', 'true')
+    await goToMonth(page, 'December 2027')
+    await expect(chip('2027-12')).toHaveAttribute('aria-pressed', 'true')
+    // (the last chip ends where the strip ends, to a fraction of a pixel)
+    await expect(chip('2027-12')).toBeInViewport({ ratio: 0.99 })
+
+    // one stop for the Tab key: the arrow keys move along the chips, Enter opens the month
+    await chip('2027-12').focus()
+    await page.keyboard.press('ArrowLeft')
+    await expect(chip('2027-11')).toBeFocused()
+    await page.keyboard.press('Home')
+    await expect(chip('2026-09')).toBeFocused()
+    await page.keyboard.press('ArrowRight')
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('heading', { level: 2, name: 'October 2026' })).toBeVisible()
+
+    // the (i) says what the two lines are
+    await strip.getByRole('button', { name: 'About The months of the plan' }).click()
+    await expect(page.getByText('Line one is what came in: income + what came out of your accounts.', { exact: false })).toBeVisible()
+    await page.keyboard.press('Escape')
+
+    // the strip scrolls away with the name of the screen; the month and its controls stay
+    await page.getByRole('button', { name: 'Expand all' }).click()
+    await page.evaluate(() => window.scrollTo(0, 500))
+    await expect(strip).not.toBeInViewport()
+    await expect(page.getByRole('heading', { level: 2, name: 'October 2026' })).toBeInViewport()
+  })
+
   test('spending from a virtual account shows on both sides', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'October 2026')
@@ -2496,6 +2568,27 @@ test.describe('working the month in the Statement', () => {
 
 test.describe('the Statement on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
+
+  test('the strip of months fits a phone: it scrolls sideways, and the page does not', async ({ page }) => {
+    await openStatement(page)
+    await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
+    const strip = page.getByRole('navigation', { name: 'Months' })
+    const chip = (m: string) => strip.locator(`[data-month="${m}"]`)
+    // a few chips fit: the months before the current one and the current one are in view, the rest is a swipe away
+    await expect(chip('2026-09')).toBeInViewport({ ratio: 1 })
+    await expect(chip('2026-11')).toBeInViewport({ ratio: 1 })
+    await expect(chip('2026-11')).toContainText('7,405 + 660')
+    await expect(chip('2027-03')).not.toBeInViewport()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+    await page.screenshot({ path: 'e2e/output/statement-month-strip-phone.png' })
+    // a chip opens its month, and the strip follows the arrows beside the month's name
+    await chip('2026-12').tap()
+    await expect(page.getByRole('heading', { level: 2, name: 'December 2026' })).toBeVisible()
+    await page.getByRole('button', { name: 'Next month' }).tap()
+    await page.getByRole('button', { name: 'Next month' }).tap()
+    await expect(chip('2027-02')).toHaveAttribute('aria-pressed', 'true')
+    await expect(chip('2027-02')).toBeInViewport({ ratio: 1 })
+  })
 
   test('the row\'s dialog with its "Repeats" lines fits the screen', async ({ page }) => {
     await openStatement(page)

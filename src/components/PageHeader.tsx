@@ -20,10 +20,13 @@ const BAR = 'md:sticky md:top-0 md:z-30 md:-mx-6 md:mb-2 md:bg-background md:px-
  * notice) wraps onto a line of its own.
  *
  * `sticky` keeps the toolbar, and `below` under it (the Statement's progress line), in view while a long page
- * scrolls: the name scrolls away, the month and its controls stay.
+ * scrolls: the name scrolls away, the month and its controls stay. `above` stands between the name and the toolbar
+ * and scrolls away with the name (the Statement's strip of months).
  */
-export function PageHeader({ title, subline, children, controls = true, sticky = false, below }: {
+export function PageHeader({ title, subline, children, controls = true, sticky = false, above, below }: {
   title: string; subline?: ReactNode; children?: ReactNode; controls?: boolean
+  /** Between the screen's name and the toolbar; it scrolls away with the name. */
+  above?: ReactNode
   /** The toolbar stays at the top of the window while the page scrolls (from `md` up). */
   sticky?: boolean
   /** A line that belongs to the toolbar and stays with it. */
@@ -36,6 +39,8 @@ export function PageHeader({ title, subline, children, controls = true, sticky =
         <h1 className="text-2xl font-semibold leading-8 tracking-tight">{title}</h1>
         {subline && <p className="text-xs leading-4 text-muted-foreground">{subline}</p>}
       </div>
+      {/* the header makes no box when its bar is sticky, so what stands above the bar brings its own distance to the name */}
+      {above && <div className={cn('min-w-0', sticky && 'md:mt-2')}>{above}</div>}
       {/* where the bar stands while nothing is scrolled: once this is above the window, the bar is stuck */}
       {sticky && <div ref={mark} className="-mb-px h-px max-md:hidden" aria-hidden />}
       <div className={cn(sticky && BAR)} data-stuck={sticky ? stuck : undefined} data-sticky-bar={sticky || undefined}>

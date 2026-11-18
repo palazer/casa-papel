@@ -32,11 +32,13 @@ import { AccountMenu } from './AccountMenu'
 import { AddCategoryInline } from './AddCategoryInline'
 import { CategoryMenu } from './CategoryMenu'
 import { EstimateDialog } from './EstimateDialog'
+import { MonthStrip } from './MonthStrip'
 import { PerPerson } from './PerPerson'
 import { RateChip } from './RateChip'
 import { monthProgress, nearestMonth, progressText } from './progress'
 import { SetupGuide } from './SetupGuide'
 import { StatementBand } from './StatementBand'
+import { stripMonths } from './stripMonths'
 import { AccountSuggestionLines, SuggestionLines } from './SuggestionLines'
 import { TopUpDialog } from './TopUpDialog'
 import { LINE_MENU, type LineContext } from './StatementLine'
@@ -173,6 +175,8 @@ export function StatementScreen() {
   const month = picked ?? (settingUp && household ? household.startMonth : monthOfDate())
   const m = nearestMonth(months, month)
   const statement = useMemo(() => (tables && engine && m ? buildStatement(tables, engine, m) : null), [tables, engine, m])
+  /** Every month of the plan in four figures, for the strip at the top. The guided setup holds the top instead. */
+  const strip = useMemo(() => (tables && engine && !settingUp ? stripMonths(tables, engine, months) : []), [tables, engine, months, settingUp])
   /** What each virtual account is short by in the month shown. */
   const shortNow = useMemo(() => {
     const out: Record<string, number> = {}
@@ -595,6 +599,7 @@ export function StatementScreen() {
       <PageHeader
         title="Statement" subline={<>{household.name}{isPastMonth(m) && <> · <Chip tone="zinc" title="This month is over. It can still be changed.">past</Chip></>}</>}
         sticky={!settingUp}
+        above={strip.length > 0 && <MonthStrip months={strip} month={m} today={monthOfDate()} currency={ccy} locale={locale} onChange={setMonth} />}
         below={progress.total > 0 && (
           // How much of the month is ticked and what is still open; a month with nothing in it has nothing to count
           <p role="status" className="flex items-center gap-1 text-xs text-muted-foreground" data-testid="progress">

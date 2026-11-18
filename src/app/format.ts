@@ -8,6 +8,11 @@ export function formatAmount(minor: Money, currency: string, locale: string, opt
   }).format(fromMinor(minor, currency))
 }
 
+/** A whole amount without its currency ("7,405"), for a place too small for both: the page it stands on says the currency. */
+export function formatWhole(minor: Money, currency: string, locale: string): string {
+  return new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(fromMinor(minor, currency))
+}
+
 export function formatPercent(fraction: number, locale: string): string {
   return new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 0 }).format(fraction)
 }
