@@ -304,11 +304,12 @@ export const GUIDE: GuideTopic[] = [
       'Press a row to open its dialog and pick the currency beside the amount: it is the row\'s, for every month, and is saved with the amount. The same choice is in the row menu → "Currency…" → "Amounts in this row are in" (the first entry, "EUR (household currency)", is the default) → "Save".',
       'Open a cell of that row; under the amount, "Change this month\'s rate…" → type after "1 USD =" → "Save rate". One rate per currency per month, for every row and balance in it. On the Statement the month\'s rate is a chip in the toolbar, "1 EUR = 1.08 USD": press it to type your own or to go back to the ECB\'s.',
       '"Use the ECB rate again" drops a manual rate for the published one.',
+      'Where money is really changed into another currency, "Record the conversion…" under the amount keeps what it came to: type the amount in the other currency or the rate, or pick a day and "Use" its official rate. Two figures give the third. "Done", then "Save": the amount is Done, and a new rate for the month leaves it alone. "Change…" and "Remove" are on its line.',
       'An account\'s currency is under "More options" in its dialog. Household → "Currency rates" → "Fetch ECB rates" brings the rates up to date at once, and is the way back after being offline.',
       '"Months to come", per currency: "Follow the recent trend" (the average change per month of the last 12 months, each further month 80% of the step before), "Hold the last rate", or "My own change per month" with a %. With less than a year of rates the last rate is held. A rate typed for a month to come is used as it is, and the forecast goes on from it.',
       'Type over a month in the "1 EUR in USD" column to set it by hand; empty it to take the official rate back. A month to come has none and goes back to its forecast.',
     ],
-    tips: ['row.currency', 'cell.rate', 'statement.rate', 'balance.inBase', 'household.fxForecast'],
+    tips: ['row.currency', 'cell.rate', 'cell.conversion', 'statement.rate', 'balance.inBase', 'household.fxForecast'],
     open: 'household',
   },
   {

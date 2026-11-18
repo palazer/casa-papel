@@ -378,7 +378,9 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
         const about = !isEmpty && cell.currency !== ccy ? formatAmount(cell.valueBase, ccy, locale, { compact: true }) : null
         // an income with deductions shows what is left instead
         const net = row.section === 'income' && cell.deductionsBase > 0 ? formatAmount(cell.netBase, ccy, locale, { compact: true }) : null
-        const sub = net ? { text: `net ${net}`, label: `net ${net}` } : about ? { text: `≈ ${about}`, label: `about ${about}` } : null
+        // all of it recorded as converted (rule X10): what it came to, not what it is about
+        const recorded = cell.recorded != null && cell.recorded.reduce((sum, p) => sum + p.amount, 0) === cell.value
+        const sub = net ? { text: `net ${net}`, label: `net ${net}` } : about ? (recorded ? { text: `= ${about}`, label: `recorded as ${about}` } : { text: `≈ ${about}`, label: `about ${about}` }) : null
         // One mark only: a green dot for done in any month; the current month also shows red (nothing yet) and amber (partly).
         const dot = !isEmpty && (!isDerived || cell.value !== 0) && (m === thisMonth || cell.status === 'done') ? doneness(cell) : null
         return (

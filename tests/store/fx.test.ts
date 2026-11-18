@@ -3,7 +3,7 @@ import { FxRateSchema, newId, type FxRate } from '@/model'
 import { monthEnds, rateService } from '../rateService'
 import { restoreToday, setToday } from '../today'
 import {
-  CasaDb, Store, addAccount, fetchEcbRates, loadTables, monthRatesWithDates, neededPairs, quickCreateHousehold, rateSettled, ratesToFetch, refreshRates, restoreEcbRate,
+  CasaDb, Store, addAccount, fetchDayRate, fetchEcbRates, loadTables, monthRatesWithDates, neededPairs, quickCreateHousehold, rateSettled, ratesToFetch, refreshRates, restoreEcbRate,
   setManualRate,
 } from '@/store'
 
@@ -280,5 +280,26 @@ describe('"Use the ECB rate again"', () => {
     const empty = (async () => new Response(JSON.stringify({ rates: {} }), { status: 200 })) as unknown as typeof fetch
     await expect(restoreEcbRate(store, 'EUR/USD', '2026-01', empty)).rejects.toThrow(/no USD rate for that month/)
     expect(await rateIn(store, '2026-01')).toMatchObject({ rate: 1.5, source: 'manual' })
+  })
+})
+
+describe('the official rate of one day, for a recorded conversion (rule X10)', () => {
+  const daily = { '2026-01-29': { USD: 1.09 }, '2026-01-30': { USD: 1.1 }, '2026-02-02': { USD: 1.12 } }
+
+  it('is that day\'s, and a weekend takes the working day before it; only the codes and the day are asked', async () => {
+    const calls: string[] = []
+    expect(await fetchDayRate('EUR', 'USD', '2026-01-29', rateService(daily, calls))).toEqual({ rate: 1.09, date: '2026-01-29' })
+    expect(await fetchDayRate('EUR', 'USD', '2026-01-31', rateService(daily, calls))).toEqual({ rate: 1.1, date: '2026-01-30' })
+    expect(calls).toEqual([
+      'https://api.frankfurter.dev/v1/2026-01-29..2026-01-29?base=EUR&symbols=USD',
+      'https://api.frankfurter.dev/v1/2026-01-31..2026-01-31?base=EUR&symbols=USD',
+    ])
+  })
+
+  it('says so when there is none, the currency is not published, or the service fails', async () => {
+    await expect(fetchDayRate('EUR', 'USD', '2025-12-31', rateService(daily))).rejects.toThrow('The European Central Bank published no USD rate on or before 2025-12-31.')
+    await expect(fetchDayRate('EUR', 'XXX', '2026-01-30', rateService(daily))).rejects.toThrow('The European Central Bank publishes no XXX rate.')
+    const failing = (async () => new Response('down', { status: 500 })) as unknown as typeof fetch
+    await expect(fetchDayRate('EUR', 'USD', '2026-01-30', failing)).rejects.toThrow(/answered 500/)
   })
 })

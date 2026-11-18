@@ -7,6 +7,7 @@ import {
 import type { Mutation, Store } from './store'
 import { cellPut, cellRecord } from './cells'
 import { refuseThirdCurrency } from './currencies'
+import { monthSpan } from './impact'
 import { primaryKeyOf } from './keys'
 import { planEnd } from './months'
 
@@ -264,11 +265,29 @@ export function categoryPlacement(tables: Tables, row: Row, categoryId: string |
   return { categoryId, order: generateKeyBetween(group.at(-1)?.order ?? null, null) }
 }
 
+/**
+ * Why a row's currency cannot change to `next` (null: the household's), or null where it can. A month that holds a
+ * recorded conversion (rule X10) keeps the row in its currency: the conversion is between that currency and the
+ * household's. The dialogs ask it on the spot; the store refuses with it.
+ */
+export function currencyHeldReason(tables: Tables, rowId: string, next: string | null): string | null {
+  const row = tables.rows.find((r) => r.id === rowId)
+  if (!row || (row.currency ?? null) === next) return null
+  const months = [...new Set(tables.cells.filter((c) => c.rowId === rowId && c.items.some((i) => i.conversion != null)).map((c) => c.month))].sort()
+  if (months.length === 0) return null
+  const household = tables.household.find((h) => !h.deletedAt)
+  const locale = household?.locale ?? 'en'
+  const where = months.length === 1 ? monthSpan(months, locale) : `${months.length} months, the first ${monthSpan(months.slice(0, 1), locale)}`
+  return `"${row.name}" has a conversion recorded in ${where}, so its currency stays ${row.currency ?? household?.baseCurrency ?? ''}. Remove the conversion there first.`
+}
+
 /** The row record that goes with a save of the row's dialog: one put for whatever changed on the row, none when nothing did. */
 export function rowChangePut(tables: Tables, rowId: string, change: RowChange | undefined): Mutation[] {
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
   if (!change || !row) return []
   let next: Row = row
+  const held = change.currency !== undefined ? currencyHeldReason(tables, rowId, change.currency) : null
+  if (held) throw new Error(held)
   if (change.currency !== undefined && (row.currency ?? null) !== change.currency) next = { ...next, currency: change.currency }
   if (change.categoryId !== undefined && (row.categoryId ?? null) !== change.categoryId) next = { ...next, ...categoryPlacement(tables, row, change.categoryId) }
   return next === row ? [] : [{ op: 'put', table: 'rows', record: RowSchema.parse({ ...next, updatedAt: now() }) }]
@@ -624,6 +643,8 @@ export async function updateRow(store: Store, rowId: string, patch: Partial<Omit
   const row = tables.rows.find((r) => r.id === rowId)
   if (!row) throw new Error('Row not found')
   const ts = now()
+  const held = patch.currency !== undefined ? currencyHeldReason(tables, rowId, patch.currency) : null
+  if (held) throw new Error(held)
   // another currency: the amounts the row holds keep their digits (`keepDigits`), in the same step
   const moved = patch.currency !== undefined && (patch.currency ?? null) !== (row.currency ?? null) ? keepDigits(tables, rowId, patch.currency, ts).mutations : []
   const mutations: Mutation[] = [{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, ...patch, updatedAt: ts }) }, ...moved]

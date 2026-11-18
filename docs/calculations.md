@@ -246,6 +246,12 @@ month's rate again, and what was recorded stays on it for when it is done once m
 the rate stays and the other amount follows. Each item of a month has its own; what is not recorded is converted at
 the month's rate as before.
 
+It is recorded in the row's dialog, under the amount: "Record the conversion…". The rate is typed, taken from the
+official rate of a day (the last working day on or before it), or follows from the two amounts; recording sets the
+amount to Done. It is offered only where money is really changed into another currency on its way: a dollar expense
+paid out of a dollar account has nothing to record. A row keeps its currency while one of its months holds a
+recorded conversion, and an amount the app works out (a percentage, the rest) has none.
+
 > 3,300.00 USD recorded as 3,000.00 EUR (1.1000) counts 3,000.00 whatever January's rate becomes. Corrected to
 > 3,520.00 USD it counts 3,200.00.
 

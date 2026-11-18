@@ -349,3 +349,40 @@ test.describe('whole stories, as the scenarios tell them', () => {
     await expect(s.dlg.getByTestId('paid-off-note')).toContainText('"Car loan" is paid off: nothing counts this month.')
   })
 })
+
+test.describe('whole stories in another currency', () => {
+  // service workers are blocked so page.route can stand in for the rate service
+  test.use({ serviceWorkers: 'block' })
+
+  // scenarios/05: "A recorded conversion keeps its rate when the month's rate changes"
+  test('a salary in dollars recorded as converted keeps its euros when the month\'s rate changes', async ({ page }) => {
+    await page.route('https://api.frankfurter.dev/**', (r) => r.fulfill({ json: { rates: { '2026-11-02': { USD: 1.1 } } } }))
+    const s = await household(page)
+    await s.moneyIn.getByRole('button', { name: 'Add income row' }).click()
+    await s.moneyIn.getByLabel('New income row name').fill('Alex – Salary')
+    await s.moneyIn.getByLabel('New income row name').press('Enter')
+    await s.dlg.getByLabel('Currency of Alex – Salary').selectOption('USD')
+    await s.dlg.getByLabel('Amount in USD').fill('3300')
+    await s.dlg.getByRole('button', { name: 'Record the conversion…' }).click()
+    // converted at 1.1000, the month's rate of the day: 3,000.00 euros
+    await expect(s.dlg.getByLabel('In EUR')).toHaveValue('3000')
+    await s.dlg.getByRole('button', { name: 'Done', exact: true }).click()
+    await s.dlg.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(s.dlg).toBeHidden()
+    const salary = line(s.moneyIn, 'Alex – Salary')
+    await expect(salary).toContainText('€3,000.00')
+
+    // the month's rate becomes 1.2000: the recorded salary stays at 3,000.00
+    await salary.getByRole('button', { name: /^Alex – Salary:/ }).click()
+    await s.dlg.getByRole('button', { name: "Change this month's rate…" }).click()
+    await s.dlg.getByLabel('1 EUR =').fill('1.2')
+    await s.dlg.getByRole('button', { name: 'Save rate' }).click()
+    await expect(s.dlg.getByTestId('rate-line')).toContainText('1 EUR = 1.20 USD')
+    // the recorded salary counts as recorded: the rate line says nothing of what it would be at the month's rate
+    await expect(s.dlg.getByTestId('rate-line')).not.toContainText('≈')
+    await expect(s.dlg.getByTestId('conversion')).toContainText('= €3,000.00')
+    await s.dlg.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(page.getByTestId('month-rates')).toContainText('1 EUR = 1.20 USD')
+    await expect(salary).toContainText('€3,000.00')
+  })
+})

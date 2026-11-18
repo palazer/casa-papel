@@ -450,6 +450,87 @@ test('a third currency is refused where it is picked: the dialog says which two 
   await expect(dlg.getByRole('button', { name: 'Save' })).toBeDisabled()
 })
 
+test('a conversion is recorded under the amount: two figures give the third, it counts as recorded, and it can be changed and removed', async ({ page }) => {
+  // the service answers with the days it has; the panel takes the last one on or before the day it asks for
+  await page.route('https://api.frankfurter.dev/**', (r) => r.fulfill({ json: { rates: { '2026-10-30': { USD: 1.1 }, '2026-11-02': { USD: 1.25 } } } }))
+  await loadDemo(page)
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
+  const moneyIn = page.getByRole('region', { name: 'Money in' })
+  const dlg = page.getByRole('dialog')
+  await moneyIn.getByRole('button', { name: 'Add income row' }).click()
+  await moneyIn.getByLabel('New income row name').fill('Freelance')
+  await moneyIn.getByRole('button', { name: 'Add', exact: true }).click()
+  await dlg.getByLabel('Currency of Freelance').selectOption('USD')
+  await dlg.getByLabel('Amount in USD').fill('1000')
+
+  // the amount in euros that arrived: the rate follows from the two amounts
+  await dlg.getByRole('button', { name: 'Record the conversion…' }).click()
+  const panel = dlg.getByTestId('conversion-panel')
+  await expect(panel.getByLabel('In EUR')).toHaveValue('800')
+  await expect(panel.getByLabel('Rate, USD for 1 EUR')).toHaveValue('1.25')
+  await panel.getByLabel('In EUR').fill('790')
+  await expect(panel.getByLabel('Rate, USD for 1 EUR')).toHaveValue('1.2658')
+  await expect(panel).toContainText('$1,000.00 = €790.00.')
+  await dlg.screenshot({ path: 'e2e/output/conversion-panel.png' })
+  await panel.getByRole('button', { name: 'Done' }).click()
+  const line = dlg.getByTestId('conversion')
+  await expect(line).toContainText('= €790.00')
+  await expect(line).toContainText('recorded')
+  // recording sets the amount to Done
+  await expect(dlg.getByRole('radio', { name: 'Done' })).toBeChecked()
+  await dlg.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(dlg).toBeHidden()
+
+  // it counts as recorded: on the Statement, and in the Grid as "=" instead of "≈"
+  const row = moneyIn.locator('[data-line]').filter({ hasText: 'Freelance' }).first()
+  await expect(row).toContainText('€790.00')
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Grid' }).click()
+  await expect(page.getByRole('button', { name: /^Freelance Nov 2026: .*recorded as €790/ })).toBeVisible()
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
+
+  // changed: the official rate of a day, then Cancel puts back what was recorded
+  await row.getByRole('button', { name: /^Freelance:/ }).click()
+  await expect(line).toContainText('= €790.00')
+  await line.getByRole('button', { name: 'Change…' }).click()
+  await panel.getByRole('button', { name: 'Use' }).click()
+  await expect(panel.getByLabel('Rate, USD for 1 EUR')).toHaveValue('1.25')
+  await expect(panel).toContainText('ECB rate of 2 Nov 2026')
+  await expect(panel.getByLabel('In EUR')).toHaveValue('800')
+  await panel.getByRole('button', { name: 'Cancel' }).click()
+  await expect(line).toContainText('= €790.00')
+
+  // while it is recorded the row keeps its currency
+  await dlg.getByLabel('Currency of Freelance').selectOption('GBP')
+  await expect(dlg.getByTestId('third-currency')).toHaveText('"Freelance" has a conversion recorded in Nov 2026, so its currency stays USD. Remove the conversion there first.')
+  await expect(dlg.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  await dlg.getByLabel('Currency of Freelance').selectOption('USD')
+
+  // removed, the month's rate counts again
+  await line.getByRole('button', { name: 'Remove' }).click()
+  await expect(dlg.getByRole('button', { name: 'Record the conversion…' })).toBeVisible()
+  await dlg.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(dlg).toBeHidden()
+  await expect(row).toContainText('€800.00')
+
+  // euros and a rate: the amount in dollars follows into its field
+  await row.getByRole('button', { name: /^Freelance:/ }).click()
+  await dlg.getByRole('button', { name: 'Record the conversion…' }).click()
+  await panel.getByLabel('In EUR').fill('750')
+  await panel.getByLabel('Rate, USD for 1 EUR').fill('1.2')
+  await expect(dlg.getByLabel('Amount in USD')).toHaveValue('900')
+  await expect(panel).toContainText('$900.00 = €750.00.')
+
+  // itemized, each item has its own
+  await dlg.getByRole('tab', { name: 'Itemized' }).click()
+  await dlg.getByRole('button', { name: 'Record the conversion of this item…' }).click()
+  await dlg.getByLabel('In EUR of this item').fill('790')
+  await expect(dlg.getByLabel('Rate, USD for 1 EUR of this item')).toHaveValue('1.2658')
+  await dlg.getByRole('button', { name: 'Done', exact: true }).click()
+  await dlg.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(dlg).toBeHidden()
+  await expect(row).toContainText('€790.00')
+})
+
 test('a foreign-currency account shows its household-currency value beneath', async ({ page }) => {
   // the rate service cannot be reached: the rate is typed by hand
   await page.route('https://api.frankfurter.dev/**', (r) => r.abort())

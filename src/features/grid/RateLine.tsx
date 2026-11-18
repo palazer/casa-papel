@@ -14,9 +14,10 @@ import { useMonthRate } from './useMonthRate'
  * Under an amount typed in another currency (DESIGN.md §8): what it is in the household currency, at which rate and from
  * where, with the chip tones of the rates table. "Change this month's rate…" sets one rate per currency per month by hand;
  * "Use the ECB rate again" drops it and fetches that month afresh. The Statement shows the same rate as a chip in its
- * toolbar (`RateChip`).
+ * toolbar (`RateChip`). Where the amount's recorded conversion counts instead (rule X10, `recorded`), the line leaves out
+ * what the amount is about at the month's rate: the conversion's own line says what it counts as.
  */
-export function RateLine({ tables, household, month, currency, amount }: { tables: Tables; household: Household; month: MonthKey; currency: string; amount: Money }) {
+export function RateLine({ tables, household, month, currency, amount, recorded = false }: { tables: Tables; household: Household; month: MonthKey; currency: string; amount: Money; recorded?: boolean }) {
   const { base, locale, fx, info, rec, tag, readable, busy, error, setError, save, restore } = useMonthRate(tables, household, month, currency)
   const inputId = useId()
   const inBase = info ? convertMoney(fx, amount, currency, base, month).value : null
@@ -29,7 +30,7 @@ export function RateLine({ tables, household, month, currency, amount }: { table
     <div className="space-y-1 text-xs text-muted-foreground" data-testid="rate-line">
       <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 tabular-nums">
         {info && inBase != null
-          ? <><span>≈ {formatAmount(inBase, base, locale)}</span><span aria-hidden>·</span><span>{readable.text}</span><span aria-hidden>·</span></>
+          ? <>{!recorded && <><span>≈ {formatAmount(inBase, base, locale)}</span><span aria-hidden>·</span></>}<span>{readable.text}</span><span aria-hidden>·</span></>
           : <span>No {currency} rate for {formatMonth(month, locale)} yet.</span>}
         <Chip tone={TAG_TONE[tag]}>{tag}</Chip>
         {rec?.date && <span>{formatDay(rec.date, locale)}</span>}

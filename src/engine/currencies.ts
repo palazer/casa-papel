@@ -120,6 +120,27 @@ export function amountUnits(tables: Tables, row: Row): AmountUnit[] {
   return v ? unitsIn(v, row) : []
 }
 
+/**
+ * The other currency of a conversion recorded for one of a row's amounts (rule X10): the currency the money is really
+ * changed into or out of on its way, besides the household's. Null where nothing is changed (a dollar expense paid out
+ * of a dollar account, a euro expense from the month's income) and where the amount spans three currencies (data
+ * stored before rule X15). `source` is the amount's own, for an expense; `currency` the one it is typed in.
+ */
+export function conversionCurrency(tables: Tables, row: Row, source: FundedBy = row.defaultFundedBy, currency?: string): string | null {
+  const v = viewOf(tables)
+  if (!v) return null
+  const own = ownEnd(v, row)
+  const spends = row.section === 'expense' && !BOOKED_BY_KIND.has(row.kind)
+  const from = spends ? sourceEnd(v, source) : null
+  const ends = [own, from].filter((e): e is AmountEnd => e != null)
+  // the current accounts are in the household's currency: every amount goes through them, except an expense paid
+  // out of an account or bought on a card
+  const viaCurrent = !(spends && (from != null || own?.way === 'out-of'))
+  const on = new Set([currency ?? currencyOf(v, row), ...ends.map((e) => e.account.currency), ...(viaCurrent ? [v.home] : [])])
+  if (on.size !== 2 || !on.has(v.home)) return null
+  return [...on].find((c) => c !== v.home) ?? null
+}
+
 /** The currencies an amount involves: its own, the household's, and those of the accounts at its ends. */
 export function unitCurrencies(unit: AmountUnit, home: string): Set<string> {
   return new Set([home, unit.currency, ...unit.ends.map((e) => e.account.currency)])

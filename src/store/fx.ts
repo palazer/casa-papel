@@ -202,6 +202,22 @@ export async function setManualRate(store: Store, pair: string, month: MonthKey,
  * a stale fetched one). Only that month is written. A month to come has nothing to fetch: what is stored for it goes,
  * and the month is a forecast again.
  */
+/**
+ * The official rate of one day, for a conversion recorded at it (rule X10): how many of `foreign` one `base` buys, and
+ * the day the rate is of. The service is asked for that day alone and answers with the last day it published on or
+ * before it, so a weekend or a holiday takes the working day before. Only the two codes and the date are sent.
+ */
+export async function fetchDayRate(base: string, foreign: string, day: string, fetchFn: typeof fetch = fetch, timeoutMs: number = RATE_TIMEOUT_MS): Promise<{ rate: number; date: string }> {
+  const get = withDeadline(fetchFn, timeoutMs, 'The rate service did not answer. Try again.')
+  const res = await get(`https://api.frankfurter.dev/v1/${day}..${day}?base=${encodeURIComponent(base)}&symbols=${encodeURIComponent(foreign)}`)
+  if (res.status === 404 || res.status === 422) throw new Error(`The European Central Bank publishes no ${foreign} rate.`)
+  if (!res.ok) throw new Error(`The rate service answered ${res.status}. Try again later.`)
+  const json = (await res.json()) as { rates?: Record<string, Record<string, number>> }
+  const found = Object.entries(json.rates ?? {}).filter(([date, rates]) => date <= day && rates[foreign] > 0).sort(([a], [b]) => (a < b ? -1 : 1)).at(-1)
+  if (!found) throw new Error(`The European Central Bank published no ${foreign} rate on or before ${day}.`)
+  return { rate: found[1][foreign], date: found[0] }
+}
+
 export async function restoreEcbRate(store: Store, pair: string, month: MonthKey, fetchFn: typeof fetch = fetch): Promise<FetchResult> {
   const tables = await loadTables(store)
   const household = tables.household.find((h) => !h.deletedAt)

@@ -207,7 +207,9 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   dialog, §8).
 - A cell in another currency is two lines: the typed amount over a `text-[10px] leading-3` muted `≈ €3,120` in the household
   currency at that month's rate (the cell button becomes `flex-col items-end`; the certainty styling stays on the amount
-  line; the `aria-label` says `, about €3,120`). The label keeps the currency code, a follower's too. A foreign account's
+  line; the `aria-label` says `, about €3,120`). Where the whole amount was recorded as converted (rule X10) the line
+  reads `= €3,000` and the `aria-label` `, recorded as €3,000`: what it came to, not what it is about. The label keeps
+  the currency code, a follower's too. A foreign account's
   balance row has a muted `in EUR` sub-row like `Deposited`; the Statement counts the account in the household currency.
 - An income cell with deductions shows `net €2,775` as its second line in place of the `≈` line (`aria-label` `, net
   €2,775`). A deduction row's label carries the muted tag `out of <income>` with an (i); a follower that takes a share
@@ -638,7 +640,23 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   The cell editor's rate line (`src/features/grid/RateLine.tsx`) sits under an amount in another currency:
   `≈ €3,120.00 · 1 EUR = 1.084 USD · [ECB] 2 Nov 2026` with the table's chip tones, a ghost `xs` "Change this month's
   rate…" that reveals an inline input (one rate per currency per month), and "Use the ECB rate again" while the rate is
-  manual. The ECB day is the latest published one while the month runs and its last working day once it is over. **On the Statement the month's rate is a
+  manual. The ECB day is the latest published one while the month runs and its last working day once it is over.
+  **"Record the conversion…"** (`src/features/grid/ConversionPanel.tsx`, rule X10) stands under a single amount and
+  under each item that is not on a schedule, wherever money is really changed into another currency on its way
+  (`conversionCurrency`): an amount in another currency that goes through the current accounts, or a household-currency
+  amount that moves an account in another; never for a dollar expense out of a dollar account. An outline `xs` button
+  with an (i) opens an inline `rounded-md border` panel, "What the amount came to": `In <other currency>` and
+  `1 EUR = [ ] USD` (read the usual way round, fixed while the panel is open), then `Official rate of [date] [Use]`
+  (the month's last day, or today in a month that runs; the service answers with the last working day on or before
+  it, shown as `ECB rate of <day>`). Of the three figures, the amount as typed, the other amount and the rate, the
+  two typed last give the third, so typing the other amount and the rate writes the amount into its field. A sentence
+  under them says both amounts and that a new rate for the month leaves them alone. `Done` closes the panel, `Cancel`
+  puts back what was there. Recording sets the amount to Done; the dialog's Save stores it with the amount, and no
+  other button saves. Closed, the line reads `= $3,300.00 · 1 EUR = 1.1000 USD · [recorded] 30 Jan 2026 (i)` (sky
+  chip) with ghost `Change…` and `Remove`, and under it, while the amount is not Done, `Counts once the amount is
+  Done; until then the month's rate does.` While it counts, the rate line above it leaves out its `≈ €…`: the
+  conversion's line says what the amount counts as. A row whose month holds a recorded conversion keeps its currency: picking
+  another says which month in the dialog's `role="alert"` line, and Save waits. **On the Statement the month's rate is a
   chip in the toolbar** (`RateChip`, after the legend and before the month's primary action; `data-testid="month-rates"`),
   once for every other currency the month on screen counts in (its rows and accounts, and the current accounts): the
   rate alone, `1 EUR = 1.084 USD` (`No USD rate` while there is none), in the tone of where it came from (zinc ECB or

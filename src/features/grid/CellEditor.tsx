@@ -11,14 +11,14 @@ import { AmountHint } from '@/components/AmountHint'
 import { amountToInput, formatAmount, formatMonth, parseAmount, unreadableAmount } from '@/app/format'
 import { readPref, writePref } from '@/app/prefs'
 import { useStore } from '@/app/store'
-import { cellKey, typedAmount, type EngineOutput } from '@/engine'
+import { cellKey, conversionCurrency, householdFx, rateInfo, typedAmount, type EngineOutput } from '@/engine'
 import { RepeatField } from '@/features/recurring/RepeatField'
 import {
-  addMonths, cadenceOf, canCarryRule, compareMonths, fromMinor, isDue, isTakenFromAccount, newId, nextDue, parseMonth, paysAsExpense, repeatOf, runningSchedules, sameRepeat, toMinor,
-  type CellItem, type Household, type ItemStatus, type MonthKey, type RepeatChoice, type Repeating, type Row, type Tables,
+  addMonths, cadenceOf, canCarryRule, compareMonths, fromMinor, isDue, isTakenFromAccount, isoDateOfToday, lastDayOfMonth, newId, nextDue, parseMonth, paysAsExpense, repeatOf, runningSchedules, sameRepeat, toMinor,
+  type CellItem, type Conversion, type Household, type ItemStatus, type MonthKey, type RepeatChoice, type Repeating, type Row, type Tables,
 } from '@/model'
 import {
-  cellPut, clearCell, derivedRowReason, endRecurringFrom, itemsFromCurrent, oneMonthValuesReplaced, planFollowing, refreshRates, rowInNewCurrency, saveRowMonth, setCellItems, setCellValue, skipRecurringMonth,
+  cellPut, clearCell, currencyHeldReason, derivedRowReason, endRecurringFrom, itemsFromCurrent, oneMonthValuesReplaced, planFollowing, refreshRates, rowInNewCurrency, saveRowMonth, setCellItems, setCellValue, skipRecurringMonth,
   thirdCurrencyReason, type EditScope, type Mutation, type RuleTarget,
 } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
@@ -26,6 +26,7 @@ import { RuleFields, RulePicker } from '@/features/rules/RuleDialog'
 import { ruleFacts, type RuleKind } from '@/features/rules/ruleFacts'
 import { DoneDot } from '@/components/DoneDot'
 import { NativeSelect } from '@/components/NativeSelect'
+import { ConversionPanel } from './ConversionPanel'
 import { RateLine } from './RateLine'
 import { followingEffects, followingText, onlyThisMonthText } from './followingText'
 import { fundingOptions as buildFundingOptions } from './funding'
@@ -132,7 +133,11 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   }
   const [status, setStatus] = useState<StatusChoice>(soloItem ? soloItem.status : 'default')
   const [fundedBy, setFundedBy] = useState<CellItem['fundedBy']>(soloItem ? soloItem.fundedBy : row.defaultFundedBy)
+  /** The conversion recorded for the single amount (rule X10), as the panel has it until Save. */
+  const [conversion, setConversion] = useState<Conversion | null>(soloItem?.conversion ?? null)
   const [items, setItems] = useState<CellItem[]>(() => itemsFromCurrent(cell, row.defaultFundedBy, row.defaultStatus))
+  /** An item's amount field is read once; an amount that follows from its conversion is written in by drawing it anew. */
+  const [amountDrawn, setAmountDrawn] = useState<Record<string, number>>({})
   /** For edited scheduled items: does the change apply only here or from this month on? */
   const [applyTo, setApplyTo] = useState<Record<string, EditScope>>({})
   const [removing, setRemoving] = useState<string | null>(null)
@@ -193,8 +198,19 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
       rowId: row.id, month, mode: 'items', value: null, items: sources.map((s) => ({ ...blankItem(), amount: 0, status: 'projected' as const, fundedBy: s })),
     }, 0)] : []
     if (newCurrency !== undefined) asked.push({ op: 'put', table: 'rows', record: { ...row, currency: newCurrency } })
-    return thirdCurrencyReason(tables, asked)
+    // a month that holds a recorded conversion keeps the row in its currency
+    return (newCurrency !== undefined ? currencyHeldReason(tables, row.id, newCurrency) : null) ?? thirdCurrencyReason(tables, asked)
   }, [tables, row, month, mode, fundedBy, items, newCurrency])
+  // ----- a recorded conversion (rule X10): where money is really changed into another currency on its way -----
+  const rowAsSaved = newCurrency !== undefined ? { ...row, currency: newCurrency } : row
+  const conversionIn = (source: CellItem['fundedBy']) => conversionCurrency(tables, rowAsSaved, source, currency)
+  const fx = useMemo(() => householdFx(tables.fxRates, household), [tables.fxRates, household])
+  const monthRateOf = (foreign: string) => rateInfo(fx, base, foreign, month)?.rate ?? null
+  /** The day whose official rate the panel offers first: the month's last, or today in a month that is not over. */
+  const today = isoDateOfToday()
+  const rateDay = lastDayOfMonth(month) < today ? lastDayOfMonth(month) : today
+  /** The other currency of the single amount's conversion; a recorded one stays offered, to be removed, whatever changed. */
+  const singleForeign = conversionIn(fundedBy) ?? conversion?.foreign ?? null
 
   // the rule fills the months after this one: nothing carries on from a typed amount, and nothing is held for it
   const saveScope: EditScope = ruleRuns ? 'from-now-on' : scope
@@ -263,7 +279,9 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
     }
     // A single amount that is stored as one item keeps what that item holds beside its amount, above all the
     // conversion that was recorded for it (`CellItem.conversion`): built anew field by field, it would lose it.
-    const single: CellItem = { ...(soloItem ? storedItem(soloItem) : blankItem()), amount: minor, status: status === 'default' ? row.defaultStatus : status, fundedBy }
+    // what the item held beside its amount stays; its conversion is the one the panel has now
+    const { conversion: _was, ...kept } = soloItem ? storedItem(soloItem) : blankItem()
+    const single: CellItem = { ...kept, amount: minor, status: status === 'default' ? row.defaultStatus : status, fundedBy, ...(conversion && !onSchedule ? { conversion } : {}) }
     if (onSchedule && !ruleRuns) {
       if (minor === 0) return setError('Type the amount that repeats.')
       if (rhythm.kind === 'months' && rhythm.months.length === 0) return setError('Pick at least one month.')
@@ -272,7 +290,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
     }
     // A plain value takes the row's defaults; any other certainty or source is stored as one unlabelled item, and so
     // is an amount with a recorded conversion: set back from Done it keeps the conversion, which counts again once done.
-    if (status === 'default' && fundedBy === row.defaultFundedBy && !soloItem?.conversion) return void run(saving(() => setCellValue(store, row.id, month, minor, saveScope, rowChange)))
+    if (status === 'default' && fundedBy === row.defaultFundedBy && !conversion) return void run(saving(() => setCellValue(store, row.id, month, minor, saveScope, rowChange)))
     void run(saving(() => setCellItems(store, row.id, month, [single], saveScope, rowChange)))
   }
 
@@ -457,7 +475,21 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                   </div>
                   <AmountHint text={text} currency={currency} locale={locale} />
                   {currencyNote}
-                  {currency !== household.baseCurrency && <RateLine tables={tables} household={household} month={month} currency={currency} amount={parseAmount(text, currency, locale) ?? 0} />}
+                  {currency !== household.baseCurrency && (
+                    <RateLine
+                      tables={tables} household={household} month={month} currency={currency} amount={parseAmount(text, currency, locale) ?? 0}
+                      recorded={!onSchedule && conversion != null && (status === 'default' ? row.defaultStatus : status) === 'done'}
+                    />
+                  )}
+                  {!onSchedule && singleForeign && (
+                    <ConversionPanel
+                      amount={parseAmount(text, currency, locale)} currency={currency} home={base} foreign={singleForeign} value={conversion}
+                      monthRate={monthRateOf(singleForeign)} day={rateDay} locale={locale} done={(status === 'default' ? row.defaultStatus : status) === 'done'}
+                      // recording sets the amount to Done: a conversion says what happened
+                      onChange={(c) => { setConversion(c); if (c) setStatus('done') }}
+                      onAmount={(m) => setText(amountToInput(m, currency, locale))}
+                    />
+                  )}
                 </div>
                 {ruleRuns ? (
                   <p className="text-xs text-muted-foreground" data-testid="rule-runs">This amount is for {formatMonth(month, locale, 'long')} alone. A rule works this row out in every month without a typed amount; to change the rule, open a month it works out.</p>
@@ -542,6 +574,8 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                   /** A change of the schedule from this month on replaces what later months hold of it for themselves: said before saving. */
                   const fromHere = !!schedule && (moved ? choice.kind !== 'none' : edited && applyTo[it.id] === 'from-now-on')
                   const replaces = schedule && fromHere && Number.isFinite(it.amount) ? followingEffects({ replaced: oneMonthValuesReplaced(tables, schedule, month, { amount: it.amount, fundedBy: it.fundedBy }), kept: [] }, locale) : ''
+                  /** The other currency of a conversion of this item; none for one a schedule lands, which the schedule keeps writing. */
+                  const itemForeign = !schedule ? conversionIn(it.fundedBy) ?? it.conversion?.foreign ?? null : null
                   return (
                     <div key={it.id} className={cn('space-y-2 rounded-md border p-2', schedule && 'border-transfer/40')}>
                       {/* the name takes what the other fields leave: they are as narrow as their content allows */}
@@ -553,8 +587,9 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                         </div>
                         <div className="space-y-0.5">
                           <Input
+                            key={amountDrawn[it.id] ?? 0}
                             aria-label="Item amount" inputMode="decimal" placeholder="0"
-                            defaultValue={amountToInput(it.amount, currency, locale)}
+                            defaultValue={Number.isFinite(it.amount) ? amountToInput(it.amount, currency, locale) : typedAmounts[it.id] ?? ''}
                             // an empty field is zero; anything else that cannot be read is kept as such, so saving says so instead of storing zero
                             onChange={(e) => {
                               const typed = e.target.value
@@ -573,6 +608,18 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                         </NativeSelect>
                         <Button size="icon" variant="ghost" aria-label="Remove item" onClick={() => (schedule ? setRemoving(removing === it.id ? null : it.id) : removePlain(it.id))}><Trash2 /></Button>
                       </div>
+                      {itemForeign && (
+                        <ConversionPanel
+                          amount={Number.isFinite(it.amount) ? it.amount : null} currency={currency} home={base} foreign={itemForeign} value={it.conversion ?? null}
+                          monthRate={monthRateOf(itemForeign)} day={rateDay} locale={locale} done={it.status === 'done'} of={`of ${it.label.trim() || 'this item'}`}
+                          onChange={(c) => updateItem(it.id, c ? { conversion: c, status: 'done' } : { conversion: undefined })}
+                          onAmount={(m) => {
+                            updateItem(it.id, { amount: m })
+                            setTypedAmounts((t) => ({ ...t, [it.id]: amountToInput(m, currency, locale) }))
+                            setAmountDrawn((d) => ({ ...d, [it.id]: (d[it.id] ?? 0) + 1 }))
+                          }}
+                        />
+                      )}
                       {schedule && it.label.trim() !== '' && it.label.trim() !== schedule.name && (
                         <p className="text-xs text-muted-foreground" data-testid="rename-note">Renamed from "{schedule.name}" in every month.</p>
                       )}
