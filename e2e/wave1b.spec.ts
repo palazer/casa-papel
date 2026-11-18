@@ -274,6 +274,10 @@ test.describe('wave 1b', () => {
     await dlg.getByLabel('Name', { exact: true }).fill('Car loan')
     await dlg.getByLabel('Type').selectOption('loan')
     await expect(dlg.getByRole('checkbox', { name: 'Add the row that pays it off' })).toBeChecked()
+    // a payment stops at what is owed, so a loan whose balance is tracked says what is owed before it is saved
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg.getByRole('alert')).toContainText('Type what is still owed on the loan, or untick "Track the balance month by month in the grid".')
+    await dlg.getByLabel(/^Owed at the start of/).fill('5000')
     await dlg.getByRole('button', { name: 'Save' }).click()
     // one Save made both; the row asks for its amount, which this household leaves for later
     await expect(dlg.getByRole('heading', { name: 'Car loan – Payment · November 2026' })).toBeVisible()

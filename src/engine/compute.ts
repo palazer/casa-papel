@@ -271,6 +271,110 @@ export function computeEngine(input: EngineInput): EngineOutput {
     }
   }
 
+  /** A balance in the base currency; a missing rate leaves it 1:1 and warns once per account. */
+  const inBase = (acc: Account, balance: Money, m: MonthKey): { balanceBase: Money; missingRate: boolean } => {
+    const conv = convertMoney(fx, balance, acc.currency, base, m)
+    if (conv.missingRate) warnOnce(acc.id, `No ${acc.currency}→${base} rate for ${m} (${acc.name})`)
+    return { balanceBase: conv.value, missingRate: conv.missingRate }
+  }
+
+  // An account's balance is kept in the account's own currency, so whatever moves it is counted in that currency:
+  // as it was typed when the amount is in it already, at the month's rate otherwise. An account in the base currency
+  // takes the base figures, the ones the Statement shows.
+
+  /** A row's amount of a month in an account's currency. */
+  const inAccountCurrency = (acc: Account, c: CellResult, m: MonthKey): Money => {
+    const conv = convertMoney(fx, c.value, c.currency, acc.currency, m)
+    if (conv.missingRate) warnOnce(`${acc.id}|${c.currency}`, `No ${c.currency}→${acc.currency} rate for ${m} (${acc.name})`)
+    return conv.value
+  }
+
+  // ---------- loans: a payment stops at what is owed ----------
+  // Before the month's sums, because they, the estimates and the rest of the month all read the payment. A loan's
+  // balance needs nothing from the sums: what was owed, its payments, and the real balances typed for it. Month by
+  // month the payments take what is still owed, in the Grid's order; what does not fit is cut from the cell, which
+  // keeps what was planned in `asked`. The stored amounts stay as they are, so when a real balance raises what is
+  // owed, the payments count again by themselves.
+  const loanSeries: Record<string, AccountSeries> = {}
+  {
+    const loans = accounts.filter((a) => a.type === 'loan' && a.tracked)
+    /** Put another amount into a cell, with everything that follows from it scaled the same way. */
+    const setAmount = (c: CellResult, value: Money): void => {
+      const f = c.value !== 0 ? value / c.value : 0
+      const scale = (x: Money): Money => Math.round(x * f)
+      const scaleFunding = (fu: Funding): Funding => ({
+        cash: scale(fu.cash), savings: scale(fu.savings),
+        pools: Object.fromEntries(Object.entries(fu.pools).map(([k, v]) => [k, scale(v)])),
+        accounts: Object.fromEntries(Object.entries(fu.accounts).map(([k, v]) => [k, scale(v)])),
+      })
+      c.valueBase = c.currency === base ? value : scale(c.valueBase)
+      c.netBase = c.valueBase - c.deductionsBase
+      c.funding = scaleFunding(c.funding)
+      c.fundingOwn = scaleFunding(c.fundingOwn)
+      // the items give way in their order: the first ones count, the later ones are what no longer fits
+      let left = value
+      c.items = c.items.map((it) => {
+        if (it.skipped || it.effectiveAmount <= 0) return it
+        const counts = Math.max(0, Math.min(it.effectiveAmount, left))
+        left -= counts
+        return counts === it.effectiveAmount ? it : { ...it, effectiveAmount: counts }
+      })
+      c.value = value
+    }
+    const paymentsOf = new Map(loans.map((a) => [a.id, rows.filter((r) => r.kind === 'debt-payment' && r.accountId === a.id)]))
+    const followersOf = (rowId: string) => rows.filter((r) => r.followsRowId === rowId && !rules.byRow.get(r.id))
+    const owed = new Map<string, Money>()
+    for (const acc of loans) loanSeries[acc.id] = { accountId: acc.id, currency: acc.currency, liability: true, ...(isOutsideNetWorth(acc) ? { outside: true as const } : {}), months: {} }
+    for (const m of months) {
+      const open = loans.filter((a) => compareMonths(m, a.openingMonth) >= 0 && !(a.archivedMonth && compareMonths(m, a.archivedMonth) >= 0))
+      const paid = new Map<string, Money>()
+      const room = new Map<string, Money>()
+      const live = (acc: Account, follower: boolean) => (paymentsOf.get(acc.id) ?? []).flatMap((row) => {
+        const c = cells[cellKey(row.id, m)]
+        const follows = row.followsRowId != null && !rules.byRow.get(row.id)
+        return c && c.value !== 0 && c.source !== 'archived' && follows === follower ? [{ row, c }] : []
+      })
+      // an amount below zero is money drawn again: it raises what is owed, and is never cut
+      for (const acc of open) {
+        const start = owed.get(acc.id) ?? acc.openingBalance
+        let drawn: Money = 0
+        for (const follower of [false, true]) for (const { c } of live(acc, follower)) if (c.value < 0) drawn += inAccountCurrency(acc, c, m)
+        paid.set(acc.id, drawn)
+        room.set(acc.id, Math.max(0, start - drawn))
+      }
+      // rows that follow another row are read after it, so one that mirrors a payment mirrors what counted
+      for (const follower of [false, true]) {
+        for (const acc of open) {
+          for (const { row, c } of live(acc, follower)) {
+            if (c.value < 0) continue
+            const asked = inAccountCurrency(acc, c, m)
+            const left = room.get(acc.id) ?? 0
+            const counts = Math.min(asked, left)
+            room.set(acc.id, left - counts)
+            paid.set(acc.id, (paid.get(acc.id) ?? 0) + counts)
+            if (counts === asked) continue
+            c.asked = c.value
+            c.askedBase = c.valueBase
+            setAmount(c, c.currency === acc.currency ? counts : Math.round(c.value * (counts / asked)))
+            for (const f of followersOf(row.id)) {
+              const fc = cells[cellKey(f.id, m)]
+              if (fc && fc.source === 'derived') setAmount(fc, scaleMoney(c.value, f.followShare ?? 1))
+            }
+          }
+        }
+      }
+      for (const acc of open) {
+        const start = owed.get(acc.id) ?? acc.openingBalance
+        const outflow = paid.get(acc.id) ?? 0
+        const computed: Money = start - outflow
+        const actual = actuals.get(`${acc.id}|${m}`)?.actualBalance ?? null
+        const balance: Money = actual ?? computed
+        loanSeries[acc.id].months[m] = { start, computed, entered: actual != null, balance, adjustment: actual != null ? actual - computed : 0, inflow: 0, outflow, projected: actual == null, ...inBase(acc, balance, m) }
+        owed.set(acc.id, balance)
+      }
+    }
+  }
+
   // ---------- category estimates: what a category's rows have not explained yet ----------
   // After pass 1 as a whole, so every row of the category has its amount. The typed estimate keeps carrying forward
   // (pass 1 did that); what counts this month is the estimate minus the category's spending rows, never below zero:
@@ -503,23 +607,6 @@ export function computeEngine(input: EngineInput): EngineOutput {
     poolSeries[pool.id] = series
   }
 
-  /** A balance in the base currency; a missing rate leaves it 1:1 and warns once per account. */
-  const inBase = (acc: Account, balance: Money, m: MonthKey): { balanceBase: Money; missingRate: boolean } => {
-    const conv = convertMoney(fx, balance, acc.currency, base, m)
-    if (conv.missingRate) warnOnce(acc.id, `No ${acc.currency}→${base} rate for ${m} (${acc.name})`)
-    return { balanceBase: conv.value, missingRate: conv.missingRate }
-  }
-
-  // An account's balance is kept in the account's own currency, so whatever moves it is counted in that currency:
-  // as it was typed when the amount is in it already, at the month's rate otherwise. An account in the base currency
-  // takes the base figures, the ones the Statement shows.
-
-  /** A row's amount of a month in an account's currency. */
-  const inAccountCurrency = (acc: Account, c: CellResult, m: MonthKey): Money => {
-    const conv = convertMoney(fx, c.value, c.currency, acc.currency, m)
-    if (conv.missingRate) warnOnce(`${acc.id}|${c.currency}`, `No ${c.currency}→${acc.currency} rate for ${m} (${acc.name})`)
-    return conv.value
-  }
   /** What one source paid in a month (`MonthTotals.fundedOwn`), in an account's currency: a dollar expense lowers a dollar account by exactly its dollars. */
   const ownIn = (acc: Account, source: FundedBy, m: MonthKey): Money => {
     let paid: Money = 0
@@ -655,6 +742,11 @@ export function computeEngine(input: EngineInput): EngineOutput {
     // Cash always has a balance: while it counted with the current accounts it was stored as untracked, with no say
     // in it, so the flag of a cash account says nothing.
     if (!acc.tracked && acc.type !== 'cash') continue
+    // a loan's months were worked out before the month's sums, with its payments cut at what was owed
+    if (acc.type === 'loan') {
+      accountSeries[acc.id] = loanSeries[acc.id]
+      continue
+    }
     const series: AccountSeries = { accountId: acc.id, currency: acc.currency, liability, ...outsideOf(acc), months: {} }
     let prevBalance: Money | null = null
     for (const m of months) {
@@ -675,13 +767,6 @@ export function computeEngine(input: EngineInput): EngineOutput {
           if (!itemized) continue
           if (row.kind === 'card-payment') outflow += inAccountCurrency(acc, c, m)
           else if (row.section === 'expense') inflow += inAccountCurrency(acc, c, m)
-        }
-      } else if (acc.type === 'loan') {
-        for (const row of rows) {
-          if (row.accountId !== acc.id || row.kind !== 'debt-payment') continue
-          const c = cells[cellKey(row.id, m)]
-          if (!c || c.value === 0 || c.source === 'archived') continue
-          outflow += inAccountCurrency(acc, c, m)
         }
       }
       // an other asset falls by what expenses took straight out of it, and rises by pocket money that lands in it

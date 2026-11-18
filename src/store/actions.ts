@@ -1,5 +1,5 @@
 import { generateKeyBetween } from 'fractional-indexing'
-import { computeEngine, cellKey, sortRows, type EngineOutput } from '@/engine'
+import { computeEngine, cellKey, sortRows, typedAmount, type EngineOutput } from '@/engine'
 import {
   ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RowSchema, accountIdOf, addMonths, canCarryRule, canTakeRest, cardIsItemized, compareMonths, isOldPocketShare, isOutsideNetWorth, isShareRule, monthKey, monthOfDate, monthRange, newId, parseMonth, paysExpenses, poolIdOf, resolveRules, sharePercent,
   type Account, type Category, type Cell, type CellInput, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Pool, type Row, type RowKind, type Tables,
@@ -61,8 +61,9 @@ export function freezeNext(tables: Tables, engine: EngineOutput, rowId: string, 
   if (!current) return []
   if (nextCell && nextCell.mode !== 'inherit') return []
   // A row that had no amount yet goes back to none after this month: without the zero the new amount would carry on.
-  // A category's estimate carries what was typed, not what its rows have left of it.
-  const held = current.source === 'empty' ? 0 : current.estimate ?? current.value
+  // A category's estimate carries what was typed, not what its rows have left of it; a payment to a loan what was
+  // planned, not what was still owed.
+  const held = current.source === 'empty' ? 0 : typedAmount(current)
   return [putCell({ rowId, month: next, mode: 'value', value: held, items: [], note: null, currencyOverride: null, updatedAt: now() })]
 }
 
@@ -126,13 +127,14 @@ export async function clearCell(store: Store, rowId: string, month: MonthKey): P
 }
 
 /** Turn whatever the cell shows into an items list so single entries can be added. */
-export function itemsFromCurrent(engineCell: { source: string; value: Money; items: CellItem[] } | undefined, defaultFundedBy: CellItem['fundedBy'], defaultStatus: ItemStatus): CellItem[] {
+export function itemsFromCurrent(engineCell: { source: string; value: Money; asked?: Money; items: CellItem[] } | undefined, defaultFundedBy: CellItem['fundedBy'], defaultStatus: ItemStatus): CellItem[] {
   if (!engineCell || engineCell.source === 'empty' || engineCell.source === 'archived') return []
   if (engineCell.source === 'items') return engineCell.items.map(({ ...it }) => ({ ...it }))
   if (engineCell.source === 'inherit') {
     return [{ id: newId(), label: '', amount: 0, status: defaultStatus, fundedBy: defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'carry', skipped: false }]
   }
-  return [{ id: newId(), label: '', amount: engineCell.value, status: defaultStatus, fundedBy: defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }]
+  // what was planned, where a payment to a loan counts for less because less was owed
+  return [{ id: newId(), label: '', amount: engineCell.asked ?? engineCell.value, status: defaultStatus, fundedBy: defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }]
 }
 
 export async function setItemStatus(store: Store, rowId: string, month: MonthKey, itemId: string, status: ItemStatus): Promise<void> {
@@ -451,7 +453,7 @@ export function closeMonthMutations(tables: Tables, engine: EngineOutput, househ
     const c = engine.cells[cellKey(row.id, month)]
     if (!c || c.source === 'derived' || c.source === 'archived' || c.source === 'empty') continue
     if (c.source === 'inherit') {
-      mutations.push(putCell({ rowId: row.id, month, mode: 'value', value: c.value, items: [], note: null, currencyOverride: null, updatedAt: now() }))
+      mutations.push(putCell({ rowId: row.id, month, mode: 'value', value: typedAmount(c), items: [], note: null, currencyOverride: null, updatedAt: now() }))
     } else if (c.source === 'items' && c.cell) {
       if (c.cell.items.some((it) => it.status !== 'done' && !it.skipped)) {
         mutations.push(putCell({ ...c.cell, items: c.cell.items.map((it) => (it.skipped ? it : { ...it, status: 'done' })) }))
@@ -549,9 +551,9 @@ export async function setCellDone(store: Store, rowId: string, month: MonthKey, 
   const items: CellItem[] =
     existing?.mode === 'items'
       ? existing.items.map((it) => (it.skipped ? it : { ...it, status }))
-      : current.value === 0
+      : typedAmount(current) === 0
         ? []
-        : [{ id: newId(), label: '', amount: current.value, status, fundedBy: row.defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }]
+        : [{ id: newId(), label: '', amount: typedAmount(current), status, fundedBy: row.defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }]
   if (items.length === 0 && !existing) return
   await store.commit([putCell({ rowId, month, mode: 'items', value: null, items, note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, updatedAt: now() })])
 }
@@ -650,10 +652,10 @@ export function planRowFundedBy(tables: Tables, row: Row, fundedBy: FundedBy, sc
       const engine = computeEngine({ tables: open, months })
       for (const m of months) {
         const c = engine.cells[cellKey(row.id, m)]
-        if (!c || (c.source !== 'value' && c.source !== 'inherit') || c.value === 0) continue
+        if (!c || (c.source !== 'value' && c.source !== 'inherit') || typedAmount(c) === 0) continue
         const existing = cellOf(tables, row.id, m)
         const item: CellItem = {
-          id: newId(), label: '', amount: c.value, status: c.status === 'derived' ? row.defaultStatus : c.status, fundedBy: row.defaultFundedBy,
+          id: newId(), label: '', amount: typedAmount(c), status: c.status === 'derived' ? row.defaultStatus : c.status, fundedBy: row.defaultFundedBy,
           date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false,
         }
         mutations.push({ op: 'put', table: 'cells', record: CellSchema.parse({ rowId: row.id, month: m, mode: 'items', value: null, items: [item], note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, markedDone: existing?.markedDone ?? false, updatedAt: ts }) })

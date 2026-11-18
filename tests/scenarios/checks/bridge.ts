@@ -132,6 +132,10 @@ export function bridgeOf(view: View, m: MonthKey): Bridge {
       if (before) count('accounts starting or ending', -before.balanceBase)
       continue
     }
+    // rule C1: a payment stops at what is owed, so the rows never take a loan below nothing
+    if (acc?.type === 'loan' && r.start >= 0 && r.computed < 0) {
+      problems.push(`"${acc.name}" was paid down to ${moneyText(r.computed)} in ${monthName(m)}: a payment to a loan stops at what is owed.`)
+    }
     const foreign = series.currency !== base
     const opening = before ? 0 : inBase(series.currency, r.start)
     const growth = inBase(series.currency, r.computed - r.start - r.inflow + r.outflow)

@@ -317,7 +317,18 @@ The order within a month: percentages of the income, what is kept, percentages o
     owed at the end = owed at the start − paid
 
 Net worth does not change: the current accounts and the debt fall by the same amount. The plan works out no
-interest: a real balance says what is really owed (B5). Finding F4 belongs here.
+interest: a real balance says what is really owed (B5).
+
+A payment stops at what is owed. The last one is what is still owed, and after it the payment counts as nothing: not
+in the month's expenses, not in what is left, not in the current accounts. What was planned stays stored, so the
+payments count again when a real balance says more is owed (finding F4, closed).
+
+    owes 600.00, 250.00 planned a month: 250.00, 250.00, 100.00 count, then nothing
+    several rows to one loan take what is owed in the Grid's order
+    a loan in another currency is counted in that currency, so it ends on exactly nothing
+
+Not cut: a loan whose balance is not tracked, a payment row that names no loan, the months before the loan starts,
+and an amount below zero, which is money drawn again and raises what is owed.
 
 **C2. A card whose purchases are expense rows.** A purchase is an expense of its month and raises what is owed. The
 cash stays in the current accounts until the card is paid. The payment moves money and is no expense: the current

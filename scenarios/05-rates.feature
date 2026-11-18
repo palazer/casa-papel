@@ -199,6 +199,18 @@ Feature: Amounts and accounts in another currency
     When I hold the forecast for EUR/USD at the last known rate
     Then the forecast rate for EUR/USD in December 2026 is 1.0000
 
+  # A payment in euros to a loan in dollars: what is owed is counted in dollars, so the loan ends on exactly nothing,
+  # and the last payment is what those dollars cost in euros that month.
+  @X5 @C1 @F4
+  Scenario: The last payment to a loan in another currency is what is still owed, at that month's rate
+    Given a loan "Dollar loan" in USD of 330.00, paid off with 200.00 a month from January 2026
+    Then "Dollar loan" ends January 2026 with 110.00
+    And "Dollar loan – Payment" is 200.00 in January 2026
+    And "Dollar loan – Payment" is 88.00 in February 2026
+    And "Dollar loan – Payment" is 0.00 in March 2026
+    And "Dollar loan" ends February 2026 with 0.00
+    And "Dollar loan" ends December 2026 with 0.00
+
   @X14 @planned
   Scenario: A virtual account in a dollar savings account is kept in dollars
     Given a savings account "Dollar savings" in USD holding 1,100.00

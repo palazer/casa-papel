@@ -59,7 +59,7 @@ export function HouseholdScreen() {
       <ArchivedRowsCard household={household} tables={tables} onError={setError} />
       <FxCard household={household} tables={tables} months={months} onError={setError} />
       <Island air tone={HUES.transfer} title="Schedules" description="Recurring payments and incomes: rent, salary, insurance, subscriptions, anything on a schedule. They land in the grid by themselves and show up in Moves when due.">
-        <RecurringList />
+        <RecurringList engine={engine} />
       </Island>
     </div>
   )

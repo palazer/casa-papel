@@ -2586,6 +2586,7 @@ test.describe('the Statement on a phone', () => {
     await moneyOut.getByRole('button', { name: 'Add', exact: true }).tap()
     await dlg.getByLabel('Name', { exact: true }).fill('Car loan')
     await expect(dlg.getByTestId('acc-row')).toHaveText('Saving also adds the row "Car loan – Payment", linked to this account.')
+    await dlg.getByLabel(/^Owed at the start of/).fill('5000')
     await expect(dlg).toHaveCSS('opacity', '1')
     await page.screenshot({ path: 'e2e/output/statement-row-first-account-phone.png' })
     await dlg.getByRole('button', { name: 'Save' }).tap()

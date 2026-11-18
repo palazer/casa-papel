@@ -189,6 +189,8 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
       {line.net != null && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">net {formatAmount(line.net, ccy, locale)}</span>}
       {line.budget != null && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">estimate {formatAmount(line.budget, ccy, locale)}</span>}
       {line.chip && <Chip tone="zinc">{line.chip}</Chip>}
+      {/* a payment to a loan that counts for less than was planned: what was planned, beside the "paid off" chip */}
+      {line.planned && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground" data-planned>{formatAmount(line.planned.amount, line.planned.currency, locale)} planned</span>}
       {!!line.paidFor?.length && <span className="min-w-0 max-w-64 truncate text-[11px] text-muted-foreground" title={line.paidFor.join(', ')}>for {line.paidFor.join(', ')}</span>}
       {line.ownName && <span className="min-w-0 max-w-64 truncate text-[11px] text-muted-foreground" title={line.ownName}>{line.ownName}</span>}
       {line.note && <span className="min-w-0 max-w-64 truncate text-[11px] text-muted-foreground" title={line.note}>{line.note}</span>}

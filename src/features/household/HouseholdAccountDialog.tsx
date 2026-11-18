@@ -119,6 +119,10 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
   async function save() {
     const openingBalance = opening.trim() ? parseAmount(opening, ccy, locale) : 0
     if (openingBalance == null) return setError(unreadableAmount(opening, `"${balanceWord(type)} at the start" is not a number I can read.`))
+    // a payment to a loan stops at what is owed, so a loan that says nothing about it would take no payment at all
+    if (type === 'loan' && trackable && tracked && !opening.trim()) {
+      return setError('Type what is still owed on the loan, or untick "Track the balance month by month in the grid". A payment stops at what is owed, so with nothing owed the payments to this loan would count as nothing.')
+    }
     const annualRate = Number(annual.replace(',', '.')) / 100
     if (type === 'investment' && !Number.isFinite(annualRate)) return setError('Growth per year is not a number.')
     const fixed = Number(fixedRate.replace(',', '.'))
@@ -164,7 +168,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
             <Input id="acc-open" className="sm:w-1/2" inputMode="decimal" value={opening} onChange={(e) => setOpening(e.target.value)} placeholder="0" />
             <AmountHint text={opening} currency={ccy} locale={locale} />
             <p className="text-xs text-muted-foreground">
-              {type === 'loan' ? 'What is still owed. A payment row that names this loan brings it down.'
+              {type === 'loan' ? 'What is still owed. A payment row that names this loan brings it down, and stops counting once nothing is owed.'
                 : type === 'credit-card' ? 'What you owed on the card when the month began.'
                 : type === 'other-asset' ? 'What it is worth. Enter a real value from its line whenever that changes.'
                 : 'From then on every month starts with what the month before ended on. Press the account\'s amount in a month to type what it really held at the start and at the end.'}

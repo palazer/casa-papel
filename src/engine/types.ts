@@ -62,8 +62,23 @@ export interface CellResult {
    */
   estimate?: Money
   estimateBase?: Money
+  /**
+   * A payment to a loan that was cut because less was still owed: what was planned (typed, carried or scheduled), in
+   * the row's currency and in the base currency. `value` and `valueBase` are what counts: what was still owed, or
+   * nothing once the loan is paid off. Left out when the payment counts in full.
+   */
+  asked?: Money
+  askedBase?: Money
   cell: Cell | null
 }
+
+/**
+ * What a cell was given: typed, carried from the month before, or scheduled. The engine makes two kinds of cell count
+ * for less than that: a category's estimate (by what its rows explain) and a payment to a loan (by what is still
+ * owed). Whoever copies a month's amount into a stored cell copies this, so the cut stays the engine's to make again:
+ * a payment written down as what counted would never count in full again.
+ */
+export const typedAmount = (c: Pick<CellResult, 'value' | 'estimate' | 'asked'>): Money => c.estimate ?? c.asked ?? c.value
 
 export interface MonthTotals {
   month: MonthKey

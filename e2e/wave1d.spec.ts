@@ -58,7 +58,7 @@ test.describe('wave 1d', () => {
     await page.getByRole('button', { name: 'Add account' }).click()
     await dlg.getByLabel('Name', { exact: true }).fill('Car loan')
     await dlg.getByLabel('Type').selectOption('loan')
-    await expect(dlg.getByText('What is still owed. A payment row that names this loan brings it down.')).toBeVisible()
+    await expect(dlg.getByText('What is still owed. A payment row that names this loan brings it down, and stops counting once nothing is owed.')).toBeVisible()
     await dlg.getByLabel('Owed at the start of September 2026 (EUR)').fill('5000')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()

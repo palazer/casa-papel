@@ -1,4 +1,4 @@
-import { cellKey, computeEngine } from '@/engine'
+import { cellKey, computeEngine, typedAmount } from '@/engine'
 import {
   CellSchema, RecurringItemSchema, addMonths, compareMonths, isDue, newId,
   type Cell, type CellItem, type MonthKey, type RecurringItem, type Row, type Tables,
@@ -116,8 +116,8 @@ export function pinCarriedMonths(tables: Tables, rowId: string, before: MonthKey
   const out: Mutation[] = []
   for (const m of months) {
     const c = engine.cells[cellKey(rowId, m)]
-    if (!c || c.source !== 'inherit' || c.value === 0 || engine.totals[m]?.closed) continue
-    out.push({ op: 'put', table: 'cells', record: CellSchema.parse({ rowId, month: m, mode: 'value', value: c.value, items: [], note: c.cell?.note ?? null, currencyOverride: c.cell?.currencyOverride ?? null, updatedAt: ts }) })
+    if (!c || c.source !== 'inherit' || typedAmount(c) === 0 || engine.totals[m]?.closed) continue
+    out.push({ op: 'put', table: 'cells', record: CellSchema.parse({ rowId, month: m, mode: 'value', value: typedAmount(c), items: [], note: c.cell?.note ?? null, currencyOverride: c.cell?.currencyOverride ?? null, updatedAt: ts }) })
   }
   return out
 }

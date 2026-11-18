@@ -302,7 +302,9 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   when there is no room: a zinc chip with the currency code and the original amount in muted `text-[11px]` for a
   line in another currency (the amount column is always the household currency), a rose `no rate` chip, `net €…`
   on an income with deductions, and a zinc chip for what the line is (`automatic`, `calculated`,
-  `counted when bought` on a card payment that is shown muted and left out of the sum). Virtual accounts sit by name
+  `counted when bought` on a card payment that is shown muted and left out of the sum, `paid off` on a payment to
+  a loan that owes less than the payment or nothing, followed by what was planned as a muted `€250.00 planned`; the
+  amount column shows what counts). Virtual accounts sit by name
   under the savings account that holds them, with `Not set aside` for the rest of it; the right side sums them in
   one `Set aside` line. Below zero, `Not set aside` says why beside its red figure, in the muted note every line
   has: `more is set aside than the account holds`. **An account left out of net worth** (`isOutsideNetWorth`:
@@ -325,7 +327,12 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   all done` for a closed month; a month with nothing in it shows no line. The month is worked in its upper half: a row and each of its items
   carry the `Tick` before the name (44 px on phones, 24 px with a 12 px dot from 768 px), and the rest of the line is
   a button named `<line>: <amount>` (`, an estimate` when shaded) that opens the row's one dialog, the cell editor
-  (§8), for that row and month. An itemized row's chevron is a button of its own, `Items of <row>`. An automatic row
+  (§8), for that row and month. For a payment to a loan that counts for less than was planned, the dialog starts
+  from the planned amount and says why in a muted note under its header (`text-xs`, `bg-muted`, `rounded-md`):
+  `€250.00 is planned. €100.00 was still owed on "Car loan", so €100.00 counts this month.`, and once nothing is
+  owed `"Car loan" is paid off: nothing counts this month.`, each followed by `What is planned stays as it is, and
+  counts again if a real balance raises what is owed.` The list of schedules shows a zinc `paid off` chip, without a
+  tick box, where such a month would say `due`. An itemized row's chevron is a button of its own, `Items of <row>`. An automatic row
   has the tick (it marks the money as moved) and, when a rule works it out, the same button; any other automatic row
   has none; a closed month has neither. A different amount than planned is typed in the cell
   editor ("Only this month", "Done"); there is no quick sheet for it.

@@ -13,7 +13,7 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
 | F1 | An exception in the plan's last month lengthens the plan by a year | small | with step 3 | open, with step 3 |
 | F2 | Money "moved between your accounts" lowers net worth | net worth is wrong | the row names the account that receives it | open |
 | F3 | The month after an exception holds an amount nobody typed | amounts can change by surprise | with step 3 | open, with step 3 |
-| F4 | A loan that is paid off keeps taking payments | net worth is right, the debt reads below zero | the payment stops at what is owed | open |
+| F4 | A loan that is paid off keeps taking payments | net worth is right, the debt reads below zero | the payment stops at what is owed | closed |
 | F5 | A card that records only its payments never lowers net worth | net worth is wrong | payments do not move what is owed | closed |
 | F6 | The Statement's change for a virtual account that ran short | one figure on the Statement | show the change of the balance | closed |
 | F7 | Restoring does not bring back what archiving changed with it | amounts stay changed | restore puts it back | open |
@@ -79,12 +79,25 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
 - **What still holds.** Net worth is right in total: the current accounts are lower by exactly what the "debt" is
   below zero. What is wrong is where the money shows, and that the month's expenses include a payment nobody makes.
 - **What the rule says.** A debt is paid down to nothing, not below (rule C1).
-- **Scenario.** `09-loans-and-cards.feature`: "A loan that is paid off owes nothing, and not less than nothing".
+- **Scenarios.** `09-loans-and-cards.feature`: "A loan that is paid off owes nothing, and not less than nothing",
+  "The last payment to a loan is what is still owed, and after it the payment counts as nothing", "A real balance
+  that raises what is owed makes the payments count again", "Two payments to one loan take what is owed in their
+  order", "Changing a payment that was cut keeps what was planned in the other months"; `05-rates.feature`: "The
+  last payment to a loan in another currency is what is still owed, at that month's rate".
 - **Options.** (a) The payment stops at what is owed: the last payment is what is left of the debt, and the months
   after it show no payment. (b) The payment stays as typed and the app warns in the month the loan is paid off.
   (c) Leave it.
 - **Recommendation.** (a).
-- **Decision.** Yes (17 November 2026): the payment stops at what is owed.
+- **Decision.** Yes (17 November 2026): the payment stops at what is owed. It stops by itself and is marked; the
+  row is not ended, so what was planned stays.
+- **Closed** (18 November 2026). A payment to a loan counts up to what is still owed: 250.00, 250.00, 100.00, then
+  nothing. The month's expenses, what is left, the current accounts and net worth use what counts. The Statement
+  marks the row "paid off" with what was planned beside it, the row's dialog says why, and the list of schedules
+  says "paid off" where it would say "due". What was planned stays stored, so a real balance that says more is owed
+  makes the payments count again. Not cut: a loan whose balance is not tracked, a payment row that names no loan,
+  the months before the loan starts, and an amount below zero (money drawn again, which raises what is owed). The
+  loan form asks for what is owed while the balance is tracked. The checks got one more: rows never take a loan
+  below nothing.
 
 ### F5. A card that records only its payments never lowers net worth
 

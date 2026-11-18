@@ -11,6 +11,13 @@ step('a loan {string} of {money}, paid off with {money} a month from {month}', a
   await setCellValue(world.store, row.id, from, payment, 'from-now-on')
 })
 
+// the same loan kept in another currency; its payment row is typed in the household's currency
+step('a loan {string} in {ccy} of {money}, paid off with {money} a month from {month}', async (world: World, name: string, currency: string, owed: number, payment: number, from: string) => {
+  const { household } = await world.view()
+  const { row } = await addAccountWithRow(world.store, { name, type: 'loan', currency, openingMonth: household.startMonth, openingBalance: owed }, { kind: 'pay-off' })
+  await setCellValue(world.store, row.id, from, payment, 'from-now-on')
+})
+
 // ---------- credit cards ----------
 
 // "What do you record for this card?": "Everything I buy with it"

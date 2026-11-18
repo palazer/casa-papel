@@ -202,4 +202,50 @@ test.describe('whole stories, as the scenarios tell them', () => {
     await expect(s.moneyOut.getByRole('button', { name: /^Amex – Payment: €300\.00/ })).toBeVisible()
     await expect(amex).toContainText('€500.00')
   })
+
+  // scenarios/09: "The last payment to a loan is what is still owed, and after it the payment counts as nothing"
+  test('a loan payment stops at what is owed: the last one is smaller, then the row is marked paid off', async ({ page }) => {
+    const s = await household(page)
+    const claims = page.getByRole('region', { name: 'Debts and net worth' })
+    await claims.getByRole('button', { name: 'Add a card or loan' }).click()
+    await s.dlg.getByLabel('Name', { exact: true }).fill('Car loan')
+    await s.dlg.getByLabel('Type').selectOption('loan')
+    // a payment stops at what is owed, so the form asks for it
+    await s.dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(s.dlg.getByRole('alert')).toContainText('Type what is still owed on the loan')
+    await s.dlg.getByLabel(/^Owed at the start of November 2026/).fill('600')
+    await s.dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(s.dlg.getByRole('heading', { name: 'Car loan – Payment · November 2026' })).toBeVisible()
+    await s.dlg.getByLabel('Amount in EUR').fill('250')
+    await s.dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(s.dlg).toBeHidden()
+    const loan = claims.locator('[data-line^="acc:"]').filter({ hasText: 'Car loan' })
+    const payment = line(s.moneyOut, 'Car loan – Payment')
+    await expect(loan).toContainText('€350.00')
+    await expect(payment).not.toContainText('paid off')
+
+    // December: 250 again, 100 is left. January: only those 100 count, and the month has 150 more left
+    await toMonth(page, 'December 2026')
+    await expect(loan).toContainText('€100.00')
+    await toMonth(page, 'January 2027')
+    await expect(s.moneyOut.getByRole('button', { name: /^Car loan – Payment: €100\.00/ })).toBeVisible()
+    await expect(payment).toContainText('paid off')
+    await expect(payment).toContainText('€250.00 planned')
+    await page.screenshot({ path: 'e2e/output/story-loan-paid-off.png', fullPage: true })
+    await expect(line(s.moneyOut, 'Leftover')).toContainText('€1,700.00')
+    await expect(loan).toContainText('€0.00')
+    // the row's dialog says why, and still holds what was planned
+    await s.moneyOut.getByRole('button', { name: /^Car loan – Payment: €100\.00/ }).click()
+    await expect(s.dlg.getByTestId('paid-off-note')).toHaveText('€250.00 is planned. €100.00 was still owed on "Car loan", so €100.00 counts this month. What is planned stays as it is, and counts again if a real balance raises what is owed.')
+    await expect(s.dlg.getByLabel('Amount in EUR')).toHaveValue(/^250/)
+    await s.dlg.getByRole('button', { name: 'Cancel' }).click()
+    await expect(s.dlg).toBeHidden()
+
+    // February: nothing is owed, so nothing counts, and the row says so
+    await toMonth(page, 'February 2027')
+    await expect(payment).toContainText('paid off')
+    await expect(line(s.moneyOut, 'Leftover')).toContainText('€1,800.00')
+    await payment.getByRole('button', { name: /^Car loan – Payment:/ }).click()
+    await expect(s.dlg.getByTestId('paid-off-note')).toContainText('"Car loan" is paid off: nothing counts this month.')
+  })
 })

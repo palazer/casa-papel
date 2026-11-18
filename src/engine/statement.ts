@@ -127,6 +127,8 @@ export interface StatementLine {
   missingRate?: boolean
   /** The amount in the row's own currency, when that is not the base currency. */
   native?: { amount: Money; currency: string }
+  /** A payment to a loan that counts for less than was planned, because less was still owed: what was planned. The line's chip says `paid off`. */
+  planned?: { amount: Money; currency: string }
   /** Income after its deductions. */
   net?: Money
   goals?: GoalProgress[]
@@ -284,6 +286,8 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
       native: c.currency !== base ? { amount: c.value, currency: c.currency } : undefined,
       net: row.section === 'income' && c.deductionsBase > 0 ? c.netBase : undefined,
       ...(running.length ? { scheduled: true, repeats: repeatsText(running, household!.locale), nextDue: next, upcoming, resting: empty || undefined } : {}),
+      // a payment to a loan that owed less than the payment, or nothing: the line says so, and what was planned
+      ...(c.asked != null ? { chip: 'paid off', planned: { amount: c.asked, currency: c.currency } } : {}),
       rowId: row.id, ...over,
     }
   }

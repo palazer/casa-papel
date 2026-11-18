@@ -9,6 +9,7 @@ import { MonthPicker } from '@/components/MonthPicker'
 import { formatAmount, formatMonth } from '@/app/format'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useTables } from '@/app/useEngine'
+import { cellKey, type EngineOutput } from '@/engine'
 import { describeCadence, monthOfDate, type MonthKey, type RecurringItem } from '@/model'
 import { endRecurringItem, recurringStatus, setRecurringPaid } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
@@ -17,7 +18,10 @@ import { RecurringDialog } from './RecurringDialog'
 const TH = 'px-1.5 py-1 font-semibold text-muted-foreground'
 const TD = 'px-1.5 py-0.5'
 
-export function RecurringList() {
+export function RecurringList({ engine }: {
+  /** The screen's figures, so a payment to a paid-off loan can say that it no longer counts; left out, it says "due". */
+  engine?: EngineOutput | null
+}) {
   const store = useStore()
   const tables = useTables()
   const household = activeHousehold(tables)
@@ -53,6 +57,8 @@ export function RecurringList() {
             {items.map((it) => {
               const status = recurringStatus(tables, it, m)
               const ended = it.endMonth != null && it.endMonth < m
+              // due, but its loan owes less than the payment or nothing: the month counts less, and there is nothing to tick
+              const paidOff = status === 'due' && engine?.cells[cellKey(it.rowId, m)]?.asked != null
               return (
                 <Fragment key={it.id}>
                 <tr className={ended ? 'text-muted-foreground' : ''}>
@@ -62,7 +68,7 @@ export function RecurringList() {
                   <td className={TD}>{describeCadence(it, locale)}</td>
                   <td className={TD}>{accountName(it.accountId)}</td>
                   <td className={TD}>
-                    {status === 'not-due' ? <span className="text-muted-foreground">—</span> : (
+                    {status === 'not-due' ? <span className="text-muted-foreground">—</span> : paidOff ? <Chip tone="zinc">paid off</Chip> : (
                       <Check
                         label={<Chip tone={status === 'paid' ? 'emerald' : status === 'skipped' ? 'zinc' : 'amber'}>{status === 'paid' ? 'paid' : status === 'skipped' ? 'skipped' : 'due'}</Chip>}
                         checked={status === 'paid'}

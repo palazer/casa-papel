@@ -106,7 +106,10 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   // "How sure" on a single amount is stored as one unlabelled item; keep showing it as a single amount
   const soloItem = cell?.source === 'items' && cell.items.length === 1 && cell.items[0].kind === 'normal' && !cell.items[0].label && !cell.items[0].recurringItemId && !cell.items[0].skipped ? cell.items[0] : null
   const [mode, setMode] = useState<Mode>(isRecurringRow || (cell?.source === 'items' && !soloItem) ? 'items' : 'value')
-  const [text, setText] = useState(() => amountToInput(cell?.value ?? 0, stored, locale))
+  // A payment to a loan that owed less than the payment counts for less (`asked` is then what was planned). The form
+  // edits what is planned: that is what is stored, and what counts again once more is owed.
+  const [text, setText] = useState(() => amountToInput(cell ? cell.asked ?? cell.value : 0, stored, locale))
+  const paidOffLoan = cell?.asked != null ? tables.accounts.find((a) => a.id === row.accountId)?.name ?? 'The loan' : null
   // money taken out of an account is a one-off unless you say otherwise; any other row remembers the last choice
   const oneOff = isTakenFromAccount(row)
   const [scope, setScope] = useState<EditScope>(() => (oneOff ? 'this-month' : readPref<EditScope>('editScope', 'from-now-on')))
@@ -184,7 +187,9 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   function prevValue(): number {
     const idx = engine.months.indexOf(month)
     if (idx <= 0) return 0
-    return engine.cells[cellKey(row.id, engine.months[idx - 1])]?.value ?? 0
+    // what the month before was given, also where a paid-off loan made it count for less
+    const before = engine.cells[cellKey(row.id, engine.months[idx - 1])]
+    return before ? before.asked ?? before.value : 0
   }
 
   /** A save of the amount, and of what changed on the row with it; a row that changed category tells the screen. */
@@ -349,6 +354,14 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
             {sourceText}{cell ? ` · currently ${formatAmount(cell.value, stored, locale)}` : ''}
           </DialogDescription>
         </DialogHeader>
+        {cell?.asked != null && paidOffLoan && (
+          <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground" data-testid="paid-off-note">
+            {cell.value > 0
+              ? `${formatAmount(cell.asked, stored, locale)} is planned. ${formatAmount(cell.value, stored, locale)} was still owed on "${paidOffLoan}", so ${formatAmount(cell.value, stored, locale)} counts this month.`
+              : `"${paidOffLoan}" is paid off: nothing counts this month.`}
+            {' '}What is planned stays as it is, and counts again if a real balance raises what is owed.
+          </p>
+        )}
 
         {closed ? (
           <div className="space-y-3">

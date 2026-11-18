@@ -23,12 +23,58 @@ Feature: Loans and credit cards
     And net worth changes by 1,800.00 in February 2026
     And of that, -1,200.00 is "spending"
 
-  @C1 @open @F4
+  @C1 @F4
   Scenario: A loan that is paid off owes nothing, and not less than nothing
     Given a loan "Car loan" of 600.00, paid off with 250.00 a month from January 2026
     Then "Car loan" ends February 2026 with 100.00
     And "Car loan" ends March 2026 with 0.00
     And "Car loan" ends December 2026 with 0.00
+
+  # The payment stops at what is owed: the last one is smaller, and after it nothing counts. The month has that much
+  # more left, which is what really happens when a loan is paid off.
+  @C1 @F4
+  Scenario: The last payment to a loan is what is still owed, and after it the payment counts as nothing
+    Given a loan "Car loan" of 600.00, paid off with 250.00 a month from January 2026
+    Then "Car loan – Payment" is 250.00 in February 2026
+    And "Car loan – Payment" is 100.00 in March 2026
+    And "Car loan – Payment" is 0.00 in April 2026
+    And the Statement of March 2026 shows "Expenses" at 1,300.00
+    And the Statement of April 2026 shows "Expenses" at 1,200.00
+    And "Current account" ends March 2026 with 5,800.00
+    And "Current account" ends April 2026 with 7,600.00
+    And net worth changes by 1,800.00 in March 2026
+    And net worth changes by 1,800.00 in April 2026
+
+  # What was planned stays stored. A real balance that says more is owed makes the payments count again.
+  @C1 @F4 @B5
+  Scenario: A real balance that raises what is owed makes the payments count again
+    Given a loan "Car loan" of 600.00, paid off with 250.00 a month from January 2026
+    When "Car loan" really held 400.00 at the end of April 2026
+    Then "Car loan – Payment" is 0.00 in April 2026
+    And "Car loan – Payment" is 250.00 in May 2026
+    And "Car loan – Payment" is 150.00 in June 2026
+    And "Car loan – Payment" is 0.00 in July 2026
+    And "Car loan" ends May 2026 with 150.00
+    And "Car loan" ends June 2026 with 0.00
+
+  @C1 @F4
+  Scenario: Two payments to one loan take what is owed in their order
+    Given a loan "Car loan" of 600.00, paid off with 250.00 a month from January 2026
+    And a payment "Car loan – Extra" of 200.00 to "Car loan" from January 2026
+    Then "Car loan" ends January 2026 with 150.00
+    And "Car loan – Payment" is 150.00 in February 2026
+    And "Car loan – Extra" is 0.00 in February 2026
+    And "Car loan" ends February 2026 with 0.00
+    And the Statement of February 2026 shows "Expenses" at 1,350.00
+
+  @C1 @F4 @A4
+  Scenario: Changing a payment that was cut keeps what was planned in the other months
+    Given a loan "Car loan" of 600.00, paid off with 250.00 a month from January 2026
+    When I type 50.00 for "Car loan – Payment" in March 2026, only this month
+    Then "Car loan – Payment" is 50.00 in March 2026
+    And "Car loan – Payment" is 50.00 in April 2026
+    And "Car loan – Payment" is 0.00 in May 2026
+    And "Car loan" ends April 2026 with 0.00
 
   @C1 @B5
   Scenario: A real balance says what is really owed

@@ -42,7 +42,7 @@ export const HELP = {
   'balance.deposited': { title: 'Deposited', text: 'The money you have put in so far, without any growth. The difference to the value above is the return.' },
   'balance.return': { title: 'Return', text: 'Total growth so far as a share of what was deposited. Negative when the value fell below the deposits.' },
   'balance.cardOwed': { title: 'Owed on the card', text: 'What is on the card at month end: last month\'s amount plus purchases on the card minus the payment. Depends on how you record card spending in the account\'s settings.' },
-  'balance.loanOutstanding': { title: 'Loan outstanding', text: 'What is still owed. Each instalment brings it down; interest is not modelled, so enter the real balance now and then to keep it honest.' },
+  'balance.loanOutstanding': { title: 'Loan outstanding', text: 'What is still owed. Each instalment brings it down, and stops at what is owed: once the loan is paid off, the payment counts as nothing. Interest is not modelled, so enter the real balance now and then to keep it honest.' },
   'balance.otherAsset': { title: 'Other asset', text: 'Something you own with a value, like a rental deposit or cash. It falls by what an expense takes straight out of it and otherwise keeps its value until you type a new one; it counts towards net worth.' },
   'balance.pool': { title: 'Virtual account', text: 'Money set aside inside a savings account for one purpose: what goes in every month minus the spending that comes out of it. The savings balance already includes it. It never goes below zero: when more comes out than it holds, the rest comes out of the unassigned savings and the virtual account shows as short until you top it up on the Statement.' },
   'balance.inBase': { title: 'In the household currency', text: 'The balance converted at the month\'s rate, so it can be compared with the other balances and counted in net worth. The line above is in the account\'s own currency.' },
@@ -82,7 +82,7 @@ export const HELP = {
 
   // Goals and schedules
   'goal.status': { title: 'Goal status', text: 'Measured against the plan in the grid, so the bar moves when the plan changes. On track: reached by the target month. Late: reached after it, or not within the months shown. Reached: already there.' },
-  'schedule.status': { title: 'Status this month', text: 'Due: lands in this month and is not ticked yet. Paid: ticked done. Skipped: left out for this month only; the schedule continues. A dash means nothing is due this month.' },
+  'schedule.status': { title: 'Status this month', text: 'Due: lands in this month and is not ticked yet. Paid: ticked done. Skipped: left out for this month only; the schedule continues. Paid off: a payment to a loan that owes nothing any more, so it counts as nothing. A dash means nothing is due this month.' },
 } as const satisfies Record<string, HelpText>
 
 export type HelpKey = keyof typeof HELP
