@@ -17,6 +17,7 @@ import {
 import type { Mutation } from './store'
 import { primaryKeyOf, type PrimaryKey } from './keys'
 import { accountTypeForRow, planRowFundedBy } from './actions'
+import { cellPut } from './cells'
 import { planChangeRecurringFrom, planDropSchedule, planRecurringPosts } from './recurring'
 import { defaultMonths } from './months'
 
@@ -381,6 +382,7 @@ type Parser<T> = { parse: (x: unknown) => T }
 function put<T extends TableName>(table: T, schema: Parser<Tables[T][number]>, record: Tables[T][number], patch: Partial<Tables[T][number]>, ts: number): Mutation {
   return { op: 'put', table, record: schema.parse({ ...record, ...patch, updatedAt: ts }) } as Mutation
 }
+/** A stored month with something changed in it: the caller spreads the stored record, so nothing it holds is lost. */
 const putCell = (cell: CellInput, ts: number): Mutation => ({ op: 'put', table: 'cells', record: CellSchema.parse({ ...cell, updatedAt: ts }) })
 const cellOf = (tables: Tables, rowId: string, month: MonthKey): Cell | undefined => tables.cells.find((c) => c.rowId === rowId && c.month === month)
 
@@ -439,9 +441,12 @@ function pinFollowers(ctx: Ctx, row: Row, from: MonthKey, ts: number): Mutation[
         const items: CellItem[] = moved
           ? [{ id: newId(), label: '', amount: c.value, status: 'done', fundedBy: f.defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }]
           : []
-        muts.push(putCell({
-          rowId: f.id, month: m, mode: moved ? 'items' : 'value', value: moved ? null : c.value, items, note: existing?.note ?? null,
-          currencyOverride: c.currency !== own ? c.currency : existing?.currencyOverride ?? null, markedDone: existing?.markedDone ?? false, updatedAt: ts,
+        // where the followed row's amount was that month's alone, so is what the follower keeps of it
+        const followed = eng.cells[cellKey(row.id, m)]
+        const once = (followed?.source === 'value' || followed?.source === 'items') && !!followed.cell?.once
+        muts.push(cellPut(existing, {
+          rowId: f.id, month: m, mode: moved ? 'items' : 'value', value: moved ? null : c.value, items,
+          currencyOverride: c.currency !== own ? c.currency : existing?.currencyOverride ?? null, once,
         }, ts))
       }
     }

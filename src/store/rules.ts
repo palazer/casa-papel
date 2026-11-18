@@ -1,11 +1,12 @@
 import { cellKey, computeEngine, sortRows, type EngineOutput } from '@/engine'
 import {
-  CellSchema, HouseholdSchema, PoolSchema, RowSchema, addMonths, canCarryRule, canTakeRest, compareMonths, isOldPocketShare, isPocketRow, isTakenFromAccount, monthRange, newId, poolRowName,
+  HouseholdSchema, PoolSchema, RowSchema, addMonths, canCarryRule, canTakeRest, compareMonths, isOldPocketShare, isPocketRow, isTakenFromAccount, monthRange, newId, poolRowName,
   resolveRules, rowsFeeding, sharePercent,
   type Cell, type CellItem, type Money, type MonthKey, type Pool, type Row, type RuleState, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
 import { loadTables, newRowMutation } from './actions'
+import { cellPut, type CellPatch } from './cells'
 import { applyMutations } from './impact'
 
 /**
@@ -117,7 +118,8 @@ export function ruleMutations(tables: Tables, target: RuleTarget, choice: RuleCh
   // what every month before the start shows now
   const months = compareMonths(household.startMonth, from) < 0 ? monthRange(household.startMonth, addMonths(from, -1)) : []
   const engine: EngineOutput | null = months.length ? computeEngine({ tables: working, months }) : null
-  const put = (cell: Cell): void => { mutations.push({ op: 'put', table: 'cells', record: CellSchema.parse({ ...cell, updatedAt: ts }) }) }
+  /** Write a month of a row: what is stored for it, with `patch` on top (`cellRecord`). */
+  const put = (cur: Cell | undefined, patch: CellPatch): void => { mutations.push(cellPut(cur, patch, ts)) }
   const rowPatches = new Map<string, Partial<Row>>()
 
   /**
@@ -140,7 +142,8 @@ export function ruleMutations(tables: Tables, target: RuleTarget, choice: RuleCh
         const items: CellItem[] = moved
           ? [{ id: newId(), label: '', amount: c.value, status: 'done', fundedBy: r.defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }]
           : []
-        put({ rowId: r.id, month: m, mode: moved ? 'items' : 'value', value: moved ? null : c.value, items, note: cur?.note ?? null, currencyOverride, markedDone: cur?.markedDone ?? false, updatedAt: ts })
+        // what the month showed, written down as an amount of the usual kind: whatever its record said before was not read
+        put(cur, { rowId: r.id, month: m, mode: moved ? 'items' : 'value', value: moved ? null : c.value, items, currencyOverride, once: false })
       }
     }
     for (const cur of stored.values()) {
@@ -149,11 +152,11 @@ export function ruleMutations(tables: Tables, target: RuleTarget, choice: RuleCh
       // a month whose typed amount was ticked as done stays ticked when the rule fills it
       const live = cur.items.filter((i) => !i.skipped)
       const ticked = then === 'rule' && cur.mode === 'items' && live.length > 0 && live.every((i) => i.status === 'done')
-      put({ ...cur, mode: 'inherit', value: null, items: [], markedDone: ticked || (cur.markedDone ?? false) })
+      put(cur, { rowId: r.id, month: cur.month, mode: 'inherit', value: null, items: [], markedDone: ticked || (cur.markedDone ?? false) })
     }
     if (then !== 'rule') {
       const cur = stored.get(from)
-      put({ rowId: r.id, month: from, mode: 'value', value: then.amount, items: [], note: cur?.note ?? null, currencyOverride: null, markedDone: false, updatedAt: ts })
+      put(cur, { rowId: r.id, month: from, mode: 'value', value: then.amount, items: [], currencyOverride: null, markedDone: false, once: false })
     }
   }
 
@@ -190,7 +193,7 @@ export function ruleMutations(tables: Tables, target: RuleTarget, choice: RuleCh
     // the idle rows beside the rest row showed zero in every month; typed now, they keep showing it
     for (const r of liveRows) {
       if (before.byRow.get(r.id)?.kind !== 'idle') continue
-      for (const cur of working.cells) if (cur.rowId === r.id && cur.mode !== 'inherit') put({ ...cur, mode: 'inherit', value: null, items: [] })
+      for (const cur of working.cells) if (cur.rowId === r.id && cur.mode !== 'inherit') put(cur, { rowId: r.id, month: cur.month, mode: 'inherit', value: null, items: [] })
       rowPatches.set(r.id, { rule: 'fixed', ruleShare: null })
     }
   }

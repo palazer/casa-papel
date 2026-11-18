@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { cellKey, computeEngine } from '@/engine'
-import { CategorySchema, RecurringItemSchema, monthRange, newId } from '@/model'
+import { CategorySchema, CellSchema, RecurringItemSchema, monthRange, newId, type Cell } from '@/model'
 import { T0, account, cellItems, cellValue, household, row, tables } from './helpers'
 
 const months = monthRange('2026-01', '2026-06')
+
+/** A stored month whose amount is that month's alone. */
+const once = (cell: Cell): Cell => CellSchema.parse({ ...cell, once: true })
 
 /** What each month of a row is given and what it hands on, as `given > handsOn`; "-" is no amount yet. */
 function chain(out: ReturnType<typeof computeEngine>, rowId: string, over = months): string[] {
@@ -83,5 +86,71 @@ describe('what a month is given and what it hands on', () => {
     const t = tables({ household: [household()], rows: [insurance], recurringItems: [schedule], cells: [cellItems(insurance.id, '2026-01', [{ amount: 600_00, recurringItemId: schedule.id }])] })
     const out = computeEngine({ tables: t, months })
     expect(out.cells[cellKey(insurance.id, '2026-02')]).toMatchObject({ source: 'empty', value: 0, given: 600_00, handsOn: 0 })
+  })
+})
+
+describe('an amount that is its month\'s alone', () => {
+  const values = (out: ReturnType<typeof computeEngine>, rowId: string) => months.map((m) => out.cells[cellKey(rowId, m)].value / 100)
+
+  it('counts in its month, and the months after go on with what came before it', () => {
+    const rent = row({ name: 'Rent', section: 'expense' })
+    const t = tables({ household: [household()], rows: [rent], cells: [cellValue(rent.id, '2026-01', 1200_00), once(cellValue(rent.id, '2026-03', 1500_00))] })
+    const out = computeEngine({ tables: t, months })
+    expect(values(out, rent.id)).toEqual([1200, 1200, 1500, 1200, 1200, 1200])
+    expect(chain(out, rent.id)).toEqual(['- > 1200', '1200 > 1200', '1200 > 1200', '1200 > 1200', '1200 > 1200', '1200 > 1200'])
+    expect(out.cells[cellKey(rent.id, '2026-03')].source).toBe('value')
+    expect(out.cells[cellKey(rent.id, '2026-04')].source).toBe('inherit')
+  })
+
+  it('one after another, each stays in its own month', () => {
+    const rent = row({ name: 'Rent', section: 'expense' })
+    const t = tables({ household: [household()], rows: [rent], cells: [cellValue(rent.id, '2026-01', 1200_00), once(cellValue(rent.id, '2026-03', 1500_00)), once(cellValue(rent.id, '2026-04', 0)), cellValue(rent.id, '2026-06', 1300_00)] })
+    const out = computeEngine({ tables: t, months })
+    expect(values(out, rent.id)).toEqual([1200, 1200, 1500, 0, 1200, 1300])
+  })
+
+  it('on a row that had no amount yet, the months after it have none either', () => {
+    const gift = row({ name: 'Gift', section: 'expense' })
+    const t = tables({ household: [household()], rows: [gift], cells: [once(cellValue(gift.id, '2026-02', 80_00))] })
+    const out = computeEngine({ tables: t, months })
+    expect(values(out, gift.id)).toEqual([0, 80, 0, 0, 0, 0])
+    expect(chain(out, gift.id).slice(1, 4)).toEqual(['- > -', '- > -', '- > -'])
+    expect(out.cells[cellKey(gift.id, '2026-03')].source).toBe('empty')
+  })
+
+  it('as a list of items: a carried item in it is worth what the month was given, and the list is not handed on', () => {
+    const food = row({ name: 'Food', section: 'expense' })
+    const t = tables({
+      household: [household()], rows: [food],
+      cells: [cellValue(food.id, '2026-01', 400_00), once(cellItems(food.id, '2026-03', [{ amount: 0, kind: 'carry' }, { amount: 60_00, label: 'Party' }]))],
+    })
+    const out = computeEngine({ tables: t, months })
+    expect(values(out, food.id)).toEqual([400, 400, 460, 400, 400, 400])
+  })
+
+  it('how sure it is stays in its month too: a done exception does not make the months after it read differently', () => {
+    const rent = row({ name: 'Rent', section: 'expense', defaultStatus: 'projected' })
+    const t = tables({
+      household: [household()], rows: [rent],
+      cells: [cellItems(rent.id, '2026-01', [{ amount: 1200_00, status: 'committed' }]), once(cellItems(rent.id, '2026-03', [{ amount: 1500_00, status: 'done' }]))],
+    })
+    const out = computeEngine({ tables: t, months })
+    expect(months.map((m) => out.cells[cellKey(rent.id, m)].status)).toEqual(['committed', 'committed', 'done', 'committed', 'committed', 'committed'])
+  })
+
+  it('the mark on a month without an amount of its own says nothing', () => {
+    const rent = row({ name: 'Rent', section: 'expense' })
+    const empty = CellSchema.parse({ rowId: rent.id, month: '2026-03', mode: 'inherit', once: true, updatedAt: T0 })
+    const t = tables({ household: [household()], rows: [rent], cells: [cellValue(rent.id, '2026-01', 1200_00), empty, cellValue(rent.id, '2026-04', 1300_00)] })
+    const out = computeEngine({ tables: t, months })
+    expect(values(out, rent.id)).toEqual([1200, 1200, 1200, 1300, 1300, 1300])
+  })
+
+  it('a record from before the mark existed reads as an amount that runs on', () => {
+    const rent = row({ name: 'Rent', section: 'expense' })
+    // as an older version stored it, and as it sits in a database that was never rewritten: no `once` at all
+    const old = { rowId: rent.id, month: '2026-01', mode: 'value', value: 1200_00, items: [], note: null, currencyOverride: null, markedDone: false, updatedAt: T0 } as unknown as Cell
+    const out = computeEngine({ tables: tables({ household: [household()], rows: [rent], cells: [old] }), months })
+    expect(values(out, rent.id)).toEqual([1200, 1200, 1200, 1200, 1200, 1200])
   })
 })

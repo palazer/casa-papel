@@ -8,7 +8,7 @@ import { FUNDED_BY_PATTERN, type FundedBy } from './fundedBy'
 z.config({ jitless: true })
 
 /** Bump when the shape of stored data changes; add a migration in migrations.ts. */
-export const SCHEMA_VERSION = 15
+export const SCHEMA_VERSION = 16
 
 // ---------- primitives ----------
 export const IdSchema = z.string().regex(ID_PATTERN, 'expected ULID')
@@ -262,6 +262,12 @@ export const CellSchema = z.object({
   currencyOverride: CurrencyCodeSchema.nullable().default(null),
   /** Automatic rows only (the savings plug, a pocket share, a follower): this month's amount was ticked as moved. */
   markedDone: z.boolean().default(false),
+  /**
+   * The month's own amount is this month's alone (an exception): the months after it go on with what the month
+   * before handed to it. Only said of a month with an amount of its own (`value` or `items`). A record from before
+   * schema 16 lacks it: read it by truthiness.
+   */
+  once: z.boolean().default(false),
   updatedAt: TimestampSchema,
 })
 

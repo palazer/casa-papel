@@ -183,6 +183,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
       let baseStatus: CellStatus = row.defaultStatus
       let items: ResolvedItem[] = []
       const funding = zeroFunding()
+      /** The month's own amount is this month's alone (`Cell.once`): the month hands on what it was given. */
+      let alone = false
       // A rule fills the month unless an amount was typed into it (the months before the rule started keep theirs
       // that way). The rest row and the idle ones beside it are worked out even when archived, as they always were;
       // a share stops with its row.
@@ -222,11 +224,13 @@ export function computeEngine(input: EngineInput): EngineOutput {
       } else if (cell.mode === 'value') {
         value = cell.value ?? 0
         source = 'value'
-        everSet = true
+        alone = !!cell.once
+        if (!alone) everSet = true
         addFunding(funding, row.defaultFundedBy, value, paying)
       } else {
         source = 'items'
-        everSet = true
+        alone = !!cell.once
+        if (!alone) everSet = true
         let anyProjected = false
         let allDone = true
         for (const it of cell.items) {
@@ -267,7 +271,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
         if (list) list.push({ row, rule, c: result })
         else ruled.set(m, [{ row, rule, c: result }])
       }
-      if (!byRule && !archived) {
+      // an amount that is this month's alone leaves no trace in the months after it: not the amount, not how sure it is
+      if (!byRule && !archived && !alone) {
         prev = value
         if (baseStatus !== 'derived') prevBase = baseStatus
       }

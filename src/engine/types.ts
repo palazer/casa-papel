@@ -77,8 +77,8 @@ export interface CellResult {
   given: Money | null
   /**
    * What this month hands to the next one: its own amount as it was typed or carried (before a paid-off loan or a
-   * category's rows made it count for less), or what it was given where a rule works the month out or the row is
-   * archived. null while the row has had no amount yet.
+   * category's rows made it count for less), or what it was given where a rule works the month out, the row is
+   * archived, or the month's amount is this month's alone (`Cell.once`). null while the row has had no amount yet.
    */
   handsOn: Money | null
   cell: Cell | null

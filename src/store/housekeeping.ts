@@ -1,6 +1,7 @@
 import { computeEngine } from '@/engine'
-import { CellSchema, MonthStateSchema, addMonths, compareMonths, isDue, monthOfDate, monthRange, type Household, type MonthKey, type MonthState, type Tables } from '@/model'
+import { MonthStateSchema, addMonths, compareMonths, isDue, monthOfDate, monthRange, type Household, type MonthKey, type MonthState, type Tables } from '@/model'
 import { countDoneMutations, loadTables } from './actions'
+import { cellPut } from './cells'
 import { applyMutations } from './impact'
 import { defaultMonths } from './months'
 import { managedItem, planRecurringPosts, scheduleLive } from './recurring'
@@ -35,10 +36,7 @@ function planOpenClosedMonths(tables: Tables, household: Household, closed: Mont
       const missing = due.filter((d) => !(cell?.items ?? []).some((i) => i.recurringItemId === d.id))
       if (missing.length === 0) continue
       const items = [...(cell?.mode === 'items' ? cell.items : []), ...missing.map((d) => ({ ...managedItem(d, row), skipped: true }))]
-      out.push({ op: 'put', table: 'cells', record: CellSchema.parse({
-        rowId: row.id, month: state.month, mode: 'items', value: null, items, note: cell?.note ?? null,
-        currencyOverride: cell?.currencyOverride ?? null, markedDone: cell?.markedDone ?? false, updatedAt: ts,
-      }) })
+      out.push(cellPut(cell, { rowId: row.id, month: state.month, mode: 'items', value: null, items }, ts))
     }
     out.push({ op: 'put', table: 'monthStates', record: MonthStateSchema.parse({ ...state, closed: false, closedAt: null, updatedAt: ts }) })
   }

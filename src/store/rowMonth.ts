@@ -1,9 +1,10 @@
 import type { EngineOutput } from '@/engine'
 import {
-  CellSchema, RecurringItemSchema, cadenceOf, compareMonths, isDue, monthOfDate, newId, repeatOf, sameRepeat,
+  RecurringItemSchema, cadenceOf, compareMonths, isDue, monthOfDate, newId, repeatOf, sameRepeat,
   type CellItem, type Money, type MonthKey, type RecurringItem, type RepeatChoice, type Repeating, type Tables,
 } from '@/model'
 import { engineUpTo, freezeNext, rowChangePut, type EditScope, type RowChange } from './actions'
+import { cellPut } from './cells'
 import { applyMutations } from './impact'
 import { defaultMonths } from './months'
 import { managedItem, pinCarriedMonths, planChangeRecurringFrom, planRecurringPosts, planRename } from './recurring'
@@ -132,10 +133,9 @@ export function planRowMonthSave(tables: Tables, engine: EngineOutput, rowId: st
   const out = muts.filter((m) => !isCellPut(m, rowId, month))
   const scheduled = t.recurringItems.some((r) => !r.deletedAt && r.rowId === rowId)
   if (!scheduled && save.scope === 'this-month') out.push(...freezeNext(tables, engine, rowId, month))
-  const cell = { rowId, month, value: null, note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, markedDone: existing?.markedDone ?? false, updatedAt: ts }
-  if (items.length > 0 || !scheduled) out.push({ op: 'put', table: 'cells', record: CellSchema.parse({ ...cell, mode: 'items', items }) })
+  if (items.length > 0 || !scheduled) out.push(cellPut(existing, { rowId, month, mode: 'items', value: null, items }, ts))
   // a row on a schedule with nothing in the month has no cell of its own there
-  else if (existing && existing.mode !== 'inherit') out.push({ op: 'put', table: 'cells', record: CellSchema.parse({ ...cell, mode: 'inherit', items: [] }) })
+  else if (existing && existing.mode !== 'inherit') out.push(cellPut(existing, { rowId, month, mode: 'inherit', value: null, items: [] }, ts))
   out.push(...rowChangePut(tables, rowId, save.row))
   return out
 }

@@ -5,6 +5,7 @@ import {
   type Account, type Category, type Cell, type CellInput, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Pool, type Row, type RowKind, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
+import { cellPut } from './cells'
 import { planEnd } from './months'
 
 export type EditScope = 'this-month' | 'from-now-on'
@@ -97,7 +98,7 @@ export async function setCellValue(store: Store, rowId: string, month: MonthKey,
   const { tables, engine } = await engineUpTo(store, month)
   const mutations: Mutation[] = scope === 'this-month' ? freezeNext(tables, engine, rowId, month) : []
   const existing = cellOf(tables, rowId, month)
-  mutations.push(putCell({ rowId, month, mode: 'value', value, items: [], note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, updatedAt: now() }))
+  mutations.push(cellPut(existing, { rowId, month, mode: 'value', value, items: [], markedDone: false }, now()))
   mutations.push(...rowChangePut(tables, rowId, rowChange))
   await store.commit(mutations)
 }
@@ -106,7 +107,7 @@ export async function setCellItems(store: Store, rowId: string, month: MonthKey,
   const { tables, engine } = await engineUpTo(store, month)
   const mutations: Mutation[] = scope === 'this-month' ? freezeNext(tables, engine, rowId, month) : []
   const existing = cellOf(tables, rowId, month)
-  mutations.push(putCell({ rowId, month, mode: 'items', value: null, items, note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, updatedAt: now() }))
+  mutations.push(cellPut(existing, { rowId, month, mode: 'items', value: null, items, markedDone: false }, now()))
   mutations.push(...rowChangePut(tables, rowId, rowChange))
   await store.commit(mutations)
 }
@@ -116,7 +117,8 @@ export async function clearCell(store: Store, rowId: string, month: MonthKey): P
   const tables = await loadTables(store)
   const existing = cellOf(tables, rowId, month)
   if (!existing || existing.mode === 'inherit') return
-  await store.commit([putCell({ rowId, month, mode: 'inherit', value: null, items: [], note: existing.note, currencyOverride: existing.currencyOverride, updatedAt: now() })])
+  // an inheriting month has no amount of its own, so the mark of an exception goes with the amount (`cellRecord`)
+  await store.commit([cellPut(existing, { rowId, month, mode: 'inherit', value: null, items: [], markedDone: false }, now())])
 }
 
 /** Turn whatever the cell shows into an items list so single entries can be added. */
@@ -135,7 +137,7 @@ export async function setItemStatus(store: Store, rowId: string, month: MonthKey
   const cell = cellOf(tables, rowId, month)
   if (!cell || cell.mode !== 'items') throw new Error('Cell has no items')
   if (!cell.items.some((it) => it.id === itemId)) throw new Error('That item is gone.')
-  await store.commit([putCell({ ...cell, items: cell.items.map((it) => (it.id === itemId ? { ...it, status } : it)) })])
+  await store.commit([cellPut(cell, { rowId, month, items: cell.items.map((it) => (it.id === itemId ? { ...it, status } : it)) }, now())])
 }
 
 // ---------- rows ----------
@@ -344,7 +346,7 @@ export function categoryEstimateMutations(tables: Tables, category: Category, mo
     mutations.push({ op: 'put', table: 'rows', record: row })
   }
   const existing = cellOf(tables, row.id, month)
-  mutations.push(putCell({ rowId: row.id, month, mode: 'value', value: amount, items: [], note: existing?.note ?? null, currencyOverride: null, markedDone: existing?.markedDone, updatedAt: now() }))
+  mutations.push(cellPut(existing, { rowId: row.id, month, mode: 'value', value: amount, items: [], currencyOverride: null }, now()))
   if (scope === 'this-month') {
     const next = addMonths(month, 1)
     const nextCell = cellOf(tables, row.id, next)
@@ -408,7 +410,7 @@ export function cardBookingMutations(tables: Tables, engine: EngineOutput, house
       : existing?.mode === 'value' && existing.value ? [{ id: newId(), label: '', amount: existing.value, status: row.defaultStatus, fundedBy: row.defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }]
       : []
     const booked: CellItem = { id: newId(), label: 'Not recorded', amount: extra, status: 'done', fundedBy: 'cash', date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }
-    mutations.push(putCell({ rowId: row.id, month, mode: 'items', value: null, items: [...kept, booked], note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, updatedAt: now() }))
+    mutations.push(cellPut(existing, { rowId: row.id, month, mode: 'items', value: null, items: [...kept, booked], markedDone: false }, now()))
     const next = addMonths(month, 1)
     const nextCell = cellOf(tables, row.id, next)
     if (!nextCell || nextCell.mode === 'inherit') mutations.push(putCell({ rowId: row.id, month: next, mode: 'value', value: 0, items: [], note: nextCell?.note ?? null, currencyOverride: nextCell?.currencyOverride ?? null, updatedAt: now() }))
@@ -509,13 +511,9 @@ export function lineDoneMutations(tables: Tables, engine: EngineOutput, row: Row
   const current = engine.cells[cellKey(row.id, month)]
   if (!current || current.source === 'archived') return []
   const existing = cellOf(tables, row.id, month)
-  const put = (cell: CellInput): Mutation => ({ op: 'put', table: 'cells', record: CellSchema.parse({ ...cell, updatedAt: ts }) })
   if (current.source === 'derived') {
     if ((existing?.markedDone ?? false) === done) return []
-    return [put({
-      rowId: row.id, month, mode: existing?.mode ?? 'inherit', value: existing?.value ?? null, items: existing?.items ?? [],
-      note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, markedDone: done, updatedAt: ts,
-    })]
+    return [cellPut(existing, { rowId: row.id, month, markedDone: done }, ts)]
   }
   const status = done ? 'done' : row.defaultStatus
   if (existing?.mode === 'items' && existing.items.every((it) => it.skipped || it.status === status)) return []
@@ -526,7 +524,7 @@ export function lineDoneMutations(tables: Tables, engine: EngineOutput, row: Row
         ? []
         : [{ id: newId(), label: '', amount: typedAmount(current), status, fundedBy: row.defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }]
   if (items.length === 0 && !existing) return []
-  return [put({ rowId: row.id, month, mode: 'items', value: null, items, note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, updatedAt: ts })]
+  return [cellPut(existing, { rowId: row.id, month, mode: 'items', value: null, items, markedDone: false }, ts)]
 }
 
 /**
@@ -555,10 +553,7 @@ export async function setDerivedDone(store: Store, rowId: string, month: MonthKe
   const tables = await loadTables(store)
   const existing = cellOf(tables, rowId, month)
   if ((existing?.markedDone ?? false) === done) return
-  await store.commit([putCell({
-    rowId, month, mode: existing?.mode ?? 'inherit', value: existing?.value ?? null, items: existing?.items ?? [],
-    note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, markedDone: done, updatedAt: now(),
-  })])
+  await store.commit([cellPut(existing, { rowId, month, markedDone: done }, now())])
 }
 
 // ---------- monthly defaults with a scope ----------
@@ -642,7 +637,7 @@ export function planRowFundedBy(tables: Tables, row: Row, fundedBy: FundedBy, sc
           id: newId(), label: '', amount: typedAmount(c), status: c.status === 'derived' ? row.defaultStatus : c.status, fundedBy: row.defaultFundedBy,
           date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false,
         }
-        mutations.push({ op: 'put', table: 'cells', record: CellSchema.parse({ rowId: row.id, month: m, mode: 'items', value: null, items: [item], note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, markedDone: existing?.markedDone ?? false, updatedAt: ts }) })
+        mutations.push(cellPut(existing, { rowId: row.id, month: m, mode: 'items', value: null, items: [item] }, ts))
       }
     }
   }

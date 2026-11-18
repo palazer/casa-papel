@@ -1,10 +1,11 @@
 import { cellKey, computeEngine } from '@/engine'
 import {
-  CellSchema, PoolSchema, addMonths, compareMonths, monthRange, newId, poolRowName, resolveRules,
-  type Cell, type CellItem, type Money, type MonthKey, type Row, type Tables,
+  PoolSchema, addMonths, compareMonths, monthRange, newId, poolRowName, resolveRules,
+  type CellItem, type Money, type MonthKey, type Row, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
 import { loadTables, newRowMutation } from './actions'
+import { cellPut } from './cells'
 import { applyMutations } from './impact'
 
 /**
@@ -70,7 +71,6 @@ export function topUpMutations(tables: Tables, poolId: string, month: MonthKey, 
   const start = compareMonths(household.startMonth, month) < 0 ? household.startMonth : month
   const engine = computeEngine({ tables: working, months: monthRange(start, month) })
   const rules = resolveRules(engine.rows, household.closingRule)
-  const put = (cell: Cell): Mutation => ({ op: 'put', table: 'cells', record: CellSchema.parse({ ...cell, updatedAt: ts }) })
 
   /** One more item on a row's month, with what the month showed kept as it was and the month after left alone. */
   const oneOff = (row: Row, label: string): Mutation[] => {
@@ -85,13 +85,13 @@ export function topUpMutations(tables: Tables, poolId: string, month: MonthKey, 
       ? existing.items.map((it) => (it.kind === 'carry' ? { ...it, kind: 'normal' as const, amount: current.items.find((x) => x.id === it.id)?.effectiveAmount ?? it.amount } : it))
       : shown !== 0 ? [item('', shown, current?.status === 'done' ? 'done' : row.defaultStatus)] : []
     const currencyOverride = current && current.currency !== (row.currency ?? base) ? current.currency : existing?.currencyOverride ?? null
-    out.push(put({ rowId: row.id, month, mode: 'items', value: null, items: [...kept, item(label, amount, row.defaultStatus)], note: existing?.note ?? null, currencyOverride, markedDone: existing?.markedDone ?? false, updatedAt: ts }))
+    out.push(cellPut(existing, { rowId: row.id, month, mode: 'items', value: null, items: [...kept, item(label, amount, row.defaultStatus)], currencyOverride }, ts))
     // The month after keeps what this month handed to it before the top-up. A rule fills its own months, and a
     // scheduled row never carries, so neither needs holding.
     if (!rules.byRow.has(row.id) && !engine.recurringRowIds.includes(row.id)) {
       const next = addMonths(month, 1)
       const nextCell = working.cells.find((c) => c.rowId === row.id && c.month === next)
-      if (!nextCell || nextCell.mode === 'inherit') out.push(put({ rowId: row.id, month: next, mode: 'value', value: current?.handsOn ?? 0, items: [], note: nextCell?.note ?? null, currencyOverride, markedDone: nextCell?.markedDone ?? false, updatedAt: ts }))
+      if (!nextCell || nextCell.mode === 'inherit') out.push(cellPut(nextCell, { rowId: row.id, month: next, mode: 'value', value: current?.handsOn ?? 0, items: [], currencyOverride }, ts))
     }
     return out
   }

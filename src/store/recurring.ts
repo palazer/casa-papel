@@ -1,10 +1,11 @@
 import { cellKey, computeEngine, typedAmount } from '@/engine'
 import {
-  CellSchema, RecurringItemSchema, addMonths, compareMonths, isDue, monthOfDate, newId,
+  RecurringItemSchema, addMonths, compareMonths, isDue, monthOfDate, newId,
   type Cell, type CellItem, type MonthKey, type RecurringItem, type Row, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
 import { loadTables, newRowMutation } from './actions'
+import { cellPut } from './cells'
 import { applyMutations, monthSpan } from './impact'
 import { defaultMonths } from './months'
 
@@ -84,9 +85,9 @@ export function planRecurringPosts(tables: Tables, months: MonthKey[], only?: It
       }
       if (!cell || cell.mode !== 'items') {
         if (next.length === 0) continue
-        mutations.push({ op: 'put', table: 'cells', record: CellSchema.parse({ rowId, month: m, mode: 'items', value: null, items: next, note: cell?.note ?? null, currencyOverride: cell?.currencyOverride ?? null, markedDone: cell?.markedDone ?? false, updatedAt: now() }) })
+        mutations.push(cellPut(cell, { rowId, month: m, mode: 'items', value: null, items: next }, now()))
       } else if (sig(next) !== sig(cell.items)) {
-        mutations.push({ op: 'put', table: 'cells', record: CellSchema.parse({ ...cell, items: next, updatedAt: now() }) })
+        mutations.push(cellPut(cell, { rowId, month: m, items: next }, now()))
       }
     }
   }
@@ -119,7 +120,7 @@ export function pinCarriedMonths(tables: Tables, rowId: string, before: MonthKey
   for (const m of months) {
     const c = engine.cells[cellKey(rowId, m)]
     if (!c || c.source !== 'inherit' || typedAmount(c) === 0) continue
-    out.push({ op: 'put', table: 'cells', record: CellSchema.parse({ rowId, month: m, mode: 'value', value: typedAmount(c), items: [], note: c.cell?.note ?? null, currencyOverride: c.cell?.currencyOverride ?? null, updatedAt: ts }) })
+    out.push(cellPut(c.cell, { rowId, month: m, mode: 'value', value: typedAmount(c), items: [], markedDone: false }, ts))
   }
   return out
 }
@@ -179,7 +180,7 @@ export function planRename(tables: Tables, rowId: string, from: string, to: stri
   const muts: Mutation[] = renamed.map((r) => ({ op: 'put', table: 'recurringItems', record: RecurringItemSchema.parse({ ...r, name: to, updatedAt: ts }) }))
   for (const c of tables.cells) {
     if (c.rowId !== rowId || !c.items.some((i) => posted(i) && i.label !== to)) continue
-    muts.push({ op: 'put', table: 'cells', record: CellSchema.parse({ ...c, items: c.items.map((i) => (posted(i) ? { ...i, label: to } : i)), updatedAt: ts }) })
+    muts.push(cellPut(c, { rowId: c.rowId, month: c.month, items: c.items.map((i) => (posted(i) ? { ...i, label: to } : i)) }, ts))
   }
   return muts
 }
@@ -304,7 +305,7 @@ export function planDropSchedule(tables: Tables, item: RecurringItem, ts: number
   for (const c of tables.cells) {
     if (c.rowId !== item.rowId) continue
     if (!c.items.some((i) => i.recurringItemId === item.id && i.status !== 'done')) continue
-    muts.push({ op: 'put', table: 'cells', record: CellSchema.parse({ ...c, items: c.items.filter((i) => i.recurringItemId !== item.id || i.status === 'done'), updatedAt: ts }) })
+    muts.push(cellPut(c, { rowId: c.rowId, month: c.month, items: c.items.filter((i) => i.recurringItemId !== item.id || i.status === 'done') }, ts))
   }
   return muts
 }
@@ -332,7 +333,7 @@ export async function setRecurringPaid(store: Store, id: string, month: MonthKey
   const idx = items.findIndex((i) => i.recurringItemId === id)
   if (idx === -1) items.push({ ...managedItem(item, row), status: paid ? 'done' : row.defaultStatus })
   else items[idx] = { ...items[idx], status: paid ? 'done' : row.defaultStatus, skipped: false }
-  await store.commit([{ op: 'put', table: 'cells', record: CellSchema.parse({ rowId: item.rowId, month, mode: 'items', value: null, items, note: cell?.note ?? null, currencyOverride: cell?.currencyOverride ?? null, markedDone: cell?.markedDone ?? false, updatedAt: now() }) }])
+  await store.commit([cellPut(cell, { rowId: item.rowId, month, mode: 'items', value: null, items }, now())])
 }
 
 export type RecurringMonthStatus = 'not-due' | 'due' | 'paid' | 'skipped'
@@ -368,7 +369,7 @@ export async function skipRecurringMonth(store: Store, id: string, month: MonthK
   const cell = tables.cells.find((c) => c.rowId === item.rowId && c.month === month)
   if (!cell) return
   const items = cell.items.map((i) => (i.recurringItemId === id ? { ...i, skipped } : i))
-  await store.commit([{ op: 'put', table: 'cells', record: CellSchema.parse({ ...cell, items, updatedAt: now() }) }])
+  await store.commit([cellPut(cell, { rowId: cell.rowId, month: cell.month, items }, now())])
 }
 
 /** Stop the schedule from `month` on. Earlier months keep what was posted. */
@@ -414,7 +415,7 @@ export function planChangeRecurringFrom(tables: Tables, item: RecurringItem, mon
         : i.pinned || i.status === 'done' ? { ...i, recurringItemId: targetId }
         : { ...i, recurringItemId: targetId, amount: patch.amount ?? i.amount, fundedBy: patch.fundedBy ?? i.fundedBy, label: patch.name ?? i.label },
     )
-    mutations.push({ op: 'put', table: 'cells', record: CellSchema.parse({ ...cell, items, updatedAt: ts }) })
+    mutations.push(cellPut(cell, { rowId: cell.rowId, month: cell.month, items }, ts))
   }
   return { mutations, targetId }
 }

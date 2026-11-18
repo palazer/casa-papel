@@ -56,6 +56,11 @@ const STEPS: Record<number, Step> = {
   // versions wrote, and the app turns a closed month into a month with everything ticked when it meets one
   // (`planHousekeeping`). The version keeps an older app, which would lock those months again, from syncing.
   14: (raw) => raw,
+  // 15 → 16: `Cell.once` (an amount that is its month's alone: the months after it go on with what came before).
+  // It fills in from its default: an exception an older version made keeps the amount that version wrote into the
+  // month after. The version keeps an older app, which would count such a month as an amount that runs on, from
+  // syncing.
+  15: (raw) => raw,
 }
 
 export function migrateExport(raw: unknown): unknown {
