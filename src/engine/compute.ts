@@ -1,5 +1,5 @@
 import {
-  accountIdOf, accountRef, cardIsItemized, compareMonths, fromMinor, isOldPocketShare, isOutsideNetWorth, isShareRule, isTakenFromAccount, monthRange, paysAsExpense, paysExpenses, pocketLandsIn, poolIdOf, poolRef, resolveRules, scaleMoney, toMinor,
+  accountIdOf, accountRef, cardIsItemized, compareMonths, fromMinor, isOldPocketShare, isOutsideNetWorth, isShareRule, isTakenFromAccount, movesInto, monthRange, paysAsExpense, paysExpenses, pocketLandsIn, poolIdOf, poolRef, resolveRules, scaleMoney, toMinor,
   type Account, type Category, type Cell, type FundedBy, type Money, type MonthKey, type Row, type RuleState, type Section, type Tables,
 } from '@/model'
 import { buildFxIndex, convertMoney } from './fx'
@@ -436,7 +436,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
   for (const m of months) {
     const t: MonthTotals = {
       month: m, closed: isClosed(m), income: 0, cashExpense: 0, savingsFunded: 0, poolFunded: 0, poolFundedByPool: {}, accountFunded: 0, accountFundedByAccount: {}, fundedOwn: {},
-      allocations: 0, allocationsByPool: {}, toInvestment: 0, pocket: 0, debt: 0, moved: 0,
+      allocations: 0, allocationsByPool: {}, toInvestment: 0, pocket: 0, debt: 0, moved: 0, movedToAccounts: 0,
       buffer: bufferFor(m), toSavings: 0, leftover: 0, fromSavingsDerived: 0, expensesTotal: 0, transfersTotal: 0,
       fromAccounts: 0, takeHome: 0, takeHomeBy: {}, leftForShares: 0, rest: null,
     }
@@ -504,9 +504,11 @@ export function computeEngine(input: EngineInput): EngineOutput {
             for (const [pid, amt] of Object.entries(c.fundingOwn.pools)) own(poolRef(pid), amt)
             for (const [aid, amt] of Object.entries(c.fundingOwn.accounts)) own(accountRef(aid), amt)
           } else {
-            // plain transfer rows behave like outflows the user controls
-            t.moved += v
+            // A row that moves money is an outflow the user controls, and no expense. Named an account with a
+            // balance, the money arrives there; named none, it leaves the plan.
             t.cashExpense += v
+            if (movesInto(row, row.accountId ? accountsById.get(row.accountId) : undefined)) t.movedToAccounts += v
+            else t.moved += v
           }
         }
       }
@@ -580,8 +582,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
     t.fromSavingsDerived = t.savingsFunded + t.poolFunded + t.accountFunded
     // what the month costs: the expense rows, whatever they come out of, and the payments to loans and cards. Pocket
     // money and what is moved between the household's own accounts are transfers, not expenses.
-    t.expensesTotal = t.cashExpense - t.moved + t.savingsFunded + t.poolFunded + t.accountFunded + t.debt
-    t.transfersTotal = t.allocations + t.toInvestment + t.toSavings
+    t.expensesTotal = t.cashExpense - t.moved - t.movedToAccounts + t.savingsFunded + t.poolFunded + t.accountFunded + t.debt
+    t.transfersTotal = t.allocations + t.toInvestment + t.toSavings + t.movedToAccounts
     totals[m] = t
   }
 
@@ -634,7 +636,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
       const c = cells[cellKey(row.id, m)]
       if (!c) continue
       // pocket money that lands here counts like a deposit: the account is its adult's own, outside net worth
-      if ((row.kind === 'to-savings' && row.accountId === acc.id) || pocketLandsIn(row, acc)) inflow += home ? c.valueBase : inAccountCurrency(acc, c, m)
+      // and so does money moved into it by a row that names it
+      if ((row.kind === 'to-savings' && row.accountId === acc.id) || pocketLandsIn(row, acc) || movesInto(row, acc)) inflow += home ? c.valueBase : inAccountCurrency(acc, c, m)
       // a virtual account is kept in the base currency; the account that holds it receives the row's own amount
       else if (!home && row.kind === 'pool-allocation' && c.source !== 'archived' && poolByAllocationRow.get(row.id)?.accountId === acc.id) inflow += inAccountCurrency(acc, c, m)
     }
@@ -704,7 +707,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
         const c = cells[cellKey(row.id, m)]
         if (!c || c.value === 0) continue
         // pocket money that lands here is a deposit like any other
-        if (row.kind === 'to-investment' || pocketLandsIn(row, acc)) {
+        if (row.kind === 'to-investment' || pocketLandsIn(row, acc) || movesInto(row, acc)) {
           // a negative deposit is money taken out: the rest in a month that overran, or a typed correction
           const v = toAccountCurrency(c, m)
           if (v >= 0) deposit += v
@@ -770,10 +773,11 @@ export function computeEngine(input: EngineInput): EngineOutput {
         }
       }
       // an other asset falls by what expenses took straight out of it, and rises by pocket money that lands in it
+      // and by money a row moves into it
       if (!liability) {
         outflow += paidFrom(acc, m)
         for (const row of rows) {
-          if (!pocketLandsIn(row, acc)) continue
+          if (!pocketLandsIn(row, acc) && !movesInto(row, acc)) continue
           const c = cells[cellKey(row.id, m)]
           if (c && c.source !== 'archived') inflow += inAccountCurrency(acc, c, m)
         }

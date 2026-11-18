@@ -14,6 +14,11 @@ export function hasAccountChoice(row: Row, accounts: Account[]): boolean {
   return !paysByCard(row) || row.accountId != null || accounts.some((a) => !a.deletedAt && !a.archivedMonth && a.type === 'credit-card')
 }
 
+/** A row that "moves money between your accounts": a typed transfer row. The account it names receives the money. */
+export function movesMoney(row: Pick<Row, 'kind' | 'section'>): boolean {
+  return row.section === 'transfer' && row.kind === 'plain'
+}
+
 /** Menu and dialog wording for a row's account, by what the row does. */
 export function accountVerb(row: Row): string {
   switch (row.kind) {
@@ -29,7 +34,7 @@ export function accountVerb(row: Row): string {
     case 'pocket-money':
       return 'Lands in'
     default:
-      return row.section === 'income' ? 'Paid into' : paysByCard(row) ? 'Paid by card' : 'Paid from'
+      return movesMoney(row) ? 'Goes into' : row.section === 'income' ? 'Paid into' : paysByCard(row) ? 'Paid by card' : 'Paid from'
   }
 }
 
@@ -50,6 +55,7 @@ export function accountHelp(row: Row): string {
     case 'pocket-money':
       return 'An account of this adult\'s own that net worth leaves out. The pocket money raises its balance each month; it still leaves the month, and "Per person" still counts it. With "Nowhere" the app does not follow it.'
     default:
+      if (movesMoney(row)) return 'The account the money goes into: its balance rises by the amount, and net worth stays as it is. With no account the money leaves the plan, and net worth falls by it. Current accounts are not listed: they are one balance, so a move between them changes nothing.'
       if (row.section === 'income') return 'Which of your accounts receives it. For your overview only; the sums do not change.'
       return paysByCard(row)
         ? 'The credit card this is bought on. On a card where everything you buy is recorded, the spending adds to what you owe on it until it is paid. An expense that comes straight out of a savings account, an investment account or another asset is set under "Comes out of…" in the row menu instead.'

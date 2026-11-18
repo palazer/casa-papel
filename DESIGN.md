@@ -231,7 +231,11 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   first as a visible label, `What is it for?`, then `Which one`, then the name. Its choices are the places the rest
   of the month is shared out to, in this order: goes into a savings account, deposits into an investment account,
   fills a virtual account (offered once a savings account can hold one; `New virtual account…` opens the virtual
-  account's own form, which names its row), pocket money, and last the plain move between accounts. A payment to a
+  account's own form, which names its row), pocket money, and last the plain move between accounts. The move names
+  the account that receives the money: its list holds every account with a balance of its own (savings,
+  investments, cash, other assets). The list starts with `No account: the money leaves the plan`, which is what the
+  form starts on; while that is picked the sentence under the form says what follows (net worth falls by it), and
+  the row needs a name of its own. A payment to a
   loan or a card is not among them: it has to be made, so it is added with the expenses. The Statement's expense
   places (the foot of Expenses, and inside a category: the car loan under Transport) offer `Pays off a loan or card`
   for every loan and card, and the line stays where it was added. Only the payment to a card whose purchases are
@@ -391,8 +395,11 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   the spending), in the category its row has, as in the Grid; that it brings a debt down shows in the lower half and
   through its link. `From what is left` is how the rest is shared out: pocket money first, a line per adult, then
   the transfers into savings, investment and virtual accounts, then the figure that closes the month. These are the
-  lines whose amount can follow a rule. The payment to a card whose purchases are expense rows moves no new money: it
-  stands under `Moved elsewhere` with the `counted when bought` chip and is in no sum. The group was `To savings,
+  lines whose amount can follow a rule. A row that moves money into another of the household's accounts stands here
+  too, linked to that account (`Goes into Wallet`): the money is still the household's. `Moved elsewhere` holds what
+  no account of the household receives: a move that names no account, with the zinc chip `leaves the plan` (net
+  worth falls by it), and the payment to a card whose purchases are expense rows, which moves no new money and
+  carries the `counted when bought` chip and is in no sum. The group was `To savings,
   investments and debts` while the page was cut by what becomes of the money (gone, or still the household's); its
   code name stays `set-aside`. Both headings carry an (i) that says which question they answer. The Grid's `Expenses
   total` is the same figure as the `Expenses` heading (`expensesTotal`: payments in, pocket money and plain
@@ -630,7 +637,9 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 - A row's menu (`src/features/grid/RowMenu.tsx`) runs Rename…, Move up, Move down, Category…, Belongs to…, Currency…,
   then Treat new values as…, Comes out of…, Deducted from an income… (spending rows, followers included; it names the
   income once set), the account verb, Follow another row…, then Archive or delete… or Restore. The account verb says
-  what the row's account is for (`Goes into…`, `Comes from…`, `Pays off…`, `Paid into…`); on an ordinary expense
+  what the row's account is for (`Goes into…`, `Comes from…`, `Pays off…`, `Paid into…`; a row that moves money
+  says `Goes into…` too, and its dialog lists the accounts with a balance and `No account: the money leaves the
+  plan`); on an ordinary expense
   row it is `Paid by card…`, lists the credit cards after `Not by card` and nothing else (which account the money
   comes out of is "Comes out of…", so the two cannot be mistaken for each other), and is left out while the
   household has no card. Belongs to offers the

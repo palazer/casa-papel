@@ -18,7 +18,7 @@
  * Grid): that it brings a debt down shows in the lower half. "From what is left" is how the rest is shared out:
  * pocket money, savings, investments, virtual accounts, and the figure that closes the month.
  */
-import { accountGroup, addMonths, canCarryRule, cardIsItemized, describeCadence, isTakenFromAccount, nextDue, paysAsExpense, pocketLandsIn, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
+import { accountGroup, addMonths, canCarryRule, cardIsItemized, describeCadence, isTakenFromAccount, movesInto, nextDue, paysAsExpense, pocketLandsIn, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
 import { computeGoals, type GoalProgress } from './goals'
 import { currentAccountsIn, mainAccountLabel } from './mainAccount'
 import { cellKey, fundingTotal, type AccountSeries, type CellResult, type CellStatus, type EngineOutput } from './types'
@@ -192,7 +192,9 @@ function bucketOf(row: Row, accountsById: Map<string, Account>): Bucket {
     case 'pocket-money': return 'pocket'
     case 'debt-payment':
     case 'card-payment': return paysAsExpense(row, row.accountId ? accountsById.get(row.accountId) : undefined) ? 'pay-off' : 'memo'
-    default: return row.section === 'expense' ? 'expense' : 'moved'
+    // a row that moves money into another of the household's accounts stands with what is set aside; one that names
+    // none moves its money out of the plan
+    default: return row.section === 'expense' ? 'expense' : movesInto(row, row.accountId ? accountsById.get(row.accountId) : undefined) ? 'set-aside' : 'moved'
   }
 }
 
@@ -390,7 +392,8 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
         pocket.push(rowLine(row, c, v))
         break
       case 'moved':
-        moved.push(rowLine(row, c, v))
+        // no account of the household receives it: the line says so, because net worth falls by it
+        moved.push(rowLine(row, c, v, { chip: 'leaves the plan' }))
         break
       case 'set-aside': {
         // the rest on an investment or a virtual account closes the month; in a month that overruns it comes back from there
@@ -619,8 +622,10 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
       const pool = poolOfRow.get(row.id)
       // pocket money is linked to the account it lands in, which is one that net worth leaves out
       const lands = row.accountId ? pocketLandsIn(row, accountsById.get(row.accountId)) : false
+      // a row that moves money is linked to the account it moves it into
+      const moves = row.accountId ? movesInto(row, accountsById.get(row.accountId)) : false
       const target = row.kind === 'pool-allocation' ? (pool ? poolLines.get(pool.id) : undefined)
-        : fills.includes(row.kind) || takes.includes(row.kind) || pays.includes(row.kind) || lands ? (row.accountId ? accountLines.get(row.accountId) : undefined)
+        : fills.includes(row.kind) || takes.includes(row.kind) || pays.includes(row.kind) || lands || moves ? (row.accountId ? accountLines.get(row.accountId) : undefined)
         : undefined
       if (!target) continue
       // a payment brings down what is owed, except on a card that records only its payments: there it is the

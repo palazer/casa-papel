@@ -203,6 +203,55 @@ test.describe('whole stories, as the scenarios tell them', () => {
     await expect(amex).toContainText('€500.00')
   })
 
+  // scenarios/02: "Money moved to another of the household's accounts leaves net worth as it is",
+  // "A row that moves money and names no account takes it out of the plan"
+  test('a row that moves money names the account that receives it; named none, the money leaves the plan', async ({ page }) => {
+    const s = await household(page)
+    const claims = page.getByRole('region', { name: 'Debts and net worth' })
+    await addAccount(s, 'Wallet', 'Cash', '150')
+    const what = s.moneyOut.getByLabel('What is it for?')
+    const which = s.moneyOut.getByLabel('Which one')
+    const text = s.moneyOut.getByTestId('add-row-text')
+    const part = (id: string) => s.moneyOut.locator(`li:has(> [data-line="${id}"])`)
+
+    // the form starts on "No account", and says what that means; picking the account changes the sentence and names the row
+    await s.moneyOut.getByRole('button', { name: 'Add transfer row' }).click()
+    await what.selectOption('plain')
+    await expect(which.locator('option')).toHaveText(['No account: the money leaves the plan', 'Wallet'])
+    await expect(text).toHaveText('An amount you type each month that no account of yours receives, like money sent to family. It is not counted as spending, and net worth falls by it.')
+    await which.selectOption({ label: 'Wallet' })
+    await expect(text).toHaveText('An amount you type each month goes from the current accounts into the account you pick. Its balance rises by it, and net worth stays as it is. It is not spending.')
+    await expect(s.moneyOut.getByLabel('New transfer row name')).toHaveAttribute('placeholder', 'To Wallet')
+    await s.moneyOut.getByRole('button', { name: 'Add', exact: true }).click()
+    await expect(s.dlg.getByRole('heading', { name: 'To Wallet · November 2026' })).toBeVisible()
+    await s.dlg.getByLabel('Amount in EUR').fill('300')
+    await s.dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(s.dlg).toBeHidden()
+
+    // it stands with what is shared out of the rest, linked to its account, which rises; net worth is what it was
+    await expect(part('set-aside').getByRole('button', { name: /^To Wallet: €300\.00/ })).toBeVisible()
+    await expect(s.moneyOut.getByRole('button', { name: 'Goes into Wallet: go there' })).toBeVisible()
+    await expect(s.assets.locator('[data-line^="acc:"]').filter({ hasText: 'Wallet' })).toContainText('€450.00')
+    await expect(line(s.moneyOut, 'Leftover')).toContainText('€1,500.00')
+    await expect(s.assets.locator('[data-line="main"]')).toContainText('€2,500.00')
+    await expect(claims.locator('[data-line="net-worth"]')).toContainText('€2,950.00')
+
+    // the same kind of row without an account: under "Moved elsewhere", marked, and net worth falls by it
+    await s.moneyOut.getByRole('button', { name: 'Add transfer row' }).click()
+    await what.selectOption('plain')
+    await s.moneyOut.getByLabel('New transfer row name').fill('To grandma')
+    await s.moneyOut.getByRole('button', { name: 'Add', exact: true }).click()
+    await expect(s.dlg.getByRole('heading', { name: 'To grandma · November 2026' })).toBeVisible()
+    await s.dlg.getByLabel('Amount in EUR').fill('50')
+    await s.dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(s.dlg).toBeHidden()
+    const gift = part('moved').locator('[data-line]').filter({ hasText: 'To grandma' })
+    await expect(gift).toContainText('leaves the plan')
+    await expect(s.moneyOut.locator('[data-line="moved"]')).toContainText('€50.00')
+    await expect(claims.locator('[data-line="net-worth"]')).toContainText('€2,900.00')
+    await page.screenshot({ path: 'e2e/output/story-move-money.png', fullPage: true })
+  })
+
   // scenarios/09: "The last payment to a loan is what is still owed, and after it the payment counts as nothing"
   test('a loan payment stops at what is owed: the last one is smaller, then the row is marked paid off', async ({ page }) => {
     const s = await household(page)

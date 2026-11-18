@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { cellKey, computeEngine, computePersonBudgets } from '@/engine'
 import { monthRange, newId } from '@/model'
-import { CasaDb, Store, addAccount, addEntity, addPool, addRowOfKind, loadTables, planArchive, planRemoval, quickCreateHousehold, rowTargets, setCellValue } from '@/store'
+import { CasaDb, Store, addAccount, addEntity, addPool, addRowOfKind, loadTables, planArchive, planRemoval, quickCreateHousehold, rowTargets, setCellValue, setRowAccount } from '@/store'
 
 const months = monthRange('2026-01', '2026-03')
 
@@ -80,6 +80,33 @@ describe('addRowOfKind under Transfers', () => {
     expect(computePersonBudgets(t, out, '2026-01').find((p) => p.entityId === pat.id)?.pocket).toBe(5000)
     const plain = await addRowOfKind(store, { section: 'transfer', name: 'To the joint account', categoryId: null, kind: 'plain' })
     expect(plain).toMatchObject({ kind: 'plain', accountId: null, defaultStatus: 'projected' })
+  })
+
+  it('a row that moves money names the account that receives it: one with a balance of its own, which may name the row', async () => {
+    const { store } = await fresh()
+    const wallet = await addAccount(store, { name: 'Wallet', type: 'cash', currency: 'EUR', openingMonth: '2026-01', openingBalance: 15000 })
+    const current = await addAccount(store, { name: 'Joint account', type: 'joint', currency: 'EUR', openingMonth: '2026-01' })
+    const named = await addAccount(store, { name: 'Old savings', type: 'savings', currency: 'EUR', openingMonth: '2026-01', tracked: false })
+    expect(rowTargets(await loadTables(store), undefined).balances.map((a) => a.name)).toContain('Wallet')
+    expect(rowTargets(await loadTables(store), undefined).balances.map((a) => a.name)).not.toContain('Joint account')
+    expect(rowTargets(await loadTables(store), undefined).balances.map((a) => a.name)).not.toContain('Old savings')
+
+    const move = await addRowOfKind(store, { section: 'transfer', name: '', categoryId: null, kind: 'plain', accountId: wallet.id })
+    expect(move).toMatchObject({ kind: 'plain', section: 'transfer', accountId: wallet.id, name: 'To Wallet' })
+    await setCellValue(store, move.id, '2026-01', 10000, 'from-now-on')
+    const out = computeEngine({ tables: await loadTables(store), months })
+    expect(out.accounts[wallet.id].months['2026-01'].balance).toBe(25000)
+    expect(out.totals['2026-01']).toMatchObject({ movedToAccounts: 10000, moved: 0 })
+
+    // the current accounts are one balance, and an account that is only named has none: neither can receive it
+    await expect(addRowOfKind(store, { section: 'transfer', name: 'Between', categoryId: null, kind: 'plain', accountId: current.id })).rejects.toThrow(/no balance of its own/)
+    await expect(addRowOfKind(store, { section: 'transfer', name: 'Old', categoryId: null, kind: 'plain', accountId: named.id })).rejects.toThrow(/no balance of its own/)
+    // the row menu's "Goes into…" follows the same rule, and "no account" takes the money out of the plan again
+    await expect(setRowAccount(store, move.id, current.id)).rejects.toThrow(/no balance of its own/)
+    await setRowAccount(store, move.id, null)
+    const gone = computeEngine({ tables: await loadTables(store), months })
+    expect(gone.totals['2026-01']).toMatchObject({ movedToAccounts: 0, moved: 10000 })
+    expect(gone.accounts[wallet.id].months['2026-01'].balance).toBe(15000)
   })
 })
 

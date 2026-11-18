@@ -11,7 +11,7 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
 | | Finding | Weighs | Recommendation | State |
 | --- | --- | --- | --- | --- |
 | F1 | An exception in the plan's last month lengthens the plan by a year | small | with step 3 | open, with step 3 |
-| F2 | Money "moved between your accounts" lowers net worth | net worth is wrong | the row names the account that receives it | open |
+| F2 | Money "moved between your accounts" lowers net worth | net worth is wrong | the row names the account that receives it | closed |
 | F3 | The month after an exception holds an amount nobody typed | amounts can change by surprise | with step 3 | open, with step 3 |
 | F4 | A loan that is paid off keeps taking payments | net worth is right, the debt reads below zero | the payment stops at what is owed | closed |
 | F5 | A card that records only its payments never lowers net worth | net worth is wrong | payments do not move what is owed | closed |
@@ -47,8 +47,11 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
   falls by the amount, every month. With 300.00 a month, net worth is 3,600.00 lower after a year.
 - **What the rule says.** Money that only moves between the household's own accounts changes nothing in net worth
   (rule N2).
-- **Scenario.** `02-balances-month-to-month.feature`: "Money moved between the household's own accounts leaves net
-  worth as it is".
+- **Scenarios.** `02-balances-month-to-month.feature`: "Money moved to another of the household's accounts leaves
+  net worth as it is", "Money can be moved into a savings account, an investment account or an other asset the same
+  way", "A row that moves money and names no account takes it out of the plan", "Money moved into an account that
+  net worth leaves out lowers net worth", "A move cannot name an account without a balance of its own";
+  `05-rates.feature`: "Money moved into an account in another currency arrives at the month's rate".
 - **To be fair to the app.** If the money goes to an account the plan keeps no balance for, falling net worth is what
   the plan can know. But the row's own words say the money stays yours, and its help says "It is not spending".
 - **Options.** (a) Such a row says which account receives the money; with an account that has a balance, net worth
@@ -56,6 +59,16 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
   (c) Leave it.
 - **Recommendation.** (a), with (b)'s wording for a row that names no account.
 - **Decision.** Yes (17 November 2026): the row names the account that receives the money; a row that names none says that the money leaves the plan.
+  Any account with a balance of its own can be named (savings, investments, cash, other assets). A row that names
+  one stands under "From what is left" with its link; "Moved elsewhere" keeps what names none.
+- **Closed** (18 November 2026). "Moves money between your accounts" has a list of the accounts with a balance; the
+  amount leaves the current accounts and arrives in the one that is named, at the month's rate when that account is
+  in another currency, and net worth stays as it is. The row stands under "From what is left", linked to its account
+  ("Goes into Wallet"). The list starts with "No account: the money leaves the plan": that row stands under "Moved
+  elsewhere" with the mark "leaves the plan", and net worth falls by it, as before. The row menu's dialog says "Goes
+  into" and offers the same list. Current accounts are not in it: they are one balance today, and join with the
+  main-account step. One thing changed for stored data: a row of this kind that already noted an account "for your
+  overview" sends its amount there from now on, when that account has a balance.
 
 ### F3. The month after an exception holds an amount nobody typed
 

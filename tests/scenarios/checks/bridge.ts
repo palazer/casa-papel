@@ -1,5 +1,5 @@
 import { buildFxIndex, cellKey, convertMoney } from '@/engine'
-import { addMonths, cardIsItemized, isTakenFromAccount, pocketLandsIn, type Money, type MonthKey } from '@/model'
+import { addMonths, cardIsItemized, isTakenFromAccount, movesInto, pocketLandsIn, type Money, type MonthKey } from '@/model'
 import { moneyText, monthName } from '../registry'
 import type { View } from '../world'
 
@@ -97,6 +97,10 @@ export function bridgeOf(view: View, m: MonthKey): Bridge {
     } else if (row.kind === 'pool-allocation') {
       const pool = [...pools.values()].find((p) => p.allocationRowId === row.id)
       route(pool?.accountId, v)
+    } else if (movesInto(row, account)) {
+      // a row that moves money into the account it names: it arrives there. One that names none is in the month's
+      // "moved elsewhere", and no account receives it.
+      route(row.accountId, v)
     } else if (row.kind === 'card-payment' && account?.type === 'credit-card' && !cardIsItemized(account)) {
       // nothing says what was bought on such a card, so its payment is what was spent; what is owed moves only with a real balance
       paidToLumpCards += v

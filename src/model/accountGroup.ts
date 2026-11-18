@@ -50,3 +50,22 @@ export function isOutsideNetWorth(account: Pick<Account, 'type' | 'outsideNetWor
 export function pocketLandsIn(row: Pick<Row, 'kind' | 'accountId'>, account: Pick<Account, 'id' | 'type' | 'outsideNetWorth'> | undefined): boolean {
   return row.kind === 'pocket-money' && !!account && row.accountId === account.id && isOutsideNetWorth(account)
 }
+
+/**
+ * Whether an account holds money with a balance of its own that the plan follows month by month: a savings account,
+ * an investment account or an other asset whose balance is tracked, and cash, which always has one. The current
+ * accounts are one balance together, and a card or a loan is what is owed.
+ */
+export function holdsBalance(account: Pick<Account, 'type' | 'tracked'>): boolean {
+  return paysExpenses(account) && (account.tracked || account.type === 'cash')
+}
+
+/**
+ * Whether a row that "moves money between your accounts" sends its amount into the account it names ("Goes into"):
+ * a typed transfer row, and an account with a balance of its own. The money then leaves the current accounts and
+ * arrives there, so net worth stays as it is. A row of this kind that names no such account moves its money out of
+ * the plan: no account of the household receives it.
+ */
+export function movesInto(row: Pick<Row, 'kind' | 'section' | 'accountId'>, account: Pick<Account, 'id' | 'type' | 'tracked'> | undefined): boolean {
+  return row.section === 'transfer' && row.kind === 'plain' && !!account && row.accountId === account.id && holdsBalance(account)
+}

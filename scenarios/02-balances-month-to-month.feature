@@ -94,17 +94,60 @@ Feature: Balances from month to month
     And a transfer "To Index fund" of 200.00 to "Index fund" from January 2026
     Then "Index fund" ends December 2026 with 12,400.00
 
-  @N2
-  Scenario: A row that moves money elsewhere takes it out of the month
-    Given a row "To the joint account" that moves 300.00 between my accounts from January 2026
+  # A row that "moves money between your accounts" names the account that receives it. The money leaves the
+  # current account and arrives there: net worth is what it was.
+  @N2 @F2
+  Scenario: Money moved to another of the household's accounts leaves net worth as it is
+    Given a cash account "Wallet" holding 150.00
+    And a row "To Wallet" that moves 300.00 to "Wallet" from January 2026
+    Then "Wallet" ends January 2026 with 450.00
+    And "Wallet" ends February 2026 with 750.00
+    And "Current account" ends January 2026 with 2,500.00
+    And the Statement of January 2026 shows "To Wallet" at 300.00
+    And the Statement of January 2026 shows "From what is left" at 1,800.00
+    And the Statement of January 2026 shows "Leftover" at 1,500.00
+    And net worth changes by 1,800.00 in February 2026
+    And of that, 0.00 is "moved elsewhere"
+
+  @N2 @F2
+  Scenario: Money can be moved into a savings account, an investment account or an other asset the same way
+    Given a savings account "Savings" holding 5,000.00
+    And an investment account "Index fund" holding 10,000.00
+    And an other asset "Loan to Kim" worth 0.00
+    And a row "Extra to Savings" that moves 100.00 to "Savings" from January 2026
+    And a row "Extra to Index fund" that moves 200.00 to "Index fund" from January 2026
+    And a row "Lent to Kim" that moves 50.00 to "Loan to Kim" from January 2026
+    Then "Savings" ends January 2026 with 5,100.00
+    And "Index fund" ends January 2026 with 10,200.00
+    And "Loan to Kim" ends February 2026 with 100.00
+    And the Statement of January 2026 shows "Leftover" at 1,450.00
+    And net worth changes by 1,800.00 in February 2026
+
+  # A row of the same kind that names no account: nothing of the household's receives the money.
+  @N2 @F2
+  Scenario: A row that moves money and names no account takes it out of the plan
+    Given a row "To grandma" that moves 300.00 out of the plan from January 2026
     Then the Statement of January 2026 shows "Moved elsewhere" at 300.00
     And the Statement of January 2026 shows "Leftover" at 1,500.00
     And "Current account" ends January 2026 with 2,500.00
+    And net worth changes by 1,500.00 in February 2026
+    And of that, -300.00 is "moved elsewhere"
 
-  @N2 @open @F2
-  Scenario: Money moved between the household's own accounts leaves net worth as it is
-    Given a row "To the joint account" that moves 300.00 between my accounts from January 2026
-    Then net worth changes by 1,800.00 in February 2026
+  # The account is one that net worth leaves out: the money arrives there, and net worth no longer counts it.
+  @N2 @O1 @F2
+  Scenario: Money moved into an account that net worth leaves out lowers net worth
+    Given a cash account "Sam's wallet" holding 0.00
+    And "Sam's wallet" is left out of net worth
+    And a row "To Sam's wallet" that moves 300.00 to "Sam's wallet" from January 2026
+    Then "Sam's wallet" ends February 2026 with 600.00
+    And net worth changes by 1,500.00 in February 2026
+    And of that, -300.00 is "accounts left out of net worth"
+
+  @N2 @F2
+  Scenario: A move cannot name an account without a balance of its own
+    Given a savings account "Old savings" that is only named
+    When a row "To old savings" that moves 300.00 to "Old savings" from January 2026
+    Then it is refused with "no balance of its own"
 
   @B2 @B4
   Scenario: An account that takes the rest of the month gets what the month leaves

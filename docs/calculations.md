@@ -142,7 +142,11 @@ Paying a loan down is in none of them either: the current account and the debt f
 The app shows these parts nowhere yet. The scenario runner works them out by itself from the rows and the accounts'
 settings, compares them with every balance the app calculated, and fails when a cent is left over.
 
-Finding F2 belongs here: "moved elsewhere" lowers net worth although the row says the money stays the household's.
+A row that "moves money between your accounts" names the account that receives it: one with a balance of its own
+(a savings account, an investment account, cash, an other asset). The amount leaves the current accounts and arrives
+there, so it is in none of the parts above and net worth stays as it is. Only a row of that kind that names no such
+account is "moved elsewhere": no account of the household receives the money, and net worth falls by it (finding F2,
+closed).
 
 ## P. The months of the plan
 
@@ -253,7 +257,7 @@ unless a real balance stands in between (B5).
 **M1. What comes in is what goes out plus what is left.**
 
     what is left = income − expenses paid from the month − what goes to savings, investments, virtual accounts,
-                   pocket money and loans
+                   pocket money and loans − what a row moves to another account, or out of the plan
 
 Both sides of the Statement's upper half show the same total. "Leftover" is what stays in the current accounts.
 

@@ -102,15 +102,23 @@ export interface MonthTotals {
   pocket: Money
   /** Paid to loans, and to cards whose payment is the spending. */
   debt: Money
-  /** Moved between the household's own accounts by plain transfer rows: an outflow of the month, not an expense. Counted in `cashExpense` too. */
+  /**
+   * Moved out of the plan by "moves money" rows that name no account with a balance: an outflow of the month that is
+   * no expense, and that no account of the household receives. Counted in `cashExpense` too.
+   */
   moved: Money
+  /**
+   * Moved into another of the household's accounts by "moves money" rows that name one (`movesInto`): it leaves the
+   * current accounts and arrives there. An outflow of the month, no expense. Counted in `cashExpense` too.
+   */
+  movedToAccounts: Money
   buffer: Money
   /** Positive = into savings, negative = drawn from savings. */
   toSavings: Money
   leftover: Money
   /** Derived "From savings" row: spending paid from savings, from virtual accounts and from named accounts. */
   fromSavingsDerived: Money
-  /** What the month costs: the expense rows, whatever they come out of, and `debt`. Neither `pocket` nor `moved`. */
+  /** What the month costs: the expense rows, whatever they come out of, and `debt`. Neither `pocket`, `moved` nor `movedToAccounts`. */
   expensesTotal: Money
   transfersTotal: Money
   /** The part of `income` that was taken out of your own accounts by hand (savings, investments): money in, not earned. */

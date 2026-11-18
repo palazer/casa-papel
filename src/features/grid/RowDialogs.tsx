@@ -7,14 +7,14 @@ import { Segmented } from '@/components/Segmented'
 import { formatMonth } from '@/app/format'
 import { useStore } from '@/app/store'
 import { sortRows } from '@/engine'
-import { ENTITY_KIND_LABEL, monthOfDate, type Account, type FundedBy, type Household, type Row, type Section, type Tables } from '@/model'
+import { ENTITY_KIND_LABEL, holdsBalance, monthOfDate, type Account, type FundedBy, type Household, type Row, type Section, type Tables } from '@/model'
 import { accountTypeForRow, derivedRowReason, followRow, setRowAccount, setRowDeductedFrom, setRowFundedBy, setRowScope, updateRow } from '@/store'
 import { NativeSelect } from '@/components/NativeSelect'
 import { fundingOptions } from './funding'
 import { currencyChoices, currencyLabel } from '@/app/currencies'
 import { HELP } from '@/app/help'
 import { TipLabel } from '@/components/InfoTip'
-import { accountHelp, accountVerb, landingAccounts, paysByCard } from './rowAccount'
+import { accountHelp, accountVerb, landingAccounts, movesMoney, paysByCard } from './rowAccount'
 
 interface Base {
   row: Row
@@ -111,7 +111,9 @@ export function RowAccountDialog({ row, tables, onClose }: Base) {
   const byCard = paysByCard(row)
   // pocket money lands only in an account that net worth leaves out; any other account the row still names is not offered
   const pocket = row.kind === 'pocket-money'
-  const fits = (a: Account) => (need ? a.type === need : !byCard || a.type === 'credit-card' || a.id === row.accountId)
+  // a row that moves money sends it into the account it names: only one with a balance of its own can receive it
+  const moves = movesMoney(row)
+  const fits = (a: Account) => (need ? a.type === need : moves ? holdsBalance(a) || a.id === row.accountId : !byCard || a.type === 'credit-card' || a.id === row.accountId)
   // archived accounts are offered only while the row still points at one
   const accounts = pocket ? landingAccounts(tables.accounts) : tables.accounts.filter((a) => !a.deletedAt && fits(a) && (!a.archivedMonth || a.id === row.accountId))
   const [accountId, setAccountId] = useState(() => (pocket && !accounts.some((a) => a.id === row.accountId) ? '' : row.accountId ?? ''))
@@ -129,9 +131,9 @@ export function RowAccountDialog({ row, tables, onClose }: Base) {
           <div className="space-y-1.5">
             <Label htmlFor="row-account">{byCard ? 'Card' : verb}</Label>
             <NativeSelect id="row-account" className="w-full" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-              {!need && <option value="">{byCard ? 'Not by card' : pocket ? 'Nowhere' : '—'}</option>}
+              {!need && <option value="">{byCard ? 'Not by card' : pocket ? 'Nowhere' : moves ? 'No account: the money leaves the plan' : '—'}</option>}
               {need && !accountId && <option value="">Pick an account</option>}
-              {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}{need && !a.tracked ? ' (not tracked)' : ''}{byCard && a.type !== 'credit-card' ? ' (not a card)' : ''}</option>)}
+              {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}{need && !a.tracked ? ' (not tracked)' : ''}{byCard && a.type !== 'credit-card' ? ' (not a card)' : ''}{moves && !holdsBalance(a) ? ' (has no balance to go into)' : ''}</option>)}
             </NativeSelect>
             <p className="text-xs text-muted-foreground">{accountHelp(row)}</p>
             {byCard && !accounts.some((a) => a.type === 'credit-card') && <p className="text-xs text-muted-foreground">No credit card yet: add one on the Statement under "Debts and net worth".</p>}

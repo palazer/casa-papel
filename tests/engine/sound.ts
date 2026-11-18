@@ -53,8 +53,9 @@ export function expectAddsUp(s: Statement, out: EngineOutput, m: MonthKey = s.mo
   expect(taken, `${m} taken from accounts`).toBe(tot.fromAccounts)
   expect(worked, `${m} from savings`).toBe(tot.fromSavingsDerived)
   // what covers a short month sits on the left; taken back out, the right side is the engine's outflows and closing figures
-  expect(s.flow.right.total - covered, `${m} outflows`).toBe(tot.expensesTotal + tot.moved + tot.pocket + tot.allocations + tot.toInvestment + tot.toSavings + tot.leftover)
-  // the first heading is what the month costs, to the cent what the Grid calls "Expenses total"; what is moved between the household's accounts has its own
+  expect(s.flow.right.total - covered, `${m} outflows`).toBe(tot.expensesTotal + tot.moved + tot.movedToAccounts + tot.pocket + tot.allocations + tot.toInvestment + tot.toSavings + tot.leftover)
+  // the first heading is what the month costs, to the cent what the Grid calls "Expenses total"; what is moved out of the plan has its own,
+  // and what is moved into another of the household's accounts stands with what is set aside
   expect(amountOf('out', 'expenses'), `${m} expenses`).toBe(tot.expensesTotal)
   expect(amountOf('out', 'moved'), `${m} moved`).toBe(tot.moved)
   // one net worth: the Statement's is the engine's, and both count what stays in the main account

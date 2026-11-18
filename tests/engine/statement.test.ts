@@ -273,6 +273,41 @@ describe('the Statement, the month', () => {
     expectSound(t, months)
   })
 
+  it('a row that moves money stands with what is set aside when it names an account, and leaves the plan when it names none', () => {
+    const main = account({ name: 'Main', type: 'checking', openingBalance: 0, tracked: false })
+    const wallet = account({ name: 'Wallet', type: 'cash', openingBalance: 150_00, order: 'a1' })
+    const salary = row({ name: 'Salary', section: 'income' })
+    const toWallet = row({ name: 'To Wallet', section: 'transfer', accountId: wallet.id, order: 'c0' })
+    const gift = row({ name: 'To grandma', section: 'transfer', order: 'c1' })
+    // a current account has no balance of its own to go into: such a row names no account that receives the money
+    const between = row({ name: 'To the other current account', section: 'transfer', accountId: main.id, order: 'c2' })
+    const t = tables({
+      household: [household({ closingRule: 'leftover-plug' })], accounts: [main, wallet], rows: [salary, toWallet, gift, between],
+      cells: [cellValue(salary.id, '2026-01', 4000_00), cellValue(toWallet.id, '2026-01', 100_00), cellValue(gift.id, '2026-01', 50_00), cellValue(between.id, '2026-01', 30_00)],
+    })
+    const { s, out } = statementFor(t, '2026-01')
+    expect(s.flow.right.lines.map((l) => [l.label, l.amount])).toEqual([['Expenses', 0], ['Moved elsewhere', 80_00], ['From what is left', 3920_00]])
+    expect(topLine(s, 'out', 'moved')!.children.map((c) => [c.label, c.amount, c.chip, c.link])).toEqual([
+      ['To grandma', 50_00, 'leaves the plan', undefined], ['To the other current account', 30_00, 'leaves the plan', undefined],
+    ])
+    expect(topLine(s, 'out', 'set-aside')!.children.map((c) => [c.label, c.amount, c.chip])).toEqual([['To Wallet', 100_00, undefined], ['Leftover', 3820_00, undefined]])
+    // the row and its account are the two ends of one link
+    expect(find(s, toWallet.id)!.link).toEqual({ to: [`acc:${wallet.id}`], text: 'Goes into Wallet' })
+    expect(find(s, `acc:${wallet.id}`)).toMatchObject({ amount: 250_00, change: 100_00, link: { to: [toWallet.id], text: 'Filled by To Wallet' } })
+    // the sums: all three leave the current accounts, none is an expense, and only what no account receives lowers net worth
+    expect(out.totals['2026-01']).toMatchObject({ moved: 80_00, movedToAccounts: 100_00, cashExpense: 180_00, expensesTotal: 0, leftover: 3820_00, transfersTotal: 100_00 })
+    expect(out.accounts[wallet.id].months['2026-02'].balance).toBe(350_00)
+    expect(out.netWorth['2026-01']).toBe(150_00 + 4000_00 - 80_00)
+    expectSound(t, months)
+
+    // an amount below zero is money coming back out of the account: it stands under "From accounts", named after it
+    const back = tables({ ...t, cells: [cellValue(salary.id, '2026-01', 4000_00), cellValue(toWallet.id, '2026-01', -40_00)] })
+    const b = statementFor(back, '2026-01')
+    expect(topLine(b.s, 'in', 'from-accounts')!.children.map((c) => [c.label, c.amount, c.chip])).toEqual([['From Wallet', 40_00, 'to cover the month']])
+    expect(b.out.accounts[wallet.id].months['2026-01'].balance).toBe(110_00)
+    expectSound(back, months)
+  })
+
   it('lists rows without a heading when the section has no categories, and under "No category" when it has some', () => {
     const salary = row({ name: 'Salary', section: 'income' })
     const rent = row({ name: 'Rent', section: 'expense', order: 'b0' })

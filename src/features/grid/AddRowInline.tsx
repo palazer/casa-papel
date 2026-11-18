@@ -24,6 +24,11 @@ interface Kind {
   text: string
   /** The accounts, virtual accounts or adults the row can point at; null when it points at nothing. */
   targets: ((t: Targets) => Target[]) | null
+  /**
+   * For a row that may name a target or none: the first entry of its list, which names none and is what the form
+   * starts on, and the sentence shown while it is picked. The entry and the sentence say what naming none means.
+   */
+  none?: { label: string; text: string }
   targetLabel: 'Account' | 'Virtual account' | 'Adult'
   /** Which field of the store's input the target fills. */
   field: 'accountId' | 'poolId' | 'adultId'
@@ -45,7 +50,12 @@ const NEW = {
 } satisfies Record<string, New>
 
 const K = {
-  moves: { key: 'plain', section: 'transfer', label: 'Moves money between your accounts', text: 'An amount you type each month. It is not spending, so it never counts as an expense.', targets: null, targetLabel: 'Account', field: 'accountId', empty: () => '' },
+  moves: {
+    key: 'plain', section: 'transfer', label: 'Moves money between your accounts',
+    text: 'An amount you type each month goes from the current accounts into the account you pick. Its balance rises by it, and net worth stays as it is. It is not spending.',
+    targets: (t) => t.balances, targetLabel: 'Account', field: 'accountId', empty: () => '',
+    none: { label: 'No account: the money leaves the plan', text: 'An amount you type each month that no account of yours receives, like money sent to family. It is not counted as spending, and net worth falls by it.' },
+  },
   toSavings: { key: 'to-savings', section: 'transfer', label: 'Goes into a savings account', text: 'An amount you type; that savings balance under Balances rises with it. Its rule can make it a percentage instead.', targets: (t) => t.savings, targetLabel: 'Account', field: 'accountId', create: [NEW.savings], empty: () => '' },
   toInvestment: { key: 'to-investment', section: 'transfer', label: 'Deposits into an investment account', text: 'The account\'s value, deposited total and return under Balances follow this row.', targets: (t) => t.investments, targetLabel: 'Account', field: 'accountId', create: [NEW.investment], empty: () => '' },
   pool: { key: 'pool-allocation', section: 'transfer', label: 'Fills a virtual account', text: 'For a virtual account that lost its row: the amount lands in the virtual account every month.', targets: (t) => t.orphanPools, targetLabel: 'Virtual account', field: 'poolId', empty: () => '', offered: (t) => t.orphanPools.length > 0 },
@@ -77,6 +87,8 @@ const SET_ASIDE: Kind[] = [
 const PAYS_ANY: Kind = { ...K.payOff, targets: (t) => [...t.payoff, ...t.cardsItemized].map(withType) }
 
 const newValue = (n: New) => `new:${n.type}`
+/** The entry of a target list that names no target (`Kind.none`). */
+const NONE = 'none'
 
 /**
  * "Add row" at the foot of a section: a name, a category when the section has any, and under Transfers and Expenses what
@@ -131,8 +143,10 @@ export function AddRowInline({ section, categories, tables, household, onError, 
   const targets = kind?.targets?.(t) ?? null
   const creates = kind?.create ?? []
   const creating = creates.find((n) => newValue(n) === targetId) ?? (targets?.length === 0 ? creates[0] : undefined)
-  const chosen = targets && !creating ? (targets.find((x) => x.id === targetId) ?? targets[0]) : undefined
-  const missing = kind && targets && targets.length === 0 && !creating ? kind.empty(t) : null
+  // a row that may name none starts on that entry: it names a target once one is picked from the list
+  const naming = !!kind?.none && !targets?.some((x) => x.id === targetId)
+  const chosen = targets && !creating && !naming ? (targets.find((x) => x.id === targetId) ?? targets[0]) : undefined
+  const missing = kind && targets && targets.length === 0 && !creating && !kind.none ? kind.empty(t) : null
   // a row that names an account or a virtual account can do without a name of its own
   const named = !!kind && !!targets && kind.field !== 'adultId'
   const account = chosen && kind?.field === 'accountId' ? tables.accounts.find((a) => a.id === chosen.id) : undefined
@@ -149,6 +163,7 @@ export function AddRowInline({ section, categories, tables, household, onError, 
     landsElsewhere ? payOffNote
     : creating?.type === 'pool' ? 'Add opens the form of the new virtual account. Saving it makes the virtual account and its row, "To <name>".'
     : creating ? `Add opens the form of the new ${creating.thing}. Saving it makes the ${creating.thing} and this row together.`
+    : naming && kind.none ? kind.none.text
     : kind.text)
 
   const reset = () => {
@@ -219,11 +234,12 @@ export function AddRowInline({ section, categories, tables, household, onError, 
       {kinds.map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
     </NativeSelect>
   )
-  const targetField = kind && targets && (targets.length > 0 || creates.length > 0) && (
+  const targetField = kind && targets && (targets.length > 0 || creates.length > 0 || !!kind.none) && (
     <NativeSelect
       aria-label={place === 'set-aside' ? 'Which one' : `${kind.targetLabel} for the new ${section} row`} className="h-7"
-      value={creating ? newValue(creating) : chosen?.id ?? ''} onChange={(e) => setTargetId(e.target.value)}
+      value={creating ? newValue(creating) : chosen?.id ?? (kind.none ? NONE : '')} onChange={(e) => setTargetId(e.target.value)}
     >
+      {kind.none && <option value={NONE}>{kind.none.label}</option>}
       {targets.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
       {creates.map((n) => <option key={n.type} value={newValue(n)}>{n.label}</option>)}
     </NativeSelect>

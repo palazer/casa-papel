@@ -24,8 +24,15 @@ step('an expense {string} with no amount yet', async (world: World, name: string
   await addRow(world.store, { name, section: 'expense', categoryId: null })
 })
 
-// "Just moves money between your accounts": a transfer row that names no account
-step('a row {string} that moves {money} between my accounts from {month}', (world: World, name: string, amount: number, from: string) => rowWithAmount(world, 'transfer', name, amount, from))
+// "Moves money between your accounts" with "No account: the money leaves the plan": a transfer row that names none
+step('a row {string} that moves {money} out of the plan from {month}', (world: World, name: string, amount: number, from: string) => rowWithAmount(world, 'transfer', name, amount, from))
+
+// "Moves money between your accounts" with the account it goes into: one with a balance of its own
+step('a row {string} that moves {money} to {string} from {month}', async (world: World, name: string, amount: number, accountName: string, from: string) => {
+  const account = await world.account(accountName)
+  const row = await addRowOfKind(world.store, { section: 'transfer', name, categoryId: null, kind: 'plain', accountId: account.id })
+  await setCellValue(world.store, row.id, from, amount, 'from-now-on')
+})
 
 // "Goes to a savings account" or "Goes to an investment account", with the amount typed
 step('a transfer {string} of {money} to {string} from {month}', async (world: World, name: string, amount: number, accountName: string, from: string) => {

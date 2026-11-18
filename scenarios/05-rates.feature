@@ -199,6 +199,14 @@ Feature: Amounts and accounts in another currency
     When I hold the forecast for EUR/USD at the last known rate
     Then the forecast rate for EUR/USD in December 2026 is 1.0000
 
+  # Euros moved into a dollar account arrive as dollars at the month's rate, like what a savings row puts there.
+  @X6 @N2 @F2
+  Scenario: Money moved into an account in another currency arrives at the month's rate
+    Given a savings account "Dollar savings" in USD holding 1,100.00
+    And a row "To Dollar savings" that moves 100.00 to "Dollar savings" from January 2026
+    Then "Dollar savings" ends January 2026 with 1,210.00
+    And "Dollar savings" ends February 2026 with 1,335.00
+
   # A payment in euros to a loan in dollars: what is owed is counted in dollars, so the loan ends on exactly nothing,
   # and the last payment is what those dollars cost in euros that month.
   @X5 @C1 @F4

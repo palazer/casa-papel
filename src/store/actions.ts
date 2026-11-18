@@ -1,7 +1,7 @@
 import { generateKeyBetween } from 'fractional-indexing'
 import { computeEngine, cellKey, sortRows, typedAmount, type EngineOutput } from '@/engine'
 import {
-  ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RowSchema, accountIdOf, addMonths, canCarryRule, canTakeRest, cardIsItemized, compareMonths, isOldPocketShare, isOutsideNetWorth, isShareRule, monthKey, monthOfDate, monthRange, newId, parseMonth, paysExpenses, poolIdOf, resolveRules, sharePercent,
+  ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RowSchema, accountIdOf, addMonths, canCarryRule, canTakeRest, cardIsItemized, compareMonths, holdsBalance, isOldPocketShare, isOutsideNetWorth, isShareRule, monthKey, monthOfDate, monthRange, newId, parseMonth, paysExpenses, poolIdOf, resolveRules, sharePercent,
   type Account, type Category, type Cell, type CellInput, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Pool, type Row, type RowKind, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
@@ -206,6 +206,8 @@ export function rowTargets(tables: Tables, household: Household | undefined) {
   return {
     savings: accounts.filter((a) => a.type === 'savings'),
     investments: accounts.filter((a) => a.type === 'investment'),
+    /** where a row that moves money can send it: the accounts with a balance of their own (savings, investments, cash, other assets) */
+    balances: accounts.filter(holdsBalance),
     /** what a payment row under Expenses brings down: loans, and cards whose payment is the recorded spending */
     payoff: accounts.filter((a) => a.type === 'loan' || (a.type === 'credit-card' && !cardIsItemized(a))),
     /** cards whose purchases are expense rows: their payment is a transfer, so it is offered under Transfers */
@@ -284,6 +286,13 @@ export function rowOfKindMutations(tables: Tables, input: RowOfKindInput): { row
     }
     // beside the row that takes the rest, a further savings row is typed: said outright, or it would read as idle
     if (input.kind === 'to-savings' && targets.plugTaken) base.rule = 'fixed'
+  } else if (input.kind === 'plain' && input.section === 'transfer' && input.accountId) {
+    // a row that moves money into another account: the account it names receives the amount, and may name the row
+    const acc = checkAccountForRow(tables, { kind: 'plain', section: 'transfer', name: typed || 'The new row' }, input.accountId)
+    if (acc) {
+      base.accountId = acc.id
+      nameAfter(acc.name)
+    }
   } else if (input.kind === 'pocket-money') {
     const adult = targets.adults.find((e) => e.id === input.adultId)
     if (!adult) throw new Error('Pick the adult the pocket money is for.')
@@ -767,7 +776,7 @@ export async function setRowAccount(store: Store, rowId: string, accountId: stri
 }
 
 /** The account a row may point at: it must exist, and a typed row (deposits, payments) needs the matching type. */
-function checkAccountForRow(tables: Tables, row: Pick<Row, 'kind' | 'name'>, accountId: string | null): Account | null {
+function checkAccountForRow(tables: Tables, row: Pick<Row, 'kind' | 'name'> & { section?: Row['section'] }, accountId: string | null): Account | null {
   const need = accountTypeForRow(row)
   const label = (t: Account['type']) => ACCOUNT_TYPE_INFO.find((i) => i.value === t)?.label ?? t
   if (!accountId) {
@@ -778,6 +787,10 @@ function checkAccountForRow(tables: Tables, row: Pick<Row, 'kind' | 'name'>, acc
   if (!acc) throw new Error('That account no longer exists.')
   if (acc.archivedMonth) throw new Error(`"${acc.name}" is archived.`)
   if (need && acc.type !== need) throw new Error(`"${row.name}" needs an account of type ${label(need)}, and "${acc.name}" is of type ${label(acc.type)}.`)
+  // a row that moves money sends it into the account it names, so only an account with a balance of its own can be named
+  if (row.kind === 'plain' && row.section === 'transfer' && !holdsBalance(acc)) {
+    throw new Error(`"${acc.name}" has no balance of its own for the money to go into. Pick a savings account, an investment account, cash or another asset, or no account: the money then leaves the plan.`)
+  }
   // pocket money is the adult's own: it lands only in an account that net worth leaves out, and one with a balance
   if (row.kind === 'pocket-money') {
     if (!isOutsideNetWorth(acc)) throw new Error(`Pocket money can only land in an account that is left out of net worth. Tick "Leave out of net worth" in the form of "${acc.name}" first.`)

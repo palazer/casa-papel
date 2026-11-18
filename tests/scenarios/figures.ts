@@ -14,7 +14,7 @@ export interface Figures {
   byMonth: Record<MonthKey, Record<string, string>>
 }
 
-const TOTALS = ['income', 'expensesTotal', 'moved', 'pocket', 'debt', 'allocations', 'toInvestment', 'toSavings', 'leftover', 'fromAccounts'] as const
+const TOTALS = ['income', 'expensesTotal', 'moved', 'movedToAccounts', 'pocket', 'debt', 'allocations', 'toInvestment', 'toSavings', 'leftover', 'fromAccounts'] as const
 
 /** One month's figures out of an engine run that covers it. */
 export function monthFigures(tables: Tables, engine: EngineOutput, m: MonthKey): Record<string, string> {
