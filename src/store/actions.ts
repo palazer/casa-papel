@@ -56,10 +56,10 @@ export function freezeNext(tables: Tables, engine: EngineOutput, rowId: string, 
   const current = engine.cells[cellKey(rowId, month)]
   if (!current) return []
   if (nextCell && nextCell.mode !== 'inherit') return []
-  // A row that had no amount yet goes back to none after this month: without the zero the new amount would carry on.
-  // A category's estimate carries what was typed, not what its rows have left of it; a payment to a loan what was
-  // planned, not what was still owed.
-  const held = current.source === 'empty' ? 0 : typedAmount(current)
+  // The next month keeps what this month handed to it until now. A row that had no amount yet goes back to none
+  // after this month: without the zero the new amount would carry on. (What a month hands on is what was typed: a
+  // category's estimate, not what its rows have left of it; a payment to a loan as planned, not what was still owed.)
+  const held = current.handsOn ?? 0
   return [putCell({ rowId, month: next, mode: 'value', value: held, items: [], note: null, currencyOverride: null, updatedAt: now() })]
 }
 
@@ -363,7 +363,7 @@ export async function setCategoryEstimate(store: Store, categoryId: string, mont
   const category = tables.categories.find((c) => c.id === categoryId && !c.deletedAt)
   if (!category) throw new Error('That category no longer exists.')
   const known = estimateRowOf(tables, categoryId)
-  const previous = known ? engine.cells[cellKey(known.id, month)]?.estimate ?? 0 : 0
+  const previous = known ? engine.cells[cellKey(known.id, month)]?.handsOn ?? 0 : 0
   const { row, mutations } = categoryEstimateMutations(tables, category, month, amount, scope, previous)
   await store.commit(mutations)
   return row

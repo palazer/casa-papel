@@ -69,6 +69,18 @@ export interface CellResult {
    */
   asked?: Money
   askedBase?: Money
+  /**
+   * What the month before hands to this month, in the row's currency: the amount this month shows while nothing is
+   * typed into it, and what a carried item in it is worth. null while the row has had no amount yet. (A row on a
+   * schedule shows nothing in a month without items, whatever it is given.)
+   */
+  given: Money | null
+  /**
+   * What this month hands to the next one: its own amount as it was typed or carried (before a paid-off loan or a
+   * category's rows made it count for less), or what it was given where a rule works the month out or the row is
+   * archived. null while the row has had no amount yet.
+   */
+  handsOn: Money | null
   cell: Cell | null
 }
 

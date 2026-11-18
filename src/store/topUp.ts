@@ -86,12 +86,12 @@ export function topUpMutations(tables: Tables, poolId: string, month: MonthKey, 
       : shown !== 0 ? [item('', shown, current?.status === 'done' ? 'done' : row.defaultStatus)] : []
     const currencyOverride = current && current.currency !== (row.currency ?? base) ? current.currency : existing?.currencyOverride ?? null
     out.push(put({ rowId: row.id, month, mode: 'items', value: null, items: [...kept, item(label, amount, row.defaultStatus)], note: existing?.note ?? null, currencyOverride, markedDone: existing?.markedDone ?? false, updatedAt: ts }))
-    // The month after keeps what this month showed before the top-up. A rule fills its own months, and a scheduled row
-    // never carries, so neither needs holding.
+    // The month after keeps what this month handed to it before the top-up. A rule fills its own months, and a
+    // scheduled row never carries, so neither needs holding.
     if (!rules.byRow.has(row.id) && !engine.recurringRowIds.includes(row.id)) {
       const next = addMonths(month, 1)
       const nextCell = working.cells.find((c) => c.rowId === row.id && c.month === next)
-      if (!nextCell || nextCell.mode === 'inherit') out.push(put({ rowId: row.id, month: next, mode: 'value', value: shown, items: [], note: nextCell?.note ?? null, currencyOverride, markedDone: nextCell?.markedDone ?? false, updatedAt: ts }))
+      if (!nextCell || nextCell.mode === 'inherit') out.push(put({ rowId: row.id, month: next, mode: 'value', value: current?.handsOn ?? 0, items: [], note: nextCell?.note ?? null, currencyOverride, markedDone: nextCell?.markedDone ?? false, updatedAt: ts }))
     }
     return out
   }

@@ -175,6 +175,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
     for (const m of months) {
       const archived = row.archivedMonth != null && compareMonths(m, row.archivedMonth) >= 0
       const cell = rowCells?.get(m) ?? null
+      /** What the month before hands to this one; nothing while the row has had no amount yet. */
+      const given: Money | null = everSet ? prev : null
       let currency = cell?.currencyOverride ?? row.currency ?? base
       let value: Money = 0
       let source: CellResult['source'] = 'empty'
@@ -257,7 +259,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
 
       const result: CellResult = {
         rowId: row.id, month: m, value, valueBase: conv.value, deductionsBase: 0, netBase: conv.value, currency, source, status, items,
-        funding: fundingBase, fundingOwn: funding, missingRate: conv.missingRate, rateProjected: conv.projected, cell,
+        funding: fundingBase, fundingOwn: funding, missingRate: conv.missingRate, rateProjected: conv.projected, given, handsOn: given, cell,
       }
       cells[cellKey(row.id, m)] = result
       if (byRule && rule && rule.kind !== 'idle') {
@@ -269,6 +271,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
         prev = value
         if (baseStatus !== 'derived') prevBase = baseStatus
       }
+      result.handsOn = everSet ? prev : null
     }
   }
 

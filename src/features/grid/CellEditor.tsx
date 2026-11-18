@@ -183,12 +183,9 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
     if (next !== base && !tables.fxRates.some((r) => r.pair === `${base}/${next}`)) void fetchRatesFor(store, [next]).catch(() => undefined)
   }
 
+  /** What a carried item is worth: what the month before hands to this one, as the calculation says it. */
   function prevValue(): number {
-    const idx = engine.months.indexOf(month)
-    if (idx <= 0) return 0
-    // what the month before was given, also where a paid-off loan made it count for less
-    const before = engine.cells[cellKey(row.id, engine.months[idx - 1])]
-    return before ? before.asked ?? before.value : 0
+    return cell?.given ?? 0
   }
 
   /** A save of the amount, and of what changed on the row with it; a row that changed category tells the screen. */
