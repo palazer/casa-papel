@@ -721,8 +721,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 - The estimate dialog (`src/features/statement/EstimateDialog.tsx`), titled `Estimate for <category> · <month>`: one
   amount in the household currency with an (i) (`row.categoryEstimate`), then two read-only lines that follow what
   is typed (`Rows this month`, `Not broken down yet`; a muted sentence when the rows already add up to more), then
-  "Applies to" as a `Segmented` (`This month and onwards` / `Only this month`). Footer: a ghost
-  `Remove estimate` when there is one, Cancel, Save.
+  "Applies to" as a `Segmented` (`This month and onwards` / `Only this month`), which opens on `Only this month`
+  for an estimate that is that month's alone. Footer: a ghost `Remove estimate` when there is one, Cancel, Save.
 - **A dialog saves once.** Its buttons are disabled while a save runs, and the save itself refuses a second start
   (`useSave` in `src/features/grid/RowDialogs.tsx`, the cell editor's `run`), because Enter in a field is not a
   button: pressed twice, it must not add a top-up or a virtual account twice. A field that cannot be read says so
@@ -743,6 +743,12 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
     schedule`, `Only this month`, with the chosen option's sentence under it. `On a schedule` shows the
     `RepeatField` (`src/features/recurring/RepeatField.tsx`) labelled "How often"; it starts on every year in the
     month on screen. A row a rule can work out, the rest and a category's estimate are not offered a schedule.
+  - *The choice starts from the month, not from habit.* A month whose amount is that month's alone opens on `Only
+    this month`; a month with an amount of its own that runs on opens on `Every month`; only a month that carries
+    what came before (or is empty) opens on the choice made last, which is remembered when it is picked, never
+    when a dialog merely opens. Saving a dialog without touching the choice therefore leaves the month what it
+    was: ticking an exception as done does not turn it into an amount for every later month. "The total" of a
+    list follows the same rule.
   - *The `RepeatField`*: one line in `text-xs`: a muted word, a `NativeSelect` (`h-7`) named `Repeats, <what>`,
     then `in` or `from` and a month select where the rhythm needs a month, or twelve small `Check`s for chosen
     months (a group `Months, <what>`, 4 across, 6 from `sm`). Under it a muted sentence always says where it lands

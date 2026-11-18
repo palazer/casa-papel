@@ -28,14 +28,27 @@ describe('addPlanYear', () => {
     await store.undo()
     expect(await end(store)).toBe('2028-12')
   })
-  it('a December-only edit pins January and so shows the next year', async () => {
+  it('an amount for December alone stays in December: nothing is written into January, and the plan keeps its end', async () => {
     const store = await fresh()
     const rent = (await loadTables(store)).rows.find((r) => r.name === 'Rent')!
     expect(await end(store, '2026-03')).toBe('2026-12')
     await setCellValue(store, rent.id, '2026-11', 150000, 'from-now-on')
     await setCellValue(store, rent.id, '2026-12', 99000, 'this-month')
     const t = await loadTables(store)
-    expect(t.cells.some((c) => c.rowId === rent.id && c.month === '2027-01')).toBe(true)
+    expect(t.cells.filter((c) => c.rowId === rent.id).map((c) => [c.month, c.value, c.once])).toEqual([['2026-11', 150000, false], ['2026-12', 99000, true]])
+    expect(await end(store, '2026-03')).toBe('2026-12')
+  })
+  it('the one case that still writes the month after: an exception in the month an amount began', async () => {
+    const store = await fresh()
+    const rent = (await loadTables(store)).rows.find((r) => r.name === 'Rent')!
+    // 1,500.00 from December on, and then December alone is 990.00: the 1,500.00 has to begin somewhere
+    await setCellValue(store, rent.id, '2026-12', 150000, 'from-now-on')
+    await setCellValue(store, rent.id, '2026-12', 99000, 'this-month')
+    const t = await loadTables(store)
+    expect(t.cells.filter((c) => c.rowId === rent.id).map((c) => [c.month, c.value, c.once])).toEqual([['2026-12', 99000, true], ['2027-01', 150000, false]])
     expect(await end(store, '2026-03')).toBe('2027-12')
+    // one step, one undo
+    await store.undo()
+    expect((await loadTables(store)).cells.filter((c) => c.rowId === rent.id).map((c) => [c.month, c.value, c.once])).toEqual([['2026-12', 150000, false]])
   })
 })

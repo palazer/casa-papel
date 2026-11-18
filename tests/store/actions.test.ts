@@ -32,18 +32,19 @@ describe('actions: cells', () => {
     expect(t.rows.map((r) => r.name)).toContain('To savings')
   })
 
-  it('from-now-on lets later months follow; this-month freezes the next month at the old value', async () => {
+  it('from-now-on lets later months follow; this-month stays in its month, and writes nothing into the next', async () => {
     const { store, rent } = await fresh()
     await setCellValue(store, rent.id, '2026-01', 150000, 'from-now-on')
     expect(await values(store, rent.id)).toEqual([150000, 150000, 150000, 150000])
 
     await setCellValue(store, rent.id, '2026-02', 99000, 'this-month')
     expect(await values(store, rent.id)).toEqual([150000, 99000, 150000, 150000])
+    expect((await loadTables(store)).cells.filter((c) => c.rowId === rent.id).map((c) => [c.month, c.value, c.once])).toEqual([['2026-01', 150000, false], ['2026-02', 99000, true]])
 
     await setCellValue(store, rent.id, '2026-03', 160000, 'from-now-on')
     expect(await values(store, rent.id)).toEqual([150000, 99000, 160000, 160000])
 
-    // one undo step reverts the whole this-month edit (both cells)
+    // one undo step each
     await store.undo()
     await store.undo()
     expect(await values(store, rent.id)).toEqual([150000, 150000, 150000, 150000])

@@ -7,12 +7,15 @@ import { Segmented } from '@/components/Segmented'
 import { AmountHint } from '@/components/AmountHint'
 import { amountToInput, formatAmount, formatMonth, parseAmount, unreadableAmount } from '@/app/format'
 import { useStore } from '@/app/store'
-import type { Category, Household, Money, MonthKey } from '@/model'
-import { setCategoryEstimate, type EditScope } from '@/store'
+import { cellKey, type EngineOutput } from '@/engine'
+import type { Category, Household, Money, MonthKey, Tables } from '@/model'
+import { estimateRowOf, setCategoryEstimate, type EditScope } from '@/store'
 
 interface Props {
   category: Category
   month: MonthKey
+  tables: Tables
+  engine: EngineOutput
   household: Household
   /** The estimate the month shows now, in the household currency; 0 when the category has none. */
   current: Money
@@ -25,11 +28,14 @@ interface Props {
  * What a category is expected to come to in a month, typed before its rows are known (DESIGN.md §8). The dialog shows
  * what the rows already explain and what would be left, so the number typed is never a surprise on the page.
  */
-export function EstimateDialog({ category, month, household, current, rows, onClose }: Props) {
+export function EstimateDialog({ category, month, tables, engine, household, current, rows, onClose }: Props) {
   const store = useStore()
   const { locale, baseCurrency: ccy } = household
   const [text, setText] = useState(current > 0 ? amountToInput(current, ccy, locale) : '')
-  const [scope, setScope] = useState<EditScope>('from-now-on')
+  // an estimate that is this month's alone opens on "Only this month", so that saving it again keeps it one
+  const row = estimateRowOf(tables, category.id)
+  const stored = row ? engine.cells[cellKey(row.id, month)]?.cell : null
+  const [scope, setScope] = useState<EditScope>(stored?.once && stored.mode !== 'inherit' ? 'this-month' : 'from-now-on')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const typed = text.trim() === '' ? null : parseAmount(text, ccy, locale)

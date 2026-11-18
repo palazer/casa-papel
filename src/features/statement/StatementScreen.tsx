@@ -663,7 +663,7 @@ export function StatementScreen() {
       {balances && <MonthBalancesDialog key={m} month={m} tables={tables} engine={engine} household={household} onClose={() => setBalances(false)} />}
       {estimateCategory && (
         <EstimateDialog
-          key={`${estimateCategory.id}:${m}`} category={estimateCategory} month={m} household={household}
+          key={`${estimateCategory.id}:${m}`} category={estimateCategory} month={m} tables={tables} engine={engine} household={household}
           current={estimateLine?.budget ?? 0} rows={(estimateLine?.amount ?? 0) - estimateRest} onClose={() => setEstimateFor(null)}
         />
       )}

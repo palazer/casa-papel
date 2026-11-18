@@ -3,7 +3,7 @@ import {
   RecurringItemSchema, cadenceOf, compareMonths, isDue, monthOfDate, newId, repeatOf, sameRepeat,
   type CellItem, type Money, type MonthKey, type RecurringItem, type RepeatChoice, type Repeating, type Tables,
 } from '@/model'
-import { engineUpTo, freezeNext, rowChangePut, type EditScope, type RowChange } from './actions'
+import { carriesForward, engineUpTo, rowChangePut, standingMoves, type EditScope, type RowChange } from './actions'
 import { cellPut } from './cells'
 import { applyMutations } from './impact'
 import { defaultMonths } from './months'
@@ -132,8 +132,10 @@ export function planRowMonthSave(tables: Tables, engine: EngineOutput, rowId: st
   // the month's list is written once, here: whatever the steps above put into this cell is dropped
   const out = muts.filter((m) => !isCellPut(m, rowId, month))
   const scheduled = t.recurringItems.some((r) => !r.deletedAt && r.rowId === rowId)
-  if (!scheduled && save.scope === 'this-month') out.push(...freezeNext(tables, engine, rowId, month))
-  if (items.length > 0 || !scheduled) out.push(cellPut(existing, { rowId, month, mode: 'items', value: null, items }, ts))
+  // "Only this month" on a row whose months carry forward: the list is this month's alone
+  const once = save.scope === 'this-month' && carriesForward(t, engine, rowId)
+  if (once) out.push(...standingMoves(tables, engine, rowId, month, ts))
+  if (items.length > 0 || !scheduled) out.push(cellPut(existing, { rowId, month, mode: 'items', value: null, items, once }, ts))
   // a row on a schedule with nothing in the month has no cell of its own there
   else if (existing && existing.mode !== 'inherit') out.push(cellPut(existing, { rowId, month, mode: 'inherit', value: null, items: [] }, ts))
   out.push(...rowChangePut(tables, rowId, save.row))

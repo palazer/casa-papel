@@ -133,11 +133,12 @@ describe('a row\'s month saved from its dialog', () => {
     expect(JSON.stringify(await loadTables(store))).toBe(tables)
   })
 
-  it('while nothing repeats it saves as before: the total carries on, or the next month is held', async () => {
+  it('while nothing repeats it saves as before: the total carries on, or the list is that month\'s alone', async () => {
     const { store, row } = await fresh()
     await setCellValue(store, row.id, '2026-01', 50000, 'from-now-on')
     await saveRowMonth(store, row.id, '2026-03', { items: [item({ label: 'A', amount: 100 }), item({ label: 'B', amount: 200 })], scope: 'this-month' })
     expect((await valuesOf(store, row.id)).slice(0, 5)).toEqual([50000, 50000, 300, 50000, 50000])
+    expect((await loadTables(store)).cells.filter((c) => c.rowId === row.id).map((c) => [c.month, c.mode, c.once])).toEqual([['2026-01', 'value', false], ['2026-03', 'items', true]])
     await saveRowMonth(store, row.id, '2026-06', { items: [item({ label: 'C', amount: 700 })], scope: 'from-now-on' })
     expect((await valuesOf(store, row.id)).slice(4, 8)).toEqual([50000, 700, 700, 700])
     expect(await schedulesOf(store, row.id)).toEqual([])

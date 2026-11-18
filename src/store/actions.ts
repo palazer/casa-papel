@@ -1,8 +1,8 @@
 import { generateKeyBetween } from 'fractional-indexing'
 import { computeEngine, cellKey, sortRows, typedAmount, type EngineOutput } from '@/engine'
 import {
-  ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, CellSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RowSchema, accountIdOf, addMonths, canCarryRule, canTakeRest, cardIsItemized, compareMonths, holdsBalance, isOldPocketShare, isOutsideNetWorth, isShareRule, monthKey, monthOfDate, monthRange, newId, parseMonth, paysExpenses, poolIdOf, resolveRules, sharePercent,
-  type Account, type Category, type Cell, type CellInput, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Pool, type Row, type RowKind, type Tables,
+  ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RowSchema, accountIdOf, addMonths, canCarryRule, canTakeRest, cardIsItemized, compareMonths, holdsBalance, isOldPocketShare, isOutsideNetWorth, isShareRule, monthKey, monthOfDate, monthRange, newId, parseMonth, paysExpenses, poolIdOf, resolveRules, sharePercent,
+  type Account, type Category, type Cell, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Pool, type Row, type RowKind, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
 import { cellPut } from './cells'
@@ -36,32 +36,50 @@ function cellOf(tables: Tables, rowId: string, month: MonthKey): Cell | undefine
   return tables.cells.find((c) => c.rowId === rowId && c.month === month)
 }
 
-const putCell = (cell: CellInput): Mutation => ({ op: 'put', table: 'cells', record: CellSchema.parse({ ...cell, updatedAt: now() }) })
-
 // ---------- cells ----------
 
 /**
- * Set a plain value. `from-now-on` lets later inheriting months follow;
- * `this-month` freezes the next month at the old value so the chain continues as before.
+ * Whether a row's months carry their amount forward: a typed row that is not on a schedule, that no rule works out
+ * and that follows no other row. Only such a row can hold an exception (`Cell.once`): on the others a typed amount
+ * is its month's alone by itself, since a schedule lands only in its months and a rule fills every month it is not
+ * typed over. `tables` says whether the row is on a schedule, so a caller that just made one is believed.
  */
-/** When editing only this month, pin the following month at the old value if it was inheriting. */
-export function freezeNext(tables: Tables, engine: EngineOutput, rowId: string, month: MonthKey): Mutation[] {
-  // a scheduled row never carries forward, so there is nothing to freeze (and a value cell there would post a phantom amount)
-  if (engine.recurringRowIds.includes(rowId)) return []
-  // a row a rule works out fills its own months: holding the next one would take that month away from the rule
-  const row = tables.rows.find((r) => r.id === rowId)
+export function carriesForward(tables: Tables, engine: EngineOutput, rowId: string): boolean {
+  if (tables.recurringItems.some((r) => !r.deletedAt && r.rowId === rowId)) return false
+  const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
   const household = tables.household.find((h) => !h.deletedAt)
-  if (row && household && (resolveRules(engine.rows, household.closingRule).byRow.has(rowId) || isOldPocketShare(row))) return []
-  const next = addMonths(month, 1)
-  const nextCell = cellOf(tables, rowId, next)
+  if (!row || !household || row.followsRowId || isOldPocketShare(row)) return false
+  return !resolveRules(engine.rows, household.closingRule).byRow.has(rowId)
+}
+
+/**
+ * What "Only this month" has to write beside the month itself, on a row whose months carry forward. The caller
+ * writes the month with the mark of an exception (`once`): it then hands on what it was given, and in most cases
+ * that is all. One case needs more: the month held an amount of its own that ran on from it ("1,250.00 from March
+ * on", and now "March is 1,300.00, only this month"). What ran on still has to, so it is written into the first
+ * later month that has nothing of its own. An exception on the way stays where it is, and a carried item in a list
+ * on the way gets the amount it was carrying, since what its month is given changes. `engine` is the calculation
+ * before the change; it has to reach `month`. Pure; `ts` stamps the writes.
+ */
+export function standingMoves(tables: Tables, engine: EngineOutput, rowId: string, month: MonthKey, ts: number): Mutation[] {
   const current = engine.cells[cellKey(rowId, month)]
-  if (!current) return []
-  if (nextCell && nextCell.mode !== 'inherit') return []
-  // The next month keeps what this month handed to it until now. A row that had no amount yet goes back to none
-  // after this month: without the zero the new amount would carry on. (What a month hands on is what was typed: a
-  // category's estimate, not what its rows have left of it; a payment to a loan as planned, not what was still owed.)
-  const held = current.handsOn ?? 0
-  return [putCell({ rowId, month: next, mode: 'value', value: held, items: [], note: null, currencyOverride: null, updatedAt: now() })]
+  // nothing ran on from this month: it carried what it was given, or was an exception already, or the row is new
+  if (!current || current.handsOn == null || current.handsOn === current.given) return []
+  const standing = current.handsOn
+  const stored = new Map(tables.cells.filter((c) => c.rowId === rowId).map((c) => [c.month, c]))
+  const out: Mutation[] = []
+  for (let m = addMonths(month, 1); ; m = addMonths(m, 1)) {
+    const cell = stored.get(m)
+    if (!cell || cell.mode === 'inherit') {
+      out.push(cellPut(cell, { rowId, month: m, mode: 'value', value: standing, items: [] }, ts))
+      return out
+    }
+    if (cell.items.some((i) => i.kind === 'carry')) {
+      out.push(cellPut(cell, { rowId, month: m, items: cell.items.map((i) => (i.kind === 'carry' ? { ...i, kind: 'normal' as const, amount: standing } : i)) }, ts))
+    }
+    // a month with an amount that runs on takes over from here
+    if (!cell.once) return out
+  }
 }
 
 /** What the row's dialog can change on the row itself, in the same step as the month's amount. A field left out stays as it is. */
@@ -94,20 +112,29 @@ export function rowChangePut(tables: Tables, rowId: string, change: RowChange | 
   return next === row ? [] : [{ op: 'put', table: 'rows', record: RowSchema.parse({ ...next, updatedAt: now() }) }]
 }
 
+/**
+ * Set one amount for a month. `from-now-on` lets the months after it follow; `this-month` makes it that month's alone
+ * (`Cell.once`), so the months after go on as they were. A row whose months do not carry forward (a schedule, a rule,
+ * a follower) takes the amount for its month either way.
+ */
 export async function setCellValue(store: Store, rowId: string, month: MonthKey, value: Money, scope: EditScope, rowChange?: RowChange): Promise<void> {
   const { tables, engine } = await engineUpTo(store, month)
-  const mutations: Mutation[] = scope === 'this-month' ? freezeNext(tables, engine, rowId, month) : []
+  const ts = now()
+  const once = scope === 'this-month' && carriesForward(tables, engine, rowId)
+  const mutations: Mutation[] = once ? standingMoves(tables, engine, rowId, month, ts) : []
   const existing = cellOf(tables, rowId, month)
-  mutations.push(cellPut(existing, { rowId, month, mode: 'value', value, items: [], markedDone: false }, now()))
+  mutations.push(cellPut(existing, { rowId, month, mode: 'value', value, items: [], markedDone: false, once }, ts))
   mutations.push(...rowChangePut(tables, rowId, rowChange))
   await store.commit(mutations)
 }
 
 export async function setCellItems(store: Store, rowId: string, month: MonthKey, items: CellItem[], scope: EditScope = 'from-now-on', rowChange?: RowChange): Promise<void> {
   const { tables, engine } = await engineUpTo(store, month)
-  const mutations: Mutation[] = scope === 'this-month' ? freezeNext(tables, engine, rowId, month) : []
+  const ts = now()
+  const once = scope === 'this-month' && carriesForward(tables, engine, rowId)
+  const mutations: Mutation[] = once ? standingMoves(tables, engine, rowId, month, ts) : []
   const existing = cellOf(tables, rowId, month)
-  mutations.push(cellPut(existing, { rowId, month, mode: 'items', value: null, items, markedDone: false }, now()))
+  mutations.push(cellPut(existing, { rowId, month, mode: 'items', value: null, items, markedDone: false, once }, ts))
   mutations.push(...rowChangePut(tables, rowId, rowChange))
   await store.commit(mutations)
 }
@@ -327,11 +354,12 @@ export const estimateRowOf = (tables: Tables, categoryId: string): Row | undefin
 
 /**
  * The puts that give an expense category its estimate from `month`: the estimate row on first use (at the end of the
- * category, back from the archive if it was there) and its amount for the month. `this-month` holds the following
- * month at what it was before, 0 for a category that had none. `previous` is the estimate the month showed until now.
+ * category, back from the archive if it was there) and its amount for the month. `this-month` makes the amount that
+ * month's alone: the months after go on with the estimate they had, none for a category that had none. `engine` is
+ * the calculation before the change, for a category that has an estimate row already; a new one needs none.
  * Pure; the caller commits, so a new category and its estimate can be one step.
  */
-export function categoryEstimateMutations(tables: Tables, category: Category, month: MonthKey, amount: Money, scope: EditScope, previous: Money = 0): { row: Row; mutations: Mutation[] } {
+export function categoryEstimateMutations(tables: Tables, category: Category, month: MonthKey, amount: Money, scope: EditScope, engine: EngineOutput | null = null): { row: Row; mutations: Mutation[] } {
   if (category.section !== 'expense') throw new Error('Only an expense category can have an estimate.')
   if (!Number.isFinite(amount) || amount < 0) throw new Error('An estimate cannot be below zero.')
   const mutations: Mutation[] = []
@@ -345,13 +373,11 @@ export function categoryEstimateMutations(tables: Tables, category: Category, mo
     row = RowSchema.parse({ ...row, archivedMonth: null, archiveMemo: null, updatedAt: now() })
     mutations.push({ op: 'put', table: 'rows', record: row })
   }
+  const ts = now()
+  const once = scope === 'this-month'
+  if (once && engine) mutations.push(...standingMoves(tables, engine, row.id, month, ts))
   const existing = cellOf(tables, row.id, month)
-  mutations.push(cellPut(existing, { rowId: row.id, month, mode: 'value', value: amount, items: [], currencyOverride: null }, now()))
-  if (scope === 'this-month') {
-    const next = addMonths(month, 1)
-    const nextCell = cellOf(tables, row.id, next)
-    if (!nextCell || nextCell.mode === 'inherit') mutations.push(putCell({ rowId: row.id, month: next, mode: 'value', value: previous, items: [], note: nextCell?.note ?? null, currencyOverride: null, updatedAt: now() }))
-  }
+  mutations.push(cellPut(existing, { rowId: row.id, month, mode: 'value', value: amount, items: [], currencyOverride: null, once }, ts))
   return { row, mutations }
 }
 
@@ -364,9 +390,7 @@ export async function setCategoryEstimate(store: Store, categoryId: string, mont
   const { tables, engine } = await engineUpTo(store, month)
   const category = tables.categories.find((c) => c.id === categoryId && !c.deletedAt)
   if (!category) throw new Error('That category no longer exists.')
-  const known = estimateRowOf(tables, categoryId)
-  const previous = known ? engine.cells[cellKey(known.id, month)]?.handsOn ?? 0 : 0
-  const { row, mutations } = categoryEstimateMutations(tables, category, month, amount, scope, previous)
+  const { row, mutations } = categoryEstimateMutations(tables, category, month, amount, scope, engine)
   await store.commit(mutations)
   return row
 }
@@ -378,8 +402,8 @@ export const unrecordedRowName = (card: Pick<Account, 'name'>): string => `${car
  * Pin what is really owed on a card and, when that is more than the plan expects, book the difference as that month's
  * spending on the card, so the month's expenses and the debt agree. Only for a card whose purchases are expense rows:
  * on any other card the payment is the recorded spending, and booking purchases as well would count them twice.
- * The difference lands as a done item "Not recorded" on the card's own "<card> – Not recorded" row (made on first use);
- * the following month is held at zero so the amount does not carry forward. One commit, so one undo takes it all back.
+ * The difference lands as a done item "Not recorded" on the card's own "<card> – Not recorded" row (made on first use),
+ * as that month's alone, so it does not carry forward. One commit, so one undo takes it all back.
  * Returns what was booked, 0 when the real balance is not above the expected one.
  */
 export async function setCardBalanceBooked(store: Store, accountId: string, month: MonthKey, actualBalance: Money): Promise<Money> {
@@ -410,10 +434,10 @@ export function cardBookingMutations(tables: Tables, engine: EngineOutput, house
       : existing?.mode === 'value' && existing.value ? [{ id: newId(), label: '', amount: existing.value, status: row.defaultStatus, fundedBy: row.defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }]
       : []
     const booked: CellItem = { id: newId(), label: 'Not recorded', amount: extra, status: 'done', fundedBy: 'cash', date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }
-    mutations.push(cellPut(existing, { rowId: row.id, month, mode: 'items', value: null, items: [...kept, booked], markedDone: false }, now()))
-    const next = addMonths(month, 1)
-    const nextCell = cellOf(tables, row.id, next)
-    if (!nextCell || nextCell.mode === 'inherit') mutations.push(putCell({ rowId: row.id, month: next, mode: 'value', value: 0, items: [], note: nextCell?.note ?? null, currencyOverride: nextCell?.currencyOverride ?? null, updatedAt: now() }))
+    // what was spent and not recorded is this month's alone: the months after go on with what the row had before
+    const ts = now()
+    mutations.push(...standingMoves(tables, engine, row.id, month, ts))
+    mutations.push(cellPut(existing, { rowId: row.id, month, mode: 'items', value: null, items: [...kept, booked], markedDone: false, once: true }, ts))
   }
   const known = tables.accountMonths.find((a) => a.accountId === accountId && a.month === month)
   mutations.push({ op: 'put', table: 'accountMonths', record: AccountMonthSchema.parse({ ...known, accountId, month, actualBalance, updatedAt: now() }) })
@@ -505,7 +529,9 @@ export async function addPlanYear(store: Store, today: MonthKey = monthOfDate())
  * What ticking one line of a month as done (or as not done) writes; nothing for a line that is archived there, or
  * that reads so already. An amount the app works out keeps its tick beside it (`markedDone`). A typed or carried
  * amount becomes one item that carries the tick, and an itemized line gets it on every item that counts. No amount
- * changes. Pure; `ts` stamps the writes.
+ * changes: a month that only carried its amount is written down as that month's alone (`once`), so the months after
+ * it go on reading the amount where it was typed, and a ticked month never becomes where an amount begins.
+ * Pure; `ts` stamps the writes.
  */
 export function lineDoneMutations(tables: Tables, engine: EngineOutput, row: Row, month: MonthKey, done: boolean, ts: number): Mutation[] {
   const current = engine.cells[cellKey(row.id, month)]
@@ -524,7 +550,7 @@ export function lineDoneMutations(tables: Tables, engine: EngineOutput, row: Row
         ? []
         : [{ id: newId(), label: '', amount: typedAmount(current), status, fundedBy: row.defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }]
   if (items.length === 0 && !existing) return []
-  return [cellPut(existing, { rowId: row.id, month, mode: 'items', value: null, items, markedDone: false }, ts)]
+  return [cellPut(existing, { rowId: row.id, month, mode: 'items', value: null, items, markedDone: false, ...(current.source === 'inherit' ? { once: true } : {}) }, ts)]
 }
 
 /**

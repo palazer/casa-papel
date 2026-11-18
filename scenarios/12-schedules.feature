@@ -86,6 +86,20 @@ Feature: Schedules: amounts that repeat by themselves
     Then "Insurance" is 0.00 in May 2026
     And "Insurance" is 300.00 in August 2026
 
+  # A row that once held a scheduled item is looked at by the app's own pass, which rewrites a typed amount as a
+  # list. The mark of an exception has to survive that.
+  @A4 @H5
+  Scenario: An exception lasts one month on a row that was on a schedule once
+    Given "Insurance" is on a schedule of 600.00 once a year from February 2026
+    And I mark "Insurance" as done in February 2026
+    And I delete the schedule "Insurance" in the list
+    And I type 100.00 for "Insurance" in June 2026, every month
+    When I type 500.00 for "Insurance" in July 2026, only this month
+    Then "Insurance" is 600.00 in February 2026
+    And "Insurance" is 100.00 in June 2026
+    And "Insurance" is 500.00 in July 2026
+    And "Insurance" is 100.00 in every month from August 2026 to December 2026
+
   @H6
   Scenario: An item that repeats beside one that does not
     When I add the item "Liability" of 90.00 to "Insurance" in March 2026, repeating once a year

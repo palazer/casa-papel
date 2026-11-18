@@ -88,6 +88,11 @@ describe('"Count everything in <Month> as done"', () => {
     expect(await cell('2026-03')).toMatchObject({ source: 'inherit', value: 3000_00 })
     expect((await cell('2026-03')).status).not.toBe('done')
     expect((await cell('2026-01')).status).not.toBe('done')
+    // the tick is February's alone: March still reads January's amount, also once January changes
+    expect((await loadTables(store)).cells.find((c) => c.rowId === salary.id && c.month === '2026-02')).toMatchObject({ mode: 'items', once: true })
+    await setCellValue(store, salary.id, '2026-01', 3100_00, 'from-now-on')
+    expect(await cell('2026-02')).toMatchObject({ value: 3000_00, status: 'done' })
+    expect(await cell('2026-03')).toMatchObject({ source: 'inherit', value: 3100_00 })
   })
 
   it('writes nothing for a line that is ticked already', async () => {

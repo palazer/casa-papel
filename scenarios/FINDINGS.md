@@ -10,9 +10,9 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
 
 | | Finding | Weighs | Recommendation | State |
 | --- | --- | --- | --- | --- |
-| F1 | An exception in the plan's last month lengthens the plan by a year | small | with step 3 | open, with step 3 |
+| F1 | An exception in the plan's last month lengthens the plan by a year | small | with step 3 | closed; one case is left, and says so |
 | F2 | Money "moved between your accounts" lowers net worth | net worth is wrong | the row names the account that receives it | closed |
-| F3 | The month after an exception holds an amount nobody typed | amounts can change by surprise | with step 3 | open, with step 3 |
+| F3 | The month after an exception holds an amount nobody typed | amounts can change by surprise | with step 3 | closed |
 | F4 | A loan that is paid off keeps taking payments | net worth is right, the debt reads below zero | the payment stops at what is owed | closed |
 | F5 | A card that records only its payments never lowers net worth | net worth is wrong | payments do not move what is owed | closed |
 | F6 | The Statement's change for a virtual account that ran short | one figure on the Statement | show the change of the balance | closed |
@@ -39,6 +39,15 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
   no figure is wrong.
 - **Recommendation.** (a).
 - **Decision.** Yes (17 November 2026): settled with step 3.
+- **Closed** (18 November 2026). "Only this month" is a mark on its own month (`Cell.once`): the month shows its
+  amount and hands on what it was given, so nothing is written into January and the plan keeps its end. The same
+  holds for an item added for one month, a top-up, a category's estimate for one month and a card's difference
+  booked as spending.
+- **What is left.** One case still writes the month after: an amount that *begins* in a month ("1,250.00 from
+  December on") and is then made that month's alone ("December is 1,300.00, only this month"). The 1,250.00 has to
+  begin somewhere, so it begins in January, and the plan then reaches into the next year. The figures are the ones
+  asked for. Scenario: "An exception in the month an amount began, in the plan's last month, reaches into the next
+  year".
 
 ### F2. Money "moved between your accounts" lowers net worth
 
@@ -84,6 +93,11 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
   (b) Leave it.
 - **Recommendation.** (a).
 - **Decision.** Yes (17 November 2026): settled with step 3.
+- **Closed** (18 November 2026). The month after an exception holds nothing: "Clear" finds nothing to clear there,
+  and an amount changed before the exception reaches the months after it (scenario "An amount changed before an
+  exception reaches the months after the exception"). Exceptions made by an earlier version keep the amount that
+  version wrote into the month after: such a pair cannot be told from two amounts that were typed, and no figure
+  is wrong.
 
 ### F4. A loan that is paid off keeps taking payments
 
@@ -240,7 +254,7 @@ with the place it fails today.
 
 | Step | Rule | Scenarios |
 | --- | --- | --- |
-| 3. "This and following months" | A3 | `01-amounts-over-months.feature`: 2 |
+| 3. "This and following months" | A3 | `01-amounts-over-months.feature`: 1 |
 | 4. The currency model | X10 to X15 | `05-rates.feature`: 12 |
 | 5. The question before a change alters the past | T4 | `06-the-past.feature`: 7, `14-people-goals-data.feature`: 1 |
 | One main account (its own step) | B9 | `15-main-account.feature`: 2 |

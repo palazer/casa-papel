@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Repeat, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -109,9 +109,18 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   // edits what is planned: that is what is stored, and what counts again once more is owed.
   const [text, setText] = useState(() => amountToInput(cell ? cell.asked ?? cell.value : 0, stored, locale))
   const paidOffLoan = cell?.asked != null ? tables.accounts.find((a) => a.id === row.accountId)?.name ?? 'The loan' : null
-  // money taken out of an account is a one-off unless you say otherwise; any other row remembers the last choice
+  // The choice starts from what the month holds, so that saving without touching it keeps what the month is: an
+  // amount that is this month's alone opens on "Only this month", an amount of its own that runs on opens on the
+  // other choice. A month that only carries (or is empty) has neither: money taken out of an account is a one-off
+  // unless you say otherwise, and any other row opens on the choice you made last.
   const oneOff = isTakenFromAccount(row)
-  const [scope, setScope] = useState<EditScope>(() => (oneOff ? 'this-month' : readPref<EditScope>('editScope', 'from-now-on')))
+  const ownAmount = cell?.cell != null && cell.cell.mode !== 'inherit' && (cell.source === 'value' || cell.source === 'items')
+  const [scope, setScope] = useState<EditScope>(() => (ownAmount ? (cell.cell?.once ? 'this-month' : 'from-now-on') : oneOff ? 'this-month' : readPref<EditScope>('editScope', 'from-now-on')))
+  /** The choice as you make it; it is remembered for the next month that has none of its own. */
+  const pickScope = (next: EditScope) => {
+    setScope(next)
+    if (!oneOff) writePref('editScope', next)
+  }
   const [status, setStatus] = useState<StatusChoice>(soloItem ? soloItem.status : 'default')
   const [fundedBy, setFundedBy] = useState<CellItem['fundedBy']>(soloItem ? soloItem.fundedBy : row.defaultFundedBy)
   const [items, setItems] = useState<CellItem[]>(() => itemsFromCurrent(cell, row.defaultFundedBy, row.defaultStatus))
@@ -166,9 +175,6 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   ]
   const fundingOptions = useMemo(() => buildFundingOptions(tables, [row.defaultFundedBy, ...items.map((i) => i.fundedBy)]), [tables, row.defaultFundedBy, items])
 
-  useEffect(() => {
-    if (!oneOff) writePref('editScope', scope)
-  }, [scope, oneOff])
   // the rule fills the months after this one: nothing carries on from a typed amount, and nothing is held for it
   const saveScope: EditScope = ruleRuns ? 'from-now-on' : scope
 
@@ -416,7 +422,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                       label="Repeats" value={onSchedule ? 'schedule' : scope}
                       onChange={(v) => {
                         setOnSchedule(v === 'schedule')
-                        if (v !== 'schedule') setScope(v as EditScope)
+                        if (v !== 'schedule') pickScope(v as EditScope)
                       }}
                       options={[{ value: 'from-now-on', label: 'Every month' }, ...(canSchedule ? [{ value: 'schedule', label: 'On a schedule' }] : []), { value: 'this-month', label: 'Only this month' }]}
                     />
@@ -608,7 +614,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                 ) : !isRecurringRow && !ruleRuns && (
                   <fieldset className="space-y-1.5">
                     <legend className="text-sm font-medium">The total</legend>
-                    <Segmented label="The total" value={scope} onChange={(v) => setScope(v as EditScope)} options={[{ value: 'from-now-on', label: 'Every month' }, { value: 'this-month', label: 'Only this month' }]} />
+                    <Segmented label="The total" value={scope} onChange={(v) => pickScope(v as EditScope)} options={[{ value: 'from-now-on', label: 'Every month' }, { value: 'this-month', label: 'Only this month' }]} />
                     <p className="text-xs text-muted-foreground">
                       {scope === 'from-now-on' ? `Nothing here repeats by itself: later months show the total, ${formatAmount(itemsTotal, currency, locale)}, as one amount.` : 'The next month keeps the old amount.'}
                     </p>

@@ -1,10 +1,10 @@
 import { cellKey, computeEngine } from '@/engine'
 import {
-  PoolSchema, addMonths, compareMonths, monthRange, newId, poolRowName, resolveRules,
+  PoolSchema, compareMonths, monthRange, newId, poolRowName,
   type CellItem, type Money, type MonthKey, type Row, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
-import { loadTables, newRowMutation } from './actions'
+import { carriesForward, loadTables, newRowMutation, standingMoves } from './actions'
 import { cellPut } from './cells'
 import { applyMutations } from './impact'
 
@@ -18,7 +18,8 @@ export type TopUpSource = { kind: 'account'; accountId: string } | { kind: 'inco
  * Top a virtual account up for one month, with a record of where the money came from. Two one-off items, this month only:
  * "Top-up for <virtual account>" on the row that takes money out of the source account (made on first use), and "Top-up from
  * <account>" on the virtual account's own set-aside row. The month takes the money in and sets it aside again, so the
- * rest is untouched; from the month's income only the second is written, and the rest shrinks. A set-aside that a
+ * rest is untouched; from the month's income only the second is written, and the rest shrinks. Each is written as
+ * that month's alone (`Cell.once`), so nothing is written into the month after. A set-aside that a
  * rule works out keeps what the rule gave so far as a typed amount beside the top-up, so that month stops following
  * the rule (for the row that takes the rest: the month then closes with a leftover); the dialog says so beforehand.
  * Pure; the caller commits, and the dialog runs it on a copy to show what the month will hold.
@@ -70,7 +71,6 @@ export function topUpMutations(tables: Tables, poolId: string, month: MonthKey, 
 
   const start = compareMonths(household.startMonth, month) < 0 ? household.startMonth : month
   const engine = computeEngine({ tables: working, months: monthRange(start, month) })
-  const rules = resolveRules(engine.rows, household.closingRule)
 
   /** One more item on a row's month, with what the month showed kept as it was and the month after left alone. */
   const oneOff = (row: Row, label: string): Mutation[] => {
@@ -85,14 +85,11 @@ export function topUpMutations(tables: Tables, poolId: string, month: MonthKey, 
       ? existing.items.map((it) => (it.kind === 'carry' ? { ...it, kind: 'normal' as const, amount: current.items.find((x) => x.id === it.id)?.effectiveAmount ?? it.amount } : it))
       : shown !== 0 ? [item('', shown, current?.status === 'done' ? 'done' : row.defaultStatus)] : []
     const currencyOverride = current && current.currency !== (row.currency ?? base) ? current.currency : existing?.currencyOverride ?? null
-    out.push(cellPut(existing, { rowId: row.id, month, mode: 'items', value: null, items: [...kept, item(label, amount, row.defaultStatus)], currencyOverride }, ts))
-    // The month after keeps what this month handed to it before the top-up. A rule fills its own months, and a
-    // scheduled row never carries, so neither needs holding.
-    if (!rules.byRow.has(row.id) && !engine.recurringRowIds.includes(row.id)) {
-      const next = addMonths(month, 1)
-      const nextCell = working.cells.find((c) => c.rowId === row.id && c.month === next)
-      if (!nextCell || nextCell.mode === 'inherit') out.push(cellPut(nextCell, { rowId: row.id, month: next, mode: 'value', value: current?.handsOn ?? 0, items: [], currencyOverride }, ts))
-    }
+    // The month with the top-up in it is this month's alone: the months after go on as they were. A rule fills its
+    // own months, and a scheduled row never carries, so there the month needs no mark.
+    const once = carriesForward(working, engine, row.id)
+    if (once) out.push(...standingMoves(working, engine, row.id, month, ts))
+    out.push(cellPut(existing, { rowId: row.id, month, mode: 'items', value: null, items: [...kept, item(label, amount, row.defaultStatus)], currencyOverride, once }, ts))
     return out
   }
 

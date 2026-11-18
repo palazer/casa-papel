@@ -41,13 +41,25 @@ What the app does today: a later month that has its own amount keeps it, and so 
 > **Decided, not built (step 3).** The choice is called "This and following months", and it replaces whatever the
 > following months had: an amount typed there earlier, and an exception.
 
-**A4. "Only this month": an exception of one month.** The month gets the amount. The month after it shows what it
-showed before. An exception in a row's first month leaves the months after it empty.
+**A4. "Only this month": an exception of one month.** The month gets the amount, as that month's alone. The months
+after it go on with the amount from before the exception, and nothing is written into them: when that amount is
+changed later, they follow it. An exception in a row's first month leaves the months after it empty.
 
 > "Rent" is 1,200.00. Typed 1,250.00 in March, only this month: March is 1,250.00, April on is 1,200.00.
+> Typed 1,300.00 in February afterwards, every month: February is 1,300.00, March stays 1,250.00, April on is 1,300.00.
 
-How the app does it today: it writes the old amount into the next month, unless that month has an amount of its own
-already. Two findings follow from that: F1 (the plan grows by a year) and F3 ("Clear" on the next month).
+The same holds for whatever the app writes for one month: an item added for one month (A6), a top-up of a virtual
+account, a category's estimate for one month, a card's difference booked as spending, and the tick on a month that
+only carried its amount: the month is written down as that month's alone.
+
+One case writes a later month. An exception in the month an amount *began* leaves that amount to the months after:
+it is written into the first later month that has nothing of its own.
+
+> Typed 1,250.00 in March, every month, and then 1,300.00 in March, only this month: March is 1,300.00, April on is
+> 1,250.00, and April now holds the 1,250.00.
+
+A row on a schedule, a row a rule works out and a row that follows another have no exceptions of this kind: an
+amount typed there is for its month alone by itself (H3, R6).
 
 **A5. "Clear": the month follows the month before again.** What was typed in the month is gone, and A2 applies.
 
@@ -161,7 +173,9 @@ year's.
 **P3. The plan reaches the December of the last month an amount was typed in.** So an amount typed for a far month
 is never outside the plan.
 
-Finding F1 belongs here: an exception in the plan's last month counts as an amount typed in the month after it.
+An exception in the plan's last month is an amount in that month, and the plan keeps its end (finding F1, closed).
+The one case of A4 that writes a later month reaches further: an amount that begins in the plan's last month and is
+then made that month's alone begins in the month after, which is in the next year.
 
 **P4. A new month changes nothing in the months before it.** When the calendar moves on, no amount and no balance of
 an earlier month changes. A new year of the plan continues every row (A2) and every balance (B1).

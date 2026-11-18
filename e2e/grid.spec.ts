@@ -55,8 +55,20 @@ test.describe('grid', () => {
     await expect(page.getByRole('button', { name: /^The flat – Utilities Dec 2026/ })).toContainText('300')
     await expect(page.getByRole('button', { name: /^The flat – Utilities Jan 2027/ })).toContainText('250')
 
-    // "How sure" on a single amount survives reopening as a single amount
+    // the choice starts from the month, whatever was picked last: December is an exception, November an amount that runs on
+    await page.getByRole('button', { name: /^The flat – Utilities Dec 2026/ }).click()
+    await expect(page.getByRole('radio', { name: 'Only this month' })).toBeChecked()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog')).toBeHidden()
+    await page.getByRole('button', { name: /^The flat – Utilities Nov 2026/ }).click()
+    await expect(page.getByRole('radio', { name: 'Every month' })).toBeChecked()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog')).toBeHidden()
+
+    // "How sure" on a single amount survives reopening as a single amount. January only carries its amount, so its
+    // dialog opens on the choice made last, and the tick is January's alone: February goes on with the 250
     await page.getByRole('button', { name: /^The flat – Utilities Jan 2027/ }).click()
+    await expect(page.getByRole('radio', { name: 'Only this month' })).toBeChecked()
     await page.getByRole('radio', { name: 'Done' }).click()
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByRole('dialog')).toBeHidden()

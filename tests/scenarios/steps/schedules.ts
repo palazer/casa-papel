@@ -1,6 +1,6 @@
 import { cellKey } from '@/engine'
 import { newId, type CellItem, type MonthKey, type RepeatChoice } from '@/model'
-import { addRecurringItem, endRecurringItem, itemsFromCurrent, loadTables, reactivateRecurringItem, saveRowMonth, setCellDone, updateRecurringItem, type EditScope } from '@/store'
+import { addRecurringItem, endRecurringItem, itemsFromCurrent, loadTables, reactivateRecurringItem, removeRecurringItem, saveRowMonth, setCellDone, updateRecurringItem, type EditScope } from '@/store'
 import { monthName, step } from '../registry'
 import { ScenarioError, type World } from '../world'
 
@@ -77,6 +77,10 @@ step('I move the start of the schedule {string} in the list to {month}', async (
 })
 step('I end the schedule {string} in the list after {month}', async (world: World, name: string, month: string) => {
   await endRecurringItem(world.store, (await listed(world, name)).id, month)
+})
+// the list's "Archive or delete…", answered with "Delete": the schedule goes, and what it posted and was not paid
+step('I delete the schedule {string} in the list', async (world: World, name: string) => {
+  await removeRecurringItem(world.store, (await listed(world, name)).id)
 })
 step('I reactivate the schedule {string} in the list', async (world: World, name: string) => {
   await reactivateRecurringItem(world.store, (await listed(world, name)).id)

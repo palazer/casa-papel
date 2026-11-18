@@ -76,7 +76,7 @@ Feature: An amount over the months
     Then "Rent" is 1,200.00 in February 2026
     And "Rent" is 1,250.00 in every month from March 2026 to December 2026
 
-  @A3 @planned
+  @A3
   Scenario: "This and following months" is not held back by an earlier exception
     Given I type 1,250.00 for "Rent" in March 2026, only this month
     When I type 1,300.00 for "Rent" in March 2026, this and following months
@@ -101,14 +101,46 @@ Feature: An amount over the months
     When I clear "Rent" in March 2026
     Then "Rent" is 1,200.00 in every month from January 2026 to December 2026
 
-  # "Only this month" is kept by writing the old amount into the next month. That month then has an amount of its
-  # own that nobody typed, and "Clear" on it lets the exception run on into every later month.
-  @A4 @A5 @open @F3
+  # An exception is a mark on its own month: nothing is written into the month after it (finding F3, closed).
+  @A4 @A5
   Scenario: The month after an exception has nothing of its own to clear
     Given I type 1,250.00 for "Rent" in March 2026, only this month
     When I clear "Rent" in April 2026
     Then "Rent" is 1,250.00 in March 2026
     And "Rent" is 1,200.00 in every month from April 2026 to December 2026
+
+  @A4
+  Scenario: An amount changed before an exception reaches the months after the exception
+    Given I type 1,250.00 for "Rent" in March 2026, only this month
+    When I type 1,300.00 for "Rent" in February 2026, every month
+    Then "Rent" is 1,300.00 in February 2026
+    And "Rent" is 1,250.00 in March 2026
+    And "Rent" is 1,300.00 in every month from April 2026 to December 2026
+
+  # The one case in which "Only this month" writes a later month: the month held an amount that ran on from it.
+  # That amount has to begin somewhere, so it begins in the month after.
+  @A4
+  Scenario: An exception in the month an amount began leaves that amount to the months after
+    Given I type 1,250.00 for "Rent" in March 2026, every month
+    When I type 1,300.00 for "Rent" in March 2026, only this month
+    Then "Rent" is 1,300.00 in March 2026
+    And "Rent" is 1,250.00 in every month from April 2026 to December 2026
+    And nothing has changed before March 2026
+
+  @A4
+  Scenario: An exception in the month an amount began can be taken back in one step
+    Given I type 1,250.00 for "Rent" in March 2026, every month
+    And I type 1,300.00 for "Rent" in March 2026, only this month
+    When I undo
+    Then "Rent" is 1,250.00 in every month from March 2026 to December 2026
+
+  @A4 @T3
+  Scenario: A month ticked as done keeps its amount when the amount before it changes
+    Given I mark "Rent" as done in February 2026
+    When I type 1,300.00 for "Rent" in January 2026, every month
+    Then "Rent" is 1,300.00 in January 2026
+    And "Rent" is 1,200.00 in February 2026
+    And "Rent" is 1,300.00 in every month from March 2026 to December 2026
 
   @A6
   Scenario: A month can be a list of items, and shows their sum

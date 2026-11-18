@@ -321,7 +321,7 @@ describe('setRule', () => {
     out = await engineOf(store)
     expect(out.cells[cellKey(toRainy.id, '2026-03')]).toMatchObject({ value: 100000, source: 'value' })
     expect(out.cells[cellKey(toRainy.id, '2026-04')].source).toBe('derived')
-    // a typed row still holds its next month, as before
+    // on a typed row the amount is March's alone, and April goes on as before
     await setCellValue(store, (await loadTables(store)).rows.find((r) => r.name === 'Rent')!.id, '2026-03', 160000, 'this-month')
     out = await engineOf(store)
     const rent = out.rows.find((r) => r.name === 'Rent')!

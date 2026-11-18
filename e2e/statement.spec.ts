@@ -1597,9 +1597,9 @@ test.describe('working the month in the Statement', () => {
     expect(await rest()).toBe(2769)
     expect((await total(page, 'in').innerText()).replace(/^Total in\s*/, '')).toBe((await total(page, 'out').innerText()).replace(/^Total out\s*/, ''))
     await page.screenshot({ path: 'e2e/output/statement-taken.png', fullPage: true })
-    // nothing is taken the month after
+    // nothing is taken the month after, and nothing was written into it: the line has no amount there
     await goToMonth(page, 'December 2026')
-    await expect(moneyIn.getByRole('button', { name: /^From Savings, Car repair:/ })).toHaveAccessibleName('From Savings, Car repair: €0.00')
+    await expect(moneyIn.getByRole('button', { name: /^From Savings, Car repair:/ })).toHaveAccessibleName('From Savings, Car repair: empty')
     expect(await rest()).toBe(2369)
     // the right side does not offer what has its own place on the left
     await moneyOut.getByRole('button', { name: 'Add transfer row' }).click()
@@ -2358,7 +2358,7 @@ test.describe('working the month in the Statement', () => {
     // December is back to the usual €100, with nothing taken from savings
     await goToMonth(page, 'December 2026')
     await expect(moneyOut.getByRole('button', { name: /^To Clothing: €100\.00/ })).toBeVisible()
-    await expect(moneyIn.getByRole('button', { name: /^From Savings:/ })).toHaveAccessibleName('From Savings: €0.00')
+    await expect(moneyIn.getByRole('button', { name: /^From Savings:/ })).toHaveAccessibleName('From Savings: empty')
   })
 
   test('the rest moves to a new savings account from its line in the lower half', async ({ page }) => {

@@ -73,17 +73,27 @@ Feature: The months of the plan, and the calendar moving on
     When the calendar moves on to April 2026
     Then the plan runs from January 2026 to December 2027
 
-  @P3 @open @F1
+  @P3
   Scenario: An exception in the plan's last month does not lengthen the plan
     When I type 1,250.00 for "Rent" in December 2026, only this month
     Then "Rent" is 1,250.00 in December 2026
     And the plan runs from January 2026 to December 2026
 
-  @P3 @open @F1
+  @P3
   Scenario: An item added to the plan's last month only does not lengthen the plan
     When I add the item "Chimney sweep" of 80.00 to "Rent" in December 2026, only this month
     Then "Rent" is 1,280.00 in December 2026
     And the plan runs from January 2026 to December 2026
+
+  # What is left of finding F1: an amount that begins in the plan's last month and is then made that month's alone
+  # has to begin in the month after, and that month is in the next year.
+  @P3 @A4
+  Scenario: An exception in the month an amount began, in the plan's last month, reaches into the next year
+    Given I type 1,250.00 for "Rent" in December 2026, every month
+    When I type 1,300.00 for "Rent" in December 2026, only this month
+    Then "Rent" is 1,300.00 in December 2026
+    And "Rent" is 1,250.00 in January 2027
+    And the plan runs from January 2026 to December 2027
 
   @P3
   Scenario: Taking back what lengthened the plan shortens it again

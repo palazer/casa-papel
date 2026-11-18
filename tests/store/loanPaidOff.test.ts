@@ -35,10 +35,13 @@ describe('a loan that is paid off: the store writes what was planned, not what c
     expect(await counted(store, pay.id)).toEqual([25000, 25000, 10000, 0, 0, 0])
   })
 
-  it('an exception in a cut month holds the planned amount in the month after', async () => {
+  it('after an exception in a cut month, the month after goes on with what was planned, not with what counted', async () => {
     const { store, pay } = await fresh()
     await setCellValue(store, pay.id, '2026-03', 5000, 'this-month')
-    expect(await stored(store, pay.id, '2026-04')).toMatchObject({ mode: 'value', value: 25000 })
+    // nothing is written into April: it is given the planned 250.00, as before the exception
+    expect(await stored(store, pay.id, '2026-04')).toBeUndefined()
+    expect(await stored(store, pay.id, '2026-03')).toMatchObject({ mode: 'value', value: 5000, once: true })
+    expect(computeEngine({ tables: await loadTables(store), months }).cells[cellKey(pay.id, '2026-04')]).toMatchObject({ source: 'inherit', asked: 25000, given: 25000 })
     // March took 50, so 50 is still owed in April, and then nothing
     expect(await counted(store, pay.id)).toEqual([25000, 25000, 5000, 5000, 0, 0])
   })
