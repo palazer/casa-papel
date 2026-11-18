@@ -356,7 +356,6 @@ with the place it fails today.
 
 | Step | Rule | Scenarios |
 | --- | --- | --- |
-| 4. The currency model, part 2 | X14 (X10 to X13 and X15 are built) | `05-rates.feature`: 2 |
 | 5. The question before a change alters the past | T4 | `06-the-past.feature`: 7, `14-people-goals-data.feature`: 1 |
 | One main account (its own step) | B9 | `15-main-account.feature`: 2 |
 
@@ -365,15 +364,16 @@ without a question ("A changed growth rate does not change the past without aski
 
 ## What was open, and what you decided
 
-Decided on 17 November 2026. D1, D2 and D3 are rules now (X14, B9 and X15 in `docs/calculations.md`), not built
-yet: their scenarios are tagged `@planned`.
+Decided on 17 November 2026. D1, D2 and D3 are rules now (X14, B9 and X15 in `docs/calculations.md`). D1 and D3
+are built since 18 November 2026 (step 4, part 2); D2 is not built yet, and its scenarios are tagged `@planned`.
 
 - **D1. A virtual account inside a savings account in another currency.** Decided: allowed, and kept in that
   currency. A virtual account takes the currency of the savings account that holds it: in a dollar savings account
   it is a dollar balance. What is set aside arrives in dollars at the month's rate, and what is paid out of it
-  leaves in dollars. Moving a virtual account to another savings account needs the same currency. (Today every
-  virtual account is kept in the household's currency, whatever its savings account is in.) Corrected on
-  17 November 2026: it was first written down here as "not allowed", which was not what you said.
+  leaves in dollars. Moving a virtual account to another savings account needs the same currency. Built on
+  18 November 2026; a virtual account that sat in such an account before keeps the digits of its opening balance,
+  read in that currency now (your choice). Corrected on 17 November 2026: it was first written down here as "not
+  allowed", which was not what you said.
 - **D2. A current account in another currency, and several current accounts.** Decided: one main account, always in
   the household's currency. The month's money runs through it, and its real balance is one number. Any other
   everyday account is an account with a balance of its own that money is moved to. It is a step of its own, with a
@@ -381,7 +381,8 @@ yet: their scenarios are tagged `@planned`.
   scenario of today's behaviour: "A current account in another currency is converted when it opens, and not again".
 - **D3. An expense in a third currency paid from an account in another currency.** Decided: not allowed for now. An
   expense comes out of an account in the expense's own currency or in the household's; anything else is refused and
-  says so. Payments across three currencies stay parked.
+  says so. Payments across three currencies stay parked. Built on 18 November 2026 for every amount that moves an
+  account (rule X15); amounts stored across three currencies before it keep counting as they did.
 - **D4. A month whose rate is missing.** Decided: as today. The amount counts one to one, and the app warns that no
   rate is set. With the fifteen currencies of X13 every one has a rate. It is rule X7 now, no open decision.
 - **D5. Changing the household's own currency.** Decided: stays impossible for now. Later perhaps a way to move a

@@ -679,28 +679,6 @@ export function computeEngine(input: EngineInput): EngineOutput {
     totals[m] = t
   }
 
-  // ---------- pools ----------
-  const poolSeries: Record<string, PoolSeries> = {}
-  for (const pool of pools) {
-    const series: PoolSeries = { poolId: pool.id, months: {} }
-    let bal = pool.openingBalance
-    for (const m of months) {
-      // an archived virtual account's series stops at its archive month; net worth and later months no longer see it
-      if (pool.archivedMonth && compareMonths(m, pool.archivedMonth) >= 0) break
-      const allocation = totals[m].allocationsByPool[pool.id] ?? 0
-      const spend = totals[m].poolFundedByPool[pool.id] ?? 0
-      // A virtual account never holds less than nothing. What is taken beyond what it holds comes out of the unassigned
-      // part of its savings account: that account's balance already falls by the whole amount, so only the split
-      // inside it changes. `short` names the month's shortfall until a top-up covers it.
-      const start = bal
-      const after: Money = bal + allocation - spend
-      const short: Money = after < 0 ? -after : 0
-      bal = after < 0 ? 0 : after
-      series.months[m] = { start, balance: bal, allocation, spend, short }
-    }
-    poolSeries[pool.id] = series
-  }
-
   /** What one source paid in a month (`MonthTotals.fundedOwn`), in an account's currency: a dollar expense lowers a dollar account by exactly its dollars. */
   const ownIn = (acc: Account, source: FundedBy, m: MonthKey): Money => {
     let paid: Money = 0
@@ -714,6 +692,44 @@ export function computeEngine(input: EngineInput): EngineOutput {
   /** What expenses took straight out of an account in a month ("Comes out of" naming it), in the account's own currency. */
   const paidFrom = (acc: Account, m: MonthKey): Money =>
     acc.currency === base ? totals[m].accountFundedByAccount[acc.id] ?? 0 : ownIn(acc, accountRef(acc.id), m)
+
+  // ---------- pools ----------
+  // A virtual account is kept in the currency of the savings account that holds it (rule X14): what is set aside
+  // arrives as the account receives it, what is paid out of it leaves as the account pays it, so the two always agree.
+  // In an account kept in the household's currency these are the household's figures, as they always were.
+  const poolSeries: Record<string, PoolSeries> = {}
+  for (const pool of pools) {
+    const acc = accountsById.get(pool.accountId)
+    const currency = acc?.currency ?? base
+    const series: PoolSeries = { poolId: pool.id, currency, months: {} }
+    const allocationRow = pool.allocationRowId ? rowsById.get(pool.allocationRowId) : undefined
+    /** A figure of the month in the household's currency; a missing rate is warned about once, with the account. */
+    const toBase = (v: Money, m: MonthKey): Money => (currency === base || v === 0 ? v : convertMoney(fx, v, currency, base, m).value)
+    let bal = pool.openingBalance
+    for (const m of months) {
+      // an archived virtual account's series stops at its archive month; net worth and later months no longer see it
+      if (pool.archivedMonth && compareMonths(m, pool.archivedMonth) >= 0) break
+      let allocation: Money
+      let spend: Money
+      if (!acc || currency === base) {
+        allocation = totals[m].allocationsByPool[pool.id] ?? 0
+        spend = totals[m].poolFundedByPool[pool.id] ?? 0
+      } else {
+        const c = allocationRow ? cells[cellKey(allocationRow.id, m)] : undefined
+        allocation = c && c.source !== 'archived' ? inAccountCurrency(acc, c, m) : 0
+        spend = ownIn(acc, poolRef(pool.id), m)
+      }
+      // A virtual account never holds less than nothing. What is taken beyond what it holds comes out of the unassigned
+      // part of its savings account: that account's balance already falls by the whole amount, so only the split
+      // inside it changes. `short` names the month's shortfall until a top-up covers it.
+      const start = bal
+      const after: Money = bal + allocation - spend
+      const short: Money = after < 0 ? -after : 0
+      bal = after < 0 ? 0 : after
+      series.months[m] = { start, balance: bal, allocation, spend, short, startBase: toBase(start, m), balanceBase: toBase(bal, m), shortBase: toBase(short, m) }
+    }
+    poolSeries[pool.id] = series
+  }
 
   // ---------- savings accounts ----------
   const accountSeries: Record<string, AccountSeries> = {}
@@ -730,7 +746,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
       // pocket money that lands here counts like a deposit: the account is its adult's own, outside net worth
       // and so does money moved into it by a row that names it
       if ((row.kind === 'to-savings' && row.accountId === acc.id) || pocketLandsIn(row, acc) || movesInto(row, acc)) inflow += home ? c.valueBase : inAccountCurrency(acc, c, m)
-      // a virtual account is kept in the base currency; the account that holds it receives the row's own amount
+      // what a virtual account sets aside arrives in the account's currency, and so does the virtual account (X14)
       else if (!home && row.kind === 'pool-allocation' && c.source !== 'archived' && poolByAllocationRow.get(row.id)?.accountId === acc.id) inflow += inAccountCurrency(acc, c, m)
     }
     if (home) for (const pool of pools) if (pool.accountId === acc.id) inflow += totals[m].allocationsByPool[pool.id] ?? 0

@@ -306,11 +306,19 @@ source, an account's currency and the savings account a virtual account sits in.
 Amounts that counted across three currencies before the rule keep counting as they did, converted through the
 household's currency (X9); a change that adds no currency to them is saved.
 
-> **Decided, not built (step 4).**
->
-> **X14. A virtual account is kept in the currency of the savings account that holds it.** In a dollar savings
-> account it is a dollar balance: what is set aside arrives in dollars at the month's rate, and what is paid out of
-> it leaves in dollars. It can only be moved to a savings account in the same currency.
+**X14. A virtual account is kept in the currency of the savings account that holds it.** In a dollar savings
+account it is a dollar balance: what is set aside arrives in dollars as the account receives it (at the month's
+rate, or as recorded, X10), and what is paid out of it leaves in dollars as the account pays it. So the virtual
+account and its share of the account always agree, and "not set aside" (V1) is counted in dollars too. It can only
+be moved to a savings account in the same currency. The Statement shows it in the household's currency at each
+month's rate, like the account; its change from one month to the next includes what the rate did.
+
+> 100.00 EUR set aside in January (1.1000) arrive as 110.00 USD; 40.00 EUR spent from it in February (1.2500)
+> leave as 50.00 USD.
+
+What is set aside and a top-up are typed in the household's currency, and arrive converted. A virtual account that
+sat in a savings account in another currency before this rule keeps the digits of its opening balance, read in that
+currency now.
 
 ## T. The past
 

@@ -732,8 +732,8 @@ describe('expenses that come straight out of an account', () => {
     // + 100 dollars set aside − 50 for the trip − 200 for the boiler
     const balance = 1000_00 + 3166_67 + 100_00 - 50_00 - 200_00
     expect(find(s, `acc:${dollars.id}`)).toMatchObject({ amount: Math.round(balance * 0.9), native: { amount: balance, currency: 'USD' } })
-    // the virtual account inside it is in euros and is not touched by the rate
-    expect(find(s, `pool:${travel.id}`)).toMatchObject({ amount: 100_00 + 90_00 - 45_00 })
+    // the virtual account inside it is in dollars too (rule X14): 100 + 100 set aside − 50 for the trip, shown in euros
+    expect(find(s, `pool:${travel.id}`)).toMatchObject({ amount: Math.round(150_00 * 0.9), native: { amount: 150_00, currency: 'USD' } })
     // February: 400 euros taken out by hand are 500 dollars at that month's rate
     expect(out.accounts[dollars.id].months['2026-02'].outflow).toBe(500_00 + Math.round(45_00 / 0.8))
     expectSound(t, months)

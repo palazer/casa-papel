@@ -635,8 +635,14 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   **An account kept in another currency is moved in its own currency.** Whatever goes into or comes out of a savings
   account, an investment account, a card, a loan or an other asset counts as typed when the row is in the account's
   currency, and at the month's rate otherwise (the rest of the month and a percentage rule are household-currency
-  amounts, so they arrive converted). A virtual account is always in the household currency, also inside such an
-  account: the account moves by the converted amount, the virtual account by the household-currency one.
+  amounts, so they arrive converted). A virtual account is kept in the currency of the savings account that holds it
+  (rule X14) and moves by what that account receives and pays for it. Its form lists a foreign savings account with
+  its code (`Dollar savings (USD)`), asks `Already in it (USD)`, and says under `Held in` in a muted line `Kept in USD,
+  as "Dollar savings" is: …` (`pool-currency`); moved to a savings account in another currency it says why in a
+  `role="alert"` line (`pool-moved`) and Save waits. `Set aside each month` and a top-up stay in the household's
+  currency and arrive converted; the top-up dialog says so and gives the virtual account's figures in its own
+  currency. The Grid draws its row in its currency with an `in EUR` sub-row, the Statement its household-currency
+  figure with the code chip and its own figure beside it, as for an account; its change counts the rate's move.
   The cell editor's rate line (`src/features/grid/RateLine.tsx`) sits under an amount in another currency:
   `≈ €3,120.00 · 1 EUR = 1.084 USD · [ECB] 2 Nov 2026` with the table's chip tones, a ghost `xs` "Change this month's
   rate…" that reveals an inline input (one rate per currency per month), and "Use the ECB rate again" while the rate is

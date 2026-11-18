@@ -33,7 +33,8 @@ function reader(goal: Goal, tables: Tables, out: EngineOutput, month: MonthKey):
     const series = goal.poolId ? out.pools[goal.poolId] : undefined
     if (!pool || !series) return { read: () => null, currency: base, problem: 'The virtual account this goal watched is gone. Edit the goal and pick another.', opening: 0, openingMonth: null }
     if (pool.archivedMonth && compareMonths(pool.archivedMonth, month) <= 0) return { read: () => null, currency: base, problem: `The virtual account "${pool.name}" is archived. Restore it under Household or edit the goal.`, opening: pool.openingBalance, openingMonth: null }
-    return { read: (m) => series.months[m]?.balance ?? null, currency: base, problem: null, opening: pool.openingBalance, openingMonth: null }
+    // in the currency of the savings account that holds it (rule X14)
+    return { read: (m) => series.months[m]?.balance ?? null, currency: series.currency, problem: null, opening: pool.openingBalance, openingMonth: null }
   }
   const acc = goal.accountId ? tables.accounts.find((a) => a.id === goal.accountId && !a.deletedAt) : undefined
   const series = goal.accountId ? out.accounts[goal.accountId] : undefined

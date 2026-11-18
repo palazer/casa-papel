@@ -61,7 +61,9 @@ export function GoalDialog({ household, tables, goal, preset, onClose, onRemove 
   const tracked = family === 'net-worth' ? '' : choices.includes(thing) ? thing : choices[0] ?? ''
   const kind: GoalKind = family === 'net-worth' ? 'net-worth' : family === 'pay-down' ? 'pay-off' : tracked.startsWith('pool:') ? 'pool-balance' : 'account-balance'
   const account = tracked.startsWith('acc:') ? accounts.find((a) => `acc:${a.id}` === tracked) : undefined
-  const currency = account?.currency ?? baseCurrency
+  // a virtual account is kept in the currency of the savings account that holds it (rule X14)
+  const holder = tracked.startsWith('pool:') ? tables.accounts.find((a) => a.id === pools.find((p) => `pool:${p.id}` === tracked)?.accountId) : undefined
+  const currency = (account ?? holder)?.currency ?? baseCurrency
   const trackedName = family === 'net-worth' ? 'net worth' : nameOf(tracked) ?? ''
   // a debt is paid down to zero unless another amount is typed
   const [target, setTarget] = useState(goal ? amountToInput(goal.target, currency, locale) : given?.kind === 'pay-off' ? '0' : '')

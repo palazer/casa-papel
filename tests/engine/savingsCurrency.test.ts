@@ -83,7 +83,7 @@ describe('engine: a savings account kept in another currency', () => {
     expect(out.totals[JAN].fromAccounts).toBe(45_00 + 30_00)
   })
 
-  it('follows its virtual accounts, which stay in the household currency', () => {
+  it('keeps its virtual accounts in its own currency (rule X14), so the two always agree', () => {
     const w = world('USD')
     const travel = pool({ name: 'Travel', accountId: w.savings.id, openingBalance: 100_00 })
     const fill = row({ name: 'To Travel', section: 'transfer', kind: 'pool-allocation', accountId: w.savings.id, order: 'c1' })
@@ -94,8 +94,9 @@ describe('engine: a savings account kept in another currency', () => {
       rows: [fill, trips, hotel], pools: [travel],
       cells: [cellValue(fill.id, JAN, 90_00), cellValue(trips.id, JAN, 45_00), cellItems(hotel.id, JAN, [{ amount: 30_00, fundedBy: poolRef(travel.id) }])],
     })
-    // the virtual account: 100 + 90 set aside − 45 − 27 (30 dollars), all in euros
-    expect(out.pools[travel.id].months[JAN]).toMatchObject({ allocation: 90_00, spend: 45_00 + 27_00, balance: 100_00 + 90_00 - 72_00 })
+    // the virtual account, in dollars as its account is: 100 + 100 set aside (90 euros) − 50 (45 euros) − 30 as typed
+    expect(out.pools[travel.id].currency).toBe('USD')
+    expect(out.pools[travel.id].months[JAN]).toMatchObject({ allocation: 100_00, spend: 50_00 + 30_00, balance: 120_00, balanceBase: 108_00 })
     // the account that holds it: +100 dollars set aside, −50 for the trip, −30 for the hotel as typed
     expect(out.accounts[w.savings.id].months[JAN]).toMatchObject({ inflow: 100_00, outflow: 50_00 + 30_00, balance: 1000_00 + 100_00 - 80_00 })
     expect(out.totals[JAN].fundedOwn).toEqual({ [poolRef(travel.id)]: { EUR: 45_00, USD: 30_00 } })

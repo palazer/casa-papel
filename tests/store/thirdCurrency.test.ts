@@ -83,12 +83,18 @@ describe('a change that brings in a third currency is refused', () => {
     await updateAccount(store, dollars.id, { currency: 'EUR' })
   })
 
-  it('a virtual account moved to a savings account in a third currency', async () => {
+  it('an expense out of a virtual account in a savings account in a third currency', async () => {
+    const { store, pounds } = await fresh()
+    const holidays = await addPool(store, { name: 'Holidays', accountId: pounds.id, openingBalance: 0, monthlyAllocation: 0, fromMonth: '2026-01' })
+    await expect(addRow(store, { name: 'New York', section: 'expense', categoryId: null, currency: 'USD', defaultFundedBy: poolRef(holidays.id) }))
+      .rejects.toThrow('"New York" is in USD, so it can come out of an account in USD or in EUR. "Pound savings" is in GBP.')
+  })
+
+  it('a virtual account stays in its currency: it moves only to a savings account in it (rule X14)', async () => {
     const { store, pounds } = await fresh()
     const savings = (await loadTables(store)).accounts.find((a) => a.type === 'savings' && a.currency === 'EUR')!
     const holidays = await addPool(store, { name: 'Holidays', accountId: savings.id, openingBalance: 0, monthlyAllocation: 0, fromMonth: '2026-01' })
-    await addRow(store, { name: 'New York', section: 'expense', categoryId: null, currency: 'USD', defaultFundedBy: poolRef(holidays.id) })
-    await expect(updatePool(store, holidays.id, { accountId: pounds.id })).rejects.toThrow('"New York" is in USD, so it can come out of an account in USD or in EUR. "Pound savings" is in GBP.')
+    await expect(updatePool(store, holidays.id, { accountId: pounds.id })).rejects.toThrow('"Holidays" is kept in EUR, the currency of the savings account that holds it, so it can move to a savings account in EUR. "Pound savings" is in GBP.')
   })
 
   it('a row that follows one in another currency takes that currency', async () => {

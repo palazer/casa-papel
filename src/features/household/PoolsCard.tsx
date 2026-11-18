@@ -42,7 +42,7 @@ export function PoolsCard({ household, tables, engine, onError, onRestored }: { 
                 <li key={p.id} className="flex min-h-8 flex-wrap items-center gap-2 py-1">
                   <span className="font-medium">{p.name}</span>
                   <span className="text-muted-foreground">in {acc?.name ?? '?'}{alloc ? ` · filled by the row "${alloc.name}"` : ''}</span>
-                  {bal && <span className="tabular-nums text-muted-foreground">· {formatAmount(bal.balance, baseCurrency, locale)} now</span>}
+                  {bal && <span className="tabular-nums text-muted-foreground">· {formatAmount(bal.balance, engine?.pools[p.id]?.currency ?? baseCurrency, locale)} now</span>}
                   <Button size="xs" variant="ghost" className="ml-auto" onClick={() => setEditing(p)}>Edit</Button>
                 </li>
               )
@@ -100,7 +100,9 @@ export function PoolDialog({ pool, savings, baseCurrency, locale, fromMonth, fre
   const store = useStore()
   const [name, setName] = useState(pool?.name ?? '')
   const [accountId, setAccountId] = useState(pool?.accountId ?? savings[0]?.id ?? '')
-  const [opening, setOpening] = useState(pool ? amountToInput(pool.openingBalance, baseCurrency, locale) : '')
+  /** A virtual account is kept in the currency of the savings account that holds it (rule X14). */
+  const held = (id: string) => savings.find((a) => a.id === id)?.currency ?? baseCurrency
+  const [opening, setOpening] = useState(pool ? amountToInput(pool.openingBalance, held(pool.accountId), locale) : '')
   const [monthly, setMonthly] = useState('')
   const [spendRow, setSpendRow] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -109,12 +111,15 @@ export function PoolDialog({ pool, savings, baseCurrency, locale, fromMonth, fre
   // "Already in it" is a part of what the account holds, never money of its own: the form says how much is still
   // free there, and says so when more is asked for (it does not refuse: a balance can be corrected afterwards)
   const holder = savings.find((a) => a.id === accountId)
+  const own = held(accountId)
+  // it stays in its currency: a move to a savings account in another is refused here, as the store refuses it
+  const moved = pool && own !== held(pool.accountId) ? `"${pool.name}" is kept in ${held(pool.accountId)}, the currency of the savings account that holds it, so it can move to a savings account in ${held(pool.accountId)}. "${holder?.name ?? ''}" is in ${own}.` : null
   const free = !pool && holder ? freeOf?.(holder.id) ?? null : null
-  const asked = opening.trim() ? parseAmount(opening, baseCurrency, locale) : null
+  const asked = opening.trim() ? parseAmount(opening, own, locale) : null
   const tooMuch = free != null && asked != null && asked > Math.max(free, 0)
   function save() {
     if (busy) return
-    const openingBalance = opening.trim() ? parseAmount(opening, baseCurrency, locale) : 0
+    const openingBalance = opening.trim() ? parseAmount(opening, own, locale) : 0
     if (openingBalance == null) return setError(unreadableAmount(opening, 'Opening balance is not a number I can read.'))
     const monthlyAllocation = monthly.trim() ? parseAmount(monthly, baseCurrency, locale) : null
     if (monthly.trim() && monthlyAllocation == null) return setError(unreadableAmount(monthly, 'The monthly amount is not a number I can read.'))
@@ -134,11 +139,16 @@ export function PoolDialog({ pool, savings, baseCurrency, locale, fromMonth, fre
         </DialogHeader>
         <div className="grid gap-3">
           <div className="space-y-1.5"><Label htmlFor="pool-name">Name</Label><Input id="pool-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Gifts" /></div>
-          <div className="space-y-1.5"><Label htmlFor="pool-acc">Held in</Label><NativeSelect id="pool-acc" className="w-full" value={accountId} onChange={(e) => setAccountId(e.target.value)}>{savings.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</NativeSelect></div>
-          <div className="space-y-1.5"><Label htmlFor="pool-open">Already in it ({baseCurrency})</Label><Input id="pool-open" inputMode="decimal" value={opening} onChange={(e) => setOpening(e.target.value)} placeholder="0" /><AmountHint text={opening} currency={baseCurrency} locale={locale} />
+          <div className="space-y-1.5">
+            <Label htmlFor="pool-acc">Held in</Label>
+            <NativeSelect id="pool-acc" className="w-full" value={accountId} onChange={(e) => setAccountId(e.target.value)}>{savings.map((a) => <option key={a.id} value={a.id}>{a.name}{a.currency !== baseCurrency ? ` (${a.currency})` : ''}</option>)}</NativeSelect>
+            {own !== baseCurrency && <p className="text-xs text-muted-foreground" data-testid="pool-currency">Kept in {own}, as "{holder?.name}" is: what is set aside arrives in {own}, and what is paid out of it leaves in {own}.</p>}
+            {moved && <p className="text-sm text-destructive" role="alert" data-testid="pool-moved">{moved}</p>}
+          </div>
+          <div className="space-y-1.5"><Label htmlFor="pool-open">Already in it ({own})</Label><Input id="pool-open" inputMode="decimal" value={opening} onChange={(e) => setOpening(e.target.value)} placeholder="0" /><AmountHint text={opening} currency={own} locale={locale} />
             <p className="text-xs text-muted-foreground" data-testid="pool-open-note">
               A part of what {holder ? `"${holder.name}"` : 'the account'} already holds: it adds no money to the account.
-              {free != null && holder && ` "${holder.name}" has ${formatAmount(free, baseCurrency, locale)} that is not set aside.`}
+              {free != null && holder && ` "${holder.name}" has ${formatAmount(free, own, locale)} that is not set aside.`}
             </p>
             {tooMuch && holder && (
               <p className="text-xs text-amber-700 dark:text-amber-400" role="status" data-testid="pool-open-warning">
@@ -158,7 +168,7 @@ export function PoolDialog({ pool, savings, baseCurrency, locale, fromMonth, fre
           <div>{pool && onRemove && <Button variant="ghost" size="sm" onClick={onRemove}>{removeLabel}</Button>}</div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-            <Button disabled={busy || !name.trim() || !accountId} onClick={save}>Save</Button>
+            <Button disabled={busy || !name.trim() || !accountId || moved != null} onClick={save}>Save</Button>
           </div>
         </DialogFooter>
       </DialogContent>

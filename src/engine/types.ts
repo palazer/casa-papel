@@ -196,6 +196,10 @@ export interface AccountSeries {
   months: Record<MonthKey, AccountMonthResult>
 }
 
+/**
+ * A virtual account's month, in the currency of the savings account that holds it (rule X14), with what it is worth in
+ * the household's currency beside it at the month's rate.
+ */
 export interface PoolMonthResult {
   /** What it held when the month began: the month before's balance, or what it was opened with. */
   start: Money
@@ -205,10 +209,16 @@ export interface PoolMonthResult {
   spend: Money
   /** What the month took beyond what the virtual account held; it came out of the unassigned part of its savings account. */
   short: Money
+  /** `start`, `balance` and `short` in the household's currency, at the month's rate (the same figures in an account kept in it). */
+  startBase: Money
+  balanceBase: Money
+  shortBase: Money
 }
 
 export interface PoolSeries {
   poolId: string
+  /** The currency of the savings account that holds it. */
+  currency: string
   months: Record<MonthKey, PoolMonthResult>
 }
 

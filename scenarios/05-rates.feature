@@ -365,20 +365,32 @@ Feature: Amounts and accounts in another currency
     And "Dollar loan" ends February 2026 with 0.00
     And "Dollar loan" ends December 2026 with 0.00
 
-  @X14 @planned
+  @X14
   Scenario: A virtual account in a dollar savings account is kept in dollars
     Given a savings account "Dollar savings" in USD holding 1,100.00
     And a virtual account "Holidays" in "Dollar savings" holding 110.00
     Then the virtual account "Holidays" holds 110.00 USD at the end of January 2026
     And the virtual account "Holidays" holds 110.00 USD at the end of February 2026
 
-  @X14 @planned
+  # What is set aside in euros arrives in dollars, what is paid out of it leaves in dollars, at each month's rate: the
+  # virtual account moves exactly as its share of the account does.
+  @X14
+  Scenario: What a dollar virtual account receives and pays is counted in dollars
+    Given a savings account "Dollar savings" in USD holding 1,100.00
+    And a virtual account "Holidays" in "Dollar savings" holding 110.00, with 100.00 set aside every month from January 2026
+    And an expense "Trip" of 40.00 from February 2026
+    And "Trip" comes out of "Holidays" in every month
+    Then the virtual account "Holidays" holds 220.00 USD at the end of January 2026
+    And the virtual account "Holidays" holds 295.00 USD at the end of February 2026
+    And "Dollar savings" ends February 2026 with 1,285.00
+
+  @X14
   Scenario: A virtual account can only move to a savings account in the same currency
     Given a savings account "Savings" holding 5,000.00
     And a savings account "Dollar savings" in USD holding 1,100.00
     And a virtual account "Holidays" in "Savings" holding 600.00
     When I move the virtual account "Holidays" to "Dollar savings"
-    Then it is refused with "Dollar savings"
+    Then it is refused with '"Holidays" is kept in EUR, the currency of the savings account that holds it, so it can move to a savings account in EUR. "Dollar savings" is in USD.'
 
   @X15
   Scenario: An expense in one currency cannot come out of an account in a third one

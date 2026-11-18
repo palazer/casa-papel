@@ -36,13 +36,16 @@ export function TopUpDialog({ tables, engine, household, poolId, month, onClose 
   const now = engine.pools[poolId]?.months[month]
   const short = now?.short ?? 0
   const money = (v: number) => formatAmount(v, ccy, locale)
+  // the virtual account is kept in its savings account's currency (rule X14); the top-up is typed in the household's
+  const own = engine.pools[poolId]?.currency ?? ccy
+  const held = (v: number) => formatAmount(v, own, locale)
   const monthName = formatMonth(month, locale, 'long')
 
   /** Savings and investment accounts that hold something this month, the virtual account's own savings account first. */
   const sources = useMemo(() => {
     const live = tables.accounts.filter((a) => !a.deletedAt && !a.archivedMonth && (a.type === 'savings' || a.type === 'investment'))
     const own = live.find((a) => a.id === pool?.accountId)
-    const set = (accountId: string) => tables.pools.filter((p) => !p.deletedAt && p.accountId === accountId).reduce((sum, p) => sum + (engine.pools[p.id]?.months[month]?.balance ?? 0), 0)
+    const set = (accountId: string) => tables.pools.filter((p) => !p.deletedAt && p.accountId === accountId).reduce((sum, p) => sum + (engine.pools[p.id]?.months[month]?.balanceBase ?? 0), 0)
     return [...(own ? [own] : []), ...live.filter((a) => a.id !== own?.id)].map((a) => {
       const balance = engine.accounts[a.id]?.months[month]?.balanceBase
       // what is free in a savings account is what its virtual accounts have not set aside
@@ -55,7 +58,7 @@ export function TopUpDialog({ tables, engine, household, poolId, month, onClose 
   const setAsideCell = pool?.allocationRowId ? engine.cells[cellKey(pool.allocationRowId, month)] : undefined
   const rule = pool?.allocationRowId && setAsideCell?.source === 'derived' ? resolveRules(engine.rows, household.closingRule).byRow.get(pool.allocationRowId) : undefined
   const [sourceId, setSourceId] = useState(sources[0]?.id ?? INCOME)
-  const [text, setText] = useState(short > 0 ? amountToInput(short, ccy, locale) : '')
+  const [text, setText] = useState(short > 0 ? amountToInput(now?.shortBase ?? short, ccy, locale) : '')
   const { error, busy, save } = useSave(onClose)
 
   const amount = text.trim() === '' ? null : parseAmount(text, ccy, locale)
@@ -99,8 +102,9 @@ export function TopUpDialog({ tables, engine, household, poolId, month, onClose 
           <DialogTitle>{short > 0 ? `${pool.name} is short in ${monthName}` : `Top up ${pool.name} in ${monthName}`}</DialogTitle>
           <DialogDescription>
             {short > 0
-              ? <>{money(now.spend)} comes out of {pool.name} this month and it holds {money(now.spend - short)}: {money(short)} is missing. Until it is topped up, the missing part comes out of the unassigned savings without a line of its own.</>
-              : <>{pool.name} holds {money(now.balance)} at the end of {monthName}. A top-up adds to it this month only.</>}
+              ? <>{held(now.spend)} comes out of {pool.name} this month and it holds {held(now.spend - short)}: {held(short)} is missing{own !== ccy ? `, ${money(now.shortBase)}` : ''}. Until it is topped up, the missing part comes out of the unassigned savings without a line of its own.</>
+              : <>{pool.name} holds {held(now.balance)} at the end of {monthName}. A top-up adds to it this month only.</>}
+            {own !== ccy && <> The top-up is typed in {ccy} and arrives in {own} at the month's rate.</>}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -134,8 +138,8 @@ export function TopUpDialog({ tables, engine, household, poolId, month, onClose 
               <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm" data-testid="top-up-preview">
                 {lines.from && (<><dt className="text-muted-foreground">Money in · {lines.from.name}</dt><dd className="text-right tabular-nums">{money(lines.from.amount)}</dd></>)}
                 {lines.setAside && (<><dt className="text-muted-foreground">Money out · {lines.setAside.name}, this month</dt><dd className="text-right tabular-nums">{money(lines.setAside.amount)}</dd></>)}
-                <dt className="text-muted-foreground">{pool.name} at the end of the month{lines.short > 0 ? `, still short by ${money(lines.short)}` : ''}</dt>
-                <dd className="text-right tabular-nums" data-testid="top-up-balance">{money(lines.balance)}</dd>
+                <dt className="text-muted-foreground">{pool.name} at the end of the month{lines.short > 0 ? `, still short by ${held(lines.short)}` : ''}</dt>
+                <dd className="text-right tabular-nums" data-testid="top-up-balance">{held(lines.balance)}</dd>
               </dl>
             </div>
           )}

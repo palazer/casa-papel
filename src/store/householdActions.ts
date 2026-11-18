@@ -388,6 +388,14 @@ export async function updatePool(store: Store, id: string, patch: Partial<Pick<P
   const tables = await loadTables(store)
   const p = tables.pools.find((x) => x.id === id)
   if (!p) throw new Error('Virtual account not found')
+  // it is kept in the currency of the savings account that holds it (rule X14), and stays in it
+  if (patch.accountId != null && patch.accountId !== p.accountId) {
+    const from = tables.accounts.find((a) => a.id === p.accountId)
+    const to = tables.accounts.find((a) => a.id === patch.accountId && !a.deletedAt)
+    if (from && to && from.currency !== to.currency) {
+      throw new Error(`"${p.name}" is kept in ${from.currency}, the currency of the savings account that holds it, so it can move to a savings account in ${from.currency}. "${to.name}" is in ${to.currency}.`)
+    }
+  }
   const mutations: Mutation[] = [{ op: 'put', table: 'pools', record: PoolSchema.parse({ ...p, ...patch, updatedAt: now() }) }]
   refuseThirdCurrency(tables, mutations)
   await store.commit(mutations)

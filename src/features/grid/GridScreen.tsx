@@ -274,12 +274,16 @@ export function GridScreen() {
                 ...(s.currency !== ccy ? [derivedRow(`in ${ccy}`, s.liability ? 'out' : 'in', (m) => s.months[m]?.balanceBase ?? null, { muted: true, sub: acc.name, help: 'balance.inBase' })] : []),
               ]
             })}
-            {poolSeries.map((p) => {
+            {poolSeries.flatMap((p) => {
               const pool = tables.pools.find((x) => x.id === p.poolId)
-              return derivedRow(`Virtual account · ${pool?.name ?? ''}`, 'in', (m) => p.months[m]?.balance ?? null, {
-                hue: HUES.pool, help: 'balance.pool',
-                warn: (m) => (p.months[m]?.short ? `Short by ${formatAmount(p.months[m].short, ccy, locale)}: more came out of it than it held. Top it up on the Statement.` : null),
-              })
+              // kept in the currency of the savings account that holds it (rule X14), with its worth in the household's beneath
+              return [
+                derivedRow(`Virtual account · ${pool?.name ?? ''}`, 'in', (m) => p.months[m]?.balance ?? null, {
+                  hue: HUES.pool, help: 'balance.pool', currency: p.currency,
+                  warn: (m) => (p.months[m]?.short ? `Short by ${formatAmount(p.months[m].short, p.currency, locale)}: more came out of it than it held. Top it up on the Statement.` : null),
+                }),
+                ...(p.currency !== ccy ? [derivedRow(`in ${ccy}`, 'in', (m) => p.months[m]?.balanceBase ?? null, { muted: true, sub: `Virtual account · ${pool?.name ?? ''}`, help: 'balance.inBase' })] : []),
+              ]
             })}
             {(accountSeries.length > 0 || mainShown) && derivedRow('Net worth', 'in', (m) => (engine.netWorth[m] != null && (engine.main?.months[m] || accountSeries.some((s) => s.months[m])) ? engine.netWorth[m] : null), { strong: true, hue: HUES.worth, band: true, help: 'derived.netWorth' })}
           </tbody>

@@ -163,11 +163,12 @@ export interface Statement {
 }
 
 /**
- * What an account holds in a month that no virtual account has set aside, in the household currency; null when the
- * account has no balance that month. Below zero when its virtual accounts claim more than it holds.
+ * What an account holds in a month that no virtual account has set aside, in the account's own currency, which is
+ * that of its virtual accounts too (rule X14); null when the account has no balance that month. Below zero when its
+ * virtual accounts claim more than it holds.
  */
 export function notSetAside(tables: Tables, engine: EngineOutput, accountId: string, month: MonthKey): Money | null {
-  const balance = engine.accounts[accountId]?.months[month]?.balanceBase
+  const balance = engine.accounts[accountId]?.months[month]?.balance
   if (balance == null) return null
   let inPools: Money = 0
   for (const p of tables.pools) if (!p.deletedAt && p.accountId === accountId) inPools += engine.pools[p.id]?.months[month]?.balance ?? 0
@@ -448,7 +449,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   }
   for (const [pid, list] of fromPool) {
     const pool = poolsById.get(pid)
-    const short = engine.pools[pid]?.months[month]?.short ?? 0
+    const short = engine.pools[pid]?.months[month]?.shortBase ?? 0
     const line: StatementLine = { id: `src:${pid}`, kind: 'source', label: pool ? `From ${pool.name}` : 'From a removed virtual account', accountKind: 'virtual account', amount: sum(list), children: list, poolId: pid, paidFor: paidFor(list) }
     // it paid more than it held: the difference came out of the unassigned part of its savings account
     if (short > 0) Object.assign(line, { short, shortFrom: pool ? accountsById.get(pool.accountId)?.name : undefined })
@@ -555,16 +556,25 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
       let inPools: Money = 0
       let poolsChange: Money = 0
       for (const p of held) {
+        // in the household's currency, as the whole Statement is; the virtual account itself is kept in its account's (X14)
         const pm = engine.pools[p.id].months[month]
-        const poolLine: StatementLine = { id: `pool:${p.id}`, kind: 'pool', label: p.name, amount: pm.balance, change: pm.balance - pm.start, children: [], poolId: p.id }
+        const own = engine.pools[p.id].currency
+        // what it changed by in the household's currency: against the month before, so the rate's move is part of it,
+        // as it is for the account that holds it
+        const before = engine.pools[p.id].months[prevMonth]
+        const poolChange = pm.balanceBase - (before ? before.balanceBase : pm.startBase)
+        const poolLine: StatementLine = {
+          id: `pool:${p.id}`, kind: 'pool', label: p.name, amount: pm.balanceBase, change: poolChange, children: [], poolId: p.id,
+          native: own !== base ? { amount: pm.balance, currency: own } : undefined,
+        }
         if (!p.archivedMonth) poolLine.rule = ruleOfRows(engine.rows.filter((row) => row.id === p.allocationRowId && !row.archivedMonth))
         else poolLine.archived = true
-        if (pm.short > 0) Object.assign(poolLine, { short: pm.short, shortFrom: acc.name })
+        if (pm.short > 0) Object.assign(poolLine, { short: pm.shortBase, shortFrom: acc.name })
         poolLines.set(p.id, poolLine)
         line.children.push(poolLine)
-        inPools += pm.balance
+        inPools += pm.balanceBase
         // what the balance changed by: in a month that ran short, less than what was asked of it
-        poolsChange += pm.balance - pm.start
+        poolsChange += poolChange
       }
       const free = r.balanceBase - inPools
       // below zero the virtual accounts claim more than the account holds: said on the line, where the red figure is

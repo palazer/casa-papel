@@ -531,6 +531,48 @@ test('a conversion is recorded under the amount: two figures give the third, it 
   await expect(row).toContainText('€790.00')
 })
 
+test('a virtual account in a dollar savings account is kept in dollars, and stays in a dollar account', async ({ page }) => {
+  await page.route('https://api.frankfurter.dev/**', (r) => r.fulfill({ json: { rates: { '2026-11-02': { USD: 1.25 } } } }))
+  await loadDemo(page)
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Household' }).click()
+  await page.getByRole('button', { name: 'Add account' }).click()
+  const dlg = page.getByRole('dialog')
+  await dlg.getByLabel('Name', { exact: true }).fill('Dollar savings')
+  await dlg.getByLabel('Type').selectOption('savings')
+  await dlg.getByRole('button', { name: /^More options/ }).click()
+  await dlg.getByLabel('Currency').selectOption('USD')
+  await dlg.getByLabel(/^Holds at the start of/).fill('1000')
+  await dlg.getByRole('button', { name: 'Save' }).click()
+  await expect(dlg).toBeHidden()
+
+  // the form asks in dollars, and says why
+  await page.getByRole('button', { name: 'Add virtual account' }).click()
+  await dlg.getByLabel('Name', { exact: true }).fill('Holidays')
+  await dlg.getByLabel('Held in').selectOption({ label: 'Dollar savings (USD)' })
+  await expect(dlg.getByTestId('pool-currency')).toContainText('Kept in USD, as "Dollar savings" is')
+  await dlg.getByLabel('Already in it (USD)').fill('200')
+  await dlg.getByLabel(/^Set aside each month/).fill('80')
+  await dlg.getByRole('button', { name: 'Save' }).click()
+  await expect(dlg).toBeHidden()
+  // 200 dollars, and 80 euros set aside in November arrive as 100 dollars
+  await expect(page.locator('li').filter({ hasText: /^Holidays/ })).toContainText('US$300.00 now')
+
+  // the Grid: in dollars, with its worth in euros beneath
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Grid' }).click()
+  const holidays = page.getByRole('row', { name: /^Virtual account · Holidays/ })
+  await expect(holidays.first()).toContainText('$300.00')
+  // its sub-row reads the name out with it
+  await expect(holidays.nth(1)).toContainText('in EUR')
+  await expect(holidays.nth(1)).toContainText('€240.00')
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Household' }).click()
+
+  // moved to a savings account in euros: refused on the spot
+  await page.locator('li').filter({ hasText: /^Holidays/ }).getByRole('button', { name: 'Edit' }).click()
+  await dlg.getByLabel('Held in').selectOption({ label: 'Savings' })
+  await expect(dlg.getByTestId('pool-moved')).toHaveText('"Holidays" is kept in USD, the currency of the savings account that holds it, so it can move to a savings account in USD. "Savings" is in EUR.')
+  await expect(dlg.getByRole('button', { name: 'Save' })).toBeDisabled()
+})
+
 test('a foreign-currency account shows its household-currency value beneath', async ({ page }) => {
   // the rate service cannot be reached: the rate is typed by hand
   await page.route('https://api.frankfurter.dev/**', (r) => r.abort())
