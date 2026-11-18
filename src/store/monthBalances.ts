@@ -13,7 +13,7 @@ import {
 } from '@/model'
 import { cardBookingMutations, countDoneMutations, engineFor, loadTables } from './actions'
 import { applyMutations } from './impact'
-import type { Mutation, Store } from './store'
+import { NO_QUESTION, type Mutation, type Store } from './store'
 
 /**
  * What was typed into a month's balance fields, per account id and in the account's own currency. A number is a real
@@ -207,5 +207,5 @@ export async function setMonthBalances(store: Store, month: MonthKey, entry: Bal
     const after = mutations.length ? applyMutations(tables, mutations) : tables
     mutations.push(...countDoneMutations(after, engineFor(after, household, month), month, Date.now()))
   }
-  if (mutations.length) await store.commit(mutations)
+  if (mutations.length) await store.commit(mutations, NO_QUESTION)
 }

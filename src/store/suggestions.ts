@@ -4,7 +4,7 @@ import {
   ENTITY_TEMPLATES, HOUSEHOLD_TEMPLATES, compareMonths, resolveRules, templateTitle,
   type AccountType, type Entity, type Money, type MonthKey, type Row, type RowTemplate, type Section, type Tables,
 } from '@/model'
-import type { Mutation, Store } from './store'
+import { NO_QUESTION, type Mutation, type Store } from './store'
 import { loadTables, updateHousehold } from './actions'
 import { buildTemplateMutations } from './householdActions'
 
@@ -204,7 +204,7 @@ export function suggestionMutations(tables: Tables, id: string, opts: { amount?:
 /** Add a suggested row; one undoable step. */
 export async function addSuggestion(store: Store, id: string, opts: { amount?: Money | null; month?: MonthKey } = {}): Promise<Row> {
   const { mutations, row } = suggestionMutations(await loadTables(store), id, opts)
-  await store.commit(mutations)
+  await store.commit(mutations, NO_QUESTION)
   return row
 }
 

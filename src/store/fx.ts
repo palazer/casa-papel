@@ -102,10 +102,13 @@ const NOTHING: FetchResult = { written: 0, months: [], unsupported: [] }
  * The service starts its answer at the last published day before the range when the range begins on a day without
  * one. That day is not written into its own month, which is outside what was asked for; it serves the running month
  * in its first days, before a rate is published in it: the month then takes that latest rate, with its real day.
+ *
+ * `byHand`: the fetch is one you asked for ("Use the ECB rate again"): it is saved as your change, so it can be undone
+ * and asks first where it alters a month that is over (rule T4). Otherwise it is the app's own write.
  */
 export async function fetchEcbRates(
   store: Store,
-  opts: { base: string; symbols: string[]; from: MonthKey; to: MonthKey; replaceSettled?: boolean },
+  opts: { base: string; symbols: string[]; from: MonthKey; to: MonthKey; replaceSettled?: boolean; byHand?: boolean },
   fetchFn: typeof fetch = fetch,
   timeoutMs: number = RATE_TIMEOUT_MS,
 ): Promise<FetchResult> {
@@ -170,7 +173,7 @@ export async function fetchEcbRates(
       months.add(m)
     }
   }
-  if (mutations.length) await store.commitSystem(mutations)
+  if (mutations.length) await (opts.byHand ? store.commit(mutations) : store.commitSystem(mutations))
   return { written: mutations.length, months: [...months].sort(), unsupported }
 }
 
@@ -198,11 +201,6 @@ export async function setManualRate(store: Store, pair: string, month: MonthKey,
 }
 
 /**
- * "Use the ECB rate again": fetch one month of one pair from the ECB in place of what is stored for it (your rate, or
- * a stale fetched one). Only that month is written. A month to come has nothing to fetch: what is stored for it goes,
- * and the month is a forecast again.
- */
-/**
  * The official rate of one day, for a conversion recorded at it (rule X10): how many of `foreign` one `base` buys, and
  * the day the rate is of. The service is asked for that day alone and answers with the last day it published on or
  * before it, so a weekend or a holiday takes the working day before. Only the two codes and the date are sent.
@@ -218,6 +216,11 @@ export async function fetchDayRate(base: string, foreign: string, day: string, f
   return { rate: found[1][foreign], date: found[0] }
 }
 
+/**
+ * "Use the ECB rate again": fetch one month of one pair from the ECB in place of what is stored for it (your rate, or
+ * a stale fetched one). Only that month is written, as your change: Undo takes it back, and in a month that is over
+ * it asks first. A month to come has nothing to fetch: what is stored for it goes, and the month is a forecast again.
+ */
 export async function restoreEcbRate(store: Store, pair: string, month: MonthKey, fetchFn: typeof fetch = fetch): Promise<FetchResult> {
   const tables = await loadTables(store)
   const household = tables.household.find((h) => !h.deletedAt)
@@ -225,7 +228,7 @@ export async function restoreEcbRate(store: Store, pair: string, month: MonthKey
   const [base, symbol] = pair.split('/')
   if (base !== household.baseCurrency) throw new Error(`Rates are fetched against ${household.baseCurrency}; ${pair} is not one of its pairs.`)
   // fetch first: a failed fetch throws here and the stored rate stays; a fetched rate replaces it in one write
-  const res = await fetchEcbRates(store, { base, symbols: [symbol], from: month, to: month, replaceSettled: true }, fetchFn)
+  const res = await fetchEcbRates(store, { base, symbols: [symbol], from: month, to: month, replaceSettled: true, byHand: true }, fetchFn)
   if (res.unsupported.length) throw new Error(`The ECB does not publish ${symbol}. Keep entering its rate by hand.`)
   if (res.written === 0) {
     // only a month the ECB cannot have yet (one to come) goes back to a forecast; otherwise what was typed stays

@@ -1,6 +1,6 @@
 import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing'
 import { CategorySchema, DEFAULT_CATEGORIES, RowSchema, newId, type Category, type Money, type MonthKey, type Section, type Tables } from '@/model'
-import type { Mutation, Store } from './store'
+import { NO_QUESTION, type Mutation, type Store } from './store'
 import { categoryEstimateMutations, categoryPlacement, estimateRowName, estimateRowOf, loadTables } from './actions'
 
 const now = () => Date.now()
@@ -42,7 +42,7 @@ export async function addCategory(store: Store, input: { name: string; section: 
   if (input.estimate && input.estimate.amount > 0) {
     mutations.push(...categoryEstimateMutations({ ...tables, categories: [...tables.categories, category] }, category, input.estimate.month, input.estimate.amount, 'from-now-on').mutations)
   }
-  await store.commit(mutations)
+  await store.commit(mutations, NO_QUESTION)
   return category
 }
 

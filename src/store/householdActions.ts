@@ -5,7 +5,7 @@ import {
   ENTITY_TEMPLATES, HOUSEHOLD_TEMPLATES, isOutsideNetWorth, monthOfDate, newId, pocketLandsIn, poolRef, poolRowName, templateTitle,
   type Account, type Entity, type EntityKind, type Household, type MonthKey, type Pool, type Row, type RowTemplate, type Tables,
 } from '@/model'
-import type { Mutation, Store } from './store'
+import { NO_QUESTION, type Mutation, type Store } from './store'
 import { refuseThirdCurrency } from './currencies'
 import { loadTables, payOffKind, rowOfKindMutations } from './actions'
 
@@ -18,7 +18,7 @@ export async function addEntity(store: Store, input: { kind: EntityKind; name: s
   const last = tables.entities.filter((e) => !e.deletedAt).map((e) => e.order).sort().at(-1) ?? null
   const ts = now()
   const entity = EntitySchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, order: generateKeyBetween(last, null), attributes: {}, ...input })
-  await store.commit([{ op: 'put', table: 'entities', record: entity }])
+  await store.commit([{ op: 'put', table: 'entities', record: entity }], NO_QUESTION)
   return entity
 }
 
@@ -43,7 +43,7 @@ function newAccount(tables: Tables, input: AccountInput): Account {
 
 export async function addAccount(store: Store, input: AccountInput): Promise<Account> {
   const account = newAccount(await loadTables(store), input)
-  await store.commit([{ op: 'put', table: 'accounts', record: account }])
+  await store.commit([{ op: 'put', table: 'accounts', record: account }], NO_QUESTION)
   return account
 }
 
@@ -67,7 +67,7 @@ export async function addAccountWithRow(store: Store, input: AccountInput, rowIn
     { ...tables, accounts: [...tables.accounts, account] },
     { ...place, name: rowInput.name ?? '', categoryId: category?.section === place.section ? category.id : null, accountId: account.id },
   )
-  await store.commit([{ op: 'put', table: 'accounts', record: account }, ...mutations])
+  await store.commit([{ op: 'put', table: 'accounts', record: account }, ...mutations], NO_QUESTION)
   return { account, row }
 }
 
@@ -82,7 +82,7 @@ export async function addPayOffRow(store: Store, accountId: string): Promise<Row
   const account = tables.accounts.find((a) => a.id === accountId && !a.deletedAt)
   if (!account || (account.type !== 'loan' && account.type !== 'credit-card')) throw new Error('Only a loan or a card has a row that pays it off.')
   const { row, mutations } = rowOfKindMutations(tables, { ...payOffKind(account), name: '', categoryId: null, accountId })
-  await store.commit(mutations)
+  await store.commit(mutations, NO_QUESTION)
   return row
 }
 
@@ -147,7 +147,7 @@ export async function setAccountActual(store: Store, accountId: string, month: M
   const tables = await loadTables(store)
   const existing = tables.accountMonths.find((a) => a.accountId === accountId && a.month === month)
   if (actualBalance == null && (!existing || existing.actualBalance == null)) return
-  await store.commit([{ op: 'put', table: 'accountMonths', record: AccountMonthSchema.parse({ ...existing, accountId, month, actualBalance, updatedAt: now() }) }])
+  await store.commit([{ op: 'put', table: 'accountMonths', record: AccountMonthSchema.parse({ ...existing, accountId, month, actualBalance, updatedAt: now() }) }], NO_QUESTION)
 }
 
 // ---------- templates ----------
@@ -227,7 +227,7 @@ export async function applyTemplates(store: Store, keys: string[], entityId?: st
   const orders = generateNKeysBetween(last, null, chosen.length)
   const mutations: Mutation[] = []
   chosen.forEach((t, i) => mutations.push(...buildTemplateMutations(t, { tables, household, entity }, orders[i], tables.accounts).mutations))
-  if (mutations.length) await store.commit(mutations)
+  if (mutations.length) await store.commit(mutations, NO_QUESTION)
 }
 
 // ---------- setup ----------
@@ -341,7 +341,7 @@ export function buildSetupMutations(input: SetupInput): { mutations: Mutation[];
 
 export async function createHouseholdFromSetup(store: Store, input: SetupInput): Promise<Household> {
   const { mutations, household } = buildSetupMutations(input)
-  await store.commit(mutations)
+  await store.commit(mutations, NO_QUESTION)
   return household
 }
 
@@ -380,7 +380,7 @@ export async function addPool(store: Store, input: PoolInput): Promise<Pool> {
     const month = input.fromMonth ?? monthOfDate()
     mutations.push({ op: 'put', table: 'cells', record: CellSchema.parse({ rowId: alloc.id, month, mode: 'value', value: input.monthlyAllocation, items: [], updatedAt: ts }) })
   }
-  await store.commit(mutations)
+  await store.commit(mutations, NO_QUESTION)
   return pool
 }
 

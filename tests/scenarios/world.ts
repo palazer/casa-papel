@@ -1,7 +1,7 @@
 import { vi } from 'vitest'
 import { buildStatement, computeEngine, type EngineOutput, type Statement } from '@/engine'
 import { newId, type Account, type Category, type Entity, type Household, type MonthKey, type Pool, type Row, type Tables } from '@/model'
-import { CasaDb, Store, defaultMonths, keepHouse, loadTables, type Mutation } from '@/store'
+import { CasaDb, Store, defaultMonths, keepHouse, loadTables, type CommitOptions, type Mutation } from '@/store'
 import { rateService } from '../rateService'
 import { figuresOf, type Figures } from './figures'
 import { monthName } from './registry'
@@ -58,11 +58,13 @@ export class World {
   /** A new empty app. The scenario moves into it when it imports its data there. */
   open(): Store {
     const store = new Store(new CasaDb(`scenario-${newId()}`))
-    // count what the user could undo, without changing what a save does
+    // count what the user could undo, without changing what a save does: once it is written (a save that waits for
+    // the question about the past, or that the answer cancels, is not one yet)
     const commit = store.commit.bind(store)
-    store.commit = async (mutations: Mutation[]) => {
+    store.commit = async (mutations: Mutation[], opts?: CommitOptions) => {
+      const tx = await commit(mutations, opts)
       this.saves.set(store, (this.saves.get(store) ?? 0) + 1)
-      return commit(mutations)
+      return tx
     }
     this.stores.push(store)
     return store

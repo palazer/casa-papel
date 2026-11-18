@@ -4,7 +4,7 @@ import {
   ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RecurringItemSchema, RowSchema, accountIdOf, addMonths, canCarryRule, canTakeRest, cardIsItemized, compareMonths, currencyExponent, fromMinor, holdsBalance, isOldPocketShare, isOutsideNetWorth, isShareRule, monthKey, monthOfDate, monthRange, newId, parseMonth, paysExpenses, poolIdOf, resolveRules, sharePercent, toMinor,
   type Account, type Category, type Cell, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Pool, type Row, type RowKind, type Tables,
 } from '@/model'
-import type { Mutation, Store } from './store'
+import { NO_QUESTION, type Mutation, type Store } from './store'
 import { cellPut, cellRecord } from './cells'
 import { refuseThirdCurrency } from './currencies'
 import { monthSpan } from './impact'
@@ -353,7 +353,7 @@ export async function setItemStatus(store: Store, rowId: string, month: MonthKey
   const cell = cellOf(tables, rowId, month)
   if (!cell || cell.mode !== 'items') throw new Error('Cell has no items')
   if (!cell.items.some((it) => it.id === itemId)) throw new Error('That item is gone.')
-  await store.commit([cellPut(cell, { rowId, month, items: cell.items.map((it) => (it.id === itemId ? { ...it, status } : it)) }, now())])
+  await store.commit([cellPut(cell, { rowId, month, items: cell.items.map((it) => (it.id === itemId ? { ...it, status } : it)) }, now())], NO_QUESTION)
 }
 
 // ---------- rows ----------
@@ -395,7 +395,7 @@ export async function addRow(store: Store, input: Partial<Row> & { name: string;
   const tables = await loadTables(store)
   const { row, mutation } = newRowMutation(tables, input, afterRowId)
   refuseThirdCurrency(tables, [mutation])
-  await store.commit([mutation])
+  await store.commit([mutation], NO_QUESTION)
   return row
 }
 
@@ -532,7 +532,7 @@ export async function addRowOfKind(store: Store, input: RowOfKindInput): Promise
   const tables = await loadTables(store)
   const { row, mutations } = rowOfKindMutations(tables, input)
   refuseThirdCurrency(tables, mutations)
-  await store.commit(mutations)
+  await store.commit(mutations, NO_QUESTION)
   return row
 }
 
@@ -704,7 +704,7 @@ export async function quickCreateHousehold(store: Store, input: QuickHousehold):
     { op: 'put', table: 'household', record: household },
     { op: 'put', table: 'accounts', record: savings },
     ...rows.map((r): Mutation => ({ op: 'put', table: 'rows', record: r })),
-  ])
+  ], NO_QUESTION)
   return household
 }
 
@@ -774,13 +774,13 @@ export async function setCellDone(store: Store, rowId: string, month: MonthKey, 
   const row = tables.rows.find((r) => r.id === rowId)
   if (!row) throw new Error('Row not found')
   const mutations = lineDoneMutations(tables, engine, row, month, done, now())
-  if (mutations.length) await store.commit(mutations)
+  if (mutations.length) await store.commit(mutations, NO_QUESTION)
 }
 export async function setDerivedDone(store: Store, rowId: string, month: MonthKey, done: boolean): Promise<void> {
   const tables = await loadTables(store)
   const existing = cellOf(tables, rowId, month)
   if ((existing?.markedDone ?? false) === done) return
-  await store.commit([cellPut(existing, { rowId, month, markedDone: done }, now())])
+  await store.commit([cellPut(existing, { rowId, month, markedDone: done }, now())], NO_QUESTION)
 }
 
 // ---------- monthly defaults with a scope ----------

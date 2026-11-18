@@ -18,6 +18,49 @@ export type Mutation =
   | { [T in TableName]: { op: 'put'; table: T; record: TableRecord[T] } }[TableName]
   | { op: 'delete'; table: TableName; key: PrimaryKey }
 
+/** How a save is made (rule T4: a change that alters a month that is over asks first). */
+export interface CommitOptions {
+  /** false: saved without the question: a tick, a real balance, something new, a deletion its own dialog named. */
+  ask?: false
+  /** The same change counted from the current month on, offered as "Only from <Month> on" (an investment's growth). */
+  fromNow?: Mutation[]
+}
+
+/** For the saves that never ask: a tick, a real balance, something new, a deletion its own dialog named, a restore. */
+export const NO_QUESTION: CommitOptions = { ask: false }
+
+/** What a guard decided: what to write, and whether it waited for an answer to get there. */
+export interface GuardResult {
+  mutations: Mutation[]
+  asked: boolean
+}
+
+/**
+ * Looks at a save before it is written: returns what to write, or throws `PastChangeCancelled` when the answer was
+ * "Cancel". Installed by the app (`setGuard`); without one every save is written as it comes.
+ */
+export type CommitGuard = (mutations: Mutation[], opts: CommitOptions) => Promise<GuardResult>
+
+/** "Cancel" to the question before a change alters the past: nothing is saved, and the dialog stays as it was. */
+export class PastChangeCancelled extends Error {
+  constructor() {
+    super('Not saved: the months that are over stay as they were.')
+    this.name = 'PastChangeCancelled'
+  }
+}
+
+/**
+ * Something else was written while the question was open (a sync, the day's rates, an undo). The save was planned
+ * from what was there before, so it would write over what just arrived: it is not written, and saving again plans it
+ * from what is there now.
+ */
+export class PastChangeStale extends Error {
+  constructor() {
+    super('Something else was saved while the question was open. Nothing was saved: save again.')
+    this.name = 'PastChangeStale'
+  }
+}
+
 /**
  * All writes go through `commit`, which validates each record, writes it, and
  * appends one event per mutation inside a single transaction. Undo and redo are
@@ -29,6 +72,8 @@ export class Store {
   private redoStack: string[] = []
   private listeners = new Set<() => void>()
   private version = 0
+  private guard: CommitGuard | null = null
+  private asking = 0
 
   constructor(db: CasaDb) {
     this.db = db
@@ -44,6 +89,16 @@ export class Store {
 
   getVersion(): number {
     return this.version
+  }
+
+  /** The look a save gets before it is written (the app's question about the past); null for none. */
+  setGuard(guard: CommitGuard | null): void {
+    this.guard = guard
+  }
+
+  /** A save is waiting for an answer to the question about the past. */
+  get isAsking(): boolean {
+    return this.asking > 0
   }
 
   private notify(): void {
@@ -68,9 +123,25 @@ export class Store {
     return this.redoStack.length > 0
   }
 
-  /** Apply mutations as one user action. Returns the transaction id. */
-  async commit(mutations: Mutation[]): Promise<string> {
-    const txId = await this.write(mutations)
+  /**
+   * Apply mutations as one user action. Returns the transaction id. With a guard installed, the save is looked at
+   * first; when that waited for an answer, it is written only if nothing else was written meanwhile.
+   */
+  async commit(mutations: Mutation[], opts: CommitOptions = {}): Promise<string> {
+    let write = mutations
+    let since: number | null = null
+    if (this.guard && opts.ask !== false && mutations.length) {
+      const revision = (await this.meta()).localRevision
+      this.asking += 1
+      try {
+        const got = await this.guard(mutations, opts)
+        write = got.mutations
+        if (got.asked) since = revision
+      } finally {
+        this.asking -= 1
+      }
+    }
+    const txId = await this.write(write, since)
     this.undoStack.push(txId)
     this.redoStack = []
     this.notify()
@@ -87,6 +158,8 @@ export class Store {
 
   /** Revert the most recent action. Recorded as a new transaction. */
   async undo(): Promise<boolean> {
+    // the question's save was planned from what is there now: undo waits until it is answered
+    if (this.isAsking) return false
     const txId = this.undoStack.pop()
     if (!txId) return false
     const events = await this.eventsOf(txId)
@@ -103,6 +176,7 @@ export class Store {
 
   /** Re-apply the most recently undone action. */
   async redo(): Promise<boolean> {
+    if (this.isAsking) return false
     const txId = this.redoStack.pop()
     if (!txId) return false
     const events = await this.eventsOf(txId)
@@ -127,11 +201,17 @@ export class Store {
     return events.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
   }
 
-  private async write(mutations: Mutation[]): Promise<string> {
+  /**
+   * `since`: the revision the save was planned at, for a save that waited for an answer. When the store has moved on
+   * since, nothing is written (`PastChangeStale`); otherwise its records are stamped with the time of the write, not
+   * with the time the dialog planned them, as they are the newest change.
+   */
+  private async write(mutations: Mutation[], since: number | null = null): Promise<string> {
     const txId = newId()
     await this.db.transaction('rw', this.db.tables, async () => {
       // read inside the transaction: a merge landing in between would otherwise lose its revision bump or ours
       const meta = await this.meta()
+      if (since != null && meta.localRevision !== since) throw new PastChangeStale()
       /** Never behind what this device has merged from elsewhere, so a local change always counts as later. */
       const ts = Math.max(Date.now(), meta.clockFloor + 1)
       /** What every write from here on is later than: what was merged in, and what this device removed. */
@@ -143,7 +223,8 @@ export class Store {
           const key = primaryKeyOf(m.table, parsed)
           const inverse = (await table.get(key) as { updatedAt?: number } | undefined) ?? null
           // A write is newer than the version it replaces and than anything merged in, so undo and redo count as new edits.
-          const record = { ...parsed, updatedAt: Math.max(parsed.updatedAt, (inverse?.updatedAt ?? -1) + 1, floor + 1) }
+          const stamp = since != null ? Math.max(parsed.updatedAt, ts) : parsed.updatedAt
+          const record = { ...parsed, updatedAt: Math.max(stamp, (inverse?.updatedAt ?? -1) + 1, floor + 1) }
           await table.put(record)
           await this.db.events.add({
             id: newId(), ts, deviceId: meta.deviceId, schemaVersion: SCHEMA_VERSION, txId,

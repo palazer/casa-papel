@@ -1,5 +1,5 @@
 import type { Mutation, Store } from '@/store'
-import { applyMutations, defaultMonths, planRecurringPosts, wipeAll } from '@/store'
+import { NO_QUESTION, applyMutations, defaultMonths, planRecurringPosts, wipeAll } from '@/store'
 import { buildDemoTables } from './demoHousehold'
 
 /**
@@ -16,5 +16,5 @@ export async function loadDemo(store: Store): Promise<void> {
   for (const [table, records] of Object.entries(tables)) {
     for (const record of records) mutations.push({ op: 'put', table, record } as Mutation)
   }
-  await store.commit(mutations)
+  await store.commit(mutations, NO_QUESTION)
 }

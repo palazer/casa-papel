@@ -1,6 +1,6 @@
 import { generateKeyBetween } from 'fractional-indexing'
 import { GoalSchema, monthOfDate, newId, type Goal, type GoalKind, type MonthKey, type Tables } from '@/model'
-import type { Store } from './store'
+import { NO_QUESTION, type Store } from './store'
 import { loadTables } from './actions'
 
 const now = () => Date.now()
@@ -50,7 +50,7 @@ export async function addGoal(store: Store, input: GoalInput): Promise<Goal> {
     id: newId(), createdAt: ts, updatedAt: ts, name: input.name.trim(), kind: input.kind, ...refs,
     startMonth: input.startMonth ?? monthOfDate(), targetMonth: input.targetMonth ?? null, notes: input.notes ?? '', order: generateKeyBetween(last, null),
   })
-  await store.commit([{ op: 'put', table: 'goals', record: goal }])
+  await store.commit([{ op: 'put', table: 'goals', record: goal }], NO_QUESTION)
   return goal
 }
 

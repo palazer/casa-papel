@@ -3,7 +3,7 @@ import {
   RecurringItemSchema, addMonths, compareMonths, isDue, monthOfDate, monthRange, newId,
   type Cell, type CellItem, type MonthKey, type RecurringItem, type Row, type Tables,
 } from '@/model'
-import type { Mutation, Store } from './store'
+import { NO_QUESTION, type Mutation, type Store } from './store'
 import { loadTables, newRowMutation } from './actions'
 import { cellPut } from './cells'
 import { refuseThirdCurrency } from './currencies'
@@ -167,7 +167,7 @@ export async function addRecurringItem(
   mutations.push({ op: 'put', table: 'recurringItems', record: item })
   const all = withPosts(tables, mutations, [item.rowId], (m) => compareMonths(m, item.startMonth) >= 0)
   refuseThirdCurrency(tables, all)
-  await store.commit(all)
+  await store.commit(all, NO_QUESTION)
   return item
 }
 
@@ -360,7 +360,7 @@ export async function setRecurringPaid(store: Store, id: string, month: MonthKey
   const idx = items.findIndex((i) => i.recurringItemId === id)
   if (idx === -1) items.push({ ...managedItem(item, row), status: paid ? 'done' : row.defaultStatus })
   else items[idx] = { ...items[idx], status: paid ? 'done' : row.defaultStatus, skipped: false }
-  await store.commit([cellPut(cell, { rowId: item.rowId, month, mode: 'items', value: null, items }, now())])
+  await store.commit([cellPut(cell, { rowId: item.rowId, month, mode: 'items', value: null, items }, now())], NO_QUESTION)
 }
 
 export type RecurringMonthStatus = 'not-due' | 'due' | 'paid' | 'skipped'

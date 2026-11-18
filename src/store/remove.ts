@@ -1,5 +1,5 @@
 import type { MonthKey } from '@/model'
-import type { Store } from './store'
+import { NO_QUESTION, type Store } from './store'
 import { loadTables } from './actions'
 import { describeRemoval, planArchive, planRemoval, planRestore, type RemovalTarget, type Restored } from './impact'
 
@@ -8,7 +8,7 @@ const now = () => Date.now()
 /** Delete something and settle everything that pointed at it, as one undoable commit. Refused when the impact says so. */
 export async function removeThing(store: Store, target: RemovalTarget): Promise<void> {
   const tables = await loadTables(store)
-  await store.commit(planRemoval(tables, target, now()))
+  await store.commit(planRemoval(tables, target, now()), NO_QUESTION)
 }
 
 /**
@@ -24,7 +24,7 @@ export async function removeIfFree(store: Store, target: RemovalTarget): Promise
   // a goal that watches it would go with it: that is more than the thing itself, so the dialog says it first
   const watched = tables.goals.some((g) => !g.deletedAt && (g.accountId === target.id || g.poolId === target.id))
   if (!impact.canDelete || impact.changes.length > 0 || watched || impact.over) return null
-  await store.commit(planRemoval(tables, target, now()))
+  await store.commit(planRemoval(tables, target, now()), NO_QUESTION)
   return impact.subject
 }
 
@@ -41,7 +41,7 @@ export async function archiveThing(store: Store, target: RemovalTarget, month: M
 export async function restoreThing(store: Store, target: RemovalTarget): Promise<Restored> {
   const tables = await loadTables(store)
   const { mutations, ...restored } = planRestore(tables, target, now())
-  await store.commit(mutations)
+  await store.commit(mutations, NO_QUESTION)
   return restored
 }
 
