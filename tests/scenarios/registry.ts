@@ -49,6 +49,8 @@ types.defineParameterType(new ParameterType<string>('day', new RegExp(`\\d{1,2} 
 }, false, false))
 types.defineParameterType(new ParameterType<string>('ccy', /[A-Z]{3}/, String, (s: string) => s, false, false))
 types.defineParameterType(new ParameterType<string>('pair', /[A-Z]{3}\/[A-Z]{3}/, String, (s: string) => s, false, false))
+// EUR, USD and GBP: several currencies, in the order they are named
+types.defineParameterType(new ParameterType<string[]>('ccys', /[A-Z]{3}(?:, [A-Z]{3})* and [A-Z]{3}/, Array, (s: string) => s.split(/, | and /), false, false))
 // 10% or 2.5% → the fraction
 types.defineParameterType(new ParameterType<number>('percent', /-?\d+(?:\.\d+)?%/, Number, (s: string) => Number(s.slice(0, -1)) / 100, false, false))
 types.defineParameterType(new ParameterType<number>('rate', /\d+(?:\.\d+)?/, Number, (s: string) => Number(s), false, false))

@@ -241,6 +241,10 @@ rule T4 will ask first.
 
 **X9. Two other currencies are converted through the household's.** GBP to USD is GBP to EUR, then EUR to USD.
 
+**X13. Fifteen currencies are offered:** EUR, USD, GBP, TRY, CAD, AUD, CHF, SEK, NOK, DKK, PLN, CZK, HUF, RON, ISK.
+The ECB publishes a rate for each. A code that is already in use and not among them keeps working, and stays in the
+list of the field that holds it.
+
 > **Decided, not built (step 4).**
 >
 > **X10. A transaction in another currency keeps its own conversion.** It has a foreign amount, a home amount and a
@@ -257,8 +261,6 @@ rule T4 will ask first.
 > can set your own change per month, or hold the rate.
 >
 >     +1 % a month on average, last known 1.0000: 1.0100, then 1.0181 (+0.8 %), then 1.0246 (+0.64 %)
->
-> **X13. Fifteen currencies are offered:** EUR, USD, GBP, TRY, CAD, AUD, CHF, SEK, NOK, DKK, PLN, CZK, HUF, RON, ISK.
 >
 > **X14. A virtual account is kept in the currency of the savings account that holds it.** In a dollar savings
 > account it is a dollar balance: what is set aside arrives in dollars at the month's rate, and what is paid out of

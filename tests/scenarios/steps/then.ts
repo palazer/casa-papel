@@ -10,6 +10,7 @@ import { ScenarioError, type World } from '../world'
 import * as app from '@/store'
 import { itemsFromCurrent, planRowMonthSave } from '@/store'
 import { monthProgress } from '@/features/statement/progress'
+import { CURRENCIES, currencyChoices } from '@/app/currencies'
 
 /** Amounts are compared as the scenario writes them, so a failure reads "expected 1,200.00, got 1,250.00". */
 const same = (got: number, expected: number, what: string) => expect(moneyText(got), what).toBe(moneyText(expected))
@@ -170,6 +171,13 @@ step('the rate for {pair} in {month} is {rate}', async (world: World, pair: stri
   const [from, to] = pair.split('/')
   const got = rateFor(fx, from, to, month)
   expect(got == null ? 'no rate' : got.toFixed(4), `${pair} in ${monthName(month)}`).toBe(rate.toFixed(4))
+})
+
+// the list every currency field offers, in its order; for a household in another currency its own comes first
+step('the currencies offered are {ccys}', async (world: World, codes: string[]) => {
+  const { household } = await world.view()
+  expect(CURRENCIES, 'the currencies offered').toEqual(codes)
+  expect(currencyChoices(household.baseCurrency), 'what a currency field of this household offers').toEqual([household.baseCurrency, ...codes.filter((c) => c !== household.baseCurrency)])
 })
 
 // ---------- virtual accounts, per person, warnings, goals ----------

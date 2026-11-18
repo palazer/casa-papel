@@ -355,7 +355,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   // the codes alone: the field is narrow, and the household's own comes first
   const currencySelect = (
     <NativeSelect aria-label={`Currency of ${row.name}`} title="The currency this row is typed in" className="w-24 shrink-0" value={currency} onChange={(e) => pickCurrency(e.target.value)}>
-      {currencyChoices(base, currency).map((c) => <option key={c} value={c}>{c}</option>)}
+      {currencyChoices(base, rowCurrency).map((c) => <option key={c} value={c}>{c}</option>)}
     </NativeSelect>
   )
   const currencyNote = newCurrency !== undefined && (

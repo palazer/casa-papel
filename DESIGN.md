@@ -651,8 +651,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   from what was typed: where the field would say it cannot read the number it says `Only + and - can be used in an
   amount.` instead (`unreadableAmount`). Percentages and rates are not amounts and take one number.
 - A currency is always chosen from a list, never typed: `currencyChoices` in `src/app/currencies.ts` (the household's
-  own first, labelled `EUR (household currency)`, then the currencies the ECB publishes; a code in use that is not on
-  the list stays selectable). A currency that comes into use and has no rate at all yet gets the ECB's by itself
+  own first, labelled `EUR (household currency)`, then the rest of the fifteen in `CURRENCIES`, rule X13; a code in
+  use that is not on the list stays selectable, also after another one is picked in the same dialog). A currency that comes into use and has no rate at all yet gets the ECB's by itself
   (`useAutoRates` in the app shell, once per session per currency; only currency codes and dates are sent). The field
   that brings it in says so in its inline text. Offline, or for a currency the ECB does not publish, the amounts stay
   unconverted and the rates card under Household is where a rate is typed or fetched again.

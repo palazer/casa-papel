@@ -1,6 +1,6 @@
 Feature: Amounts and accounts in another currency
   What a rate does to an amount, to an account and to the months, as far as it holds today and in the currency
-  model that is decided. Rules X1 to X13 of docs/calculations.md.
+  model that is decided. Rules X1 to X15 of docs/calculations.md.
 
   Background:
     Given today is 15 March 2026
@@ -242,6 +242,6 @@ Feature: Amounts and accounts in another currency
     When "London hotel" comes out of "Dollar savings" in every month
     Then it is refused with "Dollar savings"
 
-  @X13 @planned
+  @X13
   Scenario: Fifteen currencies are offered
     Then the currencies offered are EUR, USD, GBP, TRY, CAD, AUD, CHF, SEK, NOK, DKK, PLN, CZK, HUF, RON and ISK

@@ -1,10 +1,10 @@
 /**
- * The currencies offered wherever one is chosen (a household's own, a row's, an account's): the ECB publishes a rate
- * for each against the euro, so the app can fetch it. The usual ones first, then the rest by code.
+ * The fifteen currencies offered wherever one is chosen (a household's own, a row's, an account's), rule X13 of
+ * docs/calculations.md. The ECB publishes a rate for each against the euro, so the app can fetch it. A code outside
+ * the list that is already in use keeps working (`currencyChoices`).
  */
 export const CURRENCIES: string[] = [
-  'EUR', 'USD', 'GBP', 'TRY', 'CHF', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'JPY', 'CAD', 'AUD',
-  'BRL', 'CNY', 'HKD', 'HUF', 'IDR', 'ILS', 'INR', 'ISK', 'KRW', 'MXN', 'MYR', 'NZD', 'PHP', 'RON', 'SGD', 'THB', 'ZAR',
+  'EUR', 'USD', 'GBP', 'TRY', 'CAD', 'AUD', 'CHF', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HUF', 'RON', 'ISK',
 ]
 
 /**
