@@ -1291,12 +1291,14 @@ test.describe('working the month in the Statement', () => {
     const under = (side: Locator, heading: string) => side.locator(`li:has(> [data-line="${heading}"]) > div > ul > li > [data-line^="acc:"]`)
     await expect(under(assets, 'savings-accounts')).toHaveText([/^Savings/, /^Rainy day/])
     await assets.getByRole('button', { name: 'Account menu for Rainy day' }).click()
-    await expect(page.getByRole('menuitem', { name: 'Move down' })).toBeDisabled()
-    await page.getByRole('menuitem', { name: 'Move up' }).click()
+    // each menu by its name: a menu that is closing stays in the page for a moment, with the same items
+    const rainyMenu = page.getByRole('menu', { name: 'Account menu for Rainy day' })
+    await expect(rainyMenu.getByRole('menuitem', { name: 'Move down' })).toBeDisabled()
+    await rainyMenu.getByRole('menuitem', { name: 'Move up' }).click()
     await expect(under(assets, 'savings-accounts')).toHaveText([/^Rainy day/, /^Savings/])
     await expect(under(claims, 'debts')).toHaveText([/^Credit card/, /^Car loan/, /^Visa/])
     await claims.getByRole('button', { name: 'Account menu for Car loan' }).click()
-    await page.getByRole('menuitem', { name: 'Move down' }).click()
+    await page.getByRole('menu', { name: 'Account menu for Car loan' }).getByRole('menuitem', { name: 'Move down' }).click()
     await expect(under(claims, 'debts')).toHaveText([/^Credit card/, /^Visa/, /^Car loan/])
     // the order is the household's: it is the same after the page is loaded again, and the totals did not move
     await page.reload()
