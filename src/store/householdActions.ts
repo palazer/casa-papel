@@ -2,7 +2,7 @@ import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing'
 import { buildDefaultCategoryMutations } from './categoryActions'
 import {
   AccountMonthSchema, AccountSchema, CellSchema, EntitySchema, HouseholdSchema, PoolSchema, RowSchema,
-  ENTITY_TEMPLATES, HOUSEHOLD_TEMPLATES, isOutsideNetWorth, monthOfDate, newId, pocketLandsIn, poolRef, poolRowName, templateTitle,
+  ENTITY_TEMPLATES, HOUSEHOLD_TEMPLATES, growthChangedFrom, growthIn, isOutsideNetWorth, monthOfDate, newId, pocketLandsIn, poolRef, poolRowName, templateTitle,
   type Account, type Entity, type EntityKind, type Household, type MonthKey, type Pool, type Row, type RowTemplate, type Tables,
 } from '@/model'
 import { NO_QUESTION, type Mutation, type Store } from './store'
@@ -125,11 +125,29 @@ export async function movePool(store: Store, id: string, direction: 'up' | 'down
   if (mutations.length) await store.commit(mutations)
 }
 
+/**
+ * Save an account's settings. The form sends an investment's growth as the current month's (`growthIn`): unchanged, the
+ * account keeps its rate and the changes it has from a month on. Changed, it counts for every month (and the dated
+ * changes go), and the save offers "Only from <Month> on" (rule T4): the months before keep the rate they had.
+ */
 export async function updateAccount(store: Store, id: string, patch: Partial<Omit<Account, 'id' | 'createdAt'>>): Promise<void> {
   const tables = await loadTables(store)
   const a = tables.accounts.find((x) => x.id === id)
   if (!a) throw new Error('Not found')
-  const next = AccountSchema.parse({ ...a, ...patch, updatedAt: now() })
+  const ts = now()
+  let fromNow: Mutation[] | undefined
+  if (patch.investment && a.investment) {
+    const today = monthOfDate()
+    const wanted = patch.investment.annualRate
+    if (wanted === growthIn(a.investment, today)) {
+      patch = { ...patch, investment: { ...patch.investment, annualRate: a.investment.annualRate, rateChanges: a.investment.rateChanges } }
+    } else {
+      const dated = { ...patch.investment, annualRate: a.investment.annualRate, rateChanges: growthChangedFrom(a.investment, today, wanted) }
+      fromNow = [{ op: 'put', table: 'accounts', record: AccountSchema.parse({ ...a, ...patch, investment: dated, updatedAt: ts }) }]
+      patch = { ...patch, investment: { ...patch.investment, rateChanges: undefined } }
+    }
+  }
+  const next = AccountSchema.parse({ ...a, ...patch, updatedAt: ts })
   // pocket money lands only where net worth does not count it: while a row lands here the account stays left out
   if (isOutsideNetWorth(a) && !isOutsideNetWorth(next)) {
     const landing = tables.rows.filter((r) => !r.deletedAt && !r.archivedMonth && pocketLandsIn(r, a))
@@ -139,7 +157,7 @@ export async function updateAccount(store: Store, id: string, patch: Partial<Omi
   }
   const mutations: Mutation[] = [{ op: 'put', table: 'accounts', record: next }]
   refuseThirdCurrency(tables, mutations)
-  await store.commit(mutations)
+  await store.commit(mutations, { fromNow })
 }
 
 /** Record (or clear with null) the real balance of an account at the end of a month. */

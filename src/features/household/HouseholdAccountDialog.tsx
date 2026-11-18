@@ -13,10 +13,11 @@ import { Segmented } from '@/components/Segmented'
 import { currencyChoices, currencyLabel } from '@/app/currencies'
 import { amountToInput, formatMonth, parseAmount, unreadableAmount } from '@/app/format'
 import { useStore } from '@/app/store'
-import { ACCOUNT_TYPE_INFO, paysExpenses, type Account, type AccountType, type Entity, type Row } from '@/model'
+import { ACCOUNT_TYPE_INFO, growthIn, monthOfDate, paysExpenses, type Account, type AccountType, type Entity, type Row } from '@/model'
 import { addAccount, addAccountWithRow, addPayOffRow, payOffRowsOf, rowNameFor, updateAccount, type AccountRowInput } from '@/store'
 import { cn } from '@/lib/utils'
 import { saveError } from '@/app/saveError'
+import { growthText } from './growthText'
 
 interface Props {
   account: Account | null
@@ -73,7 +74,9 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
   const [tracked, setTracked] = useState(account?.tracked ?? true)
   const [outside, setOutside] = useState(account?.outsideNetWorth ?? false)
   const inv0 = account?.investment
-  const [annual, setAnnual] = useState(inv0 ? String(Math.round(inv0.annualRate * 10000) / 100) : '5')
+  // the growth of the current month: where it changed from a month on, the field shows the rate that counts now
+  const [annual, setAnnual] = useState(inv0 ? String(Math.round(growthIn(inv0, monthOfDate()) * 10000) / 100) : '5')
+  const dated = inv0 ? growthText(inv0, locale) : null
   const [projection, setProjection] = useState<'fixed-rate' | 'historical-average'>(inv0?.projectionMode ?? 'fixed-rate')
   const [timing, setTiming] = useState<'start' | 'end'>(inv0?.depositTiming ?? 'start')
   const [fxMode, setFxMode] = useState<'monthly-rate' | 'fixed'>(inv0?.depositFxMode ?? 'monthly-rate')
@@ -254,6 +257,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
                     <Label htmlFor="acc-growth">Growth per year (%)</Label>
                     <Input id="acc-growth" inputMode="decimal" value={annual} onChange={(e) => setAnnual(e.target.value)} />
                     <p className="text-xs text-muted-foreground">Projects months without a real value. 5 means 5% a year, applied month by month.</p>
+                    {dated && <p className="text-xs text-muted-foreground" data-testid="growth-changes">{dated}.</p>}
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="acc-proj">Projection</Label>

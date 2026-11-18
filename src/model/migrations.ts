@@ -70,6 +70,10 @@ const STEPS: Record<number, Step> = {
   // Optional, so nothing is rewritten. The version keeps an older app from syncing: it would drop the field from
   // every month it writes, and its later write would win.
   17: (raw) => raw,
+  // 18 → 19: an investment's growth can change from a month on (`InvestmentSettings.rateChanges`, rule T4). Optional,
+  // so nothing is rewritten. The version keeps an older app from syncing: it would count the old rate in every month
+  // and drop the field when it writes the account.
+  18: (raw) => raw,
 }
 
 export function migrateExport(raw: unknown): unknown {

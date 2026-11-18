@@ -8,7 +8,7 @@ import { FUNDED_BY_PATTERN, type FundedBy } from './fundedBy'
 z.config({ jitless: true })
 
 /** Bump when the shape of stored data changes; add a migration in migrations.ts. */
-export const SCHEMA_VERSION = 18
+export const SCHEMA_VERSION = 19
 
 // ---------- primitives ----------
 export const IdSchema = z.string().regex(ID_PATTERN, 'expected ULID')
@@ -109,6 +109,11 @@ export const InvestmentSettingsSchema = z.object({
   depositTiming: z.enum(['start', 'end']).default('start'),
   depositFxMode: z.enum(['monthly-rate', 'fixed']).default('monthly-rate'),
   fixedRate: z.number().positive().nullable().default(null),
+  /**
+   * The growth from a month on, where it changed without changing the months before (rule T4: "Only from <Month> on").
+   * Before the first change `annualRate` counts. Absent on accounts that never had one; read with `?? []`.
+   */
+  rateChanges: z.array(z.object({ from: MonthKeySchema, annualRate: z.number() })).optional(),
 })
 
 /**
@@ -465,6 +470,7 @@ export type Household = z.infer<typeof HouseholdSchema>
 export type Entity = z.infer<typeof EntitySchema>
 export type EntityKind = z.infer<typeof EntityKindSchema>
 export type Account = z.infer<typeof AccountSchema>
+export type InvestmentSettings = z.infer<typeof InvestmentSettingsSchema>
 export type ArchiveMemo = z.infer<typeof ArchiveMemoSchema>
 export type AccountType = z.infer<typeof AccountTypeSchema>
 export type AccountMonth = z.infer<typeof AccountMonthSchema>

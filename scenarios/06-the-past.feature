@@ -120,7 +120,7 @@ Feature: The past
     When I change the yearly growth of "Index fund" to 12%
     Then nothing has changed before June 2026
 
-  @T4 @planned
+  @T4
   Scenario: A growth rate can be changed from the current month on only
     When I change the yearly growth of "Index fund" to 12%, only from the current month on
     Then "Index fund" ends May 2026 with 10,245.76

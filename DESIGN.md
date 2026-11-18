@@ -901,7 +901,9 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   card?" as a `Segmented` (`Everything I buy with it` / `Only what I pay to it`) with the chosen answer's sentence.
   Everything that has a usual default sits behind a `More options` disclosure (a chevron button that names what it
   holds while closed): currency (a `NativeSelect`), opening month, owner, tracking, net worth, and for investments growth, projection and when
-  deposits count. It is closed for a new account and open when editing. **`Leave out of net worth`** is a `Check`
+  deposits count. `Growth per year (%)` shows the current month's rate; where it changed from a month on ("Only from
+  <Month> on" at the question about the past, §8), a muted line under it names both: `5% a year until October 2026, 8%
+  from November 2026.` (`growthText`). It is closed for a new account and open when editing. **`Leave out of net worth`** is a `Check`
   there, for an account that holds money and has a balance (savings, investment, other asset, cash; not a current
   account, a card or a loan), with a muted sentence under it that says what it does, another one once it is ticked
   (`acc-outside`). It cannot be unticked while a pocket money row lands in the account: the dialog's error names the

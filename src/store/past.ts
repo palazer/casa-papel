@@ -238,6 +238,7 @@ export function pastGuard(store: Store, ask: (q: PastQuestion) => Promise<PastAn
     const fromNow = opts.fromNow && !changesBetween(before, work(applyMutations(tables, opts.fromNow), months), months, household.baseCurrency) ? today : null
     const answer = await ask({ changes, fromNow, locale: household.locale })
     if (answer === 'cancel') throw new PastChangeCancelled()
-    return { mutations: answer === 'from-now' && fromNow && opts.fromNow ? opts.fromNow : mutations, asked: true }
+    if (answer === 'from-now' && !(fromNow && opts.fromNow)) throw new Error('"Only from <Month> on" was not offered for this change.')
+    return { mutations: answer === 'from-now' ? opts.fromNow! : mutations, asked: true }
   }
 }

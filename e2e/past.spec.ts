@@ -70,6 +70,35 @@ test.describe('the question before a change alters a month that is over (rule T4
   })
 })
 
+test.describe('growth from a month on', () => {
+  test.use({ viewport: { width: 1400, height: 900 } })
+
+  test('a new growth for "Index fund" can count from November on: the form then names both rates', async ({ page }) => {
+    await page.goto('?demo=1&screen=statement')
+    await page.getByRole('button', { name: 'Load the demo household' }).click()
+    const assets = page.getByRole('region', { name: 'Assets' })
+    const fund = assets.getByRole('button', { name: /^Index fund balance:/ })
+    const balance = (await fund.getAttribute('aria-label')) ?? ''
+    const editor = page.getByRole('dialog').first()
+    const question = page.getByTestId('past-question')
+    await assets.getByRole('button', { name: 'Edit Index fund' }).click()
+    await expect(editor.getByLabel('Growth per year (%)')).toHaveValue('5')
+    await editor.getByLabel('Growth per year (%)').fill('8')
+    await editor.getByRole('button', { name: 'Save' }).click()
+    // October would end with more (September holds a real balance): the question offers the version that leaves it
+    await expect(question).toContainText('Oct 2026 changes:')
+    await expect(question).toContainText('"Index fund" at the end of Oct 2026:')
+    await expect(question.locator('[data-slot="dialog-footer"]').getByRole('button')).toHaveText(['Cancel', 'Only from November 2026 on', 'Save anyway'])
+    await question.getByRole('button', { name: 'Only from November 2026 on' }).click()
+    await expect(editor).toBeHidden()
+    // November grows at 8% now; October ends where it did
+    await expect(fund).not.toHaveAccessibleName(balance)
+    await assets.getByRole('button', { name: 'Edit Index fund' }).click()
+    await expect(editor.getByLabel('Growth per year (%)')).toHaveValue('8')
+    await expect(editor.getByTestId('growth-changes')).toHaveText('5% a year until October 2026, 8% from November 2026.')
+  })
+})
+
 test.describe('the question on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 

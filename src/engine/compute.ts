@@ -1,5 +1,5 @@
 import {
-  accountIdOf, accountRef, cardIsItemized, compareMonths, conversionOf, fromMinor, isOldPocketShare, isOutsideNetWorth, isShareRule, isTakenFromAccount, movesInto, monthRange, paysAsExpense, paysExpenses, pocketLandsIn, poolIdOf, poolRef, resolveRules, scaleMoney, toMinor,
+  accountIdOf, accountRef, cardIsItemized, compareMonths, conversionOf, fromMinor, growthIn, isOldPocketShare, isOutsideNetWorth, isShareRule, isTakenFromAccount, movesInto, monthRange, paysAsExpense, paysExpenses, pocketLandsIn, poolIdOf, poolRef, resolveRules, scaleMoney, toMinor,
   type Account, type Category, type Cell, type FundedBy, type Money, type MonthKey, type Row, type RuleState, type Section, type Tables,
 } from '@/model'
 import { convertMoney, householdFx } from './fx'
@@ -792,7 +792,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
     if (acc.type !== 'investment' || !acc.tracked) continue
     const inv = acc.investment ?? { projectionMode: 'fixed-rate' as const, annualRate: 0, depositTiming: 'start' as const, depositFxMode: 'monthly-rate' as const, fixedRate: null }
     const series: AccountSeries = { accountId: acc.id, currency: acc.currency, liability: false, ...outsideOf(acc), months: {} }
-    const fixedMonthly = Math.pow(1 + (inv.annualRate ?? 0), 1 / 12) - 1
+    /** The month's growth from the yearly one: the account's, or a change from a month on (rule T4). */
+    const fixedMonthly = (m: MonthKey) => Math.pow(1 + growthIn(inv, m), 1 / 12) - 1
     const realised: number[] = []
     let prevValue: Money | null = null
     let capital: Money = acc.openingBalance
@@ -836,7 +837,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
       const spent = totals[m].accountFundedByAccount[acc.id] ?? 0
       if (spent !== 0) withdrawal += inv.depositFxMode === 'fixed' && inv.fixedRate ? toMinor(fromMinor(spent, base) * inv.fixedRate, acc.currency) : paidFrom(acc, m)
       if (am?.actualDeposit != null) deposit = am.actualDeposit
-      const rate = inv.projectionMode === 'historical-average' && realised.length > 0 ? realised.reduce((a, b) => a + b, 0) / realised.length : fixedMonthly
+      const rate = inv.projectionMode === 'historical-average' && realised.length > 0 ? realised.reduce((a, b) => a + b, 0) / realised.length : fixedMonthly(m)
       const startValue: Money = inv.depositTiming === 'start' ? prev + deposit - withdrawal : prev
       const grown = Math.round(startValue * (1 + rate))
       const computed: Money = inv.depositTiming === 'start' ? grown : grown + deposit - withdrawal

@@ -31,10 +31,16 @@ step('an investment account {string} in {ccy} holding {money}', (world: World, n
 step('an investment account {string} in {ccy} holding {money} that grows {percent} a year', (world: World, name: string, currency: string, holding: number, rate: number) => account(world, 'investment', name, holding, { currency, ...grows(rate) }))
 
 // "Growth per year" in the account's form
-step('I change the yearly growth of {string} to {percent}', async (world: World, name: string, rate: number) => {
+async function changeGrowth(world: World, name: string, rate: number) {
   const acc = await world.account(name)
   if (acc.type !== 'investment') throw new ScenarioError(`"${name}" is not an investment account.`)
   await updateAccount(world.store, acc.id, { investment: { ...grows(rate).investment!, ...acc.investment, annualRate: rate } })
+}
+step('I change the yearly growth of {string} to {percent}', changeGrowth)
+// … and answer the question about the past with "Only from <the current month> on" (rule T4)
+step('I change the yearly growth of {string} to {percent}, only from the current month on', async (world: World, name: string, rate: number) => {
+  world.autoAnswer = 'from-now'
+  await changeGrowth(world, name, rate)
 })
 
 // ---------- real balances: "Balances for <Month>…" ----------
