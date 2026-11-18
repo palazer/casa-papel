@@ -1,4 +1,4 @@
-import { buildFxIndex, cellKey, convertMoney } from '@/engine'
+import { cellKey, convertMoney, householdFx } from '@/engine'
 import { addMonths, cardIsItemized, isTakenFromAccount, movesInto, pocketLandsIn, type Money, type MonthKey } from '@/model'
 import { moneyText, monthName } from '../registry'
 import type { View } from '../world'
@@ -37,7 +37,7 @@ export function bridgeOf(view: View, m: MonthKey): Bridge {
   const base = household.baseCurrency
   const prev = addMonths(m, -1)
   const t = engine.totals[m]
-  const fx = buildFxIndex(tables.fxRates, { driftMode: household.fxDriftMode ?? 'fixed', fixedDrift: household.fxDriftDefault ?? 0, pairDrift: household.fxPairDrift ?? {}, base })
+  const fx = householdFx(tables.fxRates, household)
   const accounts = new Map(tables.accounts.filter((a) => !a.deletedAt).map((a) => [a.id, a]))
   const pools = new Map(tables.pools.filter((p) => !p.deletedAt).map((p) => [p.id, p]))
   const terms = Object.fromEntries(BRIDGE_TERMS.map((k) => [k, 0])) as Record<BridgeTerm, Money>

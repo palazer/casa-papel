@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildFxIndex, convertMoney, driftFor, rateFor, rateInfo } from '@/engine'
+import { buildFxIndex, convertMoney, driftFor, fxOptionsOf, householdFx, rateFor, rateInfo } from '@/engine'
 import { FxRateSchema } from '@/model'
 
 const rate = (pair: string, month: string, rate: number, source: 'api' | 'manual' | 'projected' = 'api') => FxRateSchema.parse({ pair, month, rate, source, updatedAt: 0 })
@@ -47,5 +47,24 @@ describe('fx cross rates', () => {
     expect(rateInfo(drifting, 'USD', 'TRY', '2026-03')?.projected).toBe(true)
     // without a base currency there is nothing to cross through
     expect(rateInfo(buildFxIndex([rate('EUR/USD', '2026-01', 1.25), rate('EUR/TRY', '2026-01', 50)]), 'USD', 'TRY', '2026-01')).toBeNull()
+  })
+})
+
+describe("a household's rate options", () => {
+  it('are read in one place, with the household\'s own currency to cross through', () => {
+    expect(fxOptionsOf({ baseCurrency: 'EUR', fxDriftMode: 'average', fxDriftDefault: 0.01, fxPairDrift: { 'EUR/TRY': 0.02 } }))
+      .toEqual({ driftMode: 'average', fixedDrift: 0.01, pairDrift: { 'EUR/TRY': 0.02 }, base: 'EUR' })
+  })
+
+  it('have their defaults where an older record lacks a field', () => {
+    const old = { baseCurrency: 'TRY' } as Parameters<typeof fxOptionsOf>[0]
+    expect(fxOptionsOf(old)).toEqual({ driftMode: 'fixed', fixedDrift: 0, pairDrift: {}, base: 'TRY' })
+  })
+
+  it('give the index the calculation converts with', () => {
+    const rates = [rate('EUR/USD', '2026-01', 1.25), rate('EUR/TRY', '2026-01', 50)]
+    const fx = householdFx(rates, { baseCurrency: 'EUR', fxDriftMode: 'fixed', fxDriftDefault: 0.02, fxPairDrift: {} })
+    expect(rateFor(fx, 'USD', 'TRY', '2026-01')!).toBeCloseTo(40, 9)
+    expect(rateFor(fx, 'EUR', 'USD', '2026-02')!).toBeCloseTo(1.275, 9)
   })
 })

@@ -2,7 +2,7 @@ import {
   accountIdOf, accountRef, cardIsItemized, compareMonths, fromMinor, isOldPocketShare, isOutsideNetWorth, isShareRule, isTakenFromAccount, movesInto, monthRange, paysAsExpense, paysExpenses, pocketLandsIn, poolIdOf, poolRef, resolveRules, scaleMoney, toMinor,
   type Account, type Category, type Cell, type FundedBy, type Money, type MonthKey, type Row, type RuleState, type Section, type Tables,
 } from '@/model'
-import { buildFxIndex, convertMoney } from './fx'
+import { convertMoney, householdFx } from './fx'
 import { mainAccountSeries } from './mainAccount'
 import {
   cellKey, fundingTotal,
@@ -139,7 +139,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
   const rowsById = new Map(rows.map((r) => [r.id, r]))
   /** Rows that follow another row mirror its cells, so they are computed after everything else. */
   const pass1Order = [...rows.filter((r) => !r.followsRowId), ...rows.filter((r) => r.followsRowId)]
-  const fx = buildFxIndex(tables.fxRates, { driftMode: household.fxDriftMode ?? 'fixed', fixedDrift: household.fxDriftDefault ?? 0, pairDrift: household.fxPairDrift ?? {}, base })
+  const fx = householdFx(tables.fxRates, household)
   /** Rows driven by recurring items never carry forward: a month without items is 0. */
   const recurringRowIds = new Set(tables.recurringItems.filter((r) => !r.deletedAt).map((r) => r.rowId))
 

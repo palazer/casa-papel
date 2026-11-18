@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { buildFxIndex, computeEngine, rateFor } from '@/engine'
+import { computeEngine, householdFx, rateFor } from '@/engine'
 import { byRow, minor, num, type RawFixture } from './fixtures/rawFixture'
 import { v2ToTables } from './fixtures/v2Adapter'
 
@@ -19,7 +19,7 @@ describe('golden: v2 template workbook', () => {
   })
 
   it('projects the USD/TRY chain (row 55) from one known rate with the sheet\'s monthly drift', () => {
-    const fx = buildFxIndex(tables.fxRates, { driftMode: 'fixed', fixedDrift: household.fxDriftDefault })
+    const fx = householdFx(tables.fxRates, household)
     months.forEach((m, i) => {
       expect(rateFor(fx, 'USD', 'TRY', m)!).toBeCloseTo(sheet(55, i), 6)
     })

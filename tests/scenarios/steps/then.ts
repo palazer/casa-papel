@@ -1,5 +1,5 @@
 import { expect } from 'vitest'
-import { buildFxIndex, cellKey, computeGoals, notSetAside, rateFor } from '@/engine'
+import { cellKey, computeGoals, householdFx, notSetAside, rateFor } from '@/engine'
 import type { MonthKey } from '@/model'
 import { monthRange } from '@/model'
 import { all } from '../../engine/sound'
@@ -178,7 +178,7 @@ step('it is refused with {string}', (world: World, text: string) => {
 // how many of the second currency one of the first buys in the month, to four decimals
 step('the rate for {pair} in {month} is {rate}', async (world: World, pair: string, month: string, rate: number) => {
   const { tables, household } = await world.view()
-  const fx = buildFxIndex(tables.fxRates, { driftMode: household.fxDriftMode ?? 'fixed', fixedDrift: household.fxDriftDefault ?? 0, pairDrift: household.fxPairDrift ?? {}, base: household.baseCurrency })
+  const fx = householdFx(tables.fxRates, household)
   const [from, to] = pair.split('/')
   const got = rateFor(fx, from, to, month)
   expect(got == null ? 'no rate' : got.toFixed(4), `${pair} in ${monthName(month)}`).toBe(rate.toFixed(4))

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/NativeSelect'
 import { formatMonth } from '@/app/format'
 import { useStore } from '@/app/store'
-import { buildFxIndex, driftFor, rateInfo } from '@/engine'
+import { buildFxIndex, driftFor, householdFx, rateInfo } from '@/engine'
 import { monthOfDate, type FxMonthRate, type Household, type MonthKey, type Tables } from '@/model'
 import { fetchRatesFor, neededPairs, setFxSettings, setManualRate } from '@/store'
 import { TAG_TONE, formatRate, rateTag, readableRate, toStored } from './fxDisplay'
@@ -26,10 +26,7 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
   const [note, setNote] = useState<string | null>(null)
   const [drift, setDrift] = useState(String(Math.round((household.fxDriftDefault ?? 0) * 10000) / 100))
   const driftMode = household.fxDriftMode ?? 'fixed'
-  const fx = useMemo(
-    () => buildFxIndex(tables.fxRates, { driftMode, fixedDrift: household.fxDriftDefault ?? 0, pairDrift: household.fxPairDrift ?? {}, base }),
-    [tables.fxRates, driftMode, household.fxDriftDefault, household.fxPairDrift, base],
-  )
+  const fx = useMemo(() => householdFx(tables.fxRates, household), [tables.fxRates, household])
   const stored = useMemo(() => new Map(tables.fxRates.map((r) => [`${r.pair}|${r.month}`, r])), [tables.fxRates])
   // what the known history says about the monthly change, per pair
   const history = useMemo(() => buildFxIndex(tables.fxRates, { driftMode: 'average' }), [tables.fxRates])

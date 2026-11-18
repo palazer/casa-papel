@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useStore } from '@/app/store'
-import { buildFxIndex, rateInfo } from '@/engine'
+import { householdFx, rateInfo } from '@/engine'
 import type { Household, MonthKey, Tables } from '@/model'
 import { restoreEcbRate, setManualRate } from '@/store'
 import { rateTag, readableRate, toStored } from '@/features/household/fxDisplay'
@@ -15,10 +15,7 @@ export function useMonthRate(tables: Tables, household: Household, month: MonthK
   const base = household.baseCurrency
   const { locale } = household
   const pair = `${base}/${currency}`
-  const fx = useMemo(
-    () => buildFxIndex(tables.fxRates, { driftMode: household.fxDriftMode ?? 'fixed', fixedDrift: household.fxDriftDefault ?? 0, pairDrift: household.fxPairDrift ?? {}, base }),
-    [tables.fxRates, household.fxDriftMode, household.fxDriftDefault, household.fxPairDrift, base],
-  )
+  const fx = useMemo(() => householdFx(tables.fxRates, household), [tables.fxRates, household])
   const info = rateInfo(fx, base, currency, month)
   const rec = tables.fxRates.find((r) => r.pair === pair && r.month === month)
   const tag = rateTag(rec, info)

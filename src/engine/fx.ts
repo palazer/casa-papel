@@ -1,4 +1,4 @@
-import { fromMinor, toMinor, type FxRate, type Money, type MonthKey } from '@/model'
+import { fromMinor, toMinor, type FxRate, type Household, type Money, type MonthKey } from '@/model'
 
 interface Entry { month: MonthKey; rate: number }
 
@@ -23,6 +23,20 @@ export interface RateInfo {
   rate: number
   /** Beyond the last known month: extrapolated with the drift. */
   projected: boolean
+}
+
+/**
+ * A household's rate options, read in this one place. Every index that converts for a household is built from these
+ * (`householdFx`): the calculation, the rates card, the rate under an amount and the checks. Read in several places,
+ * they could come to disagree, and a screen would show another rate than the one the calculation used.
+ */
+export function fxOptionsOf(household: Pick<Household, 'baseCurrency' | 'fxDriftMode' | 'fxDriftDefault' | 'fxPairDrift'>): FxOptions {
+  return { driftMode: household.fxDriftMode ?? 'fixed', fixedDrift: household.fxDriftDefault ?? 0, pairDrift: household.fxPairDrift ?? {}, base: household.baseCurrency }
+}
+
+/** The index a household converts with: its stored rates, read with its options. */
+export function householdFx(rates: FxRate[], household: Parameters<typeof fxOptionsOf>[0]): FxIndex {
+  return buildFxIndex(rates, fxOptionsOf(household))
 }
 
 const monthIndex = (m: MonthKey) => {
