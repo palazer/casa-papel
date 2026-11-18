@@ -87,7 +87,7 @@ export function EstimateDialog({ category, month, tables, engine, household, cur
         {typed != null && typed > 0 && typed < rows && <p className="text-xs text-muted-foreground">The rows already add up to more, so {category.name} will show their sum.</p>}
         <fieldset className="space-y-1.5">
           <legend className="text-sm font-medium">Applies to</legend>
-          <Segmented value={scope} onChange={(v) => setScope(v as EditScope)} options={[{ value: 'from-now-on', label: 'This month and onwards' }, { value: 'this-month', label: 'Only this month' }]} />
+          <Segmented value={scope} onChange={(v) => setScope(v as EditScope)} options={[{ value: 'from-now-on', label: 'This and following months' }, { value: 'this-month', label: 'Only this month' }]} />
           <p className="text-xs text-muted-foreground" data-testid="scope-says">
             {scope === 'from-now-on' ? followingText(month, following, locale, 'The estimate stays in every later month until you change it.') : onlyThisMonthText(month, goesOn, ccy, locale, 'has no estimate')}
           </p>

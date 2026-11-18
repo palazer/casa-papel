@@ -63,7 +63,7 @@ Feature: Balances from month to month
   Scenario: Changing a transfer from a month on leaves the balances before it alone
     Given a savings account "Savings" holding 5,000.00
     And a transfer "To Savings" of 500.00 to "Savings" from January 2026
-    When I type 800.00 for "To Savings" in June 2026, every month
+    When I type 800.00 for "To Savings" in June 2026, this and following months
     Then "Savings" ends May 2026 with 7,500.00
     And "Savings" ends June 2026 with 8,300.00
     And "Savings" ends December 2026 with 13,100.00
@@ -183,6 +183,6 @@ Feature: Balances from month to month
   Scenario: Taking a transfer back restores every balance
     Given a savings account "Savings" holding 5,000.00
     And a transfer "To Savings" of 500.00 to "Savings" from January 2026
-    When I type 0.00 for "To Savings" in January 2026, every month
+    When I type 0.00 for "To Savings" in January 2026, this and following months
     Then "Savings" ends December 2026 with 5,000.00
     And "Current account" ends January 2026 with 2,800.00

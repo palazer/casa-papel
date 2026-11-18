@@ -19,6 +19,8 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
 | F7 | Restoring does not bring back what archiving changed with it | amounts stay changed | restore puts it back | closed |
 | F8 | Undo of a schedule added from the list empties the row's months | amounts are lost | save the schedule and its months as one step | closed |
 | F9 | Merging an older copy (a file, or the other device's) brings back what was taken back | an undone change returns | the merge respects what this device removed | closed; the file comparison comes with step 5 |
+| F10 | A row that followed another shows amounts it never had once that row is archived or deleted | months that are over change | write the 0.00 down | open |
+| F11 | A schedule deleted after a payment: the paid amount runs on into every later month | amounts appear that nobody planned | what was paid is that month's alone | open |
 
 ## The findings
 
@@ -247,6 +249,41 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
   removal is never dated before the record it removes, and whatever a device writes after a removal is dated after
   it (so an amount taken back and put back again reaches the other device). Still to come, with step 5: a file shows
   what it would change before it is merged (scenario "A file shows what it would change before it is merged").
+
+### F10. A row that followed another shows amounts it never had once that row is archived or deleted
+
+Found on 18 November 2026 while step 3 was built; older than that step.
+
+- **What the app does.** "Service charge" follows "Rent" at 10%. Rent is 1,200.00 in January and February and
+  0.00 from March on, so the service charge is 120.00, 120.00 and then 0.00. Archive "Rent" from June: the service
+  charge now shows 120.00 in every month, March to May included, which are over and showed 0.00.
+- **Why.** A row that stops following keeps what it showed as amounts of its own. A month in which it showed
+  nothing gets nothing written, so that month carries the amount before it (rule A2).
+- **What the rule says.** Something archived keeps its past (K1), and the app does not change a month that is over
+  by itself (T2, P4).
+- **Scenario.** `13-archive-and-restore.feature`: "A row that followed another keeps showing nothing where it
+  showed nothing".
+- **Options.** (a) Write the 0.00 down where the row showed nothing after an amount: the row keeps exactly what it
+  showed. (b) Leave it.
+- **Recommendation.** (a). A small change in one place (`pinFollowers`).
+
+### F11. A schedule deleted after a payment: the paid amount runs on into every later month
+
+Found on 18 November 2026 while step 3 was built; older than that step.
+
+- **What the app does.** "Insurance" lands 600.00 once a year, in February, and February is ticked as done. Delete
+  the schedule ("All occurrences" → "Delete"): February keeps its 600.00, as it should. But March shows 600.00
+  too, and so does every month after it.
+- **Why.** A row on a schedule never carries an amount forward (H1). Without its last schedule the row is an
+  ordinary row again, and an ordinary row carries the last amount it holds (A2): here the payment that was kept.
+  Ending a schedule after a month does not do this, because the schedule stays on the row.
+- **What the rule says.** A schedule that is stopped lands for the last time in that month (H4). Deleting it takes
+  away what it posted and was not paid; nothing says it adds amounts.
+- **Scenario.** `12-schedules.feature`: "A schedule that is deleted leaves no amounts after what was paid".
+- **Options.** (a) When a row's last schedule is deleted, what it keeps as paid becomes that month's alone (the
+  mark step 3 added for exceptions), so nothing carries on from it. (b) Deleting a schedule that has payments is
+  refused, with "End after <Month>" offered instead. (c) Leave it.
+- **Recommendation.** (a). The paid months stay as they are and no later month changes its amount by surprise.
 
 ## Decided, not built yet
 

@@ -51,7 +51,7 @@ const STATUS_LABEL: Record<ItemStatus, string> = { projected: 'Estimate', commit
 
 /**
  * The one dialog of a row in a month (DESIGN.md §8): its amount, as a single amount or as items, how sure it is and
- * how it repeats. A single amount stays every month, is for this month only, or goes on a schedule; every item says
+ * how it repeats. A single amount is for this and the following months, for this month only, or goes on a schedule; every item says
  * for itself how it repeats, and the row's schedules that land in other months are listed too, so they can be
  * changed from any month. A row that can carry a rule (pocket money, the transfer that fills an account) starts with
  * "How the amount is set": a fixed amount shows these fields, a percentage or the rest shows the rule's. Two things
@@ -132,7 +132,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   const [removingSchedule, setRemovingSchedule] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  /** A single amount put on a schedule; every month and only this month are `scope`. */
+  /** A single amount put on a schedule; "This and following months" and "Only this month" are `scope`. */
   const [onSchedule, setOnSchedule] = useState(false)
   const [rhythm, setRhythm] = useState<Repeating>(() => ({ kind: 'every', interval: 12, anchor: parseMonth(month).month }))
   /** How an item repeats, where that was touched here; the others keep what they have. */
@@ -434,7 +434,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                         setOnSchedule(v === 'schedule')
                         if (v !== 'schedule') pickScope(v as EditScope)
                       }}
-                      options={[{ value: 'from-now-on', label: 'Every month' }, ...(canSchedule ? [{ value: 'schedule', label: 'On a schedule' }] : []), { value: 'this-month', label: 'Only this month' }]}
+                      options={[{ value: 'from-now-on', label: 'This and following months' }, ...(canSchedule ? [{ value: 'schedule', label: 'On a schedule' }] : []), { value: 'this-month', label: 'Only this month' }]}
                     />
                     {onSchedule ? (
                       <>
@@ -632,7 +632,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                 ) : !isRecurringRow && !ruleRuns && (
                   <fieldset className="space-y-1.5">
                     <legend className="text-sm font-medium">The total</legend>
-                    <Segmented label="The total" value={scope} onChange={(v) => pickScope(v as EditScope)} options={[{ value: 'from-now-on', label: 'Every month' }, { value: 'this-month', label: 'Only this month' }]} />
+                    <Segmented label="The total" value={scope} onChange={(v) => pickScope(v as EditScope)} options={[{ value: 'from-now-on', label: 'This and following months' }, { value: 'this-month', label: 'Only this month' }]} />
                     <p className="text-xs text-muted-foreground" data-testid="scope-says">
                       {scope === 'from-now-on'
                         ? [`Nothing here repeats by itself: later months show the total, ${formatAmount(itemsTotal, currency, locale)}, as one amount.`, followingEffects(following, locale)].filter(Boolean).join(' ')

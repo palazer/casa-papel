@@ -73,6 +73,16 @@ Feature: Schedules: amounts that repeat by themselves
     Then "Rent" is 1,300.00 in June 2026
     And "Rent" is 0.00 in every month from July 2026 to December 2026
 
+  # Without its last schedule the row is an ordinary row again, and carries the last amount it holds: the payment
+  # that was kept.
+  @H4 @open @F11
+  Scenario: A schedule that is deleted leaves no amounts after what was paid
+    Given "Insurance" is on a schedule of 600.00 once a year from February 2026
+    And I mark "Insurance" as done in February 2026
+    When I delete the schedule "Insurance" in the list
+    Then "Insurance" is 600.00 in February 2026
+    And "Insurance" is 0.00 in every month from March 2026 to December 2026
+
   @H5
   Scenario: A new year of the plan gets the schedule's amounts
     Given "Insurance" is on a schedule of 300.00 every 3 months from February 2026
@@ -112,7 +122,7 @@ Feature: Schedules: amounts that repeat by themselves
     Given "Insurance" is on a schedule of 600.00 once a year from February 2026
     And I mark "Insurance" as done in February 2026
     And I delete the schedule "Insurance" in the list
-    And I type 100.00 for "Insurance" in June 2026, every month
+    And I type 100.00 for "Insurance" in June 2026, this and following months
     When I type 500.00 for "Insurance" in July 2026, only this month
     Then "Insurance" is 600.00 in February 2026
     And "Insurance" is 100.00 in June 2026

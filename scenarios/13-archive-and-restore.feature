@@ -60,6 +60,17 @@ Feature: Archiving and restoring
     When I restore the account "Savings"
     Then "Savings" ends December 2026 with 3,800.00
 
+  # A row that stops following keeps what it showed as amounts of its own. Where it showed nothing, nothing is
+  # written, and the month then carries the amount before it: months that are over change.
+  @K1 @M4 @open @F10
+  Scenario: A row that followed another keeps showing nothing where it showed nothing
+    Given an expense "Service charge" with no amount yet
+    And "Service charge" follows "Rent" at 10%
+    And I type 0.00 for "Rent" in March 2026, this and following months
+    When I archive the row "Rent" from June 2026
+    Then "Service charge" is 120.00 in every month from January 2026 to February 2026
+    And "Service charge" is 0.00 in every month from March 2026 to December 2026
+
   @K3 @F7
   Scenario: The app says what came back with a restored row
     Given "Rent" is on a schedule of 1,300.00 every month from March 2026

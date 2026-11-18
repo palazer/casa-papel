@@ -48,7 +48,7 @@ async function addAccount(s: Screen, name: string, type: string, holds: string):
   await s.dlg.getByRole('button', { name: 'Save' }).click()
 }
 
-/** "Add row", then the amount in the row's dialog, repeating every month. */
+/** "Add row", then the amount in the row's dialog, for this and the following months. */
 async function addRow(s: Screen, section: 'income' | 'expense', name: string, amount: string): Promise<void> {
   const side = section === 'income' ? s.moneyIn : s.moneyOut
   await side.getByRole('button', { name: `Add ${section} row` }).click()
@@ -103,6 +103,57 @@ test.describe('whole stories, as the scenarios tell them', () => {
     await page.getByRole('button', { name: 'Previous month' }).click()
     await expect(page.getByRole('heading', { level: 2, name: 'December 2026' })).toBeVisible()
     await expect(s.moneyOut.getByRole('button', { name: /^Rent: €1,200\.00/ })).toBeVisible()
+  })
+
+  // scenarios/01: ""This and following months" replaces what the following months had", "… leaves a month that is ticked
+  // as done as it is", "Replacing what the following months had can be taken back in one step"
+  test('a new amount for this and following months replaces a later one, says so first, leaves a ticked month, and undo takes it back', async ({ page }) => {
+    const s = await household(page)
+    const rent = (amount: string) => s.moneyOut.getByRole('button', { name: new RegExp(`^Rent: €${amount.replace('.', '\\.')}`) })
+    const back = async (name: string) => {
+      for (let i = 0; i < 24 && !(await page.getByRole('heading', { level: 2, name }).isVisible()); i++) await page.getByRole('button', { name: 'Previous month' }).click()
+      await expect(page.getByRole('heading', { level: 2, name })).toBeVisible()
+    }
+    // the rent rises to 1,300.00 in April 2027
+    await toMonth(page, 'April 2027')
+    await rent('1,200.00').click()
+    await expect(s.dlg.getByRole('radiogroup', { name: 'Repeats' }).getByRole('radio')).toHaveText(['This and following months', 'On a schedule', 'Only this month'])
+    await expect(s.dlg.getByRole('radio', { name: 'This and following months' })).toBeChecked()
+    await s.dlg.getByLabel('Amount in EUR').fill('1300')
+    await expect(s.dlg.getByTestId('scope-says')).toHaveText('The amount stays in every later month until you change it.')
+    await s.dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(s.dlg).toBeHidden()
+    // June's is paid
+    await toMonth(page, 'June 2027')
+    await rent('1,300.00').click()
+    await s.dlg.getByRole('radio', { name: 'Done' }).click()
+    await s.dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(s.dlg).toBeHidden()
+
+    // 1,250.00 from January 2027 on: the dialog says what that does to April and to June before anything is saved
+    await back('January 2027')
+    await rent('1,200.00').click()
+    await s.dlg.getByLabel('Amount in EUR').fill('1250')
+    await expect(s.dlg.getByTestId('scope-says')).toHaveText('Counts from January 2027 on. Replaces what you typed for Apr 2027. Jun 2027 is ticked as done and keeps its amount.')
+    // for January alone it would replace nothing, and February would go on as before
+    await s.dlg.getByRole('radio', { name: 'Only this month' }).click()
+    await expect(s.dlg.getByTestId('scope-says')).toHaveText('Only January 2027. February goes on with €1,200.00.')
+    await s.dlg.getByRole('radio', { name: 'This and following months' }).click()
+    await s.dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(s.dlg).toBeHidden()
+    await expect(rent('1,250.00')).toBeVisible()
+    await toMonth(page, 'April 2027')
+    await expect(rent('1,250.00')).toBeVisible()
+    await toMonth(page, 'June 2027')
+    await expect(rent('1,300.00')).toBeVisible()
+    await toMonth(page, 'July 2027')
+    await expect(rent('1,250.00')).toBeVisible()
+
+    // one step, one Undo: July follows April's 1,300.00 again
+    await page.getByRole('button', { name: 'Undo' }).click()
+    await expect(rent('1,300.00')).toBeVisible()
+    await back('January 2027')
+    await expect(rent('1,200.00')).toBeVisible()
   })
 
   // scenarios/03: "A real balance replaces the calculated one, and the next month starts from it"

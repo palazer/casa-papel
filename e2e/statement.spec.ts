@@ -958,7 +958,7 @@ test.describe('working the month in the Statement', () => {
     await moneyOut.getByRole('button', { name: /^To investments: €500\.00/ }).click()
     await expect(dlg.getByRole('heading', { name: 'To investments · November 2026' })).toBeVisible()
     await expect(dlg.getByRole('radiogroup', { name: 'How the amount is set' }).getByRole('radio')).toHaveText(['A fixed amount', 'A percentage of income', 'A percentage of one income', 'A percentage of what is left', 'The rest'])
-    await expect(dlg.getByRole('radiogroup', { name: 'Repeats' }).getByRole('radio')).toHaveText(['Every month', 'Only this month'])
+    await expect(dlg.getByRole('radiogroup', { name: 'Repeats' }).getByRole('radio')).toHaveText(['This and following months', 'Only this month'])
     await dlg.getByRole('button', { name: 'Cancel' }).click()
     await expect(dlg).toBeHidden()
     const investments = moneyOut.locator('[data-line]').filter({ has: page.getByRole('button', { name: /^To investments:/ }) })
@@ -1837,7 +1837,7 @@ test.describe('working the month in the Statement', () => {
     await expect(repeats).toHaveValue('none')
     await expect(repeats.locator('option')).toHaveText(['Only this month', 'Every month', 'Every 2 months', 'Every 3 months', 'Every 6 months', 'Every year', 'In chosen months'])
     // while nothing repeats by itself, the line under the list asks about the total
-    await expect(dlg.getByRole('radiogroup', { name: 'The total' }).getByRole('radio')).toHaveText(['Every month', 'Only this month'])
+    await expect(dlg.getByRole('radiogroup', { name: 'The total' }).getByRole('radio')).toHaveText(['This and following months', 'Only this month'])
     await expect(dlg.getByTestId('repeat-next')).toHaveCount(0)
     await repeats.selectOption({ label: 'Every year' })
     await expect(dlg.getByLabel('In which month, Physio')).toHaveValue('11')

@@ -69,7 +69,7 @@ Feature: The months of the plan, and the calendar moving on
   @P3
   Scenario: An amount typed in a far month stretches the plan to that year
     Given I add a year to the plan
-    And I type 1,400.00 for "Rent" in June 2027, every month
+    And I type 1,400.00 for "Rent" in June 2027, this and following months
     When the calendar moves on to April 2026
     Then the plan runs from January 2026 to December 2027
 
@@ -89,7 +89,7 @@ Feature: The months of the plan, and the calendar moving on
   # has to begin in the month after, and that month is in the next year.
   @P3 @A4
   Scenario: An exception in the month an amount began, in the plan's last month, reaches into the next year
-    Given I type 1,250.00 for "Rent" in December 2026, every month
+    Given I type 1,250.00 for "Rent" in December 2026, this and following months
     When I type 1,300.00 for "Rent" in December 2026, only this month
     Then "Rent" is 1,300.00 in December 2026
     And "Rent" is 1,250.00 in January 2027

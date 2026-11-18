@@ -463,7 +463,7 @@ test.describe('wave 1b', () => {
     const dlg = page.getByRole('dialog')
     await expect(dlg.getByRole('button', { name: 'Make recurring…' })).toHaveCount(0)
     await expect(dlg.getByLabel('Amount in EUR')).toHaveValue('700')
-    await expect(dlg.getByRole('radiogroup', { name: 'Repeats' }).getByRole('radio')).toHaveText(['Every month', 'On a schedule', 'Only this month'])
+    await expect(dlg.getByRole('radiogroup', { name: 'Repeats' }).getByRole('radio')).toHaveText(['This and following months', 'On a schedule', 'Only this month'])
     await dlg.getByRole('radio', { name: 'On a schedule' }).click()
     // it starts on every year in the month on screen, and says where it lands
     await expect(dlg.getByLabel('How often, Groceries')).toHaveValue('12')

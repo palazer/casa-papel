@@ -28,7 +28,7 @@ Feature: Rules: how much goes where
   @R2
   Scenario: A percentage is rounded to the cent
     Given an investment account "Index fund" holding 0.00
-    And I type 3,333.33 for "Sam – Salary" in January 2026, every month
+    And I type 3,333.33 for "Sam – Salary" in January 2026, this and following months
     When "Index fund" gets 10% of the income from January 2026
     Then "Index fund" ends January 2026 with 333.33
     And "Index fund" ends February 2026 with 666.66
@@ -37,7 +37,7 @@ Feature: Rules: how much goes where
   Scenario: A percentage follows the income when it changes
     Given an investment account "Index fund" holding 0.00
     And "Index fund" gets 10% of the income from January 2026
-    When I type 4,000.00 for "Sam – Salary" in March 2026, every month
+    When I type 4,000.00 for "Sam – Salary" in March 2026, this and following months
     Then "Index fund" ends February 2026 with 600.00
     And "Index fund" ends March 2026 with 1,000.00
 

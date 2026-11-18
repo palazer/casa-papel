@@ -57,7 +57,7 @@ Feature: People, goals, and the data itself
   @E3
   Scenario: Merging an older file does not bring an old amount back
     Given I export the data to a file
-    And I type 1,300.00 for "Rent" in March 2026, every month
+    And I type 1,300.00 for "Rent" in March 2026, this and following months
     When I merge that file into the app
     Then "Rent" is 1,300.00 in March 2026
 
@@ -66,7 +66,7 @@ Feature: People, goals, and the data itself
   @E3 @F9
   Scenario: On two devices, an amount that was taken back does not return through the other device
     Given a second device that has synced
-    And I type 1,300.00 for "Rent" in March 2026, every month
+    And I type 1,300.00 for "Rent" in March 2026, this and following months
     And the second device takes in what this one has
     And on the second device, an expense "Gym" of 40.00 from April 2026
     When I undo
@@ -77,7 +77,7 @@ Feature: People, goals, and the data itself
   @E3
   Scenario: On two devices, taking an amount back reaches the other device
     Given a second device that has synced
-    And I type 1,300.00 for "Rent" in March 2026, every month
+    And I type 1,300.00 for "Rent" in March 2026, this and following months
     And the second device takes in what this one has
     When I undo
     And the second device takes in what this one has
@@ -86,7 +86,7 @@ Feature: People, goals, and the data itself
   @T4 @planned
   Scenario: A file shows what it would change before it is merged
     Given I export the data to a file
-    And I type 1,300.00 for "Rent" in March 2026, every month
+    And I type 1,300.00 for "Rent" in March 2026, this and following months
     When I choose that file to merge
     Then I am shown what it would change here: "Rent" from March 2026, 1,300.00 to 1,200.00
     And nothing has changed
@@ -95,7 +95,7 @@ Feature: People, goals, and the data itself
   # merge takes it for something this app has never seen.
   @E3 @F9
   Scenario: Merging an older file does not bring back what was taken back
-    Given I type 1,300.00 for "Rent" in March 2026, every month
+    Given I type 1,300.00 for "Rent" in March 2026, this and following months
     And I export the data to a file
     And I undo
     When I merge that file into the app
@@ -106,7 +106,7 @@ Feature: People, goals, and the data itself
   @E3 @F9
   Scenario: On two devices, an amount that was taken back and put back reaches the other device
     Given a second device that has synced
-    And I type 1,300.00 for "Rent" in March 2026, every month
+    And I type 1,300.00 for "Rent" in March 2026, this and following months
     And the second device takes in what this one has
     And I undo
     And the second device takes in what this one has

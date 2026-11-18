@@ -23,7 +23,7 @@ Feature: The past
 
   @T1
   Scenario: A change in the current month leaves the past alone
-    When I type 1,300.00 for "Rent" in June 2026, every month
+    When I type 1,300.00 for "Rent" in June 2026, this and following months
     Then nothing has changed before June 2026
 
   # ---------- no month is closed ----------

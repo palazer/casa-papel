@@ -30,14 +30,14 @@ nothing.
 > "Rent" 1,200.00 typed in January: every month from January on shows 1,200.00.
 > "Gym" 40.00 typed in April: January to March show nothing, April on shows 40.00.
 
-**A3. "Every month": the amount counts for this month and the months after it, whatever they held.** The amount is
-saved in the month it is typed in, and the months after it follow by A2. A later month that had an amount of its own
-(an amount typed there earlier, an exception, a list) loses it and follows too. Zero is an amount: typed for every
-month, the row stops there, also on a row that had no amount yet. Before saving, the dialog names the months whose
-own amount goes.
+**A3. "This and following months": the amount counts for this month and the months after it, whatever they held.**
+The amount is saved in the month it is typed in, and the months after it follow by A2. A later month that had an
+amount of its own (an amount typed there earlier, an exception, a list) loses it and follows too. Zero is an amount:
+typed for this and the following months, the row stops there, also on a row that had no amount yet. Before saving,
+the dialog names the months whose own amount goes.
 
-> "Rent" is 1,200.00, and 1,300.00 from July on. Typed 1,250.00 in March, every month: January and February stay
-> 1,200.00, March to December are 1,250.00.
+> "Rent" is 1,200.00, and 1,300.00 from July on. Typed 1,250.00 in March, this and following months: January and
+> February stay 1,200.00, March to December are 1,250.00.
 
 Three things limit it:
 
@@ -50,8 +50,8 @@ Three things limit it:
   own gets the new amount and keeps that source (the months before a source was changed "from June on" are stored
   this way): emptied, it would take the row's source of today, and the past balance of the old account would move.
 
-> "Rent" is 1,200.00; July is 1,300.00 and ticked as done. Typed 1,250.00 in March, every month: March to June are
-> 1,250.00, July stays 1,300.00, August on is 1,250.00.
+> "Rent" is 1,200.00; July is 1,300.00 and ticked as done. Typed 1,250.00 in March, this and following months: March
+> to June are 1,250.00, July stays 1,300.00, August on is 1,250.00.
 
 A category's estimate follows the same rule, and so does a fixed amount set "from a month on" in the rule dialog
 (R1). The change reaches the months this device holds: an amount typed on another device that had not synced yet
@@ -64,8 +64,8 @@ where it was typed. An exception in a row's first month leaves the months after 
 > "Rent" is 1,200.00. Typed 1,250.00 in March, only this month: March is 1,250.00, April on is 1,200.00.
 > "Clear" on April afterwards changes nothing: April holds nothing of its own.
 
-An exception is an amount of its month like any other for A3: "every month" typed for an earlier month replaces it,
-unless it is ticked as done.
+An exception is an amount of its month like any other for A3: "this and following months" typed for an earlier month
+replaces it, unless it is ticked as done.
 
 The same holds for whatever the app writes for one month: an item added for one month (A6), a top-up of a virtual
 account, a category's estimate for one month, a card's difference booked as spending, and the tick on a month that
@@ -74,8 +74,8 @@ only carried its amount: the month is written down as that month's alone.
 One case writes a later month. An exception in the month an amount *began* leaves that amount to the months after:
 it is written into the first later month that has nothing of its own.
 
-> Typed 1,250.00 in March, every month, and then 1,300.00 in March, only this month: March is 1,300.00, April on is
-> 1,250.00, and April now holds the 1,250.00.
+> Typed 1,250.00 in March, this and following months, and then 1,300.00 in March, only this month: March is 1,300.00,
+> April on is 1,250.00, and April now holds the 1,250.00.
 
 A row on a schedule, a row a rule works out and a row that follows another have no exceptions of this kind: an
 amount typed there is for its month alone by itself (H3, R6).
@@ -83,8 +83,9 @@ amount typed there is for its month alone by itself (H3, R6).
 **A5. "Clear": the month follows the month before again.** What was typed in the month is gone, and A2 applies.
 
 **A6. A month can be a list of items, and shows their sum.** An item added to a month that followed the month before
-keeps that amount as the first item. Saved with "Every month", the months after it show the sum as one amount; saved
-with "Only this month", they show what they showed before (A4).
+keeps that amount as the first item. Saved with "This and following months", the months after it show the sum as one
+amount, and a new sum replaces what they held (A3); saved with "Only this month", they show what they showed before
+(A4).
 
 > "Rent" is 1,200.00. "Extra heating" 80.00 added in March, only this month: March is 1,280.00, April is 1,200.00.
 

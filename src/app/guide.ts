@@ -82,7 +82,7 @@ export const GUIDE: GuideTopic[] = [
     ],
     steps: [
       'Click a cell, "Groceries" in this month, say; type in "Amount in EUR" and press "Save".',
-      'Under "Repeats", keep "Every month" to change this month and every later month that still follows it, pick "Only this month", or put the amount "On a schedule".',
+      'Under "Repeats", keep "This and following months" to change this month and the months after it, pick "Only this month", or put the amount "On a schedule". A new amount for the following months replaces what they held, and the line under the choice names those months first; a month that is ticked as done keeps its amount.',
       'Add a row with "Add row" at the foot of a section: a "Row name", a category when the section has any, then "Add".',
       '"Earlier months (2)" shows the months before the current one, the number says how many; press it again to start at this month.',
       'Click a month name → "Open in the Statement" to read and tick that month there.',
@@ -121,7 +121,7 @@ export const GUIDE: GuideTopic[] = [
       '"Follow another row…" makes a row mirror another month by month, whole or as a "Share (%)": a tax at 25 of a salary, or Robin\'s long-term savings following "Robin – Child benefit".',
     ],
     steps: [
-      'Statement → "Money in" → press "Sam – Salary" and type the salary with "Every month".',
+      'Statement → "Money in" → press "Sam – Salary" and type the salary with "This and following months".',
       'Row menu (the … after the row\'s name, on the Statement and in the Grid) → "Belongs to…" → "This row is for" → "Sam" makes it Sam\'s own income; "Robin – Child benefit" stays with Robin.',
       'For a tax: its row menu → "Deducted from an income…" → "This expense is taken off" → "Sam – Salary". The menu item then reads "Deducted from Sam – Salary…".',
       'To mirror a row: row menu → "Follow another row…" → "Same amount as" → the row, then "Share (%)": 100 mirrors it, 25 takes a quarter. "Nothing: its own amounts" stops following.',
@@ -201,7 +201,7 @@ export const GUIDE: GuideTopic[] = [
       'Statement → "From what is left" → press a transfer like "To investments": one dialog holds its amount and its rule, under "How the amount is set". The symbol beside an account or a virtual account under "Assets" opens the same dialog, and so does Grid → row menu → "Rule…".',
       'Pick "A fixed amount", "A percentage of income", "A percentage of one income", "A percentage of what is left" or "The rest". A fixed amount is typed with "Repeats"; for a percentage or the rest, "Counts from" is the month the rule starts in, and earlier months keep their amounts.',
       'To pass one income on in full, pick "A percentage of one income", choose it under "Which income" and type 100: in the demo, "Robin – Child benefit" into "To investments". The amount follows that income line, after what is deducted from it.',
-      'Household → "Household settings" → "Cash kept in the account at month end (EUR)"; "Cash buffer changes apply to" picks "This month and onwards (earlier months keep what they show)", "Only this month" or "Every month".',
+      'Household → "Household settings" → "Cash kept in the account at month end (EUR)"; "Cash buffer changes apply to" picks "This and following months (earlier months keep what they show)", "Only this month" or "All months, past included".',
       'Statement → "From what is left" → "Add row" → "What is it for?": "Goes into a savings account", "Deposits into an investment account", "Fills a virtual account", "Pocket money for an adult" or "Moves money between your accounts". Pick the account under "Which one"; "New savings account…" and the entries like it make the account and the row together. "Moves money between your accounts" lists every account with a balance of its own (savings, investments, cash, other assets): the amount goes into it and net worth stays as it is. Its first entry, "No account: the money leaves the plan", is for money that no account of yours receives; that row stands under "Moved elsewhere", marked "leaves the plan", and net worth falls by it. The name may stay empty: the row is called after its account. Grid → Transfers → "Add row" asks the same after the name.',
       'Row menu → "Goes into…" changes a deposit row\'s account for every month.',
       'What is not passed on stays in the current accounts, which the plan counts together: one is enough, and with several each stands under "Current accounts" with its own "…". Statement → "Assets" → press the amount of "Current accounts" (or its row under "Balances" in the Grid) to type what the bank says for each account, at the start and at the end of the month. The line then shows how far the plan was off, and later months continue from the real numbers; emptying the fields takes it back. Cash you hold is not one of them: it is an account of type "Cash", with its own line under "Other assets".',
@@ -282,7 +282,7 @@ export const GUIDE: GuideTopic[] = [
     steps: [
       'Statement → "Suggestions" → under "From what is left", type an amount beside "Sam – Pocket" and press Enter; or press "Add" with the field empty to be asked for a rule.',
       'To change it, press "Sam – Pocket" (or Grid → row menu → "Rule…"). "How the amount is set" offers "A fixed amount", "A percentage of income", "A percentage of Sam\'s income", "A percentage of one income" and "A percentage of what is left".',
-      'A fixed amount is typed with "Repeats": "Every month" or "Only this month". For a percentage, "Counts from" is the month the rule starts in; earlier months keep what they showed.',
+      'A fixed amount is typed with "Repeats": "This and following months" or "Only this month". For a percentage, "Counts from" is the month the rule starts in; earlier months keep what they showed.',
       'For a line of your own: "Add row" under Transfers → "Pocket money for an adult" → pick the "Adult".',
       'To follow saved pocket money: add an account for it, "Savings" say, and tick "Leave out of net worth" under "More options". Then row menu of "Sam – Pocket" → "Lands in…" → that account: every month\'s pocket money raises its balance. Press its amount to type what it really holds once you have spent from it, and Statement → "From accounts" → "Add row" → "Taken from a savings account" brings money back into the month.',
       'Say whose a row is: row menu → "Belongs to…" → "This row is for". A percentage of Sam\'s income counts the income lines that belong to Sam.',

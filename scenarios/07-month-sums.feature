@@ -58,7 +58,7 @@ Feature: The sums of a month
   Scenario: A row that follows another moves with it
     Given an expense "Sam – Tax" with no amount yet
     And "Sam – Tax" follows "Sam – Salary" at 25%
-    When I type 4,000.00 for "Sam – Salary" in June 2026, every month
+    When I type 4,000.00 for "Sam – Salary" in June 2026, this and following months
     Then "Sam – Tax" is 750.00 in May 2026
     And "Sam – Tax" is 1,000.00 in June 2026
 

@@ -107,9 +107,9 @@ function SettingsCard({ household: h, tables, onSave, onBuffer }: { household: H
         <div className="space-y-1.5 sm:col-span-2">
           <TipLabel htmlFor="s-scope" help="household.bufferScope">Cash buffer changes apply to</TipLabel>
           <NativeSelect id="s-scope" className="w-full" value={scope} onChange={(e) => setScope(e.target.value as MonthlyDefaultScope)}>
-            <option value="from-now-on">This month and onwards (earlier months keep what they show)</option>
+            <option value="from-now-on">This and following months (earlier months keep what they show)</option>
             <option value="this-month">Only this month</option>
-            <option value="all-months">Every month</option>
+            <option value="all-months">All months, past included</option>
           </NativeSelect>
           <p className="text-muted-foreground">"This month" is {formatMonth(thisMonth, h.locale)}.</p>
         </div>

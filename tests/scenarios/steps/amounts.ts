@@ -29,8 +29,6 @@ async function typeAmount(world: World, amount: number, rowName: string, month: 
 }
 
 step('I type {money} for {string} in {month}, only this month', (world: World, amount: number, row: string, month: string) => typeAmount(world, amount, row, month, 'this-month'))
-// "Every month" is what the dialog calls it today; "this and following months" is the wording decided for it
-step('I type {money} for {string} in {month}, every month', (world: World, amount: number, row: string, month: string) => typeAmount(world, amount, row, month, 'from-now-on'))
 step('I type {money} for {string} in {month}, this and following months', (world: World, amount: number, row: string, month: string) => typeAmount(world, amount, row, month, 'from-now-on'))
 
 // "Clear (inherit)" in the row's dialog
@@ -48,4 +46,4 @@ async function addItem(world: World, label: string, amount: number, rowName: str
 }
 
 step('I add the item {string} of {money} to {string} in {month}, only this month', (world: World, label: string, amount: number, row: string, month: string) => addItem(world, label, amount, row, month, 'this-month'))
-step('I add the item {string} of {money} to {string} in {month}, every month', (world: World, label: string, amount: number, row: string, month: string) => addItem(world, label, amount, row, month, 'from-now-on'))
+step('I add the item {string} of {money} to {string} in {month}, this and following months', (world: World, label: string, amount: number, row: string, month: string) => addItem(world, label, amount, row, month, 'from-now-on'))
