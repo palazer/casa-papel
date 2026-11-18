@@ -1,5 +1,5 @@
 Feature: Schedules: amounts that repeat by themselves
-  A row on a schedule gets its amount in the months the schedule lands in. Rules H1 to H6 of docs/calculations.md.
+  A row on a schedule gets its amount in the months the schedule lands in. Rules H1 to H7 of docs/calculations.md.
 
   Background:
     Given today is 15 March 2026
@@ -81,6 +81,44 @@ Feature: Schedules: amounts that repeat by themselves
     Given "Rent" is on a schedule of 1,300.00 every month from March 2026
     When I undo
     Then "Rent" is 1,200.00 in every month from January 2026 to December 2026
+
+  @H7
+  Scenario: A schedule changed in the list of schedules counts from the current month
+    Given I add the schedule "Insurance" of 100.00 every month to "Insurance" from January 2026
+    When I change the schedule "Insurance" in the list to 120.00
+    Then "Insurance" is 100.00 in every month from January 2026 to February 2026
+    And "Insurance" is 120.00 in every month from March 2026 to December 2026
+    And nothing has changed before March 2026
+
+  @H7
+  Scenario: A month that was paid keeps what was paid when the schedule changes
+    Given I add the schedule "Insurance" of 100.00 every month to "Insurance" from January 2026
+    And I mark "Insurance" as done in May 2026
+    When I change the schedule "Insurance" in the list to 120.00
+    Then "Insurance" is 100.00 in May 2026
+    And "Insurance" is 120.00 in June 2026
+
+  @H7
+  Scenario: A first month typed in the list counts as typed
+    Given I add the schedule "Insurance" of 100.00 every month to "Insurance" from March 2026
+    When I move the start of the schedule "Insurance" in the list to January 2026
+    Then "Insurance" is 100.00 in every month from January 2026 to December 2026
+
+  @H7
+  Scenario: A schedule that is reactivated runs again from the current month
+    Given I add the schedule "Insurance" of 100.00 every month to "Insurance" from January 2026
+    And I end the schedule "Insurance" in the list after January 2026
+    When I reactivate the schedule "Insurance" in the list
+    Then "Insurance" is 100.00 in January 2026
+    And "Insurance" is 0.00 in February 2026
+    And "Insurance" is 100.00 in every month from March 2026 to December 2026
+
+  @H7
+  Scenario: A schedule that ended in a month that is over cannot get a new amount in the list
+    Given I add the schedule "Insurance" of 100.00 every month to "Insurance" from January 2026
+    And I end the schedule "Insurance" in the list after January 2026
+    When I change the schedule "Insurance" in the list to 120.00
+    Then it is refused with "Change the amount of a month that is over in that month"
 
   @H2 @F8
   Scenario: Taking back a schedule that was added from the list of schedules restores the row

@@ -10,8 +10,8 @@ import { formatAmount, formatMonth } from '@/app/format'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useTables } from '@/app/useEngine'
 import { cellKey, type EngineOutput } from '@/engine'
-import { describeCadence, monthOfDate, type MonthKey, type RecurringItem } from '@/model'
-import { endRecurringItem, recurringStatus, setRecurringPaid } from '@/store'
+import { addMonths, describeCadence, monthOfDate, type MonthKey, type RecurringItem } from '@/model'
+import { endRecurringItem, reactivateRecurringItem, recurringStatus, setRecurringPaid } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
 import { RecurringDialog } from './RecurringDialog'
 
@@ -57,6 +57,9 @@ export function RecurringList({ engine }: {
             {items.map((it) => {
               const status = recurringStatus(tables, it, m)
               const ended = it.endMonth != null && it.endMonth < m
+              // a piece that ends where a change from a month on begins: the schedule runs on under its newer piece,
+              // so there is nothing to reactivate (it would land twice)
+              const replaced = it.endMonth != null && items.some((o) => o.id !== it.id && o.rowId === it.rowId && o.name === it.name && o.startMonth === addMonths(it.endMonth!, 1))
               // due, but its loan owes less than the payment or nothing: the month counts less, and there is nothing to tick
               const paidOff = status === 'due' && engine?.cells[cellKey(it.rowId, m)]?.asked != null
               return (
@@ -82,8 +85,8 @@ export function RecurringList({ engine }: {
                       <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" aria-label={`Menu for ${it.name}`} />}><MoreHorizontal /></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => setEditing(it)}>Edit…</DropdownMenuItem>
-                        {ended ? (
-                          <DropdownMenuItem onClick={() => act(() => endRecurringItem(store, it.id, null))}>Reactivate</DropdownMenuItem>
+                        {replaced ? null : ended ? (
+                          <DropdownMenuItem onClick={() => act(() => reactivateRecurringItem(store, it.id))}>Reactivate</DropdownMenuItem>
                         ) : (
                           <DropdownMenuItem onClick={() => act(() => endRecurringItem(store, it.id, m))}>End after {formatMonth(m, locale)}</DropdownMenuItem>
                         )}

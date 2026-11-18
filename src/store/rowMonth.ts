@@ -6,7 +6,7 @@ import {
 import { engineUpTo, freezeNext, rowChangePut, type EditScope, type RowChange } from './actions'
 import { applyMutations } from './impact'
 import { defaultMonths } from './months'
-import { managedItem, pinCarriedMonths, planChangeRecurringFrom, planRecurringPosts } from './recurring'
+import { managedItem, pinCarriedMonths, planChangeRecurringFrom, planRecurringPosts, planRename } from './recurring'
 import type { Mutation, Store } from './store'
 
 /** What a row's dialog saves for one month: the month's items, and how each of them repeats from here on. */
@@ -27,24 +27,6 @@ export interface RowMonthSave {
 
 const isCellPut = (m: Mutation, rowId: string, month: MonthKey) =>
   m.op === 'put' && m.table === 'cells' && m.record.rowId === rowId && m.record.month === month
-
-/**
- * Another name for something that repeats. It is the same thing under a better name, not a change from a month on:
- * every schedule of the row that carried the old name takes the new one (a rhythm changed earlier left one behind for
- * the months before), and so do the items they posted in the open months, done or not. Closed months keep what they show.
- */
-function planRename(tables: Tables, rowId: string, from: string, to: string, ts: number): Mutation[] {
-  const closed = new Set(tables.monthStates.filter((s) => s.closed).map((s) => s.month))
-  const renamed = tables.recurringItems.filter((r) => !r.deletedAt && r.rowId === rowId && r.name === from)
-  const ids = new Set(renamed.map((r) => r.id))
-  const posted = (i: CellItem) => !!i.recurringItemId && ids.has(i.recurringItemId)
-  const muts: Mutation[] = renamed.map((r) => ({ op: 'put', table: 'recurringItems', record: RecurringItemSchema.parse({ ...r, name: to, updatedAt: ts }) }))
-  for (const c of tables.cells) {
-    if (c.rowId !== rowId || closed.has(c.month) || !c.items.some((i) => posted(i) && i.label !== to)) continue
-    muts.push({ op: 'put', table: 'cells', record: CellSchema.parse({ ...c, items: c.items.map((i) => (posted(i) ? { ...i, label: to } : i)), updatedAt: ts }) })
-  }
-  return muts
-}
 
 /**
  * The mutations behind `saveRowMonth`. An item set to repeat becomes a schedule that starts this month, and the item

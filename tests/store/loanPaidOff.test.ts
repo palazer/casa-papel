@@ -65,8 +65,9 @@ describe('a loan that is paid off: the store writes what was planned, not what c
   it('a first schedule from a later month writes the planned amount into the months before it', async () => {
     const { store, pay } = await fresh()
     await addRecurringItem(store, { name: 'Car loan', rowId: pay.id, amount: 25000, startMonth: '2026-05' })
-    // written down as the month's amount, which the schedule's own pass then keeps as an item of the row
-    for (const m of ['2026-02', '2026-03', '2026-04']) expect((await stored(store, pay.id, m))!.items.map((i) => i.amount), m).toEqual([25000])
+    // written down as the month's amount; from the current month on the schedule's own pass keeps it as an item of the row
+    expect(await stored(store, pay.id, '2026-02')).toMatchObject({ mode: 'value', value: 25000 })
+    for (const m of ['2026-03', '2026-04']) expect((await stored(store, pay.id, m))!.items.map((i) => i.amount), m).toEqual([25000])
     expect(await counted(store, pay.id)).toEqual([25000, 25000, 10000, 0, 0, 0])
   })
 

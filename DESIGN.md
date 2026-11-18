@@ -706,7 +706,13 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   when Save is pressed and nothing is stored: never a silent zero (an item's amount in the cell editor included).
 - **"Repeats": how an amount repeats is set where it is typed.** The cell editor asks it under the amount and under
   every item; there is no second form on the way (the long schedule form stays under Household → Schedules for the
-  rest: the account, whose it is, an end month, notes). One set of words everywhere: `Every month`, `Every 2 months`,
+  rest: the account, whose it is, an end month, notes). That form names no month, and its description says what
+  follows from it: `Lands in each of its months. A changed amount, source or rhythm counts from <current month> on:
+  earlier months keep what they had. "From month" and "Until month" count as you type them.` A schedule that ended
+  in a month that is over refuses a new amount in the form's `role="alert"` line and says where to change it;
+  `Reactivate` in the list's menu runs a schedule again from the current month. A change from a month on leaves
+  the earlier months their own entry in the list, muted and marked `(ended <Mon YYYY>)`; that entry has neither
+  `Reactivate` nor `End after`, because the schedule runs on under the newer one. One set of words everywhere: `Every month`, `Every 2 months`,
   `Every 3 months`, `Every 6 months`, `Every year`, `In chosen months`, `Only this month` (`describeCadence` writes
   them as `Every year (Jan)`, `In Mar, Sep`).
   - *A single amount*: a fieldset "Repeats" with an (i) (`cell.repeats`) and a `Segmented`: `Every month` (the

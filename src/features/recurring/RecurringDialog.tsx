@@ -7,10 +7,10 @@ import { Check } from '@/components/Check'
 import { MonthField } from '@/components/MonthField'
 import { NativeSelect } from '@/components/NativeSelect'
 import { AmountHint } from '@/components/AmountHint'
-import { amountToInput, parseAmount, unreadableAmount } from '@/app/format'
+import { amountToInput, formatMonth, parseAmount, unreadableAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import { sortRows } from '@/engine'
-import type { Household, MonthKey, RecurringItem, Row, Section, Tables } from '@/model'
+import { monthOfDate, type Household, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
 import { addRecurringItem, updateRecurringItem, type RecurringInput } from '@/store'
 import { fundingOptions } from '@/features/grid/funding'
 
@@ -87,7 +87,7 @@ export function RecurringDialog({ tables, household, item, defaultMonth, onClose
       <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{item ? 'Edit schedule' : 'New schedule'}</DialogTitle>
-          <DialogDescription>Lands in each of its months that is still open. Change the amount here and every open month follows.</DialogDescription>
+          <DialogDescription>{item ? `Lands in each of its months. A changed amount, source or rhythm counts from ${formatMonth(monthOfDate(), locale, 'long')} on: earlier months keep what they had. "From month" and "Until month" count as you type them.` : 'Lands in each of its months, from "From month" on.'}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="rc-name">Name</Label><Input id="rc-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Car insurance" /></div>

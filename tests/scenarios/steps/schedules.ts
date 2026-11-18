@@ -1,6 +1,6 @@
 import { cellKey } from '@/engine'
 import { newId, type CellItem, type MonthKey, type RepeatChoice } from '@/model'
-import { addRecurringItem, itemsFromCurrent, saveRowMonth, setCellDone, type EditScope } from '@/store'
+import { addRecurringItem, endRecurringItem, itemsFromCurrent, loadTables, reactivateRecurringItem, saveRowMonth, setCellDone, updateRecurringItem, type EditScope } from '@/store'
 import { monthName, step } from '../registry'
 import { ScenarioError, type World } from '../world'
 
@@ -57,6 +57,29 @@ step('I stop the item {string} of {string} after {month}', async (world: World, 
 // "Add schedule…" in the list of schedules (people & things): a schedule made outside the row's month
 step('I add the schedule {string} of {money} every month to {string} from {month}', async (world: World, name: string, amount: number, rowName: string, from: string) => {
   await addRecurringItem(world.store, { name, rowId: (await world.row(rowName)).id, amount, startMonth: from, cadence: { intervalMonths: 1, anchorMonth: monthNumber(from) } })
+})
+
+// the list's "Edit…", "End after <Month>" and "Reactivate": the schedule is found by its name; the newest piece of it
+// is the one the list would be edited on
+async function listed(world: World, name: string) {
+  const found = (await loadTables(world.store)).recurringItems.filter((r) => !r.deletedAt && r.name === name).sort((a, b) => (a.startMonth < b.startMonth ? 1 : -1))
+  if (found.length === 0) throw new ScenarioError(`There is no schedule called "${name}".`)
+  return found[0]
+}
+step('I change the schedule {string} in the list to {money}', async (world: World, name: string, amount: number) => {
+  const item = await listed(world, name)
+  // the form sends every field, as it stands in the dialog
+  await updateRecurringItem(world.store, item.id, { ...item, amount })
+})
+step('I move the start of the schedule {string} in the list to {month}', async (world: World, name: string, month: string) => {
+  const item = await listed(world, name)
+  await updateRecurringItem(world.store, item.id, { ...item, startMonth: month })
+})
+step('I end the schedule {string} in the list after {month}', async (world: World, name: string, month: string) => {
+  await endRecurringItem(world.store, (await listed(world, name)).id, month)
+})
+step('I reactivate the schedule {string} in the list', async (world: World, name: string) => {
+  await reactivateRecurringItem(world.store, (await listed(world, name)).id)
 })
 
 // the done dot of a row's month

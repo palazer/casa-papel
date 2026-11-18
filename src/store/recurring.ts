@@ -5,7 +5,7 @@ import {
 } from '@/model'
 import type { Mutation, Store } from './store'
 import { loadTables, newRowMutation } from './actions'
-import { applyMutations } from './impact'
+import { applyMutations, monthSpan } from './impact'
 import { defaultMonths } from './months'
 
 const now = () => Date.now()
@@ -145,15 +145,18 @@ export function pinCarriedMonths(tables: Tables, rowId: string, before: MonthKey
 }
 
 /**
- * A change to schedules, with what it lands in the open months of the rows it touches. Saved together they are one
- * step: one undo takes the schedule and its months back. Left to the app's own pass afterwards, the months would be a
- * second step that undo does not reach, and the rows would be left with what that pass made of them.
+ * A change to schedules, with what it lands in the months of the rows it touches. Saved together they are one step:
+ * one undo takes the schedule and its months back. Left to the app's own pass afterwards, the months would be a
+ * second step that undo does not reach, and the rows would be left with what that pass made of them. `where` says
+ * which months the change speaks of; the current month and the ones after it are always landed, as that pass would.
  */
-function withPosts(tables: Tables, mutations: Mutation[], rowIds: string[]): Mutation[] {
+function withPosts(tables: Tables, mutations: Mutation[], rowIds: string[], where: (m: MonthKey) => boolean = () => true): Mutation[] {
   const after = applyMutations(tables, mutations)
   const household = after.household.find((h) => !h.deletedAt)
   if (!household) return mutations
-  return [...mutations, ...planRecurringPosts(after, defaultMonths(household, after), rowIds)]
+  const today = monthOfDate()
+  const months = defaultMonths(household, after).filter((m) => compareMonths(m, today) >= 0 || where(m))
+  return [...mutations, ...planRecurringPosts(after, months, rowIds)]
 }
 
 /** A row that a schedule's form makes together with the schedule. */
@@ -161,7 +164,8 @@ export type RecurringNewRow = Partial<Row> & { name: string; section: Row['secti
 
 /**
  * Add a schedule to a row. With `newRow` the row is made in the same step, and `input.rowId` is not read: the form
- * that offers "New row…" saves the row, the schedule and its months as one thing.
+ * that offers "New row…" saves the row, the schedule and its months as one thing. It lands from its first month on,
+ * also where that month is over: the start is a month somebody typed.
  */
 export async function addRecurringItem(
   store: Store, input: Partial<RecurringInput> & Pick<RecurringInput, 'name' | 'rowId' | 'amount' | 'startMonth'>, newRow?: RecurringNewRow,
@@ -179,30 +183,163 @@ export async function addRecurringItem(
   // a row that is made here has carried nothing yet, so there is nothing of it to write down
   if (!newRow) mutations.push(...pinCarriedMonths(tables, item.rowId, item.startMonth, ts))
   mutations.push({ op: 'put', table: 'recurringItems', record: item })
-  await store.commit(withPosts(tables, mutations, [item.rowId]))
+  await store.commit(withPosts(tables, mutations, [item.rowId], (m) => compareMonths(m, item.startMonth) >= 0))
   return item
 }
 
-/** Change a schedule; with `newRow` it moves to a row that is made in the same step. */
+/**
+ * Another name for something that repeats. It is the same thing under a better name, not a change from a month on:
+ * every schedule of the row that carried the old name takes the new one (a rhythm changed earlier left one behind for
+ * the months before), and so do the items they posted in the open months, done or not. Closed months keep what they show.
+ */
+export function planRename(tables: Tables, rowId: string, from: string, to: string, ts: number): Mutation[] {
+  const closed = new Set(tables.monthStates.filter((s) => s.closed).map((s) => s.month))
+  const renamed = tables.recurringItems.filter((r) => !r.deletedAt && r.rowId === rowId && r.name === from)
+  const ids = new Set(renamed.map((r) => r.id))
+  const posted = (i: CellItem) => !!i.recurringItemId && ids.has(i.recurringItemId)
+  const muts: Mutation[] = renamed.map((r) => ({ op: 'put', table: 'recurringItems', record: RecurringItemSchema.parse({ ...r, name: to, updatedAt: ts }) }))
+  for (const c of tables.cells) {
+    if (c.rowId !== rowId || closed.has(c.month) || !c.items.some((i) => posted(i) && i.label !== to)) continue
+    muts.push({ op: 'put', table: 'cells', record: CellSchema.parse({ ...c, items: c.items.map((i) => (posted(i) ? { ...i, label: to } : i)), updatedAt: ts }) })
+  }
+  return muts
+}
+
+/** What a schedule's months show: what it posts and how often. A change to one of these counts from a month on. */
+const sameValues = (a: RecurringItem, b: RecurringItem): boolean =>
+  a.rowId === b.rowId && a.amount === b.amount && a.fundedBy === b.fundedBy && a.currency === b.currency
+  && JSON.stringify(a.cadence ?? null) === JSON.stringify(b.cadence ?? null)
+  && JSON.stringify([...(a.dueMonths ?? [])].sort()) === JSON.stringify([...(b.dueMonths ?? [])].sort())
+
+const isBefore = (a: MonthKey, b: MonthKey) => compareMonths(a, b) < 0
+/** The months that lie between two months, the earlier one included: where a moved start changes what is due. */
+const between = (a: MonthKey, b: MonthKey) => (m: MonthKey) => compareMonths(m, isBefore(a, b) ? a : b) >= 0 && isBefore(m, isBefore(a, b) ? b : a)
+/** The months after the earlier of two last months, up to the later one (no last month: without limit): where a moved end changes what is due. */
+const afterMovedEnd = (was: MonthKey | null, now: MonthKey | null) => (m: MonthKey): boolean => {
+  if (was === now) return false
+  const first = was == null ? now! : now == null ? was : isBefore(was, now) ? was : now
+  const last = was == null || now == null ? null : isBefore(was, now) ? now : was
+  return compareMonths(m, first) > 0 && (last == null || compareMonths(m, last) <= 0)
+}
+
+/**
+ * Change a schedule from the list of schedules; with `newRow` it moves to a row that is made in the same step.
+ *
+ * The form names no month for what the schedule posts, so a new amount, source, rhythm or row counts from the current
+ * month on: the schedule is split there, as the row's dialog splits it "from this month on", and the months before
+ * keep what they show. A first or a last month is a month somebody typed and is applied as typed: the months between
+ * the old one and the new one are filled or emptied. Its name, account, owner and notes are the schedule's own and
+ * change in every month.
+ *
+ * A schedule that ended before the current month has no month left to change from here on: with a last month in
+ * the current month or later (or none) it runs again from the current month, with what the form says; otherwise the
+ * change is refused, and says where an amount of a month that is over is changed.
+ */
 export async function updateRecurringItem(store: Store, id: string, patch: Partial<RecurringInput>, newRow?: RecurringNewRow): Promise<void> {
   const tables = await loadTables(store)
   const item = tables.recurringItems.find((r) => r.id === id)
   if (!item) throw new Error('Recurring item not found')
+  const ts = now()
+  const today = monthOfDate()
   const mutations: Mutation[] = []
-  let next = { ...item, ...patch }
+  let work = tables
+  const push = (ms: Mutation[]) => {
+    mutations.push(...ms)
+    work = applyMutations(work, ms)
+  }
+  const putItem = (record: RecurringItem) => push([{ op: 'put', table: 'recurringItems', record: RecurringItemSchema.parse({ ...record, updatedAt: ts }) }])
+  let next: RecurringItem = { ...item, ...patch }
   if (newRow) {
     const made = newRowMutation(tables, newRow)
-    mutations.push(made.mutation)
+    push([made.mutation])
     next = { ...next, rowId: made.row.id }
   }
-  mutations.push({ op: 'put', table: 'recurringItems', record: RecurringItemSchema.parse({ ...next, updatedAt: now() }) })
-  // the row it was on too, when it moved: its months lose what the schedule had landed there
-  await store.commit(withPosts(tables, mutations, [...new Set([item.rowId, next.rowId])]))
+  const rows = [...new Set([item.rowId, next.rowId])]
+  const start = next.startMonth
+  const end = next.endMonth ?? null
+  const startMoved = between(item.startMonth, start)
+  const ended = item.endMonth != null && isBefore(item.endMonth, today)
+  const runsOn = end == null || !isBefore(end, today)
+
+  // the name is the schedule's own, in every month: what it posted takes it too
+  if (next.name !== item.name) push(planRename(work, item.rowId, item.name, next.name, ts))
+
+  if (ended && runsOn) {
+    // it ended in a month that is over and is given a later end, or none: it runs again from the current month
+    push(planReactivate(work, { ...next, endMonth: item.endMonth }, today, end, ts))
+    await store.commit(withPosts(tables, mutations, rows, startMoved))
+    return
+  }
+  if (sameValues(item, next) || !isBefore(start, today)) {
+    // nothing it posts changes, or all of it lies in the current month and later: the schedule as the form has it
+    putItem(next)
+    await store.commit(withPosts(tables, mutations, rows, (m) => startMoved(m) || afterMovedEnd(item.endMonth ?? null, end)(m)))
+    return
+  }
+  if (!runsOn) {
+    const locale = tables.household.find((h) => !h.deletedAt)?.locale ?? 'en'
+    throw new Error(`"${item.name}" ${ended ? 'ended' : 'would end'} in ${monthSpan([end!], locale)}, and a change made here counts from ${monthSpan([today], locale)} on. Change the amount of a month that is over in that month, or give the schedule a later last month to run it again.`)
+  }
+  // it runs through the current month: the months before keep what it posted, a copy with the new values starts here
+  const kept: RecurringItem = { ...item, name: next.name, accountId: next.accountId, scope: next.scope, notes: next.notes, startMonth: start }
+  putItem(kept)
+  const split = planChangeRecurringFrom(work, { ...kept, updatedAt: ts }, today, { amount: next.amount, fundedBy: next.fundedBy, cadence: next.cadence, dueMonths: next.dueMonths, endMonth: end }, ts)
+  push(split.mutations)
+  if (next.rowId !== item.rowId || next.currency !== item.currency) {
+    const copy = work.recurringItems.find((r) => r.id === split.targetId)!
+    putItem({ ...copy, rowId: next.rowId, currency: next.currency })
+  }
+  await store.commit(withPosts(tables, mutations, rows, startMoved))
 }
 
-/** Stop an item after `endMonth` (null = active again). */
-export const endRecurringItem = (store: Store, id: string, endMonth: MonthKey | null) => updateRecurringItem(store, id, { endMonth })
-export const deleteRecurringItem = (store: Store, id: string) => updateRecurringItem(store, id, { deletedAt: now() } as Partial<RecurringInput>)
+/**
+ * A schedule that has ended runs again from `today`, until `end` (none: without an end). One that ended last month
+ * or later simply loses its end. One that ended further back keeps its months as they are: a copy starts at
+ * `today`, so the months in between, which are over, get nothing they did not have.
+ */
+function planReactivate(tables: Tables, item: RecurringItem, today: MonthKey, end: MonthKey | null, ts: number): Mutation[] {
+  const put = (record: RecurringItem): Mutation => ({ op: 'put', table: 'recurringItems', record: RecurringItemSchema.parse({ ...record, updatedAt: ts }) })
+  const stored = tables.recurringItems.find((r) => r.id === item.id)
+  const gap = item.endMonth != null && isBefore(item.endMonth, addMonths(today, -1))
+  if (!gap) return [put({ ...item, endMonth: end })]
+  // the piece that ended keeps what it posted; only what is the schedule's own in every month follows the form
+  const kept = stored ? [put({ ...stored, name: item.name, accountId: item.accountId, scope: item.scope, notes: item.notes })] : []
+  return [...kept, put({ ...item, id: newId(), createdAt: ts, startMonth: today, endMonth: end })]
+}
+
+/** "Reactivate" in the list of schedules: the schedule runs again from the current month, without an end. */
+export async function reactivateRecurringItem(store: Store, id: string): Promise<void> {
+  const tables = await loadTables(store)
+  const item = tables.recurringItems.find((r) => r.id === id && !r.deletedAt)
+  if (!item) throw new Error('Recurring item not found')
+  if (item.endMonth == null) return
+  await store.commit(withPosts(tables, planReactivate(tables, item, monthOfDate(), null, now()), [item.rowId]))
+}
+
+/**
+ * What takes a schedule away: its record, and what it posted and was not paid. Nothing else in its months is looked
+ * at. Closed months keep what they show.
+ */
+export function planDropSchedule(tables: Tables, item: RecurringItem, ts: number): Mutation[] {
+  const closed = new Set(tables.monthStates.filter((s) => s.closed).map((s) => s.month))
+  const muts: Mutation[] = [{ op: 'put', table: 'recurringItems', record: RecurringItemSchema.parse({ ...item, deletedAt: ts, updatedAt: ts }) }]
+  for (const c of tables.cells) {
+    if (c.rowId !== item.rowId || closed.has(c.month)) continue
+    if (!c.items.some((i) => i.recurringItemId === item.id && i.status !== 'done')) continue
+    muts.push({ op: 'put', table: 'cells', record: CellSchema.parse({ ...c, items: c.items.filter((i) => i.recurringItemId !== item.id || i.status === 'done'), updatedAt: ts }) })
+  }
+  return muts
+}
+
+/** Stop a schedule after `endMonth`: the month is one somebody chose, so what it posted after it and was not paid goes. */
+export const endRecurringItem = (store: Store, id: string, endMonth: MonthKey) => updateRecurringItem(store, id, { endMonth })
+
+export async function deleteRecurringItem(store: Store, id: string): Promise<void> {
+  const tables = await loadTables(store)
+  const item = tables.recurringItems.find((r) => r.id === id)
+  if (!item) throw new Error('Recurring item not found')
+  await store.commit(planDropSchedule(tables, item, now()))
+}
 
 /** Mark the posted item for `month` paid (done) or back to the row default. */
 export async function setRecurringPaid(store: Store, id: string, month: MonthKey, paid: boolean): Promise<void> {
@@ -271,8 +408,8 @@ export type SchedulePatch = Partial<Pick<RecurringItem, 'amount' | 'fundedBy' | 
 /**
  * Change amount/funding/name or the rhythm from `month` on. Earlier months keep the old values: the old
  * schedule ends the month before and a copy with the new values starts at `month`. Posted
- * items from `month` on are re-pointed to the copy so paid marks survive and nothing posts twice.
- * Returns the id of the schedule that now covers `month`.
+ * items from `month` on are re-pointed to the copy so paid marks survive and nothing posts twice; what is paid
+ * keeps the amount that was paid. Returns the id of the schedule that now covers `month`.
  */
 export async function changeRecurringFrom(store: Store, id: string, month: MonthKey, patch: SchedulePatch): Promise<string> {
   const { tables, item } = await findLive(store, id)
@@ -299,7 +436,7 @@ export function planChangeRecurringFrom(tables: Tables, item: RecurringItem, mon
     if (!cell.items.some((i) => i.recurringItemId === item.id)) continue
     const items = cell.items.map((i) =>
       i.recurringItemId !== item.id ? i
-        : i.pinned ? { ...i, recurringItemId: targetId }
+        : i.pinned || i.status === 'done' ? { ...i, recurringItemId: targetId }
         : { ...i, recurringItemId: targetId, amount: patch.amount ?? i.amount, fundedBy: patch.fundedBy ?? i.fundedBy, label: patch.name ?? i.label },
     )
     mutations.push({ op: 'put', table: 'cells', record: CellSchema.parse({ ...cell, items, updatedAt: ts }) })

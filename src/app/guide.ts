@@ -164,6 +164,7 @@ export const GUIDE: GuideTopic[] = [
       'Change one amount: "Apply the change to" → "Only this month" or "This and following months".',
       'Remove one: "Only this month" skips it ("Restore" brings it back), "This and following months" ends the schedule, "All occurrences" archives or deletes it. One that lands in another month is stopped with "From <Month> on".',
       'Household → "Schedules": "Add schedule" and per schedule "Edit…" for the rest ("Paid from", "Whose", "Until month (optional)", "Notes"), "End after <Month>", "Reactivate", "Delete…"; tick a month\'s chip to mark it paid.',
+      'A change made in that list names no month, so a new amount, source or rhythm counts from the current month on, and earlier months keep what they had. "From month" and "Until month" count as you type them; "Reactivate" runs the schedule again from the current month. To change a month that is over, open that month.',
       'Statement → open "Housing" and tick "The flat – Rent" once it is paid: the schedule shows "paid" for that month, and the progress line counts what is still to pay.',
     ],
     tips: ['schedule.status', 'statement.progress'],

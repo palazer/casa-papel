@@ -16,7 +16,7 @@ import {
 import type { Mutation } from './store'
 import { primaryKeyOf, type PrimaryKey } from './keys'
 import { accountTypeForRow, planRowFundedBy } from './actions'
-import { planChangeRecurringFrom, planRecurringPosts } from './recurring'
+import { planChangeRecurringFrom, planDropSchedule, planRecurringPosts } from './recurring'
 import { defaultMonths } from './months'
 
 export type RemovalKind = 'row' | 'account' | 'pool' | 'entity' | 'schedule' | 'goal' | 'category'
@@ -658,16 +658,8 @@ function entityRemoval(ctx: Ctx, e: Entity, ts: number): Mutation[] {
   return muts
 }
 
-function scheduleRemoval(ctx: Ctx, item: RecurringItem, ts: number): Mutation[] {
-  const muts: Mutation[] = [put('recurringItems', RecurringItemSchema, item, { deletedAt: ts }, ts)]
-  // what it posted and was not paid goes with it, and nothing else: a month keeps everything else it holds
-  for (const c of ctx.tables.cells) {
-    if (c.rowId !== item.rowId || ctx.closed.has(c.month)) continue
-    if (!c.items.some((i) => i.recurringItemId === item.id && i.status !== 'done')) continue
-    muts.push(putCell({ ...c, items: c.items.filter((i) => i.recurringItemId !== item.id || i.status === 'done') }, ts))
-  }
-  return muts
-}
+/** What it posted and was not paid goes with it, and nothing else: a month keeps everything else it holds. */
+const scheduleRemoval = (ctx: Ctx, item: RecurringItem, ts: number): Mutation[] => planDropSchedule(ctx.tables, item, ts)
 
 /** The mutations that delete `target` and settle everything that pointed at it. Throws when the impact forbids it. */
 export function planRemoval(tables: Tables, target: RemovalTarget, ts: number, opts: ImpactOptions = {}): Mutation[] {

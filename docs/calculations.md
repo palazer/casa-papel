@@ -395,6 +395,12 @@ takes back both (finding F8, closed).
 
 **H5. A new year of the plan gets the schedule's amounts**, whether the calendar or "Add a year" brought it.
 
+**H7. A schedule changed in the list of schedules counts from the current month.** The list names no month, so a
+new amount, source or rhythm starts in the current month, and the months before keep what they had; what was ticked
+as paid keeps what was paid. A first or a last month is a month that was typed and counts as typed: the months
+between the old one and the new one are filled or emptied. "Reactivate" runs a schedule again from the current
+month. A schedule that ended in a month that is over has nothing left to change from here on: the form says so.
+
 **H6. Items that repeat and items that do not can share a month.** The month shows their sum.
 
 ## K. Archiving and restoring
