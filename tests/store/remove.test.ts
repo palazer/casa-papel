@@ -3,7 +3,7 @@ import { computeEngine, cellKey } from '@/engine'
 import { accountRef, newId, poolRef, type Tables } from '@/model'
 import {
   CasaDb, Store, addPool, addRow, archiveAccount, archiveEntity, archiveRow, defaultMonths, followRow, loadTables, postRecurring, removeAccount, removeEntity,
-  removePool, removeRecurringItem, removeRow, restoreAccount, restoreRow, setRecurringPaid,
+  removePool, removeRecurringItem, removeRow, restoreAccount, restoreRow, restoredText, setRecurringPaid,
 } from '@/store'
 import { loadDemo } from '@/demo/loadDemo'
 
@@ -92,8 +92,19 @@ describe('remove', () => {
     expect(t.cells.find((c) => c.rowId === rent && c.month === '2026-12')?.items.some((i) => i.recurringItemId) ?? false).toBe(false)
     expect(t.cells.find((c) => c.rowId === rent && c.month === '2026-10')?.items.some((i) => i.recurringItemId)).toBe(true)
 
-    await restoreRow(store, rent)
-    expect((await tables()).rows.find((r) => r.id === rent)?.archivedMonth).toBeNull()
+    // restoring brings back what the archive changed: the schedule runs on, and its postings land again
+    const restored = await restoreRow(store, rent)
+    t = await tables()
+    expect(t.rows.find((r) => r.id === rent)).toMatchObject({ archivedMonth: null, archiveMemo: null })
+    expect(t.recurringItems.find((r) => r.name === 'Rent')).toMatchObject({ endMonth: null, deletedAt: null })
+    expect(t.cells.find((c) => c.rowId === rent && c.month === '2026-12')?.items.some((i) => i.recurringItemId)).toBe(true)
+    expect(restoredText(restored)).toBe('Restored "The flat – Rent": its schedule "Rent" runs again.')
+
+    // and the row that followed the child benefit follows it again
+    expect(restoredText(await restoreRow(store, benefit))).toBe('Restored "Robin – Child benefit": "Robin savings" follows it again.')
+    t = await tables()
+    expect(t.rows.find((r) => r.id === saver.id)?.followsRowId).toBe(benefit)
+    expect((await engine()).totals[TODAY].income).toBe(before.totals[TODAY].income)
   })
 
   it('deleting an account clears the plain rows and schedules that named it; virtual accounts block; archiving stops the balance and takes its virtual accounts along', async () => {
@@ -111,6 +122,7 @@ describe('remove', () => {
 
     const savings = idOf(t, 'accounts', 'Savings')
     await expect(removeAccount(store, savings)).rejects.toThrow(/closed months/)
+    const asItWas = await engine()
     await archiveAccount(store, savings, TODAY)
     t = await tables()
     expect(t.accounts.find((a) => a.id === savings)?.archivedMonth).toBe(TODAY)
@@ -129,10 +141,22 @@ describe('remove', () => {
     expect(out.pools[clothingId].months[TODAY]).toBeUndefined()
     expect(out.netWorth[TODAY]).toBeLessThan(out.netWorth['2026-10'])
 
-    await restoreAccount(store, savings)
+    // restoring the account brings back what its archive took along: its virtual accounts, their rows, and what they paid
+    const restored = await restoreAccount(store, savings)
     t = await tables()
-    expect(t.accounts.find((a) => a.id === savings)?.archivedMonth).toBeNull()
-    expect(t.pools.find((p) => p.id === travelId)?.archivedMonth).toBe(TODAY) // virtual accounts stay put until restored themselves
+    expect(t.accounts.find((a) => a.id === savings)).toMatchObject({ archivedMonth: null, archiveMemo: null })
+    expect(t.pools.filter((p) => p.accountId === savings).map((p) => [p.archivedMonth, p.archiveMemo])).toEqual([[null, null], [null, null]])
+    expect(t.rows.find((r) => r.name === 'To Travel')).toMatchObject({ archivedMonth: null, archiveMemo: null })
+    expect(t.rows.find((r) => r.name === 'Travel')?.defaultFundedBy).toBe(poolRef(travelId))
+    expect(t.cells.find((c) => c.rowId === idOf(t, 'rows', 'Clothing') && c.month === TODAY)?.items[0].fundedBy).toBe(poolRef(clothingId))
+    expect(restoredText(restored)).toContain('Restored "Savings": its virtual accounts "Travel" and "Clothing" are back')
+    // every figure is what it was before the archive
+    const again = await engine()
+    expect(again.netWorth).toEqual(asItWas.netWorth)
+    expect(again.accounts[savings].months).toEqual(asItWas.accounts[savings].months)
+    expect(again.pools[travelId].months).toEqual(asItWas.pools[travelId].months)
+    expect(again.pools[clothingId].months).toEqual(asItWas.pools[clothingId].months)
+    expect(again.totals).toEqual(asItWas.totals)
   })
 
   it('deleting a fresh virtual account removes the row that fills it and moves its spending to the account it was held in', async () => {

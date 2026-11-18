@@ -34,6 +34,15 @@ test.describe('archiving people and things', () => {
     await archivedRobin.getByRole('button', { name: 'Restore' }).click()
     await expect(page.getByText('Archived', { exact: true })).toHaveCount(0)
     await expect(robinRows).toBeVisible()
+    // the message says what was restored, and its "Undo" archives Robin again
+    const said = page.getByRole('status').filter({ hasText: 'Restored' })
+    await expect(said).toHaveText(/^Restored "Robin"\./)
+    await said.getByRole('button', { name: 'Undo' }).click()
+    await expect(archivedRobin).toBeVisible()
+    await expect(said).toHaveCount(0)
+    await archivedRobin.getByRole('button', { name: 'Restore' }).click()
+    await expect(said).toHaveText(/^Restored "Robin"\./)
+    await expect(page.getByText('Archived', { exact: true })).toHaveCount(0)
 
     // The car has nothing in a closed month: it can be deleted, and the dialog says what changes
     const car = page.getByRole('listitem').filter({ hasText: 'The car' }).first()

@@ -33,6 +33,8 @@ export class World {
   mark: Figures | null = null
   /** The last step that saved exactly one thing the user can undo: the figures before and after it, and the app's state then (`stamp`). */
   lastAction: { before: Figures; after: Figures; stamp: string } | null = null
+  /** What the app said after the last action that says something (a restore): the sentence the screen shows. */
+  said: string | null = null
   /** The month of the last "net worth changes by …" step: what "of that, … is …" speaks of. */
   bridgeMonth: MonthKey | null = null
   /** A second device of the same household, once a scenario has one: see the steps "a second device that has synced". */

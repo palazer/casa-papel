@@ -1,4 +1,4 @@
-import { addCategory, addGoal, mergeTables, archiveAccount, archivePool, archiveRow, followRow, importMerge, exportSnapshot, parseExportFile, removeAccount, removeRow, restoreAccount, restorePool, restoreRow, setCategoryEstimate, setRowCategory, setRowDeductedFrom, setRowScope } from '@/store'
+import { addCategory, addGoal, mergeTables, archiveAccount, archivePool, archiveRow, followRow, importMerge, exportSnapshot, parseExportFile, removeAccount, removeRow, restoreAccount, restorePool, restoreRow, restoredText, setCategoryEstimate, setRowCategory, setRowDeductedFrom, setRowScope } from '@/store'
 import type { ExportFile } from '@/model'
 import { resolve, step } from '../registry'
 import { ScenarioError, type World } from '../world'
@@ -6,13 +6,14 @@ import { ScenarioError, type World } from '../world'
 // ---------- archive, restore, delete ----------
 
 step('I archive the row {string} from {month}', async (world: World, name: string, month: string) => archiveRow(world.store, (await world.row(name)).id, month))
-step('I restore the row {string}', async (world: World, name: string) => restoreRow(world.store, (await world.row(name)).id))
+// a restore says what came back and what stayed: the sentence the screen shows, kept for "the app says …"
+step('I restore the row {string}', async (world: World, name: string) => { world.said = restoredText(await restoreRow(world.store, (await world.row(name)).id)) })
 step('I delete the row {string}', async (world: World, name: string) => removeRow(world.store, (await world.row(name)).id))
 step('I archive the account {string} from {month}', async (world: World, name: string, month: string) => archiveAccount(world.store, (await world.account(name)).id, month))
-step('I restore the account {string}', async (world: World, name: string) => restoreAccount(world.store, (await world.account(name)).id))
+step('I restore the account {string}', async (world: World, name: string) => { world.said = restoredText(await restoreAccount(world.store, (await world.account(name)).id)) })
 step('I delete the account {string}', async (world: World, name: string) => removeAccount(world.store, (await world.account(name)).id))
 step('I archive the virtual account {string} from {month}', async (world: World, name: string, month: string) => archivePool(world.store, (await world.pool(name)).id, month))
-step('I restore the virtual account {string}', async (world: World, name: string) => restorePool(world.store, (await world.pool(name)).id))
+step('I restore the virtual account {string}', async (world: World, name: string) => { world.said = restoredText(await restorePool(world.store, (await world.pool(name)).id)) })
 
 // ---------- rows that depend on other rows ----------
 

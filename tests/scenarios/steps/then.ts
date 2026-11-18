@@ -183,6 +183,12 @@ step('{string} brings home {money} in {month}', async (world: World, name: strin
   same((await world.view()).engine.totals[month]?.takeHomeBy[entity.id] ?? 0, amount, `what ${name} brings home in ${monthName(month)}`)
 })
 
+// the message after an action that says what it did: "Restored "Rent": its schedule "Rent" runs again."
+step('the app says {string}', (world: World, text: string) => {
+  if (world.said == null) throw new ScenarioError('Nothing was said: this step follows a restore.')
+  expect(world.said, 'what the app said').toContain(text)
+})
+
 step('the app warns {string}', async (world: World, text: string) => {
   expect((await world.view()).engine.warnings.join(' | '), 'the warnings').toContain(text)
 })

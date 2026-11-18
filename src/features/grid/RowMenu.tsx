@@ -8,7 +8,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { useStore } from '@/app/store'
 import { canCarryRule, type Household, type Row, type Tables } from '@/model'
-import { derivedRowReason, moveRow, removeIfFree, renameRow, restoreRow, updateRow } from '@/store'
+import { derivedRowReason, moveRow, removeIfFree, renameRow, restoreRow, restoredText, updateRow } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
 import { RowAccountDialog, RowCurrencyDialog, RowDeductionDialog, RowFollowDialog, RowScopeDialog, RowSourceDialog } from './RowDialogs'
 import { RowCategoryDialog } from './RowCategoryDialog'
@@ -23,8 +23,10 @@ const GRID_TRIGGER = 'size-6 opacity-0 group-hover:opacity-100 focus:opacity-100
  * Everything that can be done to a row, behind the "…" beside its name. The Grid and the Statement show the same
  * menu; `triggerClassName` is the one thing that differs, when the "…" is visible.
  */
-export function RowMenu({ row, tables, household, onError, onDeleted, onRule, triggerClassName = GRID_TRIGGER }: {
+export function RowMenu({ row, tables, household, onError, onDeleted, onRestored, onRule, triggerClassName = GRID_TRIGGER }: {
   row: Row; tables: Tables; household: Household; onError: (msg: string) => void
+  /** An archived row was restored: what came back with it, as the sentence the screen shows with the way back. */
+  onRestored?: (text: string) => void
   /** "Rule…" for a row that can carry one: the screen opens the row's dialog, which holds the rule. */
   onRule?: () => void
   /** A row was deleted in one click (a household that is being set up); the screen can say so and offer the way back. */
@@ -76,7 +78,7 @@ export function RowMenu({ row, tables, household, onError, onDeleted, onRule, tr
           {canFollow && <DropdownMenuItem onClick={() => setOpen('follow')}>{followed ? `Follows ${followed.name}…` : 'Follow another row…'}</DropdownMenuItem>}
           <DropdownMenuSeparator />
           {row.archivedMonth ? (
-            <DropdownMenuItem onClick={act(() => restoreRow(store, row.id))}>Restore</DropdownMenuItem>
+            <DropdownMenuItem onClick={act(async () => onRestored?.(restoredText(await restoreRow(store, row.id))))}>Restore</DropdownMenuItem>
           ) : (
             <DropdownMenuItem onClick={cheap ? act(removeNow) : () => setOpen('remove')}>{cheap ? 'Delete' : 'Archive or delete…'}</DropdownMenuItem>
           )}

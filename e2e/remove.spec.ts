@@ -53,6 +53,68 @@ test.describe('archive or delete', () => {
     await expect(page.getByRole('button', { name: /^Groceries Nov 2026/ })).toBeVisible()
   })
 
+  test('restore says what came back with it, and "Undo" beside the message archives everything again', async ({ page }) => {
+    await page.goto('?demo=1&screen=grid')
+    await page.getByRole('button', { name: 'Load the demo household' }).click()
+    const rentNov = page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })
+    await expect(rentNov).toBeVisible()
+    await page.getByRole('button', { name: 'Earlier months (2)' }).click()
+    const dlg = page.getByRole('dialog')
+    const said = page.getByRole('status').filter({ hasText: 'Restored' })
+
+    // Rent is on a schedule: archiving ends it, and the dialog says that restoring puts back what it lists
+    await page.getByRole('button', { name: 'Row menu for The flat – Rent' }).click()
+    await page.getByRole('menuitem', { name: 'Archive or delete…' }).click()
+    await expect(dlg.getByText('Restore any time under Household: restoring puts back what is listed here.')).toBeVisible()
+    await dlg.getByRole('button', { name: 'Archive from Nov 2026' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(rentNov).toHaveCount(0)
+
+    // the row's own menu restores it in the Grid: the schedule runs again, and the message says so
+    await page.getByRole('button', { name: 'Row menu for The flat – Rent' }).click()
+    await page.getByRole('menuitem', { name: 'Restore' }).click()
+    await expect(said).toHaveText(/^Restored "The flat – Rent": its schedule "Rent" runs again\./)
+    await expect(rentNov).toContainText('1,650')
+    await page.screenshot({ path: 'e2e/output/restore-row.png' })
+
+    // "Undo" beside the message takes the whole restore back, and the message goes with it
+    await said.getByRole('button', { name: 'Undo' }).click()
+    await expect(rentNov).toHaveCount(0)
+    await expect(said).toHaveCount(0)
+
+    // the same from Household's list of archived rows
+    await page.getByRole('link', { name: 'Household' }).click()
+    const archivedRent = page.getByRole('listitem').filter({ hasText: 'The flat – Rent' }).filter({ hasText: 'since Nov 2026' })
+    await archivedRent.getByRole('button', { name: 'Restore' }).click()
+    await expect(said).toHaveText(/^Restored "The flat – Rent": its schedule "Rent" runs again\./)
+    await expect(page.getByRole('heading', { name: 'Archived rows' })).toHaveCount(0)
+    await said.getByRole('button', { name: 'Dismiss' }).click()
+    await expect(said).toHaveCount(0)
+
+    // an account takes its virtual accounts with it, and brings them back: their rows, and what came out of them
+    const savings = page.getByRole('listitem').filter({ has: page.getByText('Savings', { exact: true }) })
+    await savings.getByRole('button', { name: 'Edit' }).click()
+    await dlg.getByRole('button', { name: 'Archive or delete…' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Account "Savings"' })).toBeVisible()
+    await dlg.getByRole('button', { name: 'Archive from Nov 2026' }).click()
+    await expect(dlg).toBeHidden()
+    const archivedSavings = page.getByRole('listitem').filter({ hasText: 'Savings' }).filter({ hasText: 'since Nov 2026' })
+    await expect(archivedSavings).toBeVisible()
+    // a virtual account of an archived account is not restored by itself
+    const archivedTravel = page.getByRole('listitem').filter({ has: page.getByText('Travel', { exact: true }) }).filter({ hasText: 'since Nov 2026' })
+    await archivedTravel.getByRole('button', { name: 'Restore' }).click()
+    await expect(page.getByRole('alert').filter({ hasText: 'Restore the account first.' })).toHaveText('"Travel" is held in "Savings", which is archived. Restore the account first.')
+    // nor the row that fills it, which waits under "Archived rows"
+    await page.getByRole('listitem').filter({ hasText: 'To Travel' }).filter({ hasText: 'since Nov 2026' }).getByRole('button', { name: 'Restore' }).click()
+    await expect(page.getByRole('alert').filter({ hasText: 'its row comes back with it' })).toHaveText('"To Travel" fills the virtual account "Travel", which is archived. Restore the virtual account: its row comes back with it.')
+    await archivedSavings.getByRole('button', { name: 'Restore' }).click()
+    await expect(said).toHaveText(/^Restored "Savings": its virtual accounts "Travel" and "Clothing" are back, filled by "To Travel" and "To Clothing" again; "Travel" comes out of "Travel" again; "Clothing" comes out of "Clothing" again\./)
+    await expect(archivedTravel).toHaveCount(0)
+    await page.screenshot({ path: 'e2e/output/restore-account.png' })
+    await page.getByRole('link', { name: 'Grid' }).click()
+    await expect(page.getByRole('button', { name: /^To Travel Nov 2026/ })).toBeVisible()
+  })
+
   test('an account: a virtual account inside it blocks the delete; a schedule goes from the list', async ({ page }) => {
     await page.goto('?demo=1&screen=grid')
     await page.getByRole('button', { name: 'Load the demo household' }).click()

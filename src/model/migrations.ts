@@ -48,6 +48,10 @@ const STEPS: Record<number, Step> = {
   // 12 → 13: `Account.outsideNetWorth` (an account left out of net worth) and a pocket money row that lands in such
   // an account. Both fill in from their defaults; the version keeps an older app from counting the account.
   12: (raw) => raw,
+  // 13 → 14: `archiveMemo` on rows, virtual accounts and accounts (what archiving changed with them, so that restoring
+  // can put it back). It fills in from its default; the version keeps an older app from dropping the memo when it
+  // writes an archived record back.
+  13: (raw) => raw,
 }
 
 export function migrateExport(raw: unknown): unknown {

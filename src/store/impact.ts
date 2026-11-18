@@ -9,8 +9,8 @@
 import { computeEngine, cellKey, type CellResult, type EngineOutput } from '@/engine'
 import {
   AccountSchema, CategorySchema, CellSchema, EntitySchema, GoalSchema, PoolSchema, RecurringItemSchema, RowSchema,
-  ENTITY_KIND_LABEL, accountRef, addMonths, compareMonths, monthOfDate, monthRange, parseMonth, paysExpenses, poolRef,
-  type Account, type Category, type Cell, type CellInput, type Entity, type FundedBy, type Goal, type Household, type MonthKey, type Pool, type RecurringItem, type Row,
+  ENTITY_KIND_LABEL, accountIdOf, accountRef, addMonths, compareMonths, monthOfDate, monthRange, parseMonth, paysExpenses, poolIdOf, poolRef,
+  type Account, type ArchiveMemo, type Category, type Cell, type CellInput, type Entity, type FundedBy, type Goal, type Household, type MonthKey, type Pool, type RecurringItem, type Row,
   type TableName, type Tables,
 } from '@/model'
 import type { Mutation } from './store'
@@ -446,14 +446,42 @@ function pinFollowers(ctx: Ctx, row: Row, from: MonthKey, ts: number): Mutation[
   return muts
 }
 
-function rowArchive(ctx: Ctx, row: Row, from: MonthKey, ts: number): Mutation[] {
-  // deductions keep their link: the engine stops taking them off the income from the archive month by itself
-  const muts: Mutation[] = [put('rows', RowSchema, row, { archivedMonth: from }, ts), ...pinFollowers(ctx, row, from, ts)]
-  const schedules = ctx.schedules.filter((s) => s.rowId === row.id)
-  for (const s of schedules) {
-    if (compareMonths(s.startMonth, from) >= 0) muts.push(put('recurringItems', RecurringItemSchema, s, { deletedAt: ts }, ts))
-    else if (s.endMonth == null || compareMonths(s.endMonth, from) >= 0) muts.push(put('recurringItems', RecurringItemSchema, s, { endMonth: addMonths(from, -1) }, ts))
+/** A memo with nothing in it yet, for an archive from `month`. */
+const emptyMemo = (month: MonthKey): ArchiveMemo => ({ month, schedules: [], followers: [], with: [], sources: [] })
+
+/**
+ * The memo an archive writes on its record. Something that is archived already and archived again (from another
+ * month) keeps what its first archive remembered: that is the state from before any archive, the one to go back to.
+ */
+function memoFor(record: { archivedMonth: MonthKey | null; archiveMemo?: ArchiveMemo | null }, fresh: ArchiveMemo): ArchiveMemo {
+  const first = record.archivedMonth ? record.archiveMemo ?? null : null
+  if (!first) return fresh
+  const known = <T extends { id: string }>(old: T[], now: T[]): T[] => [...old, ...now.filter((n) => !old.some((o) => o.id === n.id))]
+  return {
+    month: fresh.month,
+    schedules: known(first.schedules, fresh.schedules),
+    followers: [...new Set([...first.followers, ...fresh.followers])],
+    with: known(first.with, fresh.with),
+    sources: [...first.sources, ...fresh.sources],
   }
+}
+
+function rowArchive(ctx: Ctx, row: Row, from: MonthKey, ts: number): Mutation[] {
+  const memo = emptyMemo(from)
+  memo.followers = ctx.rows.filter((r) => r.followsRowId === row.id).map((r) => r.id)
+  const schedules = ctx.schedules.filter((s) => s.rowId === row.id)
+  const ended: Mutation[] = []
+  for (const s of schedules) {
+    if (compareMonths(s.startMonth, from) >= 0) {
+      memo.schedules.push({ id: s.id, endMonth: s.endMonth, removed: true })
+      ended.push(put('recurringItems', RecurringItemSchema, s, { deletedAt: ts }, ts))
+    } else if (s.endMonth == null || compareMonths(s.endMonth, from) >= 0) {
+      memo.schedules.push({ id: s.id, endMonth: s.endMonth, removed: false })
+      ended.push(put('recurringItems', RecurringItemSchema, s, { endMonth: addMonths(from, -1) }, ts))
+    }
+  }
+  // deductions keep their link: the engine stops taking them off the income from the archive month by itself
+  const muts: Mutation[] = [put('rows', RowSchema, row, { archivedMonth: from, archiveMemo: memoFor(row, memo) }, ts), ...pinFollowers(ctx, row, from, ts), ...ended]
   // the ended schedules' open postings go, so the next system pass finds nothing to do
   if (schedules.length) {
     const later = ctx.months.filter((m) => compareMonths(m, from) >= 0)
@@ -486,24 +514,40 @@ function moveItemSources(ctx: Ctx, ref: FundedBy, to: FundedBy, ts: number, skip
  * builds on the ones before it (`start` is the tables as the caller left them), so several sources retired at once
  * cannot write over each other.
  */
-function moveSourcesFrom(start: Tables, closed: Set<MonthKey>, refs: FundedBy[], to: FundedBy, from: MonthKey, ts: number): Mutation[] {
+function moveSourcesFrom(start: Tables, closed: Set<MonthKey>, refs: FundedBy[], to: FundedBy, from: MonthKey, ts: number): { mutations: Mutation[]; moved: ArchiveMemo['sources'] } {
   const muts: Mutation[] = []
   let work = start
   const add = (ms: Mutation[]) => {
     muts.push(...ms)
     work = applyMutations(work, ms)
   }
+  // what is moved, per source it came out of: the archive keeps it, so that a restore can put it back
+  const moved = new Map<FundedBy, ArchiveMemo['sources'][number]>()
+  const of = (was: FundedBy) => {
+    let entry = moved.get(was)
+    if (!entry) moved.set(was, (entry = { was, to, rows: [], schedules: [], items: [] }))
+    return entry
+  }
   // rows: earlier months keep the old source, the default becomes the new one
-  for (const id of start.rows.filter((r) => !r.deletedAt && refs.includes(r.defaultFundedBy)).map((r) => r.id)) {
+  for (const { id, was } of start.rows.filter((r) => !r.deletedAt && refs.includes(r.defaultFundedBy)).map((r) => ({ id: r.id, was: r.defaultFundedBy }))) {
     const row = work.rows.find((r) => r.id === id)
-    if (row && !row.deletedAt) add(planRowFundedBy(work, row, to, { from }, ts))
+    if (!row || row.deletedAt) continue
+    add(planRowFundedBy(work, row, to, { from }, ts))
+    of(was).rows.push(id)
   }
   // schedules: a copy from `from` on comes out of the new source; the old one ends the month before
   for (const id of start.recurringItems.filter((s) => !s.deletedAt && refs.includes(s.fundedBy)).map((s) => s.id)) {
     const s = work.recurringItems.find((x) => x.id === id)
     if (!s || s.deletedAt) continue
-    if (compareMonths(s.startMonth, from) >= 0) add([put('recurringItems', RecurringItemSchema, s, { fundedBy: to }, ts)])
-    else if (s.endMonth == null || compareMonths(s.endMonth, from) >= 0) add(planChangeRecurringFrom(work, s, from, { fundedBy: to }, ts).mutations)
+    if (compareMonths(s.startMonth, from) >= 0) {
+      add([put('recurringItems', RecurringItemSchema, s, { fundedBy: to }, ts)])
+      of(s.fundedBy).schedules.push(s.id)
+    } else if (s.endMonth == null || compareMonths(s.endMonth, from) >= 0) {
+      // the copy is the one that comes out of the new source from here on
+      const split = planChangeRecurringFrom(work, s, from, { fundedBy: to }, ts)
+      add(split.mutations)
+      of(s.fundedBy).schedules.push(split.targetId)
+    }
   }
   // whatever still comes out of them in open months from `from` on
   const rewrites: Mutation[] = []
@@ -512,7 +556,17 @@ function moveSourcesFrom(start: Tables, closed: Set<MonthKey>, refs: FundedBy[],
     rewrites.push(putCell({ ...c, items: c.items.map((i) => (refs.includes(i.fundedBy) ? { ...i, fundedBy: to } : i)) }, ts))
   }
   add(rewrites)
-  return muts
+  // the single items that changed their source, whichever of the steps above did it
+  const before = new Map(start.cells.map((c) => [`${c.rowId}|${c.month}`, c]))
+  for (const c of work.cells) {
+    const was = before.get(`${c.rowId}|${c.month}`)
+    if (!was || compareMonths(c.month, from) < 0) continue
+    for (const i of c.items) {
+      const old = was.items.find((x) => x.id === i.id)
+      if (old && refs.includes(old.fundedBy) && i.fundedBy === to) of(old.fundedBy).items.push({ rowId: c.rowId, month: c.month, id: i.id })
+    }
+  }
+  return { mutations: muts, moved: [...moved.values()] }
 }
 
 function accountRemoval(ctx: Ctx, acc: Account, ts: number): Mutation[] {
@@ -549,7 +603,11 @@ function accountArchive(ctx: Ctx, acc: Account, from: MonthKey, ts: number): Mut
   // its virtual accounts go with it, and what they and the account paid comes out of the month's income from then on
   const pools = ctx.pools.filter((p) => p.accountId === acc.id && !(p.archivedMonth && compareMonths(p.archivedMonth, from) <= 0))
   for (const p of pools) add(poolShelve(ctx, p, from, ts))
-  add(moveSourcesFrom(work, ctx.closed, [accountRef(acc.id), ...pools.map((p) => poolRef(p.id))], 'cash', from, ts))
+  const sources = moveSourcesFrom(work, ctx.closed, [accountRef(acc.id), ...pools.map((p) => poolRef(p.id))], 'cash', from, ts)
+  add(sources.mutations)
+  // what the archive changed with the account, kept on the account for the day it is restored
+  const memo: ArchiveMemo = { ...emptyMemo(from), with: pools.map((p) => ({ table: 'pools' as const, id: p.id, was: p.archivedMonth })), sources: sources.moved }
+  add([put('accounts', AccountSchema, acc, { archivedMonth: from, archiveMemo: memoFor(acc, memo) }, ts)])
   return muts
 }
 
@@ -567,16 +625,21 @@ function poolRemoval(ctx: Ctx, pool: Pool, ts: number): Mutation[] {
 }
 
 /** The virtual account itself from `from` on: hidden, and the row that fills it archived. What it paid is the caller's. */
-function poolShelve(ctx: Ctx, pool: Pool, from: MonthKey, ts: number): Mutation[] {
-  const muts: Mutation[] = [put('pools', PoolSchema, pool, { archivedMonth: from }, ts)]
+function poolShelve(ctx: Ctx, pool: Pool, from: MonthKey, ts: number, sources: ArchiveMemo['sources'] = []): Mutation[] {
   const alloc = pool.allocationRowId ? ctx.rows.find((r) => r.id === pool.allocationRowId) : undefined
-  if (alloc && !(alloc.archivedMonth && compareMonths(alloc.archivedMonth, from) <= 0)) muts.push(...rowArchive(ctx, alloc, from, ts))
+  const takesRow = !!alloc && !(alloc.archivedMonth && compareMonths(alloc.archivedMonth, from) <= 0)
+  // the row that was archived with it, and where what it paid went: kept on the virtual account for its restore
+  const memo: ArchiveMemo = { ...emptyMemo(from), with: takesRow ? [{ table: 'rows' as const, id: alloc!.id, was: alloc!.archivedMonth }] : [], sources }
+  const muts: Mutation[] = [put('pools', PoolSchema, pool, { archivedMonth: from, archiveMemo: memoFor(pool, memo) }, ts)]
+  if (takesRow) muts.push(...rowArchive(ctx, alloc!, from, ts))
   return muts
 }
 
 function poolArchive(ctx: Ctx, pool: Pool, from: MonthKey, ts: number): Mutation[] {
   const shelved = poolShelve(ctx, pool, from, ts)
-  return [...shelved, ...moveSourcesFrom(applyMutations(ctx.tables, shelved), ctx.closed, [poolRef(pool.id)], poolFallback(ctx, pool), from, ts)]
+  const sources = moveSourcesFrom(applyMutations(ctx.tables, shelved), ctx.closed, [poolRef(pool.id)], poolFallback(ctx, pool), from, ts)
+  // the same record once more, now that what it paid has been moved and can be remembered
+  return [...shelved, ...sources.mutations, poolShelve(ctx, pool, from, ts, sources.moved)[0]]
 }
 
 function entityRemoval(ctx: Ctx, e: Entity, ts: number): Mutation[] {
@@ -631,4 +694,217 @@ export function planArchive(tables: Tables, target: RemovalTarget, month: MonthK
     case 'entity': return [put('entities', EntitySchema, find(ctx.entities, target.id, 'person or thing'), { archivedMonth: month }, ts)]
     default: throw new Error(`A ${impact.kindLabel.toLowerCase()} cannot be archived.`)
   }
+}
+
+// ---------- restore ----------
+
+/** What a restore did, for the message that follows it. */
+export interface Restored {
+  /** The name of what was restored. */
+  subject: string
+  /** What came back with it, as short clauses: `its schedule "Rent" runs again`. */
+  back: string[]
+  /** What was left as it is, as whole sentences. */
+  kept: string[]
+}
+
+/** The sentence a screen shows after a restore: what came back, and what stayed. */
+export function restoredText(r: Restored): string {
+  return [`Restored "${r.subject}"${r.back.length ? `: ${r.back.join('; ')}` : ''}.`, ...r.kept].join(' ')
+}
+
+/**
+ * The mutations that bring an archived thing back, with what its archive changed (`ArchiveMemo`): a row's schedules
+ * and followers, a virtual account's "To …" row, an account's virtual accounts, and what came out of them. One step,
+ * so one undo archives it again.
+ *
+ * Only what still shows what archiving left is put back: a schedule that still ends where the archive ended it, a
+ * row or an item that still comes out of the fallback the archive gave it. Whatever was changed in between stays, and
+ * so does every month that was closed since.
+ */
+export function planRestore(tables: Tables, target: RemovalTarget, ts: number, opts: ImpactOptions = {}): { mutations: Mutation[] } & Restored {
+  const household = tables.household.find((h) => !h.deletedAt)
+  if (!household) throw new Error('No household yet')
+  const months = defaultMonths(household, tables, opts.today ?? monthOfDate())
+  const closed = new Set(tables.monthStates.filter((s) => s.closed).map((s) => s.month))
+  const muts: Mutation[] = []
+  let work = tables
+  const add = (ms: Mutation[]) => {
+    muts.push(...ms)
+    work = applyMutations(work, ms)
+  }
+  const back: string[] = []
+  const kept: string[] = []
+  /** Amounts and settings that were changed between the archive and now, and so stay as they are. */
+  let changed = 0
+  /** The earliest month a restore reaches back to: from there the schedules land again. */
+  let since: MonthKey | null = null
+  const reach = (m: MonthKey) => { if (!since || compareMonths(m, since) < 0) since = m }
+  const liveRow = (id: string) => work.rows.find((r) => r.id === id && !r.deletedAt)
+  const noMemo = (name: string) => kept.push(`"${name}" was archived before the app kept track of what archiving changes, so only "${name}" itself is back.`)
+
+  /**
+   * What came out of the thing and was moved to a fallback goes back, where it still comes out of that fallback.
+   * `own` is the source that is the restored thing itself ("it" in the sentence); any other is named.
+   */
+  const sourcesBack = (memo: ArchiveMemo, own: FundedBy | null) => {
+    // the first month that is still open: months closed since keep the source they were closed with
+    let from = memo.month
+    while (closed.has(from)) from = addMonths(from, 1)
+    for (const entry of memo.sources) {
+      const rowNames: string[] = []
+      let other = 0
+      const poolId = poolIdOf(entry.was)
+      const accountId = accountIdOf(entry.was)
+      const pool = poolId ? work.pools.find((p) => p.id === poolId) : undefined
+      const account = accountId ? work.accounts.find((a) => a.id === accountId) : undefined
+      const gone = (poolId && (!pool || pool.deletedAt)) || (accountId && (!account || account.deletedAt))
+      const shut = (pool && pool.archivedMonth) || (account && account.archivedMonth)
+      const count = entry.rows.length + entry.schedules.length + entry.items.length
+      if (gone || shut) {
+        if (count) kept.push(`What came out of ${pool ? `"${pool.name}"` : account ? `"${account.name}"` : 'it'} stays where the archive moved it: ${gone ? 'that no longer exists' : 'that is still archived'}.`)
+        continue
+      }
+      for (const id of entry.rows) {
+        const row = liveRow(id)
+        if (!row) continue
+        if (row.defaultFundedBy !== entry.to) { changed += 1; continue }
+        add(planRowFundedBy(work, row, entry.was, { from }, ts))
+        rowNames.push(row.name)
+      }
+      for (const id of entry.schedules) {
+        const s = work.recurringItems.find((x) => x.id === id && !x.deletedAt)
+        if (!s) continue
+        if (s.fundedBy !== entry.to) { changed += 1; continue }
+        add([put('recurringItems', RecurringItemSchema, s, { fundedBy: entry.was }, ts)])
+        other += 1
+      }
+      // single items, one write per month they are in
+      const byCell = new Map<string, string[]>()
+      for (const it of entry.items) byCell.set(`${it.rowId}|${it.month}`, [...(byCell.get(`${it.rowId}|${it.month}`) ?? []), it.id])
+      for (const [key, ids] of byCell) {
+        const [rowId, month] = key.split('|')
+        const cell = cellOf(work, rowId, month)
+        if (!cell || closed.has(month)) continue
+        const mine = cell.items.filter((i) => ids.includes(i.id))
+        const still = mine.filter((i) => i.fundedBy === entry.to)
+        changed += mine.length - still.length
+        if (!still.length) continue
+        add([putCell({ ...cell, items: cell.items.map((i) => (still.includes(i) ? { ...i, fundedBy: entry.was } : i)) }, ts)])
+        other += still.length
+      }
+      const ofWhat = entry.was === own ? 'it' : `"${(pool ?? account)?.name ?? ''}"`
+      if (rowNames.length) back.push(`${quoteNames(rowNames)} ${pick(rowNames.length, 'comes', 'come')} out of ${ofWhat} again`)
+      else if (other) back.push(`what came out of ${ofWhat} comes out of it again`)
+    }
+  }
+
+  const rowBack = (row: Row, to: MonthKey | null, top: boolean) => {
+    const memo = row.archiveMemo ?? null
+    add([put('rows', RowSchema, row, { archivedMonth: to, archiveMemo: null }, ts)])
+    if (!memo) return top ? void noMemo(row.name) : undefined
+    reach(memo.month)
+    const names: string[] = []
+    for (const entry of memo.schedules) {
+      const s = work.recurringItems.find((x) => x.id === entry.id)
+      if (!s) continue
+      if (entry.removed) {
+        // removed by the archive, and still removed
+        if (s.deletedAt == null) continue
+        add([put('recurringItems', RecurringItemSchema, s, { deletedAt: null }, ts)])
+      } else {
+        // ended by the archive: only when it still ends there
+        if (s.deletedAt != null || s.endMonth !== addMonths(memo.month, -1)) { changed += 1; continue }
+        add([put('recurringItems', RecurringItemSchema, s, { endMonth: entry.endMonth }, ts)])
+      }
+      names.push(s.name)
+    }
+    if (names.length) back.push(`${top ? 'its' : `"${row.name}" has its`} ${pick(names.length, 'schedule', 'schedules')} ${quoteNames(names)} ${top ? pick(names.length, 'runs', 'run') : 'running'} again`)
+    const following: string[] = []
+    for (const id of memo.followers) {
+      const f = liveRow(id)
+      // it follows again only while it follows nothing else, and while the row it followed follows nothing itself
+      if (!f || f.followsRowId != null || row.followsRowId != null) { if (f) changed += 1; continue }
+      add([put('rows', RowSchema, f, { followsRowId: row.id }, ts)])
+      following.push(f.name)
+    }
+    if (following.length) back.push(`${quoteNames(following)} ${pick(following.length, 'follows', 'follow')} ${top ? 'it' : `"${row.name}"`} again`)
+  }
+
+  /** Brings a virtual account back, and says which rows fill it again. */
+  const poolBack = (pool: Pool, to: MonthKey | null, top: boolean): string[] => {
+    const memo = pool.archiveMemo ?? null
+    add([put('pools', PoolSchema, pool, { archivedMonth: to, archiveMemo: null }, ts)])
+    if (!memo) {
+      if (top) noMemo(pool.name)
+      return []
+    }
+    reach(memo.month)
+    const fills: string[] = []
+    for (const entry of memo.with) {
+      const row = entry.table === 'rows' ? liveRow(entry.id) : undefined
+      // its "To …" row comes back with it, when it is still archived from the same month
+      if (!row || row.archivedMonth !== memo.month) continue
+      rowBack(row, entry.was, false)
+      fills.push(row.name)
+    }
+    if (top && fills.length) back.push(`${quoteNames(fills)} ${pick(fills.length, 'fills', 'fill')} it again`)
+    sourcesBack(memo, top ? poolRef(pool.id) : null)
+    return fills
+  }
+
+  let subject: string
+  switch (target.kind) {
+    case 'row': {
+      const row = find(tables.rows.filter((r) => !r.deletedAt), target.id, 'row')
+      subject = row.name
+      const fills = tables.pools.find((p) => !p.deletedAt && p.allocationRowId === row.id && p.archivedMonth)
+      if (fills) throw new Error(`"${row.name}" fills the virtual account "${fills.name}", which is archived. Restore the virtual account: its row comes back with it.`)
+      rowBack(row, null, true)
+      break
+    }
+    case 'pool': {
+      const pool = find(tables.pools.filter((p) => !p.deletedAt), target.id, 'virtual account')
+      subject = pool.name
+      const holder = tables.accounts.find((a) => a.id === pool.accountId && !a.deletedAt)
+      if (holder?.archivedMonth) throw new Error(`"${pool.name}" is held in "${holder.name}", which is archived. Restore the account first.`)
+      poolBack(pool, null, true)
+      break
+    }
+    case 'account': {
+      const acc = find(tables.accounts.filter((a) => !a.deletedAt), target.id, 'account')
+      subject = acc.name
+      const memo = acc.archiveMemo ?? null
+      add([put('accounts', AccountSchema, acc, { archivedMonth: null, archiveMemo: null }, ts)])
+      if (!memo) { noMemo(acc.name); break }
+      reach(memo.month)
+      const pools: string[] = []
+      const fills: string[] = []
+      for (const entry of memo.with) {
+        const pool = entry.table === 'pools' ? work.pools.find((p) => p.id === entry.id && !p.deletedAt) : undefined
+        // its virtual accounts come back with it, when they are still archived from the same month
+        if (!pool || pool.archivedMonth !== memo.month) continue
+        pools.push(pool.name)
+        fills.push(...poolBack(pool, entry.was, false))
+      }
+      if (pools.length) back.unshift(`its virtual ${pick(pools.length, 'account', 'accounts')} ${quoteNames(pools)} ${pick(pools.length, 'is', 'are')} back${fills.length ? `, filled by ${quoteNames(fills)} again` : ''}`)
+      sourcesBack(memo, accountRef(acc.id))
+      break
+    }
+    case 'entity': {
+      const e = find(tables.entities.filter((x) => !x.deletedAt), target.id, 'person or thing')
+      subject = e.name
+      add([put('entities', EntitySchema, e, { archivedMonth: null }, ts)])
+      break
+    }
+    default: throw new Error(`A ${target.kind} is never archived; there is nothing to restore.`)
+  }
+  // what the schedules land in the months that count again, in the same step: one undo takes all of it back
+  if (since) {
+    const from: MonthKey = since
+    const later = months.filter((m) => compareMonths(m, from) >= 0)
+    if (later.length) add(planRecurringPosts(work, later))
+  }
+  if (changed) kept.push(`${plural(changed, 'thing')} you changed since ${pick(changed, 'stays as it is', 'stay as they are')}.`)
+  return { mutations: muts, subject, back, kept }
 }

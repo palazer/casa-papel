@@ -38,24 +38,70 @@ Feature: Archiving and restoring
     When I restore the account "Savings"
     Then "Savings" ends December 2026 with 26,600.00
 
-  @K3 @open @F7
+  @K3 @F7
   Scenario: A restored row gets its schedule back
     Given "Rent" is on a schedule of 1,300.00 every month from March 2026
     And I archive the row "Rent" from June 2026
     When I restore the row "Rent"
     Then "Rent" is 1,300.00 in every month from March 2026 to December 2026
 
-  @K3 @open @F7
+  @K3 @F7
   Scenario: A restored virtual account is filled again
     Given a virtual account "Holidays" in "Savings" holding 600.00, with 100.00 set aside every month from January 2026
     And I archive the virtual account "Holidays" from March 2026
     When I restore the virtual account "Holidays"
     Then the virtual account "Holidays" holds 900.00 at the end of March 2026
 
-  @K3 @open @F7
+  @K3 @F7
   Scenario: A restored account pays again what came out of it
     Given an expense "Storage" of 100.00 from January 2026
     And "Storage" comes out of "Savings" in every month
     And I archive the account "Savings" from June 2026
     When I restore the account "Savings"
     Then "Savings" ends December 2026 with 3,800.00
+
+  @K3 @F7
+  Scenario: The app says what came back with a restored row
+    Given "Rent" is on a schedule of 1,300.00 every month from March 2026
+    And an expense "Service charge" with no amount yet
+    And "Service charge" follows "Rent" at 10%
+    And I archive the row "Rent" from June 2026
+    When I restore the row "Rent"
+    Then the app says 'Restored "Rent": its schedule "Rent" runs again; "Service charge" follows it again.'
+    And "Service charge" is 130.00 in every month from March 2026 to December 2026
+
+  @K3 @F7
+  Scenario: A restored account brings back its virtual accounts
+    Given a virtual account "Holidays" in "Savings" holding 600.00, with 100.00 set aside every month from January 2026
+    And I archive the account "Savings" from June 2026
+    When I restore the account "Savings"
+    Then the app says 'its virtual account "Holidays" is back'
+    And the virtual account "Holidays" holds 1,800.00 at the end of December 2026
+
+  @K3 @F7
+  Scenario: A virtual account is not restored while its account is archived
+    Given a virtual account "Holidays" in "Savings" holding 600.00, with 100.00 set aside every month from January 2026
+    And I archive the account "Savings" from June 2026
+    When I restore the virtual account "Holidays"
+    Then it is refused with "Restore the account first."
+
+  @K3 @F7
+  Scenario: What was changed since the archive stays as it is
+    Given a savings account "Reserve" holding 2,000.00
+    And an expense "Storage" of 100.00 from January 2026
+    And "Storage" comes out of "Savings" in every month
+    And I archive the account "Savings" from June 2026
+    And "Storage" comes out of "Reserve" from June 2026
+    When I restore the account "Savings"
+    Then the app says "1 thing you changed since stays as it is."
+    And "Savings" ends December 2026 with 4,500.00
+    And "Reserve" ends December 2026 with 1,300.00
+
+  @K3 @F7
+  Scenario: Taking back a restore archives it again, with everything that came back
+    Given "Rent" is on a schedule of 1,300.00 every month from March 2026
+    And I archive the row "Rent" from June 2026
+    And I restore the row "Rent"
+    When I undo
+    Then "Rent" is 1,300.00 in May 2026
+    And "Rent" is 0.00 in every month from June 2026 to December 2026

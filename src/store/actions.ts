@@ -347,7 +347,8 @@ export function categoryEstimateMutations(tables: Tables, category: Category, mo
     row = made.row
     mutations.push(made.mutation)
   } else if (row.archivedMonth) {
-    row = RowSchema.parse({ ...row, archivedMonth: null, updatedAt: now() })
+    // an estimate that is typed again is in use again: its row comes back as it is, and its archive is forgotten
+    row = RowSchema.parse({ ...row, archivedMonth: null, archiveMemo: null, updatedAt: now() })
     mutations.push({ op: 'put', table: 'rows', record: row })
   }
   const existing = cellOf(tables, row.id, month)

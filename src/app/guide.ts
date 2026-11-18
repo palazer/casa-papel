@@ -318,6 +318,7 @@ export const GUIDE: GuideTopic[] = [
     what: [
       '"Archive or delete…" sits in every row menu, beside each person or thing, and in the account and virtual account dialogs; goals and schedules have "Delete…". Archiving hides something from a month on and keeps every earlier month exactly as it was. Anything with amounts in a closed month cannot be deleted at all, only archived.',
       'The dialog lists "Deleting removes", "Also changes" and "Resolve these first" before you decide. Every removal is one undoable step, and archived things wait under Household with "Restore".',
+      '"Restore" puts back what the archive changed: a row\'s schedules run again and the rows that followed it follow it again; a virtual account\'s "To …" row fills it again; an account\'s virtual accounts come back with it, and what came out of them comes out of them again. Whatever you changed in between stays as it is.',
     ],
     steps: [
       'Row menu (the "…" beside a row\'s name in the Grid and on the Statement) → "Archive or delete…". On the Statement a category, an account and a virtual account have a "…" too: an account\'s holds "Edit…", "Move up", "Move down" and "Archive or delete…", and moves it among the accounts under the same heading.',
@@ -325,7 +326,9 @@ export const GUIDE: GuideTopic[] = [
       'If it says "…has amounts in closed months (…), so it cannot be deleted. Archive it instead.", archive it.',
       'Changed your mind? Undo right after.',
       'While a new household still shows "Setting up" on the Statement, the entry reads "Delete" and deletes at once; "Deleted …" appears at the foot of the window with "Undo". If more than the thing itself would change, the dialog still opens.',
-      'Bring something back: "Archived rows", or the "Archived" line under "Accounts", "Virtual accounts" and "People & things" → "Restore".',
+      'Bring something back: "Archived rows", or the "Archived" line under "Accounts", "Virtual accounts" and "People & things" → "Restore". An archived row still shown in the Grid has "Restore" in its row menu too.',
+      'A message at the foot of the window says what came back, like "Restored "Rent": its schedule "Rent" runs again.", and what stayed as it is. "Undo" beside it archives everything again.',
+      'A virtual account whose savings account is archived comes back with that account: restore the account. The same for the "To …" row of an archived virtual account.',
     ],
     tips: ['remove.archiveFrom', 'household.archived'],
     open: 'household',

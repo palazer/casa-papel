@@ -11,12 +11,12 @@ import { amountToInput, formatAmount, formatMonth, parseAmount, unreadableAmount
 import { useStore } from '@/app/store'
 import { notSetAside, type EngineOutput } from '@/engine'
 import { monthOfDate, type Account, type Household, type Money, type MonthKey, type Pool, type Tables } from '@/model'
-import { addPool, restorePool, updatePool } from '@/store'
+import { addPool, restorePool, updatePool, type Restored } from '@/store'
 import { HUES } from '@/app/hues'
 import { InfoTip } from '@/components/InfoTip'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
 
-export function PoolsCard({ household, tables, engine, onError }: { household: Household; tables: Tables; engine: EngineOutput | null; onError: (m: string) => void }) {
+export function PoolsCard({ household, tables, engine, onError, onRestored }: { household: Household; tables: Tables; engine: EngineOutput | null; onError: (m: string) => void; onRestored: (r: Restored) => void }) {
   const store = useStore()
   const [editing, setEditing] = useState<Pool | 'new' | null>(null)
   const [removing, setRemoving] = useState<Pool | null>(null)
@@ -57,7 +57,7 @@ export function PoolsCard({ household, tables, engine, onError }: { household: H
                 <li key={p.id} className="flex min-h-8 flex-wrap items-center gap-2 py-1 text-muted-foreground">
                   <span>{p.name}</span>
                   <span>since {formatMonth(p.archivedMonth!, locale)}</span>
-                  <Button size="xs" variant="outline" className="ml-auto" onClick={() => act(() => restorePool(store, p.id))}>Restore</Button>
+                  <Button size="xs" variant="outline" className="ml-auto" onClick={() => act(async () => onRestored(await restorePool(store, p.id)))}>Restore</Button>
                 </li>
               ))}
             </ul>

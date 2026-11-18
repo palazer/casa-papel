@@ -404,7 +404,18 @@ An archived account leaves net worth with what it held: the part "accounts start
 
 **K2. Restoring brings the thing back as it was.**
 
-**K3. Restoring also brings back what archiving changed with it.** The app does not do this today: finding F7.
+**K3. Restoring also brings back what archiving changed with it.** The archived thing keeps a note of what its
+archive changed, and "Restore" puts that back in one step:
+
+- a row: the schedules the archive ended run again, and the rows that followed it follow it again;
+- a virtual account: its "To …" row fills it again, and what came out of it comes out of it again;
+- an account: the virtual accounts archived with it are back, with their rows, and what came out of the account and
+  of them comes out of them again.
+
+Only what still shows what the archive left is put back. A schedule that was given another end since, a row that was
+given another source since, and a month that was closed since stay as they are; the app says how many. A virtual
+account is not restored while its savings account is archived, nor a "To …" row while its virtual account is.
+Something archived before the app kept this note comes back by itself (finding F7, closed).
 
 ## G. People and goals
 

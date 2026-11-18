@@ -16,7 +16,7 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
 | F4 | A loan that is paid off keeps taking payments | net worth is right, the debt reads below zero | the payment stops at what is owed | closed |
 | F5 | A card that records only its payments never lowers net worth | net worth is wrong | payments do not move what is owed | closed |
 | F6 | The Statement's change for a virtual account that ran short | one figure on the Statement | show the change of the balance | closed |
-| F7 | Restoring does not bring back what archiving changed with it | amounts stay changed | restore puts it back | open |
+| F7 | Restoring does not bring back what archiving changed with it | amounts stay changed | restore puts it back | closed |
 | F8 | Undo of a schedule added from the list empties the row's months | amounts are lost | save the schedule and its months as one step | closed |
 | F9 | Merging an older copy (a file, or the other device's) brings back what was taken back | an undone change returns | the merge respects what this device removed | closed; the file comparison comes with step 5 |
 
@@ -166,7 +166,23 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
 - **Options.** (a) Archiving remembers what it changed, and restoring puts it back. (b) Restoring stays as it is,
   and its dialog lists what does not come back. (c) Leave it.
 - **Recommendation.** (a).
-- **Decision.** Yes (17 November 2026): archiving remembers what it changed, and restoring puts it back.
+- **Decision.** Yes (17 November 2026): archiving remembers what it changed, and restoring puts it back. After the
+  press a short message says what came back, with "Undo".
+- **Closed** (18 November 2026). An archived row, virtual account or account keeps a note of what its archive
+  changed: the schedules it ended, the rows that followed, what was archived with it, and what came out of it and was
+  moved elsewhere. "Restore" puts all of that back in one step: a row's schedules run again and its followers follow
+  again; a virtual account's "To …" row fills it again; an account's virtual accounts are back, and what came out of
+  it and of them comes out of them again. A message at the foot of the window says what came back and what stayed
+  (`Restored "Rent": its schedule "Rent" runs again.`), with "Undo".
+  - Whatever was changed between the archive and the restore stays: a schedule goes back only if it still ends
+    where the archive ended it, a source only where it still shows what the archive set, and a month closed since
+    keeps what it was closed with. The message counts those ("1 thing you changed since stays as it is.").
+  - A virtual account whose savings account is still archived is not restored by itself, and neither is the "To …"
+    row of an archived virtual account: the app says which one to restore.
+  - The note travels with the record, so a restore works on a second device and years later. This is a new stored
+    field (schema 14): a device on an older version of the app is asked to reload before it syncs again.
+  - Something archived before this change has no note. Restoring it brings back the thing itself, and the message
+    says so.
 
 ### F8. Undo of a schedule added from the list empties the row's months
 

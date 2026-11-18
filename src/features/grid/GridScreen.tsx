@@ -13,6 +13,8 @@ import { readPref, writePref } from '@/app/prefs'
 import { handMonth, useScreen } from '@/app/screens'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
+import { useUndoNotice } from '@/app/useUndoNotice'
+import { UndoNotice } from '@/components/UndoNotice'
 import { cellKey, currentAccountsIn, groupRowsByCategory, mainAccountLabel, type EngineOutput } from '@/engine'
 import { isOldPocketShare, isShareRule, monthOfDate, parseMonth, repeatsText, resolveRules, runningSchedules, type Household, type Money, type MonthKey, type Row, type RuleState, type Section, type Tables } from '@/model'
 import { addPlanYear, closeMonth, derivedRowReason, monthBalances, reopenMonth } from '@/store'
@@ -49,6 +51,8 @@ export function GridScreen() {
   /** The month "Close month" was pressed for: its balances are asked for first. */
   const [closing, setClosing] = useState<MonthKey | null>(null)
   const [error, setError] = useState<string | null>(null)
+  /** What a restore from a row's menu brought back, with the way back: it goes with the next change. */
+  const notice = useUndoNotice(store)
   /** Which rows a rule works out, read the way the engine reads them. */
   const rules = useMemo(() => (engine && household ? resolveRules(engine.rows, household.closingRule) : null), [engine, household])
 
@@ -228,7 +232,7 @@ export function GridScreen() {
                       <td colSpan={months.length} />
                     </tr>
                   ),
-                  ...g.rows.map((row) => <GridRow key={row.id} row={row} band={bandOf(g.band)} rIndex={editableIndex++} months={months} engine={engine} tables={tables} household={household} ccy={ccy} locale={locale} neg={neg} rule={rules?.byRow.get(row.id)} onSelect={(m) => setSelected({ rowId: row.id, month: m })} onError={setError} />),
+                  ...g.rows.map((row) => <GridRow key={row.id} row={row} band={bandOf(g.band)} rIndex={editableIndex++} months={months} engine={engine} tables={tables} household={household} ccy={ccy} locale={locale} neg={neg} rule={rules?.byRow.get(row.id)} onSelect={(m) => setSelected({ rowId: row.id, month: m })} onError={setError} onRestored={notice.say} />),
                 ])),
                 !isCollapsed && (
                   <tr key={`${key}-add`}>
@@ -302,6 +306,7 @@ export function GridScreen() {
       {selected && selectedRow && (
         <CellEditor key={`${selectedRow.id}:${selected.month}`} tables={tables} engine={engine} household={household} row={selectedRow} month={selected.month} onClose={() => setSelected(null)} />
       )}
+      {notice.notice && <UndoNotice text={notice.notice} onUndo={() => act(() => store.undo())} onDismiss={notice.clear} />}
     </div>
   )
 }
@@ -322,9 +327,11 @@ interface GridRowProps {
   rule?: RuleState
   onSelect: (m: MonthKey) => void
   onError: (msg: string) => void
+  /** The row menu restored an archived row: the sentence that says what came back. */
+  onRestored: (text: string) => void
 }
 
-function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, locale, neg, rule, onSelect, onError }: GridRowProps) {
+function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, locale, neg, rule, onSelect, onError, onRestored }: GridRowProps) {
   const totals = engine.rowTotals[row.id]
   const flow = flowOf(row)
   const followed = row.followsRowId ? tables.rows.find((r) => r.id === row.followsRowId) : undefined
@@ -363,7 +370,7 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
           {automatic && (isOldPocketShare(row)
             ? <InfoTip help="row.rule" text={'A share of the pocket money total the household had before. Give it an amount or a rule of its own: row menu, "Rule…".'} />
             : <InfoTip help={row.kind === 'category-estimate' ? 'row.categoryEstimate' : row.kind === 'to-savings' && !isShareRule(rule?.kind) ? 'row.toSavingsPlug' : 'row.rule'} />)}
-          <RowMenu row={row} tables={tables} household={household} onError={onError} onRule={() => onSelect(ruleMonth)} />
+          <RowMenu row={row} tables={tables} household={household} onError={onError} onRestored={onRestored} onRule={() => onSelect(ruleMonth)} />
         </div>
       </th>
       {months.map((m, c) => {

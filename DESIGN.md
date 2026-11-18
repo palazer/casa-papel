@@ -844,17 +844,24 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   the only choice), `Delete` (`destructive`, disabled with blockers). The words and the write come from the same scan
   (`describeRemoval` and `planRemoval`/`planArchive` in `src/store/impact.ts`), so they cannot disagree, and every
   removal is one undoable commit ("You can undo this right after"). Archived things are listed with Restore under
-  Household: Archived rows, and an Archived line in Accounts, Virtual accounts and People & things.
+  Household: Archived rows, and an Archived line in Accounts, Virtual accounts and People & things. The Archive
+  section ends with "Restore any time under Household: restoring puts back what is listed here", and that is what
+  Restore does (`planRestore`): one press, no dialog, answered by the floating message below.
 - **Cheap while setting up.** While a household is being set up (`Household.setupOpen`, the guided setup of §7), removing
   is one click: the entry in the row menu, the category menu and the account and virtual account dialogs opened from
   the Statement reads `Delete` instead of `Archive or delete…` / `Remove…` and deletes at once, with no dialog
   (`removeIfFree` in `src/store/remove.ts`). It does so only when nothing but the thing itself goes: when rows would
   change, something stands in the way, a goal watches it, or a closed month holds its amounts, the remove dialog
   opens as always and says what. After `Done`, and for every household set up before, removing is the dialog again.
-  A one-click delete is answered by the one floating message the app has: a small bordered card (`bg-card`,
-  `shadow-md`, `role="status"`) fixed at the foot of the window, above the bottom tabs on a phone, reading `Deleted
-  "<name>".` with an `xs outline` `Undo` and a ghost `×`. It floats because what was deleted can be anywhere on a
-  long page, and it goes away with the next change, so its `Undo` always takes back that delete.
+  A one-click delete is answered by the floating message.
+- **The floating message** (`UndoNotice` in `src/components/UndoNotice.tsx`, with `useUndoNotice`) is the one thing
+  that floats. It answers the two actions that happen at one press with no dialog and reach further than the thing
+  pressed: a one-click delete (`Deleted "<name>".`) and a restore (`Restored "<name>": <what came back>. <What
+  stayed.>`, the sentence from `restoredText`). A small bordered card (`bg-card`, `shadow-md`, `role="status"`, at
+  most 40rem wide, the text wraps) fixed at the foot of the window, above the bottom tabs on a phone, with an `xs
+  outline` `Undo` and a ghost `×`. It floats because what it speaks of can be anywhere on a long page, and it goes
+  away with the next change, so its `Undo` always takes back that action. The Statement, the Grid and Household
+  show it; nothing else gets one: an action with a dialog has said what it does before it is pressed.
 - Help is one mechanism: `InfoTip` (`src/components/InfoTip.tsx`), a 16 px (i) in `text-muted-foreground/70` (24 px
   where the pointer is a finger) that opens a `w-64 text-xs` popover on hover after 150 ms and on tap, and closes when
   the mouse leaves, on Escape or on a click outside. Its accessible name is `About <title>`. It is a sibling of the thing
@@ -879,7 +886,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 - Loading is nothing (the store is local; `useLiveQuery` resolves within a frame), never a spinner.
 - An action that failed shows a `role="alert"` line in `text-destructive` in the page header's toolbar or beside the
   control; an engine warning is `text-amber-700`. Data-screen outcomes use the `Alert` block. Nothing floats, with
-  one exception: the Statement's `Deleted "<name>". Undo` after a one-click delete (§8).
+  one exception: the floating message after a one-click delete or a restore (`UndoNotice`, §8).
 - Empty states are one muted sentence that says what to do (`Nothing to transfer.`, `Add a savings account first; virtual
   accounts live inside one.`).
 - The welcome screen reports an import or the account dialog's outcome in a `role="status"` line under its header, and an

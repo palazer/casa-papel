@@ -26,7 +26,9 @@ import {
   ENTITY_KIND_LABEL, ENTITY_TEMPLATES, monthOfDate, templateTitle,
   ACCOUNT_TYPE_INFO, ENTITY_KIND_HELP, type Account, type Entity, type EntityKind, type Household, type Tables,
 } from '@/model'
-import { addEntity, applyTemplates, restoreAccount, restoreEntity, setAccountActual, setMonthlyDefault, updateHousehold, type MonthlyDefaultScope } from '@/store'
+import { addEntity, applyTemplates, restoreAccount, restoreEntity, restoredText, setAccountActual, setMonthlyDefault, updateHousehold, type MonthlyDefaultScope, type Restored } from '@/store'
+import { UndoNotice } from '@/components/UndoNotice'
+import { useUndoNotice } from '@/app/useUndoNotice'
 
 const LOCALES = ['en-IE', 'en-GB', 'en-US', 'de-DE', 'de-AT', 'tr-TR', 'fr-FR', 'es-ES', 'nl-NL', 'it-IT', 'pt-PT', 'sv-SE']
 const ACCOUNT_TYPES = ACCOUNT_TYPE_INFO
@@ -40,8 +42,11 @@ export function HouseholdScreen() {
   const months = useMemo(() => (household && tables ? defaultMonths(household, tables) : []), [household, tables])
   const engine = useEngine(tables, months)
   const [error, setError] = useState<string | null>(null)
+  /** What a restore brought back, with the way back: it goes with the next change. */
+  const notice = useUndoNotice(store)
   if (!tables || !household || !engine) return null
   const act = (fn: () => Promise<unknown>) => void fn().catch((e) => setError(e instanceof Error ? e.message : 'Action failed'))
+  const onRestored = (r: Restored) => notice.say(restoredText(r))
   const people = tables.entities.filter((e) => !e.deletedAt && !e.archivedMonth).length
   const accounts = tables.accounts.filter((a) => !a.deletedAt && !a.archivedMonth).length
 
@@ -52,15 +57,16 @@ export function HouseholdScreen() {
       </PageHeader>
       <GroupTabs />
       <SettingsCard household={household} tables={tables} onSave={(p) => act(() => updateHousehold(store, p))} onBuffer={(value, scope) => act(() => setMonthlyDefault(store, value, scope, monthOfDate()))} />
-      <EntitiesCard household={household} tables={tables} entities={tables.entities.filter((e) => !e.deletedAt)} onError={setError} />
-      <AccountsCard household={household} tables={tables} accounts={tables.accounts.filter((a) => !a.deletedAt)} entities={tables.entities} engine={engine} months={months} onError={setError} />
-      <PoolsCard household={household} tables={tables} engine={engine} onError={setError} />
+      <EntitiesCard household={household} tables={tables} entities={tables.entities.filter((e) => !e.deletedAt)} onError={setError} onRestored={onRestored} />
+      <AccountsCard household={household} tables={tables} accounts={tables.accounts.filter((a) => !a.deletedAt)} entities={tables.entities} engine={engine} months={months} onError={setError} onRestored={onRestored} />
+      <PoolsCard household={household} tables={tables} engine={engine} onError={setError} onRestored={onRestored} />
       <CategoriesCard household={household} tables={tables} onError={setError} />
-      <ArchivedRowsCard household={household} tables={tables} onError={setError} />
+      <ArchivedRowsCard household={household} tables={tables} onError={setError} onRestored={onRestored} />
       <FxCard household={household} tables={tables} months={months} onError={setError} />
       <Island air tone={HUES.transfer} title="Schedules" description="Recurring payments and incomes: rent, salary, insurance, subscriptions, anything on a schedule. They land in the grid by themselves and show up in Moves when due.">
         <RecurringList engine={engine} />
       </Island>
+      {notice.notice && <UndoNotice text={notice.notice} onUndo={() => act(() => store.undo())} onDismiss={notice.clear} />}
     </div>
   )
 }
@@ -116,7 +122,7 @@ function SettingsCard({ household: h, tables, onSave, onBuffer }: { household: H
   )
 }
 
-function EntitiesCard({ household, tables, entities: allEntities, onError }: { household: Household; tables: Tables; entities: Entity[]; onError: (m: string) => void }) {
+function EntitiesCard({ household, tables, entities: allEntities, onError, onRestored }: { household: Household; tables: Tables; entities: Entity[]; onError: (m: string) => void; onRestored: (r: Restored) => void }) {
   const store = useStore()
   const [kind, setKind] = useState<EntityKind>('adult')
   const [name, setName] = useState('')
@@ -155,7 +161,7 @@ function EntitiesCard({ household, tables, entities: allEntities, onError }: { h
                   <Chip tone="zinc">{ENTITY_KIND_LABEL[e.kind].toLowerCase()}</Chip>
                   <span>{e.name}</span>
                   <span>since {formatMonth(e.archivedMonth!, household.locale)}</span>
-                  <Button size="xs" variant="outline" className="ml-auto" onClick={() => act(() => restoreEntity(store, e.id))}>Restore</Button>
+                  <Button size="xs" variant="outline" className="ml-auto" onClick={() => act(async () => onRestored(await restoreEntity(store, e.id)))}>Restore</Button>
                 </li>
               ))}
             </ul>
@@ -206,7 +212,7 @@ function TemplatesDialog({ entity, onClose, onError }: { entity: Entity; onClose
   )
 }
 
-function AccountsCard({ household, tables, accounts: allAccounts, entities, engine, months, onError }: { household: Household; tables: Tables; accounts: Account[]; entities: Entity[]; engine: ReturnType<typeof useEngine>; months: string[]; onError: (m: string) => void }) {
+function AccountsCard({ household, tables, accounts: allAccounts, entities, engine, months, onError, onRestored }: { household: Household; tables: Tables; accounts: Account[]; entities: Entity[]; engine: ReturnType<typeof useEngine>; months: string[]; onError: (m: string) => void; onRestored: (r: Restored) => void }) {
   const store = useStore()
   const [editing, setEditing] = useState<Account | 'new' | null>(null)
   const [removing, setRemoving] = useState<Account | null>(null)
@@ -273,7 +279,7 @@ function AccountsCard({ household, tables, accounts: allAccounts, entities, engi
                   <Chip tone="zinc">{(ACCOUNT_TYPES.find((t) => t.value === a.type)?.label ?? a.type).toLowerCase()}</Chip>
                   <span>{a.name}</span>
                   <span>since {formatMonth(a.archivedMonth!, locale)}</span>
-                  <Button size="xs" variant="outline" className="ml-auto" onClick={() => act(() => restoreAccount(store, a.id))}>Restore</Button>
+                  <Button size="xs" variant="outline" className="ml-auto" onClick={() => act(async () => onRestored(await restoreAccount(store, a.id)))}>Restore</Button>
                 </li>
               ))}
             </ul>

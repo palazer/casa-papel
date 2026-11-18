@@ -1,7 +1,7 @@
-import { AccountSchema, EntitySchema, PoolSchema, RowSchema, type MonthKey } from '@/model'
-import type { Mutation, Store } from './store'
+import type { MonthKey } from '@/model'
+import type { Store } from './store'
 import { loadTables } from './actions'
-import { describeRemoval, planArchive, planRemoval, type RemovalTarget } from './impact'
+import { describeRemoval, planArchive, planRemoval, planRestore, type RemovalTarget, type Restored } from './impact'
 
 const now = () => Date.now()
 
@@ -33,24 +33,15 @@ export async function archiveThing(store: Store, target: RemovalTarget, month: M
   await store.commit(planArchive(tables, target, month, now()))
 }
 
-/** Bring an archived row, account, virtual account or person back. */
-export async function restoreThing(store: Store, target: RemovalTarget): Promise<void> {
+/**
+ * Bring an archived row, account, virtual account or person back, with what its archive changed: one undoable commit.
+ * Returns what came back and what stayed as it is, for the message the screen shows (`restoredText`).
+ */
+export async function restoreThing(store: Store, target: RemovalTarget): Promise<Restored> {
   const tables = await loadTables(store)
-  const ts = now()
-  const pick = <T extends { id: string; deletedAt: number | null }>(list: T[], what: string): T => {
-    const x = list.find((r) => r.id === target.id && !r.deletedAt)
-    if (!x) throw new Error(`That ${what} no longer exists.`)
-    return x
-  }
-  let mutation: Mutation
-  switch (target.kind) {
-    case 'row': mutation = { op: 'put', table: 'rows', record: RowSchema.parse({ ...pick(tables.rows, 'row'), archivedMonth: null, updatedAt: ts }) }; break
-    case 'account': mutation = { op: 'put', table: 'accounts', record: AccountSchema.parse({ ...pick(tables.accounts, 'account'), archivedMonth: null, updatedAt: ts }) }; break
-    case 'pool': mutation = { op: 'put', table: 'pools', record: PoolSchema.parse({ ...pick(tables.pools, 'virtual account'), archivedMonth: null, updatedAt: ts }) }; break
-    case 'entity': mutation = { op: 'put', table: 'entities', record: EntitySchema.parse({ ...pick(tables.entities, 'person or thing'), archivedMonth: null, updatedAt: ts }) }; break
-    default: throw new Error(`A ${target.kind} is never archived; there is nothing to restore.`)
-  }
-  await store.commit([mutation])
+  const { mutations, ...restored } = planRestore(tables, target, now())
+  await store.commit(mutations)
+  return restored
 }
 
 export const removeRow = (store: Store, id: string) => removeThing(store, { kind: 'row', id })

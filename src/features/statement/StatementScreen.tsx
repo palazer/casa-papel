@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
-import { Lock, Plus, X } from 'lucide-react'
+import { Lock, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { InfoTip } from '@/components/InfoTip'
@@ -11,7 +11,8 @@ import { readPref, writePref } from '@/app/prefs'
 import { useStore } from '@/app/store'
 import { clearHandedMonth, handedOverMonth } from '@/app/screens'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
-import { useStoreVersion } from '@/app/useStoreVersion'
+import { useUndoNotice } from '@/app/useUndoNotice'
+import { UndoNotice } from '@/components/UndoNotice'
 import { buildStatement, cellKey, currentAccountsIn, notSetAside, type GoalProgress, type Statement, type StatementLine, type StatementSide } from '@/engine'
 import { accountGroup, isOutsideNetWorth, isPocketRow, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type Money, type MonthKey, type Row, type Section } from '@/model'
 import { accountSuggestions, addPayOffRow, addPlanYear, closeMonth, monthBalances, moveAccount, movePool, removeIfFree, reopenMonth, ruleRowOf, setCellDone, setDerivedDone, setItemStatus, setupFocus, setupSteps, shownRowSuggestions, stepSuggestions, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupSide, type SetupStepKey } from '@/store'
@@ -149,8 +150,8 @@ export function StatementScreen() {
   const [poolEdit, setPoolEdit] = useState<string | null>(null)
   /** What "Archive or delete…" in one of those dialogs was pressed for. */
   const [removing, setRemoving] = useState<RemovalTarget | null>(null)
-  /** What a one-click delete just removed, and the store's version right after it: the message goes with the next change. */
-  const [deleted, setDeleted] = useState<{ name: string; version: number } | null>(null)
+  /** What a one-click delete just removed, or what a restore brought back, with the way back: it goes with the next change. */
+  const notice = useUndoNotice(store)
   /** The lines a link symbol has just moved the page to, for the two seconds they stay marked. */
   const [marked, setMarked] = useState<ReadonlySet<string> | null>(null)
   const markTimer = useRef<number | undefined>(undefined)
@@ -160,7 +161,6 @@ export function StatementScreen() {
   const [stepAt, setStepAt] = useState<SetupStepKey | null>(null)
   const [stepFor, setStepFor] = useState<string | null>(null)
   useEffect(() => () => window.clearTimeout(markTimer.current), [])
-  const version = useStoreVersion(store)
   /** "Suggestions" in the toolbar, once it was pressed; until then they show while the household is being set up. */
   const [suggest, setSuggest] = useState<boolean | null>(null)
   /** The virtual account being topped up. */
@@ -445,7 +445,7 @@ export function StatementScreen() {
   }
 
   /** A one-click delete went through: say what is gone, with the way back, until something else changes. */
-  const onDeleted = (name: string) => setDeleted({ name, version: store.getVersion() })
+  const onDeleted = (name: string) => notice.say(`Deleted "${name}".`)
   /**
    * Removing from an account's or a virtual account's dialog. While the household is being set up it is one click, unless
    * more than the thing itself would change; then, and always afterwards, the remove dialog asks.
@@ -461,7 +461,7 @@ export function StatementScreen() {
   /** The "…" after a row's name: the Grid's own row menu. */
   function rowMenu(rowId: string): ReactNode {
     const row = engine!.rows.find((r) => r.id === rowId)
-    return row ? <RowMenu row={row} tables={tables!} household={household!} onError={setError} onDeleted={onDeleted} onRule={() => setEditor({ rowId })} triggerClassName={LINE_MENU} /> : null
+    return row ? <RowMenu row={row} tables={tables!} household={household!} onError={setError} onDeleted={onDeleted} onRestored={notice.say} onRule={() => setEditor({ rowId })} triggerClassName={LINE_MENU} /> : null
   }
   /**
    * The lines that stand beside an account or a virtual account under the same heading, in the order on screen: what
@@ -640,20 +640,8 @@ export function StatementScreen() {
       />
       <PerPerson household={household} tables={tables} engine={engine} month={m} locked={settingUp} />
 
-      {/* What a one-click delete took away, with the way back. It floats at the foot of the window, because the thing
-          that was deleted can be anywhere on a long page; it goes with the next change. */}
-      {deleted && deleted.version === version && (
-        <div role="status" className="fixed bottom-20 left-1/2 z-40 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-2 rounded-lg border bg-card py-1.5 pl-3 pr-1.5 text-xs shadow-md md:bottom-6">
-          <span className="min-w-0 truncate">Deleted "{deleted.name}".</span>
-          <Button size="xs" variant="outline" onClick={() => act(() => store.undo())}>Undo</Button>
-          <button
-            type="button" aria-label="Dismiss" onClick={() => setDeleted(null)}
-            className="inline-flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:size-8"
-          >
-            <X className="size-3.5" aria-hidden />
-          </button>
-        </div>
-      )}
+      {/* What a one-click delete took away, or what a restore brought back, with the way back (`UndoNotice`). */}
+      {notice.notice && <UndoNotice text={notice.notice} onUndo={() => act(() => store.undo())} onDismiss={notice.clear} />}
       {editing && (
         <CellEditor
           key={`${editing.id}:${m}`} tables={tables} engine={engine} household={household} row={editing} month={m} startRule={editor?.start} onClose={() => setEditor(null)}

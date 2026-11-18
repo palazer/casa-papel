@@ -76,7 +76,7 @@ export function RemoveDialog({ target, tables, household, onClose, onDone }: Pro
                 {problem && <p className="text-xs text-destructive" role="alert">{problem}</p>}
               </div>
               <Lines items={impact.archiveChanges} />
-              <p className="text-xs text-muted-foreground">Earlier months stay exactly as they are. Restore any time under Household.</p>
+              <p className="text-xs text-muted-foreground">Earlier months stay exactly as they are. Restore any time under Household: restoring puts back what is listed here.</p>
             </section>
           )}
           <section className="space-y-2" aria-labelledby="rm-delete">

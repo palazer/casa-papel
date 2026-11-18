@@ -8,7 +8,7 @@ import { FUNDED_BY_PATTERN, type FundedBy } from './fundedBy'
 z.config({ jitless: true })
 
 /** Bump when the shape of stored data changes; add a migration in migrations.ts. */
-export const SCHEMA_VERSION = 13
+export const SCHEMA_VERSION = 14
 
 // ---------- primitives ----------
 export const IdSchema = z.string().regex(ID_PATTERN, 'expected ULID')
@@ -101,6 +101,30 @@ export const InvestmentSettingsSchema = z.object({
   fixedRate: z.number().positive().nullable().default(null),
 })
 
+/**
+ * What archiving something changed besides the thing itself. It is kept on the archived record, so that restoring
+ * can put those things back on any device and however long ago the archive was: the history of changes does not
+ * travel between devices and is cleared after a year. Ids and earlier values only, never copies of records. Restoring
+ * puts a thing back only where it still shows what archiving left, so whatever was changed in between stays.
+ */
+export const ArchiveMemoSchema = z.object({
+  /** The month the thing was archived from: what the entries below were changed for. */
+  month: MonthKeySchema,
+  /** A row's schedules that archiving ended (`endMonth` is what they had before) or removed (they started later). */
+  schedules: z.array(z.object({ id: IdSchema, endMonth: MonthKeySchema.nullable(), removed: z.boolean() })).default([]),
+  /** Rows that followed the row and were set free. */
+  followers: z.array(IdSchema).default([]),
+  /** What was archived with it: a virtual account's "To …" row, an account's virtual accounts. `was` is the archive month each had before, if any. */
+  with: z.array(z.object({ table: z.enum(['rows', 'pools']), id: IdSchema, was: MonthKeySchema.nullable() })).default([]),
+  /** What came out of it (`was`) and was moved to `to`: the rows by their default, the schedules, and single items of months. */
+  sources: z.array(z.object({
+    was: FundedBySchema, to: FundedBySchema,
+    rows: z.array(IdSchema).default([]),
+    schedules: z.array(IdSchema).default([]),
+    items: z.array(z.object({ rowId: IdSchema, month: MonthKeySchema, id: IdSchema })).default([]),
+  })).default([]),
+})
+
 export const CardSettingsSchema = z.object({
   cardMode: z.enum(['itemized', 'lump']).default('itemized'),
 })
@@ -124,6 +148,8 @@ export const AccountSchema = BaseRecord.extend({
   investment: InvestmentSettingsSchema.optional(),
   card: CardSettingsSchema.optional(),
   archivedMonth: MonthKeySchema.nullable().default(null),
+  /** While archived: what the archive changed with it. A record archived before schema 14 has none. */
+  archiveMemo: ArchiveMemoSchema.nullable().default(null),
   order: z.string().default('a0'),
 })
 
@@ -202,6 +228,8 @@ export const RowSchema = BaseRecord.extend({
   /** The suggestion that made this row (`RowTemplate.key`); with the row's person or thing it keeps the Statement from suggesting it again. */
   templateKey: z.string().nullable().default(null),
   archivedMonth: MonthKeySchema.nullable().default(null),
+  /** While archived: what the archive changed with it. A record archived before schema 14 has none. */
+  archiveMemo: ArchiveMemoSchema.nullable().default(null),
   order: z.string().default('a0'),
 })
 
@@ -267,6 +295,8 @@ export const PoolSchema = BaseRecord.extend({
   allocationRowId: IdSchema.nullable().default(null),
   openingBalance: MoneySchema.default(0),
   archivedMonth: MonthKeySchema.nullable().default(null),
+  /** While archived: what the archive changed with it. A record archived before schema 14 has none. */
+  archiveMemo: ArchiveMemoSchema.nullable().default(null),
   order: z.string().default('a0'),
 })
 
@@ -393,6 +423,7 @@ export type Household = z.infer<typeof HouseholdSchema>
 export type Entity = z.infer<typeof EntitySchema>
 export type EntityKind = z.infer<typeof EntityKindSchema>
 export type Account = z.infer<typeof AccountSchema>
+export type ArchiveMemo = z.infer<typeof ArchiveMemoSchema>
 export type AccountType = z.infer<typeof AccountTypeSchema>
 export type AccountMonth = z.infer<typeof AccountMonthSchema>
 export type Category = z.infer<typeof CategorySchema>
