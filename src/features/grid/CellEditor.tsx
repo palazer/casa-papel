@@ -11,14 +11,14 @@ import { AmountHint } from '@/components/AmountHint'
 import { amountToInput, formatAmount, formatMonth, parseAmount, unreadableAmount } from '@/app/format'
 import { readPref, writePref } from '@/app/prefs'
 import { useStore } from '@/app/store'
-import { cellKey, type EngineOutput } from '@/engine'
+import { cellKey, typedAmount, type EngineOutput } from '@/engine'
 import { RepeatField } from '@/features/recurring/RepeatField'
 import {
   addMonths, cadenceOf, canCarryRule, compareMonths, fromMinor, isDue, isTakenFromAccount, newId, nextDue, parseMonth, paysAsExpense, repeatOf, runningSchedules, sameRepeat, toMinor,
   type CellItem, type Household, type ItemStatus, type MonthKey, type RepeatChoice, type Repeating, type Row, type Tables,
 } from '@/model'
 import {
-  clearCell, derivedRowReason, endRecurringFrom, fetchRatesFor, itemsFromCurrent, saveRowMonth, setCellItems, setCellValue, skipRecurringMonth,
+  clearCell, derivedRowReason, endRecurringFrom, fetchRatesFor, itemsFromCurrent, planFollowing, saveRowMonth, setCellItems, setCellValue, skipRecurringMonth,
   type EditScope, type RuleTarget,
 } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
@@ -27,6 +27,7 @@ import { ruleFacts, type RuleKind } from '@/features/rules/ruleFacts'
 import { DoneDot } from '@/components/DoneDot'
 import { NativeSelect } from '@/components/NativeSelect'
 import { RateLine } from './RateLine'
+import { followingEffects, followingText, onlyThisMonthText } from './followingText'
 import { fundingOptions as buildFundingOptions } from './funding'
 import { HELP } from '@/app/help'
 import { InfoTip, TipLabel } from '@/components/InfoTip'
@@ -179,6 +180,15 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   const saveScope: EditScope = ruleRuns ? 'from-now-on' : scope
 
   const itemsTotal = items.filter((i) => !i.skipped).reduce((s, i) => s + (i.kind === 'carry' ? (cell?.items.find((x) => x.id === i.id)?.effectiveAmount ?? prevValue()) : Number.isFinite(i.amount) ? i.amount : 0), 0)
+
+  // ----- what the choice under the amount does to the months after this one, said before saving -----
+  /** The amount as the form holds it now; null while it cannot be read. */
+  const amountNow = mode === 'value' ? (text.trim() === '' ? 0 : parseAmount(text, currency, locale)) : itemsTotal
+  // the same function the save runs, so the sentence and the save cannot disagree
+  const following = amountNow == null || !Number.isFinite(amountNow) ? { replaced: [], kept: [] } : planFollowing(tables, engine, row.id, month, amountNow, 0)
+  const after = engine.cells[cellKey(row.id, nextMonth)]
+  /** What the month after goes on with when this month is this month's alone: its own amount, or what this month handed on until now. */
+  const goesOn = after?.source === 'archived' ? undefined : after?.cell && after.cell.mode !== 'inherit' ? typedAmount(after) : cell?.handsOn ?? null
 
   /** Another currency for the row: the digits on screen stay and are read in it. */
   function pickCurrency(next: string) {
@@ -432,8 +442,8 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                         <p className="text-xs text-muted-foreground">On a schedule the amount lands only in its months; the months between stay empty.</p>
                       </>
                     ) : (
-                      <p className="text-xs text-muted-foreground">
-                        {scope === 'from-now-on' ? 'The amount stays in every later month until you change it.' : 'The next month keeps the old amount.'}
+                      <p className="text-xs text-muted-foreground" data-testid="scope-says">
+                        {scope === 'from-now-on' ? followingText(month, following, locale, 'The amount stays in every later month until you change it.') : onlyThisMonthText(month, goesOn, currency, locale)}
                       </p>
                     )}
                   </fieldset>
@@ -615,8 +625,10 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                   <fieldset className="space-y-1.5">
                     <legend className="text-sm font-medium">The total</legend>
                     <Segmented label="The total" value={scope} onChange={(v) => pickScope(v as EditScope)} options={[{ value: 'from-now-on', label: 'Every month' }, { value: 'this-month', label: 'Only this month' }]} />
-                    <p className="text-xs text-muted-foreground">
-                      {scope === 'from-now-on' ? `Nothing here repeats by itself: later months show the total, ${formatAmount(itemsTotal, currency, locale)}, as one amount.` : 'The next month keeps the old amount.'}
+                    <p className="text-xs text-muted-foreground" data-testid="scope-says">
+                      {scope === 'from-now-on'
+                        ? [`Nothing here repeats by itself: later months show the total, ${formatAmount(itemsTotal, currency, locale)}, as one amount.`, followingEffects(following, locale)].filter(Boolean).join(' ')
+                        : onlyThisMonthText(month, goesOn, currency, locale)}
                     </p>
                   </fieldset>
                 )}

@@ -93,11 +93,12 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
   (b) Leave it.
 - **Recommendation.** (a).
 - **Decision.** Yes (17 November 2026): settled with step 3.
-- **Closed** (18 November 2026). The month after an exception holds nothing: "Clear" finds nothing to clear there,
-  and an amount changed before the exception reaches the months after it (scenario "An amount changed before an
-  exception reaches the months after the exception"). Exceptions made by an earlier version keep the amount that
-  version wrote into the month after: such a pair cannot be told from two amounts that were typed, and no figure
-  is wrong.
+- **Closed** (18 November 2026). The month after an exception holds nothing: "Clear" finds nothing to clear there.
+  And an amount typed for an earlier month with "Every month" no longer stops at the month after an exception: it
+  replaces what the following months held (rule A3; scenario "An amount for the following months, typed before an
+  exception, replaces the exception and reaches past it"). Exceptions made by an earlier version keep the amount
+  that version wrote into the month after: such a pair cannot be told from two amounts that were typed, and no
+  figure is wrong.
 
 ### F4. A loan that is paid off keeps taking payments
 
@@ -254,7 +255,6 @@ with the place it fails today.
 
 | Step | Rule | Scenarios |
 | --- | --- | --- |
-| 3. "This and following months" | A3 | `01-amounts-over-months.feature`: 1 |
 | 4. The currency model | X10 to X15 | `05-rates.feature`: 12 |
 | 5. The question before a change alters the past | T4 | `06-the-past.feature`: 7, `14-people-goals-data.feature`: 1 |
 | One main account (its own step) | B9 | `15-main-account.feature`: 2 |

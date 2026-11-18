@@ -56,11 +56,21 @@ describe('"Only this month" stays in its month', () => {
     expect(await values(store, rent.id)).toEqual([1200, 1200, 1200, 1200, 1200, 1200])
   })
 
-  it('a later change of the amount before it reaches the months after it', async () => {
+  it('an amount for this and following months, typed before it, replaces it and reaches past it', async () => {
     const { store, rent } = await fresh()
     await setCellValue(store, rent.id, '2026-03', 1500_00, 'this-month')
     await setCellValue(store, rent.id, '2026-02', 1250_00, 'from-now-on')
     // with the old amount written into April, April would have stayed at 1,200.00
+    expect(await storedOf(store, rent.id)).toEqual(['01 1200', '02 1250', '03 inherit'])
+    expect(await values(store, rent.id)).toEqual([1200, 1250, 1250, 1250, 1250, 1250])
+  })
+
+  it('once it is ticked as done it stays, and the months after it follow the new amount', async () => {
+    const { store, rent } = await fresh()
+    await setCellValue(store, rent.id, '2026-03', 1500_00, 'this-month')
+    await setCellDone(store, rent.id, '2026-03', true)
+    await setCellValue(store, rent.id, '2026-02', 1250_00, 'from-now-on')
+    expect(await storedOf(store, rent.id)).toEqual(['01 1200', '02 1250', '03 [1500]!'])
     expect(await values(store, rent.id)).toEqual([1200, 1250, 1500, 1250, 1250, 1250])
   })
 

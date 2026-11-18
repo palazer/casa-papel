@@ -166,7 +166,10 @@ export function RuleFields({ tables, household, target, facts, month, kind, onCl
         <div className="space-y-1.5">
           <TipLabel help="row.ruleFrom">Counts from</TipLabel>
           <MonthField label="Counts from" value={from} onChange={(m) => { if (m) setFrom(m) }} locale={locale} fromYear={startYear} className="max-w-xs" />
-          <p className="text-xs text-muted-foreground">Earlier months keep their amounts. What was typed for {name} from {monthName} on is replaced.</p>
+          <p className="text-xs text-muted-foreground">
+            Earlier months keep their amounts. What was typed for {name} from {monthName} on is replaced.
+            {kind === 'fixed' && ' A later month in which the amount is ticked as done keeps it.'}
+          </p>
         </div>
 
         {figures && (

@@ -35,6 +35,21 @@ Feature: Virtual accounts
     And "Savings" has 4,400.00 not set aside at the end of February 2026
     And the Statement of February 2026 shows "Leftover" at 1,700.00
 
+  # Where the months before a changed source come out of is written into those months. "This and following months"
+  # gives them the new amount and leaves the source where it is, so the past of the virtual account does not move.
+  @A3 @V2
+  Scenario: "This and following months" changes what earlier months cost, not where they come out of
+    Given a virtual account "Holidays" in "Savings" holding 2,000.00
+    And an expense "Trip" of 100.00 from January 2026
+    And "Trip" comes out of "Holidays" in every month
+    And "Trip" comes out of the month's income again from May 2026
+    When I type 150.00 for "Trip" in March 2026, this and following months
+    Then "Trip" is 100.00 in February 2026
+    And "Trip" is 150.00 in every month from March 2026 to December 2026
+    And the virtual account "Holidays" holds 1,800.00 at the end of February 2026
+    And the virtual account "Holidays" holds 1,500.00 at the end of April 2026
+    And the virtual account "Holidays" holds 1,500.00 at the end of December 2026
+
   # Every balance here is right, and the steps pass. What fails is the check "carried": the Statement's line for the
   # virtual account says it changed by -500.00, though it fell from 200.00 to nothing, and "Not set aside" is off by
   # the same 300.00 the other way.

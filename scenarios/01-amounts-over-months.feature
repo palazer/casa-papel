@@ -62,13 +62,14 @@ Feature: An amount over the months
     And "Rent" is 1,300.00 in every month from July 2026 to December 2026
 
   @A3
-  Scenario: An amount typed for an earlier month reaches up to the next typed amount
+  Scenario: An amount typed for an earlier month replaces a later amount too
     Given I type 1,300.00 for "Rent" in July 2026, every month
     When I type 1,250.00 for "Rent" in March 2026, every month
-    Then "Rent" is 1,250.00 in every month from March 2026 to June 2026
-    And "Rent" is 1,300.00 in every month from July 2026 to December 2026
+    Then "Rent" is 1,200.00 in February 2026
+    And "Rent" is 1,250.00 in every month from March 2026 to December 2026
+    And nothing has changed before March 2026
 
-  @A3 @planned
+  @A3
   Scenario: "This and following months" replaces what the following months had
     Given I type 1,300.00 for "Rent" in July 2026, every month
     And I type 1,400.00 for "Rent" in September 2026, only this month
@@ -81,6 +82,57 @@ Feature: An amount over the months
     Given I type 1,250.00 for "Rent" in March 2026, only this month
     When I type 1,300.00 for "Rent" in March 2026, this and following months
     Then "Rent" is 1,300.00 in every month from March 2026 to December 2026
+
+  @A3
+  Scenario: Replacing what the following months had can be taken back in one step
+    Given I type 1,300.00 for "Rent" in July 2026, every month
+    And I type 1,400.00 for "Rent" in September 2026, only this month
+    And I type 1,250.00 for "Rent" in March 2026, this and following months
+    When I undo
+    Then "Rent" is 1,200.00 in every month from January 2026 to June 2026
+    And "Rent" is 1,300.00 in every month from July 2026 to August 2026
+    And "Rent" is 1,400.00 in September 2026
+    And "Rent" is 1,300.00 in every month from October 2026 to December 2026
+
+  # Done is a record of what happened: a change for the following months goes around it.
+  @A3 @T3
+  Scenario: "This and following months" leaves a month that is ticked as done as it is
+    Given I type 1,300.00 for "Rent" in July 2026, every month
+    And I mark "Rent" as done in July 2026
+    When I type 1,250.00 for "Rent" in March 2026, this and following months
+    Then "Rent" is 1,250.00 in every month from March 2026 to June 2026
+    And "Rent" is 1,300.00 in July 2026
+    And "Rent" is 1,250.00 in every month from August 2026 to December 2026
+
+  @A3 @T3
+  Scenario: A ticked month that only carried its amount is kept too
+    Given I mark "Rent" as done in May 2026
+    When I type 1,250.00 for "Rent" in March 2026, this and following months
+    Then "Rent" is 1,250.00 in every month from March 2026 to April 2026
+    And "Rent" is 1,200.00 in May 2026
+    And "Rent" is 1,250.00 in every month from June 2026 to December 2026
+
+  # Only a new amount replaces. A month saved again with the amount it had (to tick it, to add a note) is not a change
+  # for the months after it.
+  @A3
+  Scenario: The same amount saved again replaces nothing
+    Given I type 1,300.00 for "Rent" in July 2026, every month
+    When I type 1,200.00 for "Rent" in January 2026, this and following months
+    Then "Rent" is 1,200.00 in every month from January 2026 to June 2026
+    And "Rent" is 1,300.00 in every month from July 2026 to December 2026
+
+  @A3
+  Scenario: An exception made into an amount for the following months replaces what they had
+    Given I type 1,300.00 for "Rent" in July 2026, every month
+    And I type 1,250.00 for "Rent" in March 2026, only this month
+    When I type 1,250.00 for "Rent" in March 2026, this and following months
+    Then "Rent" is 1,250.00 in every month from March 2026 to December 2026
+
+  @A3
+  Scenario: Zero typed for the following months replaces a later first amount
+    Given an expense "Gym" of 40.00 from April 2026
+    When I type 0.00 for "Gym" in February 2026, this and following months
+    Then "Gym" is 0.00 in every month from January 2026 to December 2026
 
   @A3
   Scenario: Zero is an amount: the row stops from that month on
@@ -109,13 +161,11 @@ Feature: An amount over the months
     Then "Rent" is 1,250.00 in March 2026
     And "Rent" is 1,200.00 in every month from April 2026 to December 2026
 
-  @A4
-  Scenario: An amount changed before an exception reaches the months after the exception
+  @A3 @A4
+  Scenario: An amount for the following months, typed before an exception, replaces the exception and reaches past it
     Given I type 1,250.00 for "Rent" in March 2026, only this month
     When I type 1,300.00 for "Rent" in February 2026, every month
-    Then "Rent" is 1,300.00 in February 2026
-    And "Rent" is 1,250.00 in March 2026
-    And "Rent" is 1,300.00 in every month from April 2026 to December 2026
+    Then "Rent" is 1,300.00 in every month from February 2026 to December 2026
 
   # The one case in which "Only this month" writes a later month: the month held an amount that ran on from it.
   # That amount has to begin somewhere, so it begins in the month after.

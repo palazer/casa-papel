@@ -7,9 +7,10 @@ import { Segmented } from '@/components/Segmented'
 import { AmountHint } from '@/components/AmountHint'
 import { amountToInput, formatAmount, formatMonth, parseAmount, unreadableAmount } from '@/app/format'
 import { useStore } from '@/app/store'
-import { cellKey, type EngineOutput } from '@/engine'
-import type { Category, Household, Money, MonthKey, Tables } from '@/model'
-import { estimateRowOf, setCategoryEstimate, type EditScope } from '@/store'
+import { cellKey, typedAmount, type EngineOutput } from '@/engine'
+import { followingText, onlyThisMonthText } from '@/features/grid/followingText'
+import { addMonths, type Category, type Household, type Money, type MonthKey, type Tables } from '@/model'
+import { estimateRowOf, planFollowing, setCategoryEstimate, type EditScope } from '@/store'
 
 interface Props {
   category: Category
@@ -40,6 +41,12 @@ export function EstimateDialog({ category, month, tables, engine, household, cur
   const [busy, setBusy] = useState(false)
   const typed = text.trim() === '' ? null : parseAmount(text, ccy, locale)
   const left = typed != null ? Math.max(0, typed - rows) : null
+  // what the choice does to the months after this one, said before saving: the function the save runs
+  const following = row && typed != null && typed >= 0 ? planFollowing(tables, engine, row.id, month, typed, 0) : { replaced: [], kept: [] }
+  const after = row ? engine.cells[cellKey(row.id, addMonths(month, 1))] : undefined
+  const then = after?.cell && after.cell.mode !== 'inherit' ? typedAmount(after) : (row ? engine.cells[cellKey(row.id, month)]?.handsOn : null) ?? null
+  // an estimate of nothing is no estimate
+  const goesOn = after?.source === 'archived' ? undefined : then || null
 
   async function save(amount: Money) {
     setBusy(true)
@@ -81,6 +88,9 @@ export function EstimateDialog({ category, month, tables, engine, household, cur
         <fieldset className="space-y-1.5">
           <legend className="text-sm font-medium">Applies to</legend>
           <Segmented value={scope} onChange={(v) => setScope(v as EditScope)} options={[{ value: 'from-now-on', label: 'This month and onwards' }, { value: 'this-month', label: 'Only this month' }]} />
+          <p className="text-xs text-muted-foreground" data-testid="scope-says">
+            {scope === 'from-now-on' ? followingText(month, following, locale, 'The estimate stays in every later month until you change it.') : onlyThisMonthText(month, goesOn, ccy, locale, 'has no estimate')}
+          </p>
         </fieldset>
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         <DialogFooter className="flex-row flex-wrap gap-2 sm:justify-between">

@@ -722,7 +722,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   amount in the household currency with an (i) (`row.categoryEstimate`), then two read-only lines that follow what
   is typed (`Rows this month`, `Not broken down yet`; a muted sentence when the rows already add up to more), then
   "Applies to" as a `Segmented` (`This month and onwards` / `Only this month`), which opens on `Only this month`
-  for an estimate that is that month's alone. Footer: a ghost `Remove estimate` when there is one, Cancel, Save.
+  for an estimate that is that month's alone, with the sentence that says what saving does to other months under
+  it (see the cell editor). Footer: a ghost `Remove estimate` when there is one, Cancel, Save.
 - **A dialog saves once.** Its buttons are disabled while a save runs, and the save itself refuses a second start
   (`useSave` in `src/features/grid/RowDialogs.tsx`, the cell editor's `run`), because Enter in a field is not a
   button: pressed twice, it must not add a top-up or a virtual account twice. A field that cannot be read says so
@@ -749,6 +750,17 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
     when a dialog merely opens. Saving a dialog without touching the choice therefore leaves the month what it
     was: ticking an exception as done does not turn it into an amount for every later month. "The total" of a
     list follows the same rule.
+  - *The sentence under the choice says what saving will do to other months* (`data-testid="scope-says"`, muted,
+    `text-xs`; `src/features/grid/followingText.ts`). It is worked out by the function the save runs
+    (`planFollowing` in `src/store/actions.ts`) from what is typed in the form, so it changes as the amount is
+    typed and cannot disagree with the save. Under `Every month`: `The amount stays in every later month until you
+    change it.` while no later month is touched; otherwise `Counts from March 2026 on. Replaces what you typed for
+    Jul 2026 and Sept 2026. Oct 2026 is ticked as done and keeps its amount.` (months by short name; beyond four,
+    `and 2 more months`). Under `Only this month`: `Only March 2026. April goes on with €1,200.00.`, or `April
+    stays empty.` on a row that had no amount. Under "The total" of a list the same effects follow the sentence
+    about the total. The estimate dialog has the same line under "Applies to" (`The estimate stays in every later
+    month until you change it.`, `April has no estimate.`). A change that reaches other months is always said in
+    words before it is saved, never only after.
   - *The `RepeatField`*: one line in `text-xs`: a muted word, a `NativeSelect` (`h-7`) named `Repeats, <what>`,
     then `in` or `from` and a month select where the rhythm needs a month, or twelve small `Check`s for chosen
     months (a group `Months, <what>`, 4 across, 6 from `sm`). Under it a muted sentence always says where it lands
@@ -790,8 +802,9 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
     amount, "Repeats", "How sure") and its footer (Clear, Cancel, Save).
   - A percentage or the rest, and any choice in a month the app works out: the rule's fields (`RuleFields`): that
     option's one field (`Amount per month in <CCY>` or the percentage), then "Counts from" as a `MonthField` with an
-    (i) and the sentence that earlier months keep their amounts (it starts on the month the dialog was opened from,
-    also when that month is over), then two read-only lines that follow what is typed: what the
+    (i) and the sentence that earlier months keep their amounts and what was typed from that month on is replaced
+    (for an amount per month it adds `A later month in which the amount is ticked as done keeps it.`; it starts on
+    the month the dialog was opened from, also when that month is over), then two read-only lines that follow what is typed: what the
     row gets in that month, with the sum the percentage is taken of (for pocket money naming whose income, `10% of
     €4,200.00, Sam's take-home income`), and what is then left for the rest (or as leftover). `A percentage of one
     income` adds "Which income" before the percentage: a `NativeSelect` of the live income lines (money taken from

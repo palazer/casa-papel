@@ -82,6 +82,105 @@ export function standingMoves(tables: Tables, engine: EngineOutput, rowId: strin
   }
 }
 
+/** What "This and following months" does to the months after the one it is said for. */
+export interface Following {
+  mutations: Mutation[]
+  /** Later months that had an amount of their own, which goes: from now on they follow the new amount. */
+  replaced: MonthKey[]
+  /** Later months in which something is ticked as done: they keep what they show. */
+  kept: MonthKey[]
+}
+
+/** Nothing to replace. A new object every time: callers add their own writes to the list they are handed. */
+const noFollowing = (): Following => ({ mutations: [], replaced: [], kept: [] })
+
+/** Whether something in a stored month of `row` is ticked as done: what happened is a record, and stays. */
+function tickedCell(row: Row, c: Cell): boolean {
+  if (c.mode === 'items' && c.items.some((i) => !i.skipped && i.status === 'done')) return true
+  // what is left of a category's estimate is worked out, and carries its tick beside it
+  return row.kind === 'category-estimate' && !!c.markedDone
+}
+
+/** The one source a stored month's amounts come out of, when that is another than the row's own; null otherwise. */
+function ownSource(row: Row, c: Cell): FundedBy | null {
+  if (row.section !== 'expense' || c.mode !== 'items') return null
+  const live = c.items.filter((i) => !i.skipped)
+  if (live.length === 0) return null
+  const source = live[0].fundedBy
+  return source !== row.defaultFundedBy && live.every((i) => i.fundedBy === source) ? source : null
+}
+
+/**
+ * Make every month after `month` follow `amount`, whatever it held: the months that have something of their own
+ * stored are emptied (they inherit again; the note stays). Two kinds of month are not emptied:
+ * - a month in which something is ticked as done keeps what it shows, as that month's alone (`once`), so the new
+ *   amount goes on after it;
+ * - a month whose amounts all come out of one source other than the row's own (the months before a source was
+ *   changed "from June on" are stored that way) gets the new amount and keeps that source: emptied, it would take
+ *   the row's source of today, and the past balance of the old account would move.
+ * `replaced` names the months that showed something else than they were handed; a month that only repeated the
+ * amount before it follows silently. `engine` is used when it reaches the last stored month, else one is worked out.
+ * No guard here: `planFollowing` decides whether there is anything to replace. Pure; `ts` stamps the writes.
+ */
+export function replaceFollowing(tables: Tables, rowId: string, month: MonthKey, amount: Money, ts: number, engine?: EngineOutput): Following {
+  const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
+  const household = tables.household.find((h) => !h.deletedAt)
+  if (!row || !household) return noFollowing()
+  const later = tables.cells
+    .filter((c) => c.rowId === rowId && compareMonths(c.month, month) > 0 && (c.mode !== 'inherit' || tickedCell(row, c)))
+    .sort((a, b) => compareMonths(a.month, b.month))
+  if (later.length === 0) return noFollowing()
+  const first = compareMonths(household.startMonth, month) < 0 ? household.startMonth : month
+  const last = later[later.length - 1].month
+  const shownBy = engine && engine.months.includes(first) && engine.months.includes(last) ? engine : computeEngine({ tables, months: monthRange(first, last) })
+  const out: Following = { mutations: [], replaced: [], kept: [] }
+  for (const c of later) {
+    const shown = shownBy.cells[cellKey(rowId, c.month)]
+    if (tickedCell(row, c)) {
+      out.kept.push(c.month)
+      if (c.mode === 'inherit') {
+        // an estimate ticked while it only carried: what it showed is written down
+        out.mutations.push(cellPut(c, { rowId, month: c.month, mode: 'value', value: shown ? typedAmount(shown) : 0, items: [], once: true }, ts))
+      } else if (!c.once || c.items.some((i) => i.kind === 'carry')) {
+        // a carried item reads what the month is given, which changes now: it gets the amount it carried
+        const items = c.items.map((i) => (i.kind === 'carry' ? { ...i, kind: 'normal' as const, amount: shown?.items.find((x) => x.id === i.id)?.effectiveAmount ?? 0 } : i))
+        out.mutations.push(cellPut(c, { rowId, month: c.month, items, once: true }, ts))
+      }
+      continue
+    }
+    if (!shown || shown.given == null || typedAmount(shown) !== shown.given) out.replaced.push(c.month)
+    const source = ownSource(row, c)
+    if (source) {
+      const live = c.items.filter((i) => !i.skipped)
+      const item: CellItem = live.length === 1 && live[0].kind === 'normal'
+        ? { ...live[0], amount }
+        : { id: newId(), label: '', amount, status: row.defaultStatus, fundedBy: source, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }
+      out.mutations.push(cellPut(c, { rowId, month: c.month, mode: 'items', value: null, items: [item], currencyOverride: null, once: false }, ts))
+    } else {
+      out.mutations.push(cellPut(c, { rowId, month: c.month, mode: 'inherit', value: null, items: [], currencyOverride: null, markedDone: false }, ts))
+    }
+  }
+  return out
+}
+
+/**
+ * What saving a month for "This and following months" does to the months after it, when the month then hands on
+ * `handsOn`. Only a new amount replaces: a month saved again with the amount it handed on already (to tick it, to
+ * change how sure it is, to add a note) leaves the later months alone. And only on a row whose months carry forward
+ * (`carriesForward`). The dialog's sentence and the save both come from here, so they cannot disagree. `engine` is
+ * the calculation before the change and has to reach `month`. Pure; `ts` stamps the writes.
+ */
+export function planFollowing(tables: Tables, engine: EngineOutput, rowId: string, month: MonthKey, handsOn: Money, ts: number): Following {
+  if (!carriesForward(tables, engine, rowId)) return noFollowing()
+  const current = engine.cells[cellKey(rowId, month)]
+  if (current && current.handsOn === handsOn) return noFollowing()
+  return replaceFollowing(tables, rowId, month, handsOn, ts, engine)
+}
+
+/** What a list of items comes to in a month that is given `given`: a carried item is worth that. */
+export const itemsAmount = (items: CellItem[], given: Money | null | undefined): Money =>
+  items.reduce((sum, i) => (i.skipped ? sum : sum + (i.kind === 'carry' ? given ?? 0 : i.amount)), 0)
+
 /** What the row's dialog can change on the row itself, in the same step as the month's amount. A field left out stays as it is. */
 export interface RowChange {
   /** The currency the row is typed in; null is the household's own. */
@@ -113,15 +212,16 @@ export function rowChangePut(tables: Tables, rowId: string, change: RowChange | 
 }
 
 /**
- * Set one amount for a month. `from-now-on` lets the months after it follow; `this-month` makes it that month's alone
- * (`Cell.once`), so the months after go on as they were. A row whose months do not carry forward (a schedule, a rule,
- * a follower) takes the amount for its month either way.
+ * Set one amount for a month. `from-now-on` is "This and following months": the months after it follow, and a new
+ * amount replaces what they held (`planFollowing`). `this-month` makes it that month's alone (`Cell.once`), so the
+ * months after go on as they were. A row whose months do not carry forward (a schedule, a rule, a follower) takes
+ * the amount for its month either way.
  */
 export async function setCellValue(store: Store, rowId: string, month: MonthKey, value: Money, scope: EditScope, rowChange?: RowChange): Promise<void> {
   const { tables, engine } = await engineUpTo(store, month)
   const ts = now()
   const once = scope === 'this-month' && carriesForward(tables, engine, rowId)
-  const mutations: Mutation[] = once ? standingMoves(tables, engine, rowId, month, ts) : []
+  const mutations: Mutation[] = once ? standingMoves(tables, engine, rowId, month, ts) : planFollowing(tables, engine, rowId, month, value, ts).mutations
   const existing = cellOf(tables, rowId, month)
   mutations.push(cellPut(existing, { rowId, month, mode: 'value', value, items: [], markedDone: false, once }, ts))
   mutations.push(...rowChangePut(tables, rowId, rowChange))
@@ -132,7 +232,8 @@ export async function setCellItems(store: Store, rowId: string, month: MonthKey,
   const { tables, engine } = await engineUpTo(store, month)
   const ts = now()
   const once = scope === 'this-month' && carriesForward(tables, engine, rowId)
-  const mutations: Mutation[] = once ? standingMoves(tables, engine, rowId, month, ts) : []
+  const total = itemsAmount(items, engine.cells[cellKey(rowId, month)]?.given)
+  const mutations: Mutation[] = once ? standingMoves(tables, engine, rowId, month, ts) : planFollowing(tables, engine, rowId, month, total, ts).mutations
   const existing = cellOf(tables, rowId, month)
   mutations.push(cellPut(existing, { rowId, month, mode: 'items', value: null, items, markedDone: false, once }, ts))
   mutations.push(...rowChangePut(tables, rowId, rowChange))
@@ -355,7 +456,8 @@ export const estimateRowOf = (tables: Tables, categoryId: string): Row | undefin
 /**
  * The puts that give an expense category its estimate from `month`: the estimate row on first use (at the end of the
  * category, back from the archive if it was there) and its amount for the month. `this-month` makes the amount that
- * month's alone: the months after go on with the estimate they had, none for a category that had none. `engine` is
+ * month's alone: the months after go on with the estimate they had, none for a category that had none. Otherwise a
+ * new amount replaces what later months held, except where the estimate is ticked as done. `engine` is
  * the calculation before the change, for a category that has an estimate row already; a new one needs none.
  * Pure; the caller commits, so a new category and its estimate can be one step.
  */
@@ -375,7 +477,7 @@ export function categoryEstimateMutations(tables: Tables, category: Category, mo
   }
   const ts = now()
   const once = scope === 'this-month'
-  if (once && engine) mutations.push(...standingMoves(tables, engine, row.id, month, ts))
+  if (engine) mutations.push(...(once ? standingMoves(tables, engine, row.id, month, ts) : planFollowing(tables, engine, row.id, month, amount, ts).mutations))
   const existing = cellOf(tables, row.id, month)
   mutations.push(cellPut(existing, { rowId: row.id, month, mode: 'value', value: amount, items: [], currencyOverride: null, once }, ts))
   return { row, mutations }

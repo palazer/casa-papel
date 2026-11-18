@@ -50,6 +50,8 @@ test.describe('grid', () => {
     await page.getByRole('button', { name: /^The flat – Utilities Dec 2026/ }).click()
     await page.getByLabel('Amount in EUR').fill('300')
     await page.getByRole('radio', { name: 'Only this month' }).click()
+    // the sentence under the choice says what the month after goes on with
+    await expect(page.getByTestId('scope-says')).toHaveText('Only December 2026. January 2027 goes on with €250.00.')
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByRole('dialog')).toBeHidden()
     await expect(page.getByRole('button', { name: /^The flat – Utilities Dec 2026/ })).toContainText('300')
@@ -62,6 +64,10 @@ test.describe('grid', () => {
     await expect(page.getByRole('dialog')).toBeHidden()
     await page.getByRole('button', { name: /^The flat – Utilities Nov 2026/ }).click()
     await expect(page.getByRole('radio', { name: 'Every month' })).toBeChecked()
+    // saved as it is, November changes nothing after it; a new amount would replace December's, and the dialog says so first
+    await expect(page.getByTestId('scope-says')).toHaveText('The amount stays in every later month until you change it.')
+    await page.getByLabel('Amount in EUR').fill('260')
+    await expect(page.getByTestId('scope-says')).toHaveText('Counts from November 2026 on. Replaces what you typed for Dec 2026.')
     await page.keyboard.press('Escape')
     await expect(page.getByRole('dialog')).toBeHidden()
 

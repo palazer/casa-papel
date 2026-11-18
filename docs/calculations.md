@@ -30,23 +30,42 @@ nothing.
 > "Rent" 1,200.00 typed in January: every month from January on shows 1,200.00.
 > "Gym" 40.00 typed in April: January to March show nothing, April on shows 40.00.
 
-**A3. "Every month": the amount counts for this month and the months after it.** The amount is saved in the month it
-is typed in. The months after it follow by A2, up to the next month that has an amount of its own. Zero is an amount
-too: typed for every month, the row stops there.
+**A3. "Every month": the amount counts for this month and the months after it, whatever they held.** The amount is
+saved in the month it is typed in, and the months after it follow by A2. A later month that had an amount of its own
+(an amount typed there earlier, an exception, a list) loses it and follows too. Zero is an amount: typed for every
+month, the row stops there, also on a row that had no amount yet. Before saving, the dialog names the months whose
+own amount goes.
 
-> "Rent" is 1,200.00. Typed 1,250.00 in March, every month: January and February stay 1,200.00, March on is 1,250.00.
+> "Rent" is 1,200.00, and 1,300.00 from July on. Typed 1,250.00 in March, every month: January and February stay
+> 1,200.00, March to December are 1,250.00.
 
-What the app does today: a later month that has its own amount keeps it, and so do the months after that one.
+Three things limit it:
 
-> **Decided, not built (step 3).** The choice is called "This and following months", and it replaces whatever the
-> following months had: an amount typed there earlier, and an exception.
+- *Only a new amount replaces.* A month saved again with the amount it already handed on (to tick it, to change how
+  sure it is, to add a note) leaves the months after it alone.
+- *What is ticked as done stays.* A later month in which something is ticked as done keeps what it shows, as that
+  month's alone (A4); the new amount goes on after it. The dialog names such a month too. Done is a record of what
+  happened, and the plan is rewritten around it.
+- *Where a month comes out of stays.* A later month whose amounts all come out of one source other than the row's
+  own gets the new amount and keeps that source (the months before a source was changed "from June on" are stored
+  this way): emptied, it would take the row's source of today, and the past balance of the old account would move.
+
+> "Rent" is 1,200.00; July is 1,300.00 and ticked as done. Typed 1,250.00 in March, every month: March to June are
+> 1,250.00, July stays 1,300.00, August on is 1,250.00.
+
+A category's estimate follows the same rule, and so does a fixed amount set "from a month on" in the rule dialog
+(R1). The change reaches the months this device holds: an amount typed on another device that had not synced yet
+comes back with the next sync.
 
 **A4. "Only this month": an exception of one month.** The month gets the amount, as that month's alone. The months
-after it go on with the amount from before the exception, and nothing is written into them: when that amount is
-changed later, they follow it. An exception in a row's first month leaves the months after it empty.
+after it go on with the amount from before the exception, and nothing is written into them: they read that amount
+where it was typed. An exception in a row's first month leaves the months after it empty.
 
 > "Rent" is 1,200.00. Typed 1,250.00 in March, only this month: March is 1,250.00, April on is 1,200.00.
-> Typed 1,300.00 in February afterwards, every month: February is 1,300.00, March stays 1,250.00, April on is 1,300.00.
+> "Clear" on April afterwards changes nothing: April holds nothing of its own.
+
+An exception is an amount of its month like any other for A3: "every month" typed for an earlier month replaces it,
+unless it is ticked as done.
 
 The same holds for whatever the app writes for one month: an item added for one month (A6), a top-up of a virtual
 account, a category's estimate for one month, a card's difference booked as spending, and the tick on a month that
@@ -310,7 +329,9 @@ deductions: that is what a percentage of the income and each person's income cou
 The transfer to a savings account, an investment account or a virtual account, and an adult's pocket money, each
 follow one rule.
 
-**R1. A typed amount.** It carries from month to month like any amount (A2).
+**R1. A typed amount.** It carries from month to month like any amount (A2). Set "from a month on" in the rule
+dialog, it replaces what was typed for the months after it, and a later month that is ticked as done keeps its
+amount (A3).
 
 **R2. A percentage of the income.** Of what the month's income brings home (M3), rounded to the cent.
 

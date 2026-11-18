@@ -1,22 +1,30 @@
 import { cellKey } from '@/engine'
 import { newId, resolveRules, type CellItem, type MonthKey } from '@/model'
-import { clearCell, itemsFromCurrent, saveRowMonth, setCellValue, type EditScope } from '@/store'
+import { clearCell, itemsFromCurrent, saveRowMonth, setCellItems, setCellValue, type EditScope } from '@/store'
 import { monthName, step } from '../registry'
 import { ScenarioError, type World } from '../world'
 
 /**
  * One amount typed into a row's dialog and saved, as `CellEditor.saveValue` does it: a plain amount with the row's
- * own certainty and source. "Repeats" is "Every month" or "Only this month"; a row a rule works out has no such
- * choice and always saves for every month.
+ * own certainty and source. A month that holds one unnamed item (a single amount with its own certainty or source)
+ * shows as a single amount there, and is saved as one item that keeps both. "Repeats" is "This and following months"
+ * or "Only this month"; a row a rule works out has no such choice and always saves for every month.
  */
 async function typeAmount(world: World, amount: number, rowName: string, month: MonthKey, scope: EditScope): Promise<void> {
   const row = await world.row(rowName)
   const { engine, household } = await world.view()
   const cell = engine.cells[cellKey(row.id, month)]
-  if (engine.recurringRowIds.includes(row.id) || cell?.source === 'items') {
+  const only = cell?.source === 'items' && cell.items.length === 1 ? cell.items[0] : null
+  const solo = only && only.kind === 'normal' && !only.label && !only.recurringItemId && !only.skipped ? only : null
+  if (engine.recurringRowIds.includes(row.id) || (cell?.source === 'items' && !solo)) {
     throw new ScenarioError(`"${rowName}" shows a list of items in ${monthName(month)}, not one amount: use the steps that add or change an item.`)
   }
   const ruled = resolveRules(engine.rows, household.closingRule).byRow.has(row.id)
+  if (solo) {
+    const single: CellItem = { id: newId(), label: '', amount, status: solo.status, fundedBy: solo.fundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }
+    await setCellItems(world.store, row.id, month, [single], ruled ? 'from-now-on' : scope)
+    return
+  }
   await setCellValue(world.store, row.id, month, amount, ruled ? 'from-now-on' : scope)
 }
 

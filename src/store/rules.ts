@@ -5,7 +5,7 @@ import {
   type Cell, type CellItem, type Money, type MonthKey, type Pool, type Row, type RuleState, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
-import { loadTables, newRowMutation } from './actions'
+import { loadTables, newRowMutation, replaceFollowing } from './actions'
 import { cellPut, type CellPatch } from './cells'
 import { applyMutations } from './impact'
 
@@ -146,15 +146,18 @@ export function ruleMutations(tables: Tables, target: RuleTarget, choice: RuleCh
         put(cur, { rowId: r.id, month: m, mode: moved ? 'items' : 'value', value: moved ? null : c.value, items, currencyOverride, once: false })
       }
     }
-    for (const cur of stored.values()) {
-      if (compareMonths(cur.month, from) < 0 || cur.mode === 'inherit') continue
-      if (then !== 'rule' && cur.month === from) continue
-      // a month whose typed amount was ticked as done stays ticked when the rule fills it
-      const live = cur.items.filter((i) => !i.skipped)
-      const ticked = then === 'rule' && cur.mode === 'items' && live.length > 0 && live.every((i) => i.status === 'done')
-      put(cur, { rowId: r.id, month: cur.month, mode: 'inherit', value: null, items: [], markedDone: ticked || (cur.markedDone ?? false) })
-    }
-    if (then !== 'rule') {
+    if (then === 'rule') {
+      for (const cur of stored.values()) {
+        if (compareMonths(cur.month, from) < 0 || cur.mode === 'inherit') continue
+        // a month whose typed amount was ticked as done stays ticked when the rule fills it
+        const live = cur.items.filter((i) => !i.skipped)
+        const ticked = cur.mode === 'items' && live.length > 0 && live.every((i) => i.status === 'done')
+        put(cur, { rowId: r.id, month: cur.month, mode: 'inherit', value: null, items: [], markedDone: ticked || (cur.markedDone ?? false) })
+      }
+    } else {
+      // a typed amount from `from` on is "this and following months": what the later months held goes, and a month
+      // in which something is ticked as done keeps what it shows
+      mutations.push(...replaceFollowing(working, r.id, from, then.amount, ts).mutations)
       const cur = stored.get(from)
       put(cur, { rowId: r.id, month: from, mode: 'value', value: then.amount, items: [], currencyOverride: null, markedDone: false, once: false })
     }
