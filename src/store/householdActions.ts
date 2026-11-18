@@ -6,6 +6,7 @@ import {
   type Account, type Entity, type EntityKind, type Household, type MonthKey, type Pool, type Row, type RowTemplate, type Tables,
 } from '@/model'
 import type { Mutation, Store } from './store'
+import { refuseThirdCurrency } from './currencies'
 import { loadTables, payOffKind, rowOfKindMutations } from './actions'
 
 const now = () => Date.now()
@@ -136,7 +137,9 @@ export async function updateAccount(store: Store, id: string, patch: Partial<Omi
       throw new Error(`${landing.map((r) => `"${r.name}"`).join(', ')} ${landing.length === 1 ? 'lands' : 'land'} in "${a.name}", and pocket money can only land in an account that is left out of net worth. Change "Lands in…" in the row's menu first.`)
     }
   }
-  await store.commit([{ op: 'put', table: 'accounts', record: next }])
+  const mutations: Mutation[] = [{ op: 'put', table: 'accounts', record: next }]
+  refuseThirdCurrency(tables, mutations)
+  await store.commit(mutations)
 }
 
 /** Record (or clear with null) the real balance of an account at the end of a month. */
@@ -385,5 +388,7 @@ export async function updatePool(store: Store, id: string, patch: Partial<Pick<P
   const tables = await loadTables(store)
   const p = tables.pools.find((x) => x.id === id)
   if (!p) throw new Error('Virtual account not found')
-  await store.commit([{ op: 'put', table: 'pools', record: PoolSchema.parse({ ...p, ...patch, updatedAt: now() }) }])
+  const mutations: Mutation[] = [{ op: 'put', table: 'pools', record: PoolSchema.parse({ ...p, ...patch, updatedAt: now() }) }]
+  refuseThirdCurrency(tables, mutations)
+  await store.commit(mutations)
 }

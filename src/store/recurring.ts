@@ -6,6 +6,7 @@ import {
 import type { Mutation, Store } from './store'
 import { loadTables, newRowMutation } from './actions'
 import { cellPut } from './cells'
+import { refuseThirdCurrency } from './currencies'
 import { applyMutations, monthSpan } from './impact'
 import { defaultMonths } from './months'
 
@@ -164,7 +165,9 @@ export async function addRecurringItem(
   // a row that is made here has carried nothing yet, so there is nothing of it to write down
   if (!newRow) mutations.push(...pinCarriedMonths(tables, item.rowId, item.startMonth, ts))
   mutations.push({ op: 'put', table: 'recurringItems', record: item })
-  await store.commit(withPosts(tables, mutations, [item.rowId], (m) => compareMonths(m, item.startMonth) >= 0))
+  const all = withPosts(tables, mutations, [item.rowId], (m) => compareMonths(m, item.startMonth) >= 0)
+  refuseThirdCurrency(tables, all)
+  await store.commit(all)
   return item
 }
 
@@ -222,6 +225,10 @@ export async function updateRecurringItem(store: Store, id: string, patch: Parti
   const ts = now()
   const today = monthOfDate()
   const mutations: Mutation[] = []
+  const commit = (all: Mutation[]) => {
+    refuseThirdCurrency(tables, all)
+    return store.commit(all)
+  }
   let work = tables
   const push = (ms: Mutation[]) => {
     mutations.push(...ms)
@@ -247,13 +254,13 @@ export async function updateRecurringItem(store: Store, id: string, patch: Parti
   if (ended && runsOn) {
     // it ended in a month that is over and is given a later end, or none: it runs again from the current month
     push(planReactivate(work, { ...next, endMonth: item.endMonth }, today, end, ts))
-    await store.commit(withPosts(tables, mutations, rows, startMoved))
+    await commit(withPosts(tables, mutations, rows, startMoved))
     return
   }
   if (sameValues(item, next) || !isBefore(start, today)) {
     // nothing it posts changes, or all of it lies in the current month and later: the schedule as the form has it
     putItem(next)
-    await store.commit(withPosts(tables, mutations, rows, (m) => startMoved(m) || afterMovedEnd(item.endMonth ?? null, end)(m)))
+    await commit(withPosts(tables, mutations, rows, (m) => startMoved(m) || afterMovedEnd(item.endMonth ?? null, end)(m)))
     return
   }
   if (!runsOn) {
@@ -269,7 +276,7 @@ export async function updateRecurringItem(store: Store, id: string, patch: Parti
     const copy = work.recurringItems.find((r) => r.id === split.targetId)!
     putItem({ ...copy, rowId: next.rowId, currency: next.currency })
   }
-  await store.commit(withPosts(tables, mutations, rows, startMoved))
+  await commit(withPosts(tables, mutations, rows, startMoved))
 }
 
 /**
@@ -437,6 +444,7 @@ export function oneMonthValuesReplaced(tables: Tables, item: RecurringItem, mont
 export async function changeRecurringFrom(store: Store, id: string, month: MonthKey, patch: SchedulePatch): Promise<string> {
   const { tables, item } = await findLive(store, id)
   const { mutations, targetId } = planChangeRecurringFrom(tables, item, month, patch, now())
+  refuseThirdCurrency(tables, mutations)
   await store.commit(mutations)
   return targetId
 }

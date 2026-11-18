@@ -1,5 +1,6 @@
 export * from './types'
 export * from './fx'
+export * from './currencies'
 export * from './compute'
 export * from './shares'
 export * from './goals'

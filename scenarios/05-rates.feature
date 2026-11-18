@@ -320,13 +320,42 @@ Feature: Amounts and accounts in another currency
     When I move the virtual account "Holidays" to "Dollar savings"
     Then it is refused with "Dollar savings"
 
-  @X15 @planned
+  @X15
   Scenario: An expense in one currency cannot come out of an account in a third one
     Given the ECB rate for EUR/GBP in January 2026 is 0.8000
     And a savings account "Dollar savings" in USD holding 1,100.00
     And an expense "London hotel" in GBP of 80.00 from January 2026
     When "London hotel" comes out of "Dollar savings" in every month
-    Then it is refused with "Dollar savings"
+    Then it is refused with '"London hotel" is in GBP, so it can come out of an account in GBP or in EUR. "Dollar savings" is in USD.'
+    And "Dollar savings" ends January 2026 with 1,100.00
+
+  # Two currencies are allowed: the expense's own and the account's, when one of them is the household's.
+  @X15
+  Scenario: An expense in the household's currency can come out of an account in another one
+    Given the ECB rate for EUR/USD in January 2026 is 1.1000
+    And a savings account "Dollar savings" in USD holding 1,100.00
+    And an expense "Hosting" of 100.00 from January 2026
+    When "Hosting" comes out of "Dollar savings" in every month
+    Then "Dollar savings" ends January 2026 with 990.00
+
+  @X15
+  Scenario: A row that comes out of an account in another currency can be in that one or in the household's
+    Given the ECB rate for EUR/USD in January 2026 is 1.1000
+    And a savings account "Dollar savings" in USD holding 1,100.00
+    And an expense "Hosting" in USD of 110.00 from January 2026
+    And "Hosting" comes out of "Dollar savings" in every month
+    When I change the currency of "Hosting" to GBP
+    Then it is refused with '"Hosting" comes out of "Dollar savings", in USD, so it can be in USD or in EUR.'
+    And "Hosting" reads "US$110.00" in January 2026
+
+  @X15
+  Scenario: Money moved into an account in another currency is in that one or in the household's
+    Given the ECB rate for EUR/USD in January 2026 is 1.1000
+    And a savings account "Dollar savings" in USD holding 0.00
+    And a row "To dollars" that moves 100.00 to "Dollar savings" from January 2026
+    When I change the currency of "To dollars" to GBP
+    Then it is refused with '"To dollars" goes into "Dollar savings", in USD, so it can be in USD or in EUR.'
+    And "Dollar savings" ends January 2026 with 110.00
 
   @X13
   Scenario: Fifteen currencies are offered

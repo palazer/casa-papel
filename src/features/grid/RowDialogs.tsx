@@ -8,7 +8,7 @@ import { formatMonth } from '@/app/format'
 import { useStore } from '@/app/store'
 import { sortRows } from '@/engine'
 import { ENTITY_KIND_LABEL, holdsBalance, monthOfDate, type Account, type FundedBy, type Household, type Row, type Section, type Tables } from '@/model'
-import { accountTypeForRow, derivedRowReason, followRow, setRowAccount, setRowDeductedFrom, setRowFundedBy, setRowScope, updateRow } from '@/store'
+import { accountTypeForRow, derivedRowReason, followRow, setRowAccount, setRowDeductedFrom, setRowFundedBy, setRowScope, thirdCurrencyReason, updateRow } from '@/store'
 import { NativeSelect } from '@/components/NativeSelect'
 import { fundingOptions } from './funding'
 import { currencyChoices, currencyLabel } from '@/app/currencies'
@@ -54,6 +54,15 @@ export function useSave(onClose: () => void) {
   return { error, busy, save }
 }
 
+/**
+ * Rule X15 on the spot: why the row with `patch` would make an amount count across three currencies, or null. The
+ * dialog shows it under its field as soon as the choice is made and holds Save back; the store refuses the same.
+ */
+function thirdCurrencyOf(tables: Tables, row: Row, patch: Partial<Row>): string | null {
+  return thirdCurrencyReason(tables, [{ op: 'put', table: 'rows', record: { ...row, ...patch } }])
+}
+const Refusal = ({ text }: { text: string | null }) => (text ? <p className="text-sm text-destructive" role="alert" data-testid="third-currency">{text}</p> : null)
+
 /** Where a spending row's single amounts come out of, from a month on or for all months. */
 export function RowSourceDialog({ row, tables, household, onClose }: Base) {
   const store = useStore()
@@ -63,6 +72,7 @@ export function RowSourceDialog({ row, tables, household, onClose }: Base) {
   const { error, busy, save } = useSave(onClose)
   const month = monthOfDate()
   const oldLabel = options.find((o) => o.value === row.defaultFundedBy)?.label ?? 'the old source'
+  const third = thirdCurrencyOf(tables, row, { defaultFundedBy: fundedBy })
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
@@ -78,6 +88,7 @@ export function RowSourceDialog({ row, tables, household, onClose }: Base) {
               {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </NativeSelect>
             <p className="text-xs text-muted-foreground">{HELP['cell.comesOutOf'].text} Items that have their own choice keep it.</p>
+            <Refusal text={third} />
           </div>
           <fieldset className="space-y-1.5">
             <legend className="text-sm font-medium">Applies to</legend>
@@ -96,7 +107,7 @@ export function RowSourceDialog({ row, tables, household, onClose }: Base) {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button onClick={() => void save(() => setRowFundedBy(store, row.id, fundedBy, scope === 'all-months' ? 'all-months' : { from: month }))} disabled={busy}>Save</Button>
+          <Button onClick={() => void save(() => setRowFundedBy(store, row.id, fundedBy, scope === 'all-months' ? 'all-months' : { from: month }))} disabled={busy || third != null}>Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -119,6 +130,7 @@ export function RowAccountDialog({ row, tables, onClose }: Base) {
   const [accountId, setAccountId] = useState(() => (pocket && !accounts.some((a) => a.id === row.accountId) ? '' : row.accountId ?? ''))
   const { error, busy, save } = useSave(onClose)
   const verb = accountVerb(row)
+  const third = thirdCurrencyOf(tables, row, { accountId: accountId || null })
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
@@ -139,13 +151,14 @@ export function RowAccountDialog({ row, tables, onClose }: Base) {
             {byCard && !accounts.some((a) => a.type === 'credit-card') && <p className="text-xs text-muted-foreground">No credit card yet: add one on the Statement under "Debts and net worth".</p>}
             {need && accounts.length === 0 && <p className="text-xs text-muted-foreground">No account of the right kind yet. Add one under Household first.</p>}
             {pocket && accounts.length === 0 && <p className="text-xs text-muted-foreground" data-testid="no-landing">No account is left out of net worth yet. Open an account, or add one, and tick "Leave out of net worth" under "More options".</p>}
+            <Refusal text={third} />
           </div>
           <p className="text-xs text-muted-foreground">Applies to every month, past ones included. To switch from a month on, archive this row and add a new one.</p>
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button onClick={() => void save(() => setRowAccount(store, row.id, accountId || null))} disabled={busy}>Save</Button>
+          <Button onClick={() => void save(() => setRowAccount(store, row.id, accountId || null))} disabled={busy || third != null}>Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -162,6 +175,7 @@ export function RowFollowDialog({ row, tables, household, onClose }: Base) {
   const seeded = String(Math.round((row.followShare ?? 1) * 1000) / 10)
   const [share, setShare] = useState(seeded)
   const { error, busy, save } = useSave(onClose)
+  const third = thirdCurrencyOf(tables, row, { followsRowId: targetId || null })
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
@@ -189,6 +203,7 @@ export function RowFollowDialog({ row, tables, household, onClose }: Base) {
               Handy for a transfer that moves exactly what came in, like a child's long-term savings following the child benefit, or a tax that takes a quarter of a salary.
               Choose "Nothing" to go back to its own amounts; they were kept.
             </p>
+            <Refusal text={third} />
           </div>
           {targetId && (
             <div className="space-y-1.5">
@@ -208,7 +223,7 @@ export function RowFollowDialog({ row, tables, household, onClose }: Base) {
               const fraction = share === seeded ? row.followShare : pct / 100
               await followRow(store, row.id, targetId || null, targetId ? fraction : null)
             })}
-            disabled={busy}
+            disabled={busy || third != null}
           >Save</Button>
         </DialogFooter>
       </DialogContent>
@@ -217,12 +232,13 @@ export function RowFollowDialog({ row, tables, household, onClose }: Base) {
 }
 
 /** The currency this row's amounts are typed in; the grid shows the household-currency value beneath each one. */
-export function RowCurrencyDialog({ row, household, onClose }: Base) {
+export function RowCurrencyDialog({ row, tables, household, onClose }: Base) {
   const store = useStore()
   const base = household.baseCurrency
   const codes = currencyChoices(base, row.currency)
   const [ccy, setCcy] = useState(row.currency ?? base)
   const { error, busy, save } = useSave(onClose)
+  const third = thirdCurrencyOf(tables, row, { currency: ccy === base ? null : ccy })
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
@@ -238,12 +254,13 @@ export function RowCurrencyDialog({ row, household, onClose }: Base) {
               {codes.map((c) => <option key={c} value={c}>{currencyLabel(c, base)}</option>)}
             </NativeSelect>
             <p className="text-xs text-muted-foreground">{HELP['row.currency'].text}</p>
+            <Refusal text={third} />
           </div>
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button onClick={() => void save(() => updateRow(store, row.id, { currency: ccy === base ? null : ccy }))} disabled={busy}>Save</Button>
+          <Button onClick={() => void save(() => updateRow(store, row.id, { currency: ccy === base ? null : ccy }))} disabled={busy || third != null}>Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

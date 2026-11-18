@@ -5,6 +5,7 @@ import {
 } from '@/model'
 import { carriesForward, engineUpTo, itemsAmount, planFollowing, rowChangePut, rowInNewCurrency, standingMoves, withoutRewritten, type EditScope, type RowChange } from './actions'
 import { cellPut } from './cells'
+import { refuseThirdCurrency } from './currencies'
 import { applyMutations } from './impact'
 import { defaultMonths } from './months'
 import { managedItem, pinCarriedMonths, planChangeRecurringFrom, planRecurringPosts, planRename } from './recurring'
@@ -160,6 +161,7 @@ export async function saveRowMonth(store: Store, rowId: string, month: MonthKey,
   const today = monthOfDate()
   const from = compareMonths(month, today) < 0 ? month : today
   muts.push(...planRecurringPosts(after, defaultMonths(household, after).filter((m) => compareMonths(m, from) >= 0), [rowId]))
+  refuseThirdCurrency(tables, muts)
   // a save that changes nothing leaves no step to undo
   if (muts.length) await store.commit(muts)
 }

@@ -745,6 +745,13 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   (`useSave` in `src/features/grid/RowDialogs.tsx`, the cell editor's `run`), because Enter in a field is not a
   button: pressed twice, it must not add a top-up or a virtual account twice. A field that cannot be read says so
   when Save is pressed and nothing is stored: never a silent zero (an item's amount in the cell editor included).
+- **A third currency is refused where it is picked** (rule X15). In the row's dialog and in the row menu's `Comes out
+  of`, `Goes into`, `Follow another row` and `Currency`, a choice that would make one amount count across three
+  currencies shows the store's own sentence at once, in a `role="alert"` line (`third-currency`) under the field (in
+  the row's dialog above its footer), and Save waits until the choice is changed. The sentence names the two
+  currencies the amount accepts and the account or currency that would be the third: `"London hotel" is in GBP, so
+  it can come out of an account in GBP or in EUR. "Dollar savings" is in USD.` The account form, the schedule form
+  and the virtual account form get the same sentence from the store when Save is pressed, in their alert line.
 - **"Repeats": how an amount repeats is set where it is typed.** The cell editor asks it under the amount and under
   every item; there is no second form on the way (the long schedule form stays under Household → Schedules for the
   rest: the account, whose it is, an end month, notes). That form names no month, and its description says what

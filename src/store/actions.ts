@@ -6,6 +6,7 @@ import {
 } from '@/model'
 import type { Mutation, Store } from './store'
 import { cellPut, cellRecord } from './cells'
+import { refuseThirdCurrency } from './currencies'
 import { primaryKeyOf } from './keys'
 import { planEnd } from './months'
 
@@ -288,7 +289,9 @@ export async function setCellValue(store: Store, rowId: string, month: MonthKey,
   const existing = cellOf(tables, rowId, month)
   mutations.push(cellPut(existing, { rowId, month, mode: 'value', value, items: [], markedDone: false, once }, ts))
   mutations.push(...rowChangePut(loaded.tables, rowId, rowChange))
-  await store.commit([...withoutRewritten(pre, mutations), ...mutations])
+  const all = [...withoutRewritten(pre, mutations), ...mutations]
+  refuseThirdCurrency(loaded.tables, all)
+  await store.commit(all)
 }
 
 export async function setCellItems(store: Store, rowId: string, month: MonthKey, items: CellItem[], scope: EditScope = 'from-now-on', rowChange?: RowChange): Promise<void> {
@@ -301,7 +304,9 @@ export async function setCellItems(store: Store, rowId: string, month: MonthKey,
   const existing = cellOf(tables, rowId, month)
   mutations.push(cellPut(existing, { rowId, month, mode: 'items', value: null, items, markedDone: false, once }, ts))
   mutations.push(...rowChangePut(loaded.tables, rowId, rowChange))
-  await store.commit([...withoutRewritten(pre, mutations), ...mutations])
+  const all = [...withoutRewritten(pre, mutations), ...mutations]
+  refuseThirdCurrency(loaded.tables, all)
+  await store.commit(all)
 }
 
 /** Back to inheriting from the previous month. Stored as an inherit record (not a delete) so the change travels between devices. */
@@ -368,7 +373,9 @@ export function newRowMutation(tables: Tables, input: Partial<Row> & { name: str
 
 /** Add a row at the end of its category group, or right after `afterRowId`, whose category it inherits unless given one. */
 export async function addRow(store: Store, input: Partial<Row> & { name: string; section: Row['section'] }, afterRowId?: string): Promise<Row> {
-  const { row, mutation } = newRowMutation(await loadTables(store), input, afterRowId)
+  const tables = await loadTables(store)
+  const { row, mutation } = newRowMutation(tables, input, afterRowId)
+  refuseThirdCurrency(tables, [mutation])
   await store.commit([mutation])
   return row
 }
@@ -503,7 +510,9 @@ export function rowOfKindMutations(tables: Tables, input: RowOfKindInput): { row
 
 /** "Add row" under Transfers and Expenses: `rowOfKindMutations`, committed. */
 export async function addRowOfKind(store: Store, input: RowOfKindInput): Promise<Row> {
-  const { row, mutations } = rowOfKindMutations(await loadTables(store), input)
+  const tables = await loadTables(store)
+  const { row, mutations } = rowOfKindMutations(tables, input)
+  refuseThirdCurrency(tables, mutations)
   await store.commit(mutations)
   return row
 }
@@ -617,7 +626,9 @@ export async function updateRow(store: Store, rowId: string, patch: Partial<Omit
   const ts = now()
   // another currency: the amounts the row holds keep their digits (`keepDigits`), in the same step
   const moved = patch.currency !== undefined && (patch.currency ?? null) !== (row.currency ?? null) ? keepDigits(tables, rowId, patch.currency, ts).mutations : []
-  await store.commit([{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, ...patch, updatedAt: ts }) }, ...moved])
+  const mutations: Mutation[] = [{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, ...patch, updatedAt: ts }) }, ...moved]
+  refuseThirdCurrency(tables, mutations)
+  await store.commit(mutations)
 }
 
 export const renameRow = (store: Store, rowId: string, name: string) => updateRow(store, rowId, { name })
@@ -803,7 +814,9 @@ export async function setRowFundedBy(store: Store, rowId: string, fundedBy: Fund
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
   if (!row) throw new Error('Row not found')
   if (row.section !== 'expense') throw new Error('Only spending rows have a source.')
-  await store.commit(planRowFundedBy(tables, row, fundedBy, scope, now()))
+  const mutations = planRowFundedBy(tables, row, fundedBy, scope, now())
+  refuseThirdCurrency(tables, mutations)
+  await store.commit(mutations)
 }
 
 /** The mutations behind `setRowFundedBy`; archiving an account or a virtual account uses them too. */
@@ -877,7 +890,9 @@ export async function followRow(store: Store, rowId: string, targetId: string | 
   }
   // the whole amount is stored as null, so "= Salary" and "= 100% of Salary" are one state
   const followShare = targetId && share != null && share !== 1 ? share : null
-  await store.commit([{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, followsRowId: targetId, followShare, updatedAt: now() }) }])
+  const mutations: Mutation[] = [{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, followsRowId: targetId, followShare, updatedAt: now() }) }]
+  refuseThirdCurrency(tables, mutations)
+  await store.commit(mutations)
 }
 
 /** The scope and tags a row gets when it belongs to `scope`: the person or thing it is scoped to is also among its tags, as templates do it. */

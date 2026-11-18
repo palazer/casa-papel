@@ -399,6 +399,57 @@ test('a currency that comes into use gets its rates by itself', async ({ page })
   expect(asked).toHaveLength(2)
 })
 
+test('a third currency is refused where it is picked: the dialog says which two the amount accepts', async ({ page }) => {
+  await page.route('https://api.frankfurter.dev/**', (r) => r.fulfill({ json: { rates: { '2026-11-02': { USD: 1.1, GBP: 0.8 } } } }))
+  await loadDemo(page)
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Household' }).click()
+  await page.getByRole('button', { name: 'Add account' }).click()
+  const dlg = page.getByRole('dialog')
+  await dlg.getByLabel('Name', { exact: true }).fill('Dollar savings')
+  await dlg.getByLabel('Type').selectOption('savings')
+  await dlg.getByRole('button', { name: /^More options/ }).click()
+  await dlg.getByLabel('Currency').selectOption('USD')
+  await dlg.getByLabel(/^Holds at the start of/).fill('1100')
+  await dlg.getByRole('button', { name: 'Save' }).click()
+  await expect(dlg).toBeHidden()
+
+  // a new expense in pounds
+  await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
+  const moneyOut = page.getByRole('region', { name: 'Money out' })
+  await moneyOut.getByRole('button', { name: 'Add expense row' }).click()
+  await moneyOut.getByLabel('New expense row name').fill('London hotel')
+  await moneyOut.getByRole('button', { name: 'Add', exact: true }).click()
+  await expect(dlg.getByRole('heading', { name: /London hotel/ })).toBeVisible()
+  await dlg.getByLabel('Currency of London hotel').selectOption('GBP')
+  await dlg.getByLabel('Amount in GBP').fill('80')
+  const third = dlg.getByTestId('third-currency')
+  const save = dlg.getByRole('button', { name: 'Save', exact: true })
+  await expect(third).toHaveCount(0)
+
+  // out of the dollar account it would be three: said at once, and Save waits
+  await dlg.getByLabel('Comes out of', { exact: true }).selectOption({ label: 'Savings account: Dollar savings' })
+  await expect(third).toHaveText('"London hotel" is in GBP, so it can come out of an account in GBP or in EUR. "Dollar savings" is in USD.')
+  await expect(save).toBeDisabled()
+  await dlg.screenshot({ path: 'e2e/output/third-currency.png' })
+  // in euros it is two currencies, and is saved
+  await dlg.getByLabel('Currency of London hotel').selectOption('EUR')
+  await expect(third).toHaveCount(0)
+  await expect(save).toBeEnabled()
+  // back in pounds, from the month's income
+  await dlg.getByLabel('Currency of London hotel').selectOption('GBP')
+  await dlg.getByLabel('Comes out of', { exact: true }).selectOption({ label: "This month's income (row default)" })
+  await expect(third).toHaveCount(0)
+  await save.click()
+  await expect(dlg).toBeHidden()
+
+  // the row menu's "Comes out of" says the same, under its field
+  await moneyOut.getByRole('button', { name: 'Row menu for London hotel' }).click()
+  await page.getByRole('menuitem', { name: 'Comes out of…' }).click()
+  await dlg.getByLabel('Single amounts in this row come out of').selectOption({ label: 'Savings account: Dollar savings' })
+  await expect(third).toHaveText('"London hotel" is in GBP, so it can come out of an account in GBP or in EUR. "Dollar savings" is in USD.')
+  await expect(dlg.getByRole('button', { name: 'Save' })).toBeDisabled()
+})
+
 test('a foreign-currency account shows its household-currency value beneath', async ({ page }) => {
   // the rate service cannot be reached: the rate is typed by hand
   await page.route('https://api.frankfurter.dev/**', (r) => r.abort())

@@ -271,6 +271,19 @@ hold the last rate. A rate typed for a month to come is not part of the history 
 The ECB publishes a rate for each. A code that is already in use and not among them keeps working, and stays in the
 list of the field that holds it.
 
+**X15. No amount across three currencies.** An amount is in its row's currency (a row that follows another is in
+that row's), the plan counts it in the household's, and it moves money out of or into accounts that each keep their
+own. Together that is two currencies at most. A pound expense comes out of an account in pounds or in the
+household's currency; a euro amount in a euro household moves money between the current accounts and an account in
+one other currency. An expense paid from several sources is one amount per source. A choice that would bring in a third currency is refused where it is made, with the two currencies the
+amount accepts; this holds for a row's currency, its source, the account it names, the row it follows, a schedule's
+source, an account's currency and the savings account a virtual account sits in.
+
+> A euro expense out of a dollar account is two currencies, and allowed. A pound expense out of it is three.
+
+Amounts that counted across three currencies before the rule keep counting as they did, converted through the
+household's currency (X9); a change that adds no currency to them is saved.
+
 > **Decided, not built (step 4).**
 >
 > **X10. A transaction in another currency keeps its own conversion.** It has a foreign amount, a home amount and a
@@ -281,9 +294,6 @@ list of the field that holds it.
 > **X14. A virtual account is kept in the currency of the savings account that holds it.** In a dollar savings
 > account it is a dollar balance: what is set aside arrives in dollars at the month's rate, and what is paid out of
 > it leaves in dollars. It can only be moved to a savings account in the same currency.
->
-> **X15. No payment across three currencies.** An expense comes out of an account in the expense's own currency or
-> in the household's. Anything else is refused, and the app says which two it accepts.
 
 ## T. The past
 

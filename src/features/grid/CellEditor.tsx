@@ -18,8 +18,8 @@ import {
   type CellItem, type Household, type ItemStatus, type MonthKey, type RepeatChoice, type Repeating, type Row, type Tables,
 } from '@/model'
 import {
-  clearCell, derivedRowReason, endRecurringFrom, itemsFromCurrent, oneMonthValuesReplaced, planFollowing, refreshRates, rowInNewCurrency, saveRowMonth, setCellItems, setCellValue, skipRecurringMonth,
-  type EditScope, type RuleTarget,
+  cellPut, clearCell, derivedRowReason, endRecurringFrom, itemsFromCurrent, oneMonthValuesReplaced, planFollowing, refreshRates, rowInNewCurrency, saveRowMonth, setCellItems, setCellValue, skipRecurringMonth,
+  thirdCurrencyReason, type EditScope, type Mutation, type RuleTarget,
 } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
 import { RuleFields, RulePicker } from '@/features/rules/RuleDialog'
@@ -183,6 +183,18 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
     ...elsewhere.filter((s) => isDue({ ...cadenceOf(others[s.id]?.repeat ?? repeatOf(s)), startMonth: s.startMonth, endMonth: s.endMonth }, nextMonth)).map((s) => ({ name: s.name, amount: otherAmount(s.id) ?? s.amount })),
   ]
   const fundingOptions = useMemo(() => buildFundingOptions(tables, [row.defaultFundedBy, ...items.map((i) => i.fundedBy)]), [tables, row.defaultFundedBy, items])
+  /**
+   * Rule X15 on the spot: the sentence when the currency or a source picked here would make the amount count across
+   * three currencies. Save waits until it is gone; the store refuses the same with the same words.
+   */
+  const thirdCurrency = useMemo(() => {
+    const sources = mode === 'value' ? [fundedBy] : items.filter((i) => !i.skipped).map((i) => i.fundedBy)
+    const asked: Mutation[] = sources.length ? [cellPut(tables.cells.find((c) => c.rowId === row.id && c.month === month), {
+      rowId: row.id, month, mode: 'items', value: null, items: sources.map((s) => ({ ...blankItem(), amount: 0, status: 'projected' as const, fundedBy: s })),
+    }, 0)] : []
+    if (newCurrency !== undefined) asked.push({ op: 'put', table: 'rows', record: { ...row, currency: newCurrency } })
+    return thirdCurrencyReason(tables, asked)
+  }, [tables, row, month, mode, fundedBy, items, newCurrency])
 
   // the rule fills the months after this one: nothing carries on from a typed amount, and nothing is held for it
   const saveScope: EditScope = ruleRuns ? 'from-now-on' : scope
@@ -680,6 +692,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
               </div>
             )}
             {notice && <p className="text-xs text-muted-foreground" role="status">{notice}</p>}
+            {thirdCurrency && <p className="text-sm text-destructive" role="alert" data-testid="third-currency">{thirdCurrency}</p>}
             {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
           </div>
         )}
@@ -691,7 +704,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-              <Button onClick={mode === 'value' ? saveValue : saveItems} disabled={busy}>Save</Button>
+              <Button onClick={mode === 'value' ? saveValue : saveItems} disabled={busy || thirdCurrency != null}>Save</Button>
             </div>
           </DialogFooter>
         )}
