@@ -22,7 +22,9 @@ async function typeAmount(world: World, amount: number, rowName: string, month: 
   }
   const ruled = resolveRules(engine.rows, household.closingRule).byRow.has(row.id)
   if (solo) {
-    const single: CellItem = { id: newId(), label: '', amount, status: solo.status, fundedBy: solo.fundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }
+    // the item as it is stored, with the new amount: what it holds beside the amount stays (a recorded conversion)
+    const { effectiveAmount: _worked, ...kept } = solo
+    const single: CellItem = { ...kept, amount }
     await setCellItems(world.store, row.id, month, [single], ruled ? 'from-now-on' : scope)
     return
   }

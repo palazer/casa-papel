@@ -49,6 +49,14 @@ type Mode = 'value' | 'items'
 type StatusChoice = 'default' | ItemStatus
 const STATUS_LABEL: Record<ItemStatus, string> = { projected: 'Estimate', committed: 'Certain', done: 'Done' }
 
+/** A new unnamed item: what a single amount is stored as once it has a certainty, a source or a conversion of its own. */
+const blankItem = (): Omit<CellItem, 'amount' | 'status' | 'fundedBy'> => ({ id: newId(), label: '', date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false })
+/** An item as it is stored, without what the calculation added to it for the screen. */
+function storedItem(item: CellItem & { effectiveAmount?: number }): CellItem {
+  const { effectiveAmount: _worked, ...stored } = item
+  return stored
+}
+
 /**
  * The one dialog of a row in a month (DESIGN.md §8): its amount, as a single amount or as items, how sure it is and
  * how it repeats. A single amount is for this and the following months, for this month only, or goes on a schedule; every item says
@@ -241,15 +249,18 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
       setError(unreadableAmount(text))
       return
     }
-    const single: CellItem = { id: newId(), label: '', amount: minor, status: status === 'default' ? row.defaultStatus : status, fundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }
+    // A single amount that is stored as one item keeps what that item holds beside its amount, above all the
+    // conversion that was recorded for it (`CellItem.conversion`): built anew field by field, it would lose it.
+    const single: CellItem = { ...(soloItem ? storedItem(soloItem) : blankItem()), amount: minor, status: status === 'default' ? row.defaultStatus : status, fundedBy }
     if (onSchedule && !ruleRuns) {
       if (minor === 0) return setError('Type the amount that repeats.')
       if (rhythm.kind === 'months' && rhythm.months.length === 0) return setError('Pick at least one month.')
       // the amount becomes the row's schedule, named after the row; it lands this month only if its rhythm does
       return void run(saving(() => saveRowMonth(store, row.id, month, { items: [single], repeats: { [single.id]: rhythm }, scope: 'from-now-on', row: rowChange })))
     }
-    // A plain value takes the row's defaults; any other certainty or source is stored as one unlabelled item.
-    if (status === 'default' && fundedBy === row.defaultFundedBy) return void run(saving(() => setCellValue(store, row.id, month, minor, saveScope, rowChange)))
+    // A plain value takes the row's defaults; any other certainty or source is stored as one unlabelled item, and so
+    // is an amount with a recorded conversion: set back from Done it keeps the conversion, which counts again once done.
+    if (status === 'default' && fundedBy === row.defaultFundedBy && !soloItem?.conversion) return void run(saving(() => setCellValue(store, row.id, month, minor, saveScope, rowChange)))
     void run(saving(() => setCellItems(store, row.id, month, [single], saveScope, rowChange)))
   }
 

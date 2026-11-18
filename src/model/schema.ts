@@ -8,7 +8,7 @@ import { FUNDED_BY_PATTERN, type FundedBy } from './fundedBy'
 z.config({ jitless: true })
 
 /** Bump when the shape of stored data changes; add a migration in migrations.ts. */
-export const SCHEMA_VERSION = 17
+export const SCHEMA_VERSION = 18
 
 // ---------- primitives ----------
 export const IdSchema = z.string().regex(ID_PATTERN, 'expected ULID')
@@ -244,6 +244,22 @@ export const RowSchema = BaseRecord.extend({
 })
 
 // ---------- cells ----------
+/**
+ * What a transaction in another currency really came to (rule X10): the amount in the other currency, the amount in
+ * the household's, and the rate between them, written the way a month's rate is (how many of the other currency one
+ * unit of the household's buys). The user records it; a month's rate does not touch it. The two amounts are kept as
+ * they were recorded: a rate worked out from them seldom gives the same cents back. See `src/model/conversion.ts`.
+ */
+export const ConversionSchema = z.object({
+  /** The other currency: the amount's own where the row is in another currency, else that of the account it moves. */
+  foreign: CurrencyCodeSchema,
+  foreignAmount: MoneySchema,
+  homeAmount: MoneySchema,
+  rate: z.number().positive(),
+  /** The day whose official rate was taken, where one was; null for a rate that was typed or follows from the two amounts. */
+  date: IsoDateSchema.nullable().default(null),
+})
+
 export const CellItemSchema = z.object({
   id: IdSchema,
   label: z.string().default(''),
@@ -258,6 +274,11 @@ export const CellItemSchema = z.object({
   skipped: z.boolean().default(false),
   /** Amount/label/funding set by hand for this month; the recurring schedule leaves it alone. */
   pinned: z.boolean().optional(),
+  /**
+   * The conversion that was recorded for this item (rule X10). It counts while the item is done; an item that is
+   * not, or a record from before schema 18, has none in force. Read it with `?? null`.
+   */
+  conversion: ConversionSchema.optional(),
 })
 
 export const CellModeSchema = z.enum(['inherit', 'value', 'items'])
@@ -456,6 +477,7 @@ export type Cell = z.infer<typeof CellSchema>
 /** A cell as written, before defaults fill in: what `putCell` and the demo build. */
 export type CellInput = z.input<typeof CellSchema>
 export type CellItem = z.infer<typeof CellItemSchema>
+export type Conversion = z.infer<typeof ConversionSchema>
 export type ItemStatus = z.infer<typeof ItemStatusSchema>
 export type RecurringItem = z.infer<typeof RecurringItemSchema>
 export type Cadence = z.infer<typeof CadenceSchema>

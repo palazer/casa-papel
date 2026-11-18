@@ -66,6 +66,10 @@ const STEPS: Record<number, Step> = {
   // copies an old % for all currencies to each pair when it opens the data (`planHousekeeping`). The version keeps an
   // older app, which would show other amounts for every month to come, from syncing.
   16: (raw) => raw,
+  // 17 → 18: an item of a month can carry the conversion that was recorded for it (`CellItem.conversion`, rule X10).
+  // Optional, so nothing is rewritten. The version keeps an older app from syncing: it would drop the field from
+  // every month it writes, and its later write would win.
+  17: (raw) => raw,
 }
 
 export function migrateExport(raw: unknown): unknown {
