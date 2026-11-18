@@ -843,7 +843,9 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   menu ("Archive or delete…"), the People & things list, the account, virtual account and goal dialogs' footers
   ("Archive or delete…", "Delete…"), the schedules list, the cell editor's "All occurrences" and the Categories card.
   Title `<Kind> "<name>"`, then an Archive section (a `MonthField` "Archive from" with an (i), what changes from that
-  month, "Earlier months stay exactly as they are") and a Delete section ("Deleting removes", "Also changes", a note,
+  month, "Earlier months stay exactly as they are") and a Delete section ("Deleting removes", with a last line
+  `2 of these months are over (Sept–Oct 2026): they change too` where the delete reaches into months before the
+  current one, "Also changes", a note,
   and blockers in a destructive `Alert` "Resolve these first" that says where to fix each). When the thing has amounts
   in a closed month the Delete section is one sentence saying so, and only Archive remains; an archive month inside
   that history is refused beside the field. Footer: Cancel, `Archive from <month>` (`outline`, `default` when it is
@@ -857,8 +859,9 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   is one click: the entry in the row menu, the category menu and the account and virtual account dialogs opened from
   the Statement reads `Delete` instead of `Archive or delete…` / `Remove…` and deletes at once, with no dialog
   (`removeIfFree` in `src/store/remove.ts`). It does so only when nothing but the thing itself goes: when rows would
-  change, something stands in the way, a goal watches it, or a closed month holds its amounts, the remove dialog
-  opens as always and says what. After `Done`, and for every household set up before, removing is the dialog again.
+  change, something stands in the way, a goal watches it, or a closed month or a month that is over holds its
+  amounts, the remove dialog opens as always and says what. A household that starts in the current month has no
+  month that is over, so its deletes stay one click. After `Done`, and for every household set up before, removing is the dialog again.
   A one-click delete is answered by the floating message.
 - **The floating message** (`UndoNotice` in `src/components/UndoNotice.tsx`, with `useUndoNotice`) is the one thing
   that floats. It answers the two actions that happen at one press with no dialog and reach further than the thing

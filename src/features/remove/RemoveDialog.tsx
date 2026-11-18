@@ -24,7 +24,8 @@ interface Props {
  * The one way anything is removed (DESIGN.md §8): a row, an account, a virtual account, a person or thing, a schedule,
  * a goal or a category. It says what archiving from a month does and what deleting removes, lists what else changes
  * and what has to be resolved first, and offers only what is possible: a thing with amounts in a closed month can be
- * archived but not deleted. Everything it does is one undoable commit.
+ * archived but not deleted. Where deleting reaches into months that are over, the list says which. Everything it
+ * does is one undoable commit.
  */
 export function RemoveDialog({ target, tables, household, onClose, onDone }: Props) {
   const store = useStore()
@@ -86,7 +87,7 @@ export function RemoveDialog({ target, tables, household, onClose, onDone }: Pro
             ) : (
               <>
                 <p className="text-xs text-muted-foreground">Deleting removes</p>
-                <Lines items={impact.loses.length ? impact.loses : [`Only the ${kindWord} itself`]} />
+                <Lines items={[...(impact.loses.length ? impact.loses : [`Only the ${kindWord} itself`]), ...(impact.over ? [impact.over] : [])]} />
                 {impact.changes.length > 0 && (
                   <>
                     <p className="text-xs text-muted-foreground">Also changes</p>

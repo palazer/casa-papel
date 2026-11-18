@@ -53,6 +53,12 @@ export interface Impact {
   blockers: Blocker[]
   /** One more line under the delete list, or null. */
   note: string | null
+  /**
+   * Its months that are over, where it has any: the months before the current one in which it has an amount or a
+   * balance, as a sentence for the delete list (`2 of these months are over (Sept–Oct 2026): they change too`).
+   * Deleting changes those months as well, and the dialog says so before the button is pressed.
+   */
+  over: string | null
   /** The closed months it has amounts in, e.g. `Sept–Oct 2026`, or null. Non-null means archive only. */
   closedHistory: string | null
   /** The last closed month with amounts, or null. */
@@ -311,7 +317,8 @@ function describeSchedule(ctx: Ctx, item: RecurringItem): Described {
   return {
     kindLabel: 'Schedule', subject: item.name, loses, changes: [], blockers: [],
     note: `${posted.length ? 'Nothing more is posted.' : 'Nothing more is posted; what was already paid stays.'} To stop it from a month on instead, use "End after" in the schedules list.`,
-    activity: [], canArchive: false, archive: () => [],
+    // the months its unpaid postings go from; none of them is closed, so they never stand in the way of the delete
+    activity: posted.map((c) => c.month), canArchive: false, archive: () => [],
   }
 }
 
@@ -353,8 +360,12 @@ function impactOf(ctx: Ctx, target: RemovalTarget, opts: ImpactOptions): Impact 
   const notBefore = closedUntil ? addMonths(closedUntil, 1) : ctx.household.startMonth
   const archiveNotBefore = compareMonths(notBefore, ctx.household.startMonth) < 0 ? ctx.household.startMonth : notBefore
   const archiveFrom = opts.archiveFrom ?? (compareMonths(ctx.today, archiveNotBefore) > 0 ? ctx.today : archiveNotBefore)
+  const over = [...new Set(d.activity.filter((m) => compareMonths(m, ctx.today) < 0))]
+  // a row and a schedule count their months in the line above; an account, a virtual account and a person do not
+  const which = target.kind === 'row' || target.kind === 'schedule' ? 'these' : 'its'
   return {
     kind: target.kind, kindLabel: d.kindLabel, subject: d.subject, loses: d.loses, changes: d.changes, blockers: d.blockers, note: d.note,
+    over: over.length ? `${over.length} of ${which} months ${pick(over.length, 'is', 'are')} over (${monthSpan(over, ctx.locale)}): ${pick(over.length, 'it changes', 'they change')} too` : null,
     closedHistory: closedActivity.length ? monthSpan(closedActivity, ctx.locale) : null, closedUntil, archiveNotBefore, archiveFrom,
     archiveChanges: d.canArchive ? d.archive(archiveFrom) : [], canArchive: d.canArchive,
     canDelete: closedActivity.length === 0 && d.blockers.length === 0,

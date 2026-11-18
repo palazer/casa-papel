@@ -21,10 +21,17 @@ describe('describeRemoval', () => {
     expect(groceries).toMatchObject({ kindLabel: 'Row', subject: 'Groceries', closedHistory: 'Sept 2026', closedUntil: '2026-09', canDelete: false, canArchive: true, archiveNotBefore: '2026-10', archiveFrom: '2026-11' })
     expect(groceries.archiveChanges).toEqual(['Hidden from Nov 2026 on; its amounts in 14 later months no longer count'])
 
+    // what of it lies in months that are over: September and October
+    expect(groceries.over).toBe('2 of these months are over (Sept–Oct 2026): they change too')
+
     const other = describeRemoval(t, { kind: 'row', id: idOf(t, 'rows', 'Other income') }, OPTS)
     expect(other.closedHistory).toBeNull()
     expect(other.canDelete).toBe(true)
     expect(other.loses).toEqual(['Its amounts in 14 months (Nov 2026 – Dec 2027)'])
+    // it begins in the current month: nothing of it is over
+    expect(other.over).toBeNull()
+    // looked at a year later, twelve of its months are
+    expect(describeRemoval(t, { kind: 'row', id: idOf(t, 'rows', 'Other income') }, { ...OPTS, today: '2027-11' }).over).toBe('12 of these months are over (Nov 2026 – Oct 2027): they change too')
     expect(other.changes).toEqual([])
     // an earlier archive month is described from that month
     expect(describeRemoval(t, { kind: 'row', id: idOf(t, 'rows', 'Other income') }, { ...OPTS, archiveFrom: '2027-01' }).archiveChanges[0]).toBe('Hidden from Jan 2027 on; its amounts in 12 later months no longer count')

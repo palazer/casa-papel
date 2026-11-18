@@ -24,6 +24,16 @@ test.describe('archive or delete', () => {
     await page.getByRole('button', { name: 'Undo' }).click()
     await expect(page.getByRole('rowheader', { name: /^Other income/ })).toBeVisible()
 
+    // Travel has an amount in October, which is over: the dialog says that deleting changes that month too
+    await page.getByRole('button', { name: 'Row menu for Travel' }).click()
+    await page.getByRole('menuitem', { name: 'Archive or delete…' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Row "Travel"' })).toBeVisible()
+    await expect(dlg.getByText('Its amounts in 15 months (Oct 2026 – Dec 2027)')).toBeVisible()
+    await expect(dlg.getByText('1 of these months is over (Oct 2026): it changes too')).toBeVisible()
+    await page.screenshot({ path: 'e2e/output/remove-months-over.png' })
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+    await expect(dlg).toBeHidden()
+
     // Groceries has amounts in September, which is closed: no Delete, only Archive
     await page.getByRole('button', { name: 'Row menu for Groceries' }).click()
     await page.getByRole('menuitem', { name: 'Archive or delete…' }).click()

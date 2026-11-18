@@ -14,15 +14,16 @@ export async function removeThing(store: Store, target: RemovalTarget): Promise<
 /**
  * Delete without asking, when there is nothing to ask about: the thing can be deleted and nothing else changes with
  * it. That is the cheap delete of a household that is still being set up. Returns the name of what was deleted, or
- * null when the dialog has to be shown instead: something else would change with it, something stands in the way, or
- * a closed month holds its amounts. Nothing is touched in that case. One undoable commit.
+ * null when the dialog has to be shown instead: something else would change with it, something stands in the way, a
+ * closed month holds its amounts, or a month that is over does (the dialog says which). Nothing is touched in that
+ * case. One undoable commit.
  */
 export async function removeIfFree(store: Store, target: RemovalTarget): Promise<string | null> {
   const tables = await loadTables(store)
   const impact = describeRemoval(tables, target)
   // a goal that watches it would go with it: that is more than the thing itself, so the dialog says it first
   const watched = tables.goals.some((g) => !g.deletedAt && (g.accountId === target.id || g.poolId === target.id))
-  if (!impact.canDelete || impact.changes.length > 0 || watched) return null
+  if (!impact.canDelete || impact.changes.length > 0 || watched || impact.over) return null
   await store.commit(planRemoval(tables, target, now()))
   return impact.subject
 }

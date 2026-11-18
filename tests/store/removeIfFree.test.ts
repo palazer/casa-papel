@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { newId } from '@/model'
 import {
   CasaDb, Store, addAccount, addCategory, addGoal, addRow, addSuggestion, closeMonth, createHouseholdFromSetup, loadTables, removeIfFree, rowSuggestions,
-  setCellValue, setRule,
+  describeRemoval, setCellValue, setRule,
 } from '@/store'
+import { restoreToday, setToday } from '../today'
 
 /** A household that is being set up: its people and things, the usual categories, nothing else. */
 async function fresh() {
@@ -20,6 +21,10 @@ const live = async (store: Store) => {
 }
 
 describe('the cheap delete of a household that is being set up', () => {
+  // the household starts in September 2026 and is being set up in that month
+  beforeEach(() => setToday('2026-09-15'))
+  afterEach(restoreToday)
+
   it('deletes a row with its amounts in one undoable step, and its suggestion is offered again', async () => {
     const store = await fresh()
     const row = await addSuggestion(store, 'household:h.groceries', { amount: 600_00 })
@@ -66,6 +71,23 @@ describe('the cheap delete of a household that is being set up', () => {
     expect(await removeIfFree(store, { kind: 'pool', id: pool.id })).toBeNull()
     expect(await live(store)).toMatchObject({ accounts: ['Savings'], pools: ['Travel'] })
     expect((await live(store)).rows).toEqual(expect.arrayContaining(['To Savings', 'Travel', 'To Travel']))
+  })
+
+  it('asks first when months that are over hold its amounts, and says which', async () => {
+    const store = await fresh()
+    const row = await addRow(store, { name: 'Rent', section: 'expense' })
+    await setCellValue(store, row.id, '2026-09', 900_00, 'from-now-on')
+    // in September nothing of it is over: one click
+    expect(describeRemoval(await loadTables(store), { kind: 'row', id: row.id }).over).toBeNull()
+    // in November two of its months are
+    setToday('2026-11-15')
+    expect(describeRemoval(await loadTables(store), { kind: 'row', id: row.id }).over).toBe('2 of these months are over (Sept–Oct 2026): they change too')
+    expect(await removeIfFree(store, { kind: 'row', id: row.id })).toBeNull()
+    expect((await live(store)).rows).toEqual(['Rent'])
+    // a row that begins in the current month is still one click
+    const fresh2 = await addRow(store, { name: 'Gym', section: 'expense' })
+    await setCellValue(store, fresh2.id, '2026-11', 30_00, 'from-now-on')
+    expect(await removeIfFree(store, { kind: 'row', id: fresh2.id })).toBe('Gym')
   })
 
   it('never deletes what has amounts in a closed month', async () => {
