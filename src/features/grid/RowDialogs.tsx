@@ -15,6 +15,7 @@ import { currencyChoices, currencyLabel } from '@/app/currencies'
 import { HELP } from '@/app/help'
 import { TipLabel } from '@/components/InfoTip'
 import { accountHelp, accountVerb, landingAccounts, movesMoney, paysByCard } from './rowAccount'
+import { saveError } from '@/app/saveError'
 
 interface Base {
   row: Row
@@ -45,7 +46,7 @@ export function useSave(onClose: () => void) {
       await fn()
       onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save.')
+      setError(saveError(e, 'Could not save.'))
     } finally {
       running.current = false
       setBusy(false)

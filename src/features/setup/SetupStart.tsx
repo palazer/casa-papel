@@ -12,6 +12,7 @@ import { useStore } from '@/app/store'
 import { ENTITY_KIND_HELP, ENTITY_KIND_LABEL, monthOfDate } from '@/model'
 import { createHouseholdFromSetup } from '@/store'
 import { LOCALES, THING_KINDS, duplicateNames, keptStart, newStart, toSetupInput, type StartDraft, type ThingKind } from './start'
+import { saveError } from '@/app/saveError'
 
 /** What a kind brings, without the sentences about settings this screen does not have. */
 const firstSentence = (text: string) => `${text.split('. ')[0].replace(/\.$/, '')}.`
@@ -38,7 +39,7 @@ export function SetupStart({ onCreated, onBack, notice }: { onCreated: () => voi
       await createHouseholdFromSetup(store, toSetupInput(d))
       onCreated()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not set up the household.')
+      setError(saveError(e, 'Could not set up the household.'))
       setBusy(false)
     }
   }

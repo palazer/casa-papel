@@ -29,6 +29,7 @@ import {
 import { addEntity, applyTemplates, restoreAccount, restoreEntity, restoredText, setAccountActual, setMonthlyDefault, updateHousehold, type MonthlyDefaultScope, type Restored } from '@/store'
 import { UndoNotice } from '@/components/UndoNotice'
 import { useUndoNotice } from '@/app/useUndoNotice'
+import { saveError, showSaveError } from '@/app/saveError'
 
 const LOCALES = ['en-IE', 'en-GB', 'en-US', 'de-DE', 'de-AT', 'tr-TR', 'fr-FR', 'es-ES', 'nl-NL', 'it-IT', 'pt-PT', 'sv-SE']
 const ACCOUNT_TYPES = ACCOUNT_TYPE_INFO
@@ -45,7 +46,7 @@ export function HouseholdScreen() {
   /** What a restore brought back, with the way back: it goes with the next change. */
   const notice = useUndoNotice(store)
   if (!tables || !household || !engine) return null
-  const act = (fn: () => Promise<unknown>) => void fn().catch((e) => setError(e instanceof Error ? e.message : 'Action failed'))
+  const act = (fn: () => Promise<unknown>) => void fn().catch((e) => setError(saveError(e, 'Action failed')))
   const onRestored = (r: Restored) => notice.say(restoredText(r))
   const people = tables.entities.filter((e) => !e.deletedAt && !e.archivedMonth).length
   const accounts = tables.accounts.filter((a) => !a.deletedAt && !a.archivedMonth).length
@@ -56,7 +57,7 @@ export function HouseholdScreen() {
         {error && <p role="alert" className="basis-full text-destructive">{error}</p>}
       </PageHeader>
       <GroupTabs />
-      <SettingsCard household={household} tables={tables} onSave={(p) => act(() => updateHousehold(store, p))} onBuffer={(value, scope) => act(() => setMonthlyDefault(store, value, scope, monthOfDate()))} />
+      <SettingsCard household={household} tables={tables} onSave={(p) => act(() => updateHousehold(store, p))} onBuffer={(value, scope) => { const saving = setMonthlyDefault(store, value, scope, monthOfDate()); act(() => saving); return saving }} />
       <EntitiesCard household={household} tables={tables} entities={tables.entities.filter((e) => !e.deletedAt)} onError={setError} onRestored={onRestored} />
       <AccountsCard household={household} tables={tables} accounts={tables.accounts.filter((a) => !a.deletedAt)} entities={tables.entities} engine={engine} months={months} onError={setError} onRestored={onRestored} />
       <PoolsCard household={household} tables={tables} engine={engine} onError={setError} onRestored={onRestored} />
@@ -71,7 +72,7 @@ export function HouseholdScreen() {
   )
 }
 
-function SettingsCard({ household: h, tables, onSave, onBuffer }: { household: Household; tables: Tables; onSave: (p: Partial<Household>) => void; onBuffer: (value: number, scope: MonthlyDefaultScope) => void }) {
+function SettingsCard({ household: h, tables, onSave, onBuffer }: { household: Household; tables: Tables; onSave: (p: Partial<Household>) => void; onBuffer: (value: number, scope: MonthlyDefaultScope) => Promise<unknown> }) {
   const thisMonth = monthOfDate()
   const state = tables.monthStates.find((s) => s.month === thisMonth)
   /** The cash buffer this month: its own value when the month has one, else the household's. */
@@ -84,7 +85,8 @@ function SettingsCard({ household: h, tables, onSave, onBuffer }: { household: H
   const saveBuffer = () => {
     const v = buffer.trim() ? parseAmount(buffer, h.baseCurrency, h.locale) : 0
     if (v == null) return setBufferError(unreadableAmount(buffer))
-    if (v !== bufferNow) onBuffer(v, scope)
+    // not saved (Cancel at the question about the past, or refused): the field shows what is stored again
+    if (v !== bufferNow) void onBuffer(v, scope).catch(() => setBuffer(amountToInput(bufferNow, h.baseCurrency, h.locale)))
   }
   return (
     <Island air title="Household settings">
@@ -130,7 +132,7 @@ function EntitiesCard({ household, tables, entities: allEntities, onError, onRes
   const [removing, setRemoving] = useState<Entity | null>(null)
   const entities = allEntities.filter((e) => !e.archivedMonth)
   const archived = allEntities.filter((e) => e.archivedMonth)
-  const act = (fn: () => Promise<unknown>) => void fn().catch((e) => onError(e instanceof Error ? e.message : 'Action failed'))
+  const act = (fn: () => Promise<unknown>) => void fn().catch(showSaveError(onError, 'Action failed'))
   const add = () => {
     act(() => addEntity(store, { kind, name: name.trim() }))
     setName('')
@@ -205,7 +207,7 @@ function TemplatesDialog({ entity, onClose, onError }: { entity: Entity; onClose
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button disabled={chosen.size === 0} onClick={() => { applyTemplates(store, [...chosen], entity.id).then(onClose).catch((e) => onError(e instanceof Error ? e.message : 'Failed')) }}>Add {chosen.size} row{chosen.size === 1 ? '' : 's'}</Button>
+          <Button disabled={chosen.size === 0} onClick={() => { applyTemplates(store, [...chosen], entity.id).then(onClose).catch(showSaveError(onError, 'Failed')) }}>Add {chosen.size} row{chosen.size === 1 ? '' : 's'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -220,7 +222,7 @@ function AccountsCard({ household, tables, accounts: allAccounts, entities, engi
   const { locale, baseCurrency } = household
   const accounts = allAccounts.filter((a) => !a.archivedMonth)
   const archived = allAccounts.filter((a) => a.archivedMonth)
-  const act = (fn: () => Promise<unknown>) => void fn().catch((e) => onError(e instanceof Error ? e.message : 'Action failed'))
+  const act = (fn: () => Promise<unknown>) => void fn().catch(showSaveError(onError, 'Action failed'))
   return (
     <Island air tone={HUES.worth} title="Accounts" description="Savings accounts get a running balance from your grid. Enter the real balance any month to keep it honest.">
       <div className="space-y-3">
@@ -257,7 +259,7 @@ function AccountsCard({ household, tables, accounts: allAccounts, entities, engi
                                 const v = typed.trim() ? parseAmount(typed, a.currency, locale) : null
                                 // what cannot be read is said and nothing is written: an empty field alone clears the real balance
                                 if (typed.trim() && v == null) return onError(unreadableAmount(typed))
-                                setAccountActual(store, a.id, m, v).catch((err) => onError(err instanceof Error ? err.message : 'Failed'))
+                                setAccountActual(store, a.id, m, v).catch(showSaveError(onError, 'Failed'))
                               }}
                             />
                           </td>

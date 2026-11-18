@@ -32,6 +32,7 @@ import { followingEffects, followingText, onlyThisMonthText } from './followingT
 import { fundingOptions as buildFundingOptions } from './funding'
 import { HELP } from '@/app/help'
 import { InfoTip, TipLabel } from '@/components/InfoTip'
+import { saveError } from '@/app/saveError'
 
 interface Props {
   tables: Tables
@@ -264,7 +265,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
       await fn()
       if (close) onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save.')
+      setError(saveError(e, 'Could not save.'))
     } finally {
       running.current = false
       setBusy(false)

@@ -8,6 +8,7 @@ import { useStore } from '@/app/store'
 import type { Category, Household, Tables } from '@/model'
 import { moveCategory, removeIfFree, renameCategory } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
+import { saveError, showSaveError } from '@/app/saveError'
 
 const byOrder = (a: Category, b: Category) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0)
 
@@ -33,7 +34,7 @@ export function CategoryMenu({ category, tables, household, onError, onDeleted, 
   const [problem, setProblem] = useState<string | null>(null)
   const siblings = tables.categories.filter((c) => !c.deletedAt && c.section === category.section).sort(byOrder)
   const at = siblings.findIndex((c) => c.id === category.id)
-  const act = (fn: () => Promise<unknown>) => () => void fn().catch((e) => onError(e instanceof Error ? e.message : 'Action failed'))
+  const act = (fn: () => Promise<unknown>) => () => void fn().catch(showSaveError(onError, 'Action failed'))
   const close = () => setOpen(null)
   // cheap while the household is being set up; a category that still has rows opens the dialog, which says they are kept
   const cheap = household.setupOpen ?? false
@@ -48,7 +49,7 @@ export function CategoryMenu({ category, tables, household, onError, onDeleted, 
     if (!n) return
     if (n === category.name) return close()
     // a name that is taken stays in the dialog, beside the field that caused it
-    renameCategory(store, category.id, n).then(close).catch((e) => setProblem(e instanceof Error ? e.message : 'That name cannot be used.'))
+    renameCategory(store, category.id, n).then(close).catch((e) => setProblem(saveError(e, 'That name cannot be used.')))
   }
 
   return (

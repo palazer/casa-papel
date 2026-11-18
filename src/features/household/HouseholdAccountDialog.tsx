@@ -16,6 +16,7 @@ import { useStore } from '@/app/store'
 import { ACCOUNT_TYPE_INFO, paysExpenses, type Account, type AccountType, type Entity, type Row } from '@/model'
 import { addAccount, addAccountWithRow, addPayOffRow, payOffRowsOf, rowNameFor, updateAccount, type AccountRowInput } from '@/store'
 import { cn } from '@/lib/utils'
+import { saveError } from '@/app/saveError'
 
 interface Props {
   account: Account | null
@@ -110,7 +111,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
       onRowAdded?.(row)
       onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not add the row.')
+      setError(saveError(e, 'Could not add the row.'))
     } finally {
       setBusy(false)
     }
@@ -149,7 +150,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
       }
       onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save.')
+      setError(saveError(e, 'Could not save.'))
     } finally {
       setBusy(false)
     }

@@ -1,6 +1,7 @@
 import { RULE_KIND_INFO, isOldPocketShare, isPocketRow, isShareRule, isTakenFromAccount, resolveRules, type Account, type Entity, type Household, type Pool, type Row, type Tables } from '@/model'
 import { sortRows } from '@/engine'
 import { ruleRowOf, type RuleChoice, type RuleTarget } from '@/store'
+import { errorText } from '@/app/saveError'
 
 export type RuleKind = RuleChoice['kind']
 
@@ -47,7 +48,7 @@ export function ruleFacts(tables: Tables, household: Household, target: RuleTarg
   try {
     row = ruleRowOf(tables, target)
   } catch (e) {
-    error = e instanceof Error ? e.message : 'That cannot have a rule.'
+    error = errorText(e, 'That cannot have a rule.')
   }
   const pool = 'poolId' in target ? tables.pools.find((p) => p.id === target.poolId) : row ? tables.pools.find((p) => !p.deletedAt && p.allocationRowId === row.id) : undefined
   const account = 'accountId' in target ? tables.accounts.find((a) => a.id === target.accountId) : row?.accountId ? tables.accounts.find((a) => a.id === row.accountId) : undefined

@@ -12,6 +12,7 @@ import type { Category, Household, Section, Tables } from '@/model'
 import { addCategory, moveCategory, renameCategory, seedDefaultCategories, setRowCategory } from '@/store'
 import { NativeSelect } from '@/components/NativeSelect'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
+import { showSaveError } from '@/app/saveError'
 
 const SECTIONS: Array<{ key: Section; title: string }> = [
   { key: 'income', title: 'Income' },
@@ -24,7 +25,7 @@ const byOrder = (a: Category, b: Category) => (a.order < b.order ? -1 : a.order 
 /** Categories per section: rename, reorder, remove, add; and every row's category in one place (DESIGN.md §6). */
 export function CategoriesCard({ household, tables, onError }: { household: Household; tables: Tables; onError: (m: string) => void }) {
   const store = useStore()
-  const act = (fn: () => Promise<unknown>) => void fn().catch((e) => onError(e instanceof Error ? e.message : 'Action failed'))
+  const act = (fn: () => Promise<unknown>) => void fn().catch(showSaveError(onError, 'Action failed'))
   return (
     <Island air title="Categories" help="household.categories" description="Named groups inside a section. Rows sort by category in the grid and share a faint band; a label line names each group. Removing a category keeps its rows.">
       <div className="space-y-5">

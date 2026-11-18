@@ -15,6 +15,7 @@ import { addPool, restorePool, updatePool, type Restored } from '@/store'
 import { HUES } from '@/app/hues'
 import { InfoTip } from '@/components/InfoTip'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
+import { saveError, showSaveError } from '@/app/saveError'
 
 export function PoolsCard({ household, tables, engine, onError, onRestored }: { household: Household; tables: Tables; engine: EngineOutput | null; onError: (m: string) => void; onRestored: (r: Restored) => void }) {
   const store = useStore()
@@ -25,7 +26,7 @@ export function PoolsCard({ household, tables, engine, onError, onRestored }: { 
   const savings = tables.accounts.filter((a) => a.type === 'savings' && !a.deletedAt && !a.archivedMonth)
   const m = monthOfDate()
   const { locale, baseCurrency } = household
-  const act = (fn: () => Promise<unknown>) => void fn().catch((e) => onError(e instanceof Error ? e.message : 'Action failed'))
+  const act = (fn: () => Promise<unknown>) => void fn().catch(showSaveError(onError, 'Action failed'))
   return (
     <Island
       air tone={HUES.pool} title="Virtual accounts"
@@ -128,7 +129,7 @@ export function PoolDialog({ pool, savings, baseCurrency, locale, fromMonth, fre
       ? updatePool(store, pool.id, { name: name.trim(), accountId, openingBalance })
       : addPool(store, { name: name.trim(), accountId, openingBalance, monthlyAllocation, fromMonth, createSpendRow: spendRow }).then((made) => onSaved?.(made))
     // a refusal is said in the dialog, where it is seen: the screen's own alert sits behind it
-    p.then(onClose).catch((e) => { setBusy(false); setError(e instanceof Error ? e.message : 'Could not save.') })
+    p.then(onClose).catch((e) => { setBusy(false); setError(saveError(e, 'Could not save.')) })
   }
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>

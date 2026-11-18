@@ -11,6 +11,7 @@ import { amountToInput, formatMonth, parseAmount, unreadableAmount } from '@/app
 import { useStore } from '@/app/store'
 import { GOAL_KIND_INFO, goalFamilyOf, monthOfDate, type Goal, type GoalFamily, type GoalKind, type Household, type Tables } from '@/model'
 import { addGoal, updateGoal } from '@/store'
+import { saveError } from '@/app/saveError'
 
 interface Props {
   household: Household
@@ -90,7 +91,7 @@ export function GoalDialog({ household, tables, goal, preset, onClose, onRemove 
       else await addGoal(store, input)
       onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save.')
+      setError(saveError(e, 'Could not save.'))
     } finally {
       setBusy(false)
     }

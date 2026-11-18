@@ -13,6 +13,7 @@ import { sortRows } from '@/engine'
 import { monthOfDate, type Household, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
 import { addRecurringItem, rowCurrencyOf, updateRecurringItem, type RecurringInput } from '@/store'
 import { fundingOptions } from '@/features/grid/funding'
+import { saveError } from '@/app/saveError'
 
 const MONTH_NAMES = Array.from({ length: 12 }, (_, i) => new Intl.DateTimeFormat('en', { month: 'short' }).format(new Date(2026, i, 1)))
 type CadenceChoice = '1' | '2' | '3' | '6' | '12' | 'months'
@@ -78,7 +79,7 @@ export function RecurringDialog({ tables, household, item, defaultMonth, onClose
       else await addRecurringItem(store, base as Parameters<typeof addRecurringItem>[1], newRow)
       onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save.')
+      setError(saveError(e, 'Could not save.'))
     } finally {
       setBusy(false)
     }

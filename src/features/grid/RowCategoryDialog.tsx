@@ -9,6 +9,7 @@ import type { Row, Tables } from '@/model'
 import { addCategory, seedDefaultCategories, setRowCategory } from '@/store'
 import { NativeSelect } from '@/components/NativeSelect'
 import { useSave } from './RowDialogs'
+import { saveError } from '@/app/saveError'
 
 const NEW = '__new__'
 
@@ -50,7 +51,7 @@ export function RowCategoryDialog({ row, tables, onClose }: { row: Row; tables: 
           )}
           {row.section === 'expense' && categories.length === 0 && (
             <div className="flex items-center gap-1">
-              <Button size="xs" variant="outline" disabled={busy} onClick={() => { setSeedError(null); seedDefaultCategories(store).catch((e) => setSeedError(e instanceof Error ? e.message : 'Could not add them.')) }}>
+              <Button size="xs" variant="outline" disabled={busy} onClick={() => { setSeedError(null); seedDefaultCategories(store).catch((e) => setSeedError(saveError(e, 'Could not add them.'))) }}>
                 Add the usual categories
               </Button>
               <InfoTip help="household.usualCategories" />

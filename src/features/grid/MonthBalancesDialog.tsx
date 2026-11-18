@@ -11,6 +11,7 @@ import { monthProgress } from '@/features/statement/progress'
 import { BalanceFields, type BalanceGroup } from './BalanceFields'
 import { CurrentTogether } from './CurrentBalanceDialog'
 import { useMonthBalances } from './useMonthBalances'
+import { saveError } from '@/app/saveError'
 
 /** The headings of the list, as on the Statement's lower half. */
 const HEADINGS: Array<[AccountGroup, string]> = [
@@ -51,7 +52,7 @@ export function MonthBalancesDialog({ month, tables, engine, household, onClose 
       await setMonthBalances(store, month, entry, { done: open > 0 && countDone })
       onClose()
     } catch (e) {
-      form.setError(e instanceof Error ? e.message : 'Could not save the balances.')
+      form.setError(saveError(e, 'Could not save the balances.'))
     } finally {
       setBusy(false)
     }

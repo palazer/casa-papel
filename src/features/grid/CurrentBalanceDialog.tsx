@@ -7,6 +7,7 @@ import type { Household, MonthKey, Tables } from '@/model'
 import { setMonthBalances } from '@/store'
 import { BalanceFields } from './BalanceFields'
 import { useMonthBalances, type MonthBalancesForm } from './useMonthBalances'
+import { saveError } from '@/app/saveError'
 
 interface Props {
   /** The line's name: the one current account's, or "Current accounts". */
@@ -53,7 +54,7 @@ export function CurrentBalanceDialog({ title, month, tables, household, onClose 
       await setMonthBalances(store, month, entry)
       onClose()
     } catch (e) {
-      form.setError(e instanceof Error ? e.message : 'Could not save.')
+      form.setError(saveError(e, 'Could not save.'))
     } finally {
       setBusy(false)
     }

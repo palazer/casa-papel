@@ -4,6 +4,7 @@ import { householdFx, rateInfo } from '@/engine'
 import type { Household, MonthKey, Tables } from '@/model'
 import { restoreEcbRate, setManualRate } from '@/store'
 import { rateTag, readableRate, toStored } from '@/features/household/fxDisplay'
+import { saveError } from '@/app/saveError'
 
 /**
  * One currency's rate in one month, and the two things that can be done to it: type your own, and go back to the
@@ -31,7 +32,7 @@ export function useMonthRate(tables: Tables, household: Household, month: MonthK
       await fn()
       done?.()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not change the rate.')
+      setError(saveError(e, 'Could not change the rate.'))
     } finally {
       setBusy(false)
     }

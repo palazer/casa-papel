@@ -7,6 +7,7 @@ import type { Account, Household, MonthKey, Tables } from '@/model'
 import { setMonthBalances } from '@/store'
 import { BalanceFields } from './BalanceFields'
 import { useMonthBalances } from './useMonthBalances'
+import { saveError } from '@/app/saveError'
 
 interface Props {
   account: Account
@@ -41,7 +42,7 @@ export function BalanceDialog({ account, month, tables, household, onClose }: Pr
       await setMonthBalances(store, month, entry)
       onClose()
     } catch (e) {
-      form.setError(e instanceof Error ? e.message : 'Could not save.')
+      form.setError(saveError(e, 'Could not save.'))
     } finally {
       setBusy(false)
     }

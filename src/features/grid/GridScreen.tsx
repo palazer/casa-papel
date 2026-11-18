@@ -26,6 +26,7 @@ import { CellEditor } from './CellEditor'
 import { RowMenu } from './RowMenu'
 import { amountDisplay, doneLabel, doneness, flowOf, ruleText, statusClass, toneClass, type Flow } from '@/app/display'
 import { DoneDot } from '@/components/DoneDot'
+import { saveError } from '@/app/saveError'
 
 const SECTIONS: Array<{ key: Section; title: string }> = [
   { key: 'income', title: 'Income' },
@@ -102,7 +103,7 @@ export function GridScreen() {
     }
   }
 
-  const act = (fn: () => Promise<unknown>) => void fn().catch((err) => setError(err instanceof Error ? err.message : 'Action failed'))
+  const act = (fn: () => Promise<unknown>) => void fn().catch((err) => setError(saveError(err, 'Action failed')))
 
   /** Balance series that still reach into the shown months; an account archived before them has nothing to show. */
   const accountSeries = Object.values(engine.accounts).filter((s) => Object.keys(s.months).length > 0)

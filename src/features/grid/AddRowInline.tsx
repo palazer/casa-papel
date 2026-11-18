@@ -9,6 +9,7 @@ import { NativeSelect } from '@/components/NativeSelect'
 import { cn } from '@/lib/utils'
 import { HouseholdAccountDialog } from '@/features/household/HouseholdAccountDialog'
 import { PoolDialog } from '@/features/household/PoolsCard'
+import { showSaveError } from '@/app/saveError'
 
 type Choice = TransferRowKind | ExpenseRowKind
 type Targets = ReturnType<typeof rowTargets>
@@ -202,7 +203,7 @@ export function AddRowInline({ section, categories, tables, household, onError, 
       reset()
       onAdded?.(row)
     } catch (e) {
-      onError(e instanceof Error ? e.message : 'Could not add row')
+      showSaveError(onError, 'Could not add row')(e)
     }
   }
 

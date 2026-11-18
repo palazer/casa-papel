@@ -14,6 +14,7 @@ import { useSyncEngine, useSyncView } from '@/sync/useSync'
 import { ImportPanel } from './ImportPanel'
 import { InviteCard } from './InviteCard'
 import { SyncCard } from './SyncCard'
+import { errorText } from '@/app/saveError'
 
 /** Where the data lives and how it moves: storage status, cloud sync, export, import, the demo, the danger zone. */
 export function DataScreen() {
@@ -76,7 +77,7 @@ export function DataScreen() {
     } catch (e) {
       // the export is the backup: a failure must not look like a button that did nothing
       setMessage(null)
-      setError(`The export did not work: ${e instanceof Error ? e.message : 'unknown error'}. Nothing was saved to a file.`)
+      setError(`The export did not work: ${errorText(e, 'unknown error')}. Nothing was saved to a file.`)
     }
   }
 
@@ -89,7 +90,7 @@ export function DataScreen() {
       setWipeWord('')
       setMessage(signedIn ? 'Signed out and all data removed from this browser. The cloud copy is untouched.' : 'All data removed from this browser.')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not wipe.')
+      setError(errorText(e, 'Could not wipe.'))
     }
   }
 
@@ -101,7 +102,7 @@ export function DataScreen() {
       setDeleteWord('')
       setMessage('The cloud copy was deleted and this device signed out. Your data stays here.')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not delete the cloud copy.')
+      setError(errorText(e, 'Could not delete the cloud copy.'))
     }
   }
 

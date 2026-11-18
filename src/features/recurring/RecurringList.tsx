@@ -14,6 +14,7 @@ import { addMonths, describeCadence, monthOfDate, type MonthKey, type RecurringI
 import { endRecurringItem, reactivateRecurringItem, recurringStatus, rowCurrencyOf, setRecurringPaid } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
 import { RecurringDialog } from './RecurringDialog'
+import { saveError } from '@/app/saveError'
 
 const TH = 'px-1.5 py-1 font-semibold text-muted-foreground'
 const TD = 'px-1.5 py-0.5'
@@ -36,7 +37,7 @@ export function RecurringList({ engine }: {
   const items = tables.recurringItems.filter((r) => !r.deletedAt).sort((a, b) => a.name.localeCompare(b.name))
   const rowName = (id: string) => tables.rows.find((r) => r.id === id)?.name ?? '?'
   const accountName = (id: string | null) => (id ? tables.accounts.find((a) => a.id === id)?.name ?? '' : '')
-  const act = (fn: () => Promise<unknown>) => void fn().catch((e) => setError(e instanceof Error ? e.message : 'Action failed'))
+  const act = (fn: () => Promise<unknown>) => void fn().catch((e) => setError(saveError(e, 'Action failed')))
 
   return (
     <div className="space-y-3">

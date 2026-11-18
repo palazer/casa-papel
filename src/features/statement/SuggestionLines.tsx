@@ -9,6 +9,7 @@ import { InfoTip } from '@/components/InfoTip'
 import { AddLead } from './AddLead'
 import type { MonthKey, Row } from '@/model'
 import { addSuggestion, dismissSuggestion, type AccountSuggestion, type RowSuggestion } from '@/store'
+import { showSaveError } from '@/app/saveError'
 
 type Need = NonNullable<RowSuggestion['needs']>
 /** A suggested row that needs an account says so with the way to make it. */
@@ -61,7 +62,7 @@ function SuggestionLine({ suggestion: s, month, currency, locale, onAdded, onErr
   const [busy, setBusy] = useState(false)
   const amount = text.trim() === '' ? null : parseAmount(text, currency, locale)
   const unreadable = text.trim() !== '' && (amount == null || amount < 0)
-  const fail = (e: unknown) => onError(e instanceof Error ? e.message : 'That did not work.')
+  const fail = showSaveError(onError, 'That did not work.')
 
   function add() {
     if (unreadable || busy || s.needs) return
@@ -115,7 +116,7 @@ export function AccountSuggestionLines({ suggestions, onAdd, onError }: {
             <Button size="xs" variant="outline" aria-label={`Add ${s.name}`} onClick={() => onAdd(s)}>Add</Button>
             <button
               type="button" className={DISMISS} aria-label={`Dismiss ${s.name}`} title="Not for us"
-              onClick={() => void dismissSuggestion(store, s.id).catch((e) => onError(e instanceof Error ? e.message : 'That did not work.'))}
+              onClick={() => void dismissSuggestion(store, s.id).catch(showSaveError(onError, 'That did not work.'))}
             >
               <X className="size-3.5" aria-hidden />
             </button>

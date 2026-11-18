@@ -11,6 +11,7 @@ import { TREND_CHANGES, historyMonths, householdFx, rateInfo, trendFor } from '@
 import { monthOfDate, type Household, type MonthKey, type Tables } from '@/model'
 import { neededPairs, refreshRates, restoreEcbRate, setManualRate, setPairForecast } from '@/store'
 import { TAG_TONE, formatRate, rateTag, readableRate, toStored } from './fxDisplay'
+import { errorText, showSaveError } from '@/app/saveError'
 
 /**
  * The rates table (DESIGN.md §8): one column per pair the household needs, one row per planned month. Each column is a
@@ -29,7 +30,7 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
   const pairs = neededPairs(tables)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
-  /** Counts the fields that were emptied, so a field shows its rate again when emptying it changed nothing. */
+  /** Counts the fields that were emptied or not saved, so a field shows its stored rate again when nothing changed. */
   const [emptied, setEmptied] = useState(0)
   /** "My own change per month" was chosen for a pair and no number is saved for it yet. */
   const [ownOpen, setOwnOpen] = useState<Record<string, boolean>>({})
@@ -48,7 +49,11 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
     return readableRate(b, f, rateInfo(fx, b, f, monthOfDate())?.rate ?? 1, locale)
   }
   const pct = (d: number) => `${d > 0 ? '+' : ''}${(d * 100).toFixed(2)}%`
-  const act = (fn: () => Promise<unknown>) => void fn().catch((e) => onError(e instanceof Error ? e.message : 'Action failed'))
+  // a field whose change was not saved (Cancel at the question about the past, or refused) shows what is stored again
+  const act = (fn: () => Promise<unknown>) => void fn().catch((e) => {
+    setEmptied((n) => n + 1)
+    showSaveError(onError, 'Action failed')(e)
+  })
   const pickForecast = (pair: string, mode: ForecastMode) => {
     setOwnOpen((o) => ({ ...o, [pair]: mode === 'own' }))
     // "My own change" is saved with its number; the two others are whole as they are
@@ -71,7 +76,7 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
       const res = await refreshRates(store)
       setNote(`${res.written === 0 ? 'The official rates are up to date.' : `Stored ${res.written} month rate${res.written === 1 ? '' : 's'} from the ECB.`}${res.unsupported.length ? ` Not published by the ECB: ${res.unsupported.join(', ')}; enter those by hand.` : ''}`)
     } catch (e) {
-      onError(e instanceof Error ? e.message : 'Could not fetch rates')
+      onError(errorText(e, 'Could not fetch rates'))
     } finally {
       setBusy(false)
     }

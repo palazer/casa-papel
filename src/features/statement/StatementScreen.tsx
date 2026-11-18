@@ -45,6 +45,7 @@ import { LINE_MENU, type LineContext } from './StatementLine'
 import { AddLead } from './AddLead'
 import { LEAD_BUTTON, LEAD_PAD } from './lead'
 import { cn } from '@/lib/utils'
+import { saveError } from '@/app/saveError'
 
 const walk = (lines: StatementLine[]): StatementLine[] => lines.flatMap((l) => [l, ...walk(l.children)])
 /** Every top line of both halves, to look a line up in. */
@@ -300,7 +301,7 @@ export function StatementScreen() {
     const run = line.itemId
       ? setItemStatus(store, row.id, m, line.itemId, done ? 'done' : row.defaultStatus)
       : cell.source === 'derived' ? setDerivedDone(store, row.id, m, done) : setCellDone(store, row.id, m, done)
-    run.catch((e) => setError(e instanceof Error ? e.message : 'Action failed')).finally(() => setBusy(null))
+    run.catch((e) => setError(saveError(e, 'Action failed'))).finally(() => setBusy(null))
   }
 
   /**
@@ -568,7 +569,7 @@ export function StatementScreen() {
   const foldable = walk([...statement.flow.left.lines, ...statement.flow.right.lines, ...statement.position.left.lines, ...statement.position.right.lines])
     .filter((l) => l.kind === 'group' || l.children.length > 0 || !!l.goals?.length || autoOpen.has(l.id))
   const setAll = (open: boolean) => setOpenLines(Object.fromEntries(foldable.map((l) => [l.id, open])))
-  const act = (fn: () => Promise<unknown>) => void fn().catch((e) => setError(e instanceof Error ? e.message : 'Action failed'))
+  const act = (fn: () => Promise<unknown>) => void fn().catch((e) => setError(saveError(e, 'Action failed')))
   // Accounts are added where they will show: what the household has under Assets, what it owes under Debts
   const savingsAccounts = tables.accounts.filter((a) => a.type === 'savings' && !a.deletedAt && !a.archivedMonth)
   // step 3 once there is a savings account and nothing takes the rest of the month yet: one press asks the first of them

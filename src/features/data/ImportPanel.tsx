@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { useStore } from '@/app/store'
 import type { ExportFile } from '@/model'
 import { importMerge, importReplace, parseExportFile } from '@/store'
+import { errorText } from '@/app/saveError'
 
 type Pending = { file: ExportFile; name: string }
 
@@ -31,7 +32,7 @@ export function ImportPanel({ trigger, onMessage, onError, emptyDevice = false }
       const file = parseExportFile(JSON.parse(text))
       setPending({ file, name: f.name })
     } catch (e) {
-      onError(e instanceof Error ? e.message : 'Could not read that file.')
+      onError(errorText(e, 'Could not read that file.'))
     } finally {
       ev.target.value = ''
     }
@@ -49,7 +50,7 @@ export function ImportPanel({ trigger, onMessage, onError, emptyDevice = false }
       }
       setPending(null)
     } catch (e) {
-      onError(e instanceof Error ? e.message : 'Import failed.')
+      onError(errorText(e, 'Import failed.'))
     }
   }
 

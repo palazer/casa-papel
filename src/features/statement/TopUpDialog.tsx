@@ -12,6 +12,7 @@ import { cellKey, computeEngine, type EngineOutput } from '@/engine'
 import { resolveRules, type Household, type MonthKey, type Tables } from '@/model'
 import { applyMutations, topUpMutations, topUpPool, type TopUpSource } from '@/store'
 import { useSave } from '@/features/grid/RowDialogs'
+import { errorText } from '@/app/saveError'
 
 interface Props {
   tables: Tables
@@ -82,7 +83,7 @@ export function TopUpDialog({ tables, engine, household, poolId, month, onClose 
         rest: out.totals[month]?.rest ?? null,
       }
     } catch (e) {
-      return { error: e instanceof Error ? e.message : 'That top-up cannot be saved.' }
+      return { error: errorText(e, 'That top-up cannot be saved.') }
     }
   }, [tables, poolId, month, sourceId, amount])
   const problem = text.trim() !== '' && amount == null ? unreadableAmount(text) : preview && 'error' in preview ? preview.error : null

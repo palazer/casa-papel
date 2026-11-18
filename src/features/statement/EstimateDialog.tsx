@@ -11,6 +11,7 @@ import { cellKey, typedAmount, type EngineOutput } from '@/engine'
 import { followingText, onlyThisMonthText } from '@/features/grid/followingText'
 import { addMonths, type Category, type Household, type Money, type MonthKey, type Tables } from '@/model'
 import { estimateRowOf, planFollowing, setCategoryEstimate, type EditScope } from '@/store'
+import { saveError } from '@/app/saveError'
 
 interface Props {
   category: Category
@@ -55,7 +56,7 @@ export function EstimateDialog({ category, month, tables, engine, household, cur
       await setCategoryEstimate(store, category.id, month, amount, scope)
       onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save.')
+      setError(saveError(e, 'Could not save.'))
     } finally {
       setBusy(false)
     }

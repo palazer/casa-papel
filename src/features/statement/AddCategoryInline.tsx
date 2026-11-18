@@ -7,6 +7,7 @@ import { parseAmount, unreadableAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import type { MonthKey, Section } from '@/model'
 import { addCategory } from '@/store'
+import { showSaveError } from '@/app/saveError'
 
 /**
  * "Add category" at the foot of Income and Expenses: a name, then the category appears as a line, ready for its first
@@ -33,7 +34,7 @@ export function AddCategoryInline({ section, onError, estimate }: { section: Sec
       await addCategory(store, { name: n, section, estimate: estimate && typed > 0 ? { month: estimate.month, amount: typed } : undefined })
       reset()
     } catch (e) {
-      onError(e instanceof Error ? e.message : 'Could not add the category')
+      showSaveError(onError, 'Could not add the category')(e)
     }
   }
 

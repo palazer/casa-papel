@@ -4,6 +4,7 @@ import { Island } from '@/components/ui/island'
 import { inviteLink } from '@/app/url'
 import type { Invite } from '@/sync/remote'
 import { useSyncEngine, useSyncView } from '@/sync/useSync'
+import { errorText } from '@/app/saveError'
 
 /** Admins only: one-time links that let someone create an account. */
 export function InviteCard({ onError }: { onError: (m: string) => void }) {
@@ -35,8 +36,8 @@ export function InviteCard({ onError }: { onError: (m: string) => void }) {
     setLatest(inv.code)
     setCopied(false)
     await refresh()
-  }).catch((e) => onError(e instanceof Error ? e.message : 'Could not create the invite.'))
-  const revoke = (code: string) => void engine.revokeInvite(code).then(refresh).catch((e) => onError(e instanceof Error ? e.message : 'Could not revoke the invite.'))
+  }).catch((e) => onError(errorText(e, 'Could not create the invite.')))
+  const revoke = (code: string) => void engine.revokeInvite(code).then(refresh).catch((e) => onError(errorText(e, 'Could not revoke the invite.')))
   const copy = (code: string) => {
     void navigator.clipboard?.writeText(inviteLink(code))
     setCopied(true)

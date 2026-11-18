@@ -5,6 +5,7 @@ import { isDemoMode } from '@/app/store'
 import { AccountDialog, type AccountStep } from '@/features/sync/AccountDialog'
 import { describeSync } from '@/features/sync/syncText'
 import { useSyncEngine, useSyncView } from '@/sync/useSync'
+import { errorText } from '@/app/saveError'
 
 interface Props {
   hasLocalData: boolean
@@ -28,7 +29,7 @@ export function SyncCard({ hasLocalData, onMessage, onError }: Props) {
   }
 
   const signedIn = view.status !== 'off'
-  const act = (fn: () => Promise<unknown>, done?: string) => () => void fn().then(() => done && onMessage(done)).catch((e) => onError(e instanceof Error ? e.message : 'Something went wrong.'))
+  const act = (fn: () => Promise<unknown>, done?: string) => () => void fn().then(() => done && onMessage(done)).catch((e) => onError(errorText(e, 'Something went wrong.')))
 
   return (
     <Island

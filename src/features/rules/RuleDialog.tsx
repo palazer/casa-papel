@@ -15,6 +15,7 @@ import { compareMonths, isShareRule, parseMonth, poolRowName, type Household, ty
 import { previewRule, setRule, type RuleChoice, type RuleTarget } from '@/store'
 import { useSave } from '@/features/grid/RowDialogs'
 import { ruleFacts, type RuleFacts, type RuleKind } from './ruleFacts'
+import { errorText } from '@/app/saveError'
 
 /**
  * What the fields say, as text (`fixed:30000`, `share-of-income:0.1`, `share-of-row:1:<income row>`, `rest`): a plain
@@ -108,7 +109,7 @@ export function RuleFields({ tables, household, target, facts, month, kind, onCl
       const t = engine.totals[from]
       return { amount: engine.cells[cellKey(r.id, from)]?.valueBase ?? 0, takeHome: t.takeHome, own: t.takeHomeBy[r.scope] ?? 0, of: ofRowId ? engine.cells[cellKey(ofRowId, from)]?.netBase ?? 0 : 0, left: t.leftForShares, rest: t.rest, leftover: t.leftover }
     } catch (e) {
-      return { error: e instanceof Error ? e.message : 'That rule cannot be saved.' }
+      return { error: errorText(e, 'That rule cannot be saved.') }
     }
   }, [tables, target, from, choiceKey, ofRowId])
   const problem = fieldError ?? (preview && 'error' in preview ? preview.error : null)

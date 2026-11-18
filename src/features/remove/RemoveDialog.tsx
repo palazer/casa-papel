@@ -10,6 +10,7 @@ import { useStore } from '@/app/store'
 import { useSave } from '@/features/grid/RowDialogs'
 import type { Household, MonthKey, Tables } from '@/model'
 import { archiveMonthProblem, archiveThing, describeRemoval, removeThing, type Impact, type RemovalTarget } from '@/store'
+import { errorText } from '@/app/saveError'
 
 interface Props {
   target: RemovalTarget
@@ -34,7 +35,7 @@ export function RemoveDialog({ target, tables, household, onClose, onDone }: Pro
     try {
       return { impact: describeRemoval(tables, target, { locale, archiveFrom: from ?? undefined }), failure: null }
     } catch (e) {
-      return { impact: null, failure: e instanceof Error ? e.message : 'Something went wrong.' }
+      return { impact: null, failure: errorText(e, 'Something went wrong.') }
     }
   }, [tables, target, locale, from])
   const { error, busy, save } = useSave(() => {

@@ -13,6 +13,7 @@ import { RemoveDialog } from '@/features/remove/RemoveDialog'
 import { RowAccountDialog, RowCurrencyDialog, RowDeductionDialog, RowFollowDialog, RowScopeDialog, RowSourceDialog } from './RowDialogs'
 import { RowCategoryDialog } from './RowCategoryDialog'
 import { accountVerb, hasAccountChoice } from './rowAccount'
+import { showSaveError } from '@/app/saveError'
 
 type Open = 'rename' | 'category' | 'scope' | 'currency' | 'source' | 'deduction' | 'account' | 'follow' | 'remove' | null
 
@@ -41,7 +42,7 @@ export function RowMenu({ row, tables, household, onError, onDeleted, onRestored
   /** Rows the app works out itself have no amount of their own to follow with. */
   const canFollow = !derivedRowReason(row, household.closingRule)
 
-  const act = (fn: () => Promise<unknown>) => () => void fn().catch((e) => onError(e instanceof Error ? e.message : 'Action failed'))
+  const act = (fn: () => Promise<unknown>) => () => void fn().catch(showSaveError(onError, 'Action failed'))
   const close = () => setOpen(null)
   // While a household is being set up, deleting is cheap: one click, and undo is the way back. When more than the row
   // would change, the dialog still opens and says what.

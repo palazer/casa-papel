@@ -8,6 +8,7 @@ import { amountToInput, formatAmount, parseAmount } from '@/app/format'
 import { conversionFor, conversionFrom, type Conversion, type ConversionFigures, type Money } from '@/model'
 import { fetchDayRate } from '@/store'
 import { formatDay, formatRate, readableRate, toStored } from '@/features/household/fxDisplay'
+import { errorText } from '@/app/saveError'
 
 /** The three figures of a conversion, as the panel names them. */
 type Field = 'amount' | 'other' | 'rate'
@@ -142,7 +143,7 @@ export function ConversionPanel({ amount, currency, home, foreign, value, monthR
       setRateDay(got.date)
       typed('rate')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not fetch the rate.')
+      setError(errorText(e, 'Could not fetch the rate.'))
     } finally {
       setBusy(false)
     }
