@@ -553,7 +553,9 @@ function moveSourcesFrom(start: Tables, refs: FundedBy[], to: FundedBy, from: Mo
       of(s.fundedBy).schedules.push(s.id)
     } else if (s.endMonth == null || compareMonths(s.endMonth, from) >= 0) {
       // the copy is the one that comes out of the new source from here on
-      const split = planChangeRecurringFrom(work, s, from, { fundedBy: to }, ts)
+      // only what came out of the archived source moves (the rewrite below does the same for single months): a
+      // month that was given another source for itself keeps it
+      const split = planChangeRecurringFrom(work, s, from, { fundedBy: to }, ts, { keepOneMonthValues: true })
       add(split.mutations)
       of(s.fundedBy).schedules.push(split.targetId)
     }

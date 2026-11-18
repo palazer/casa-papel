@@ -3,8 +3,8 @@ import { cellKey, computeEngine } from '@/engine'
 import { monthRange, newId } from '@/model'
 import {
   CasaDb, Store, addRecurringItem, addRow, deleteRecurringItem, endRecurringItem, keepHouse, loadTables, planRecurringPosts, postRecurring,
-  changeRecurringFrom, endRecurringFrom, quickCreateHousehold, reactivateRecurringItem, recurringStatus, setCellItems, setCellValue, setRecurringPaid, skipRecurringMonth,
-  updateRecurringItem,
+  changeRecurringFrom, endRecurringFrom, oneMonthValuesReplaced, planChangeRecurringFrom, quickCreateHousehold, reactivateRecurringItem, recurringStatus, setCellItems, setCellValue, setRecurringPaid,
+  skipRecurringMonth, updateRecurringItem,
 } from '@/store'
 import { restoreToday, setToday } from '../today'
 
@@ -135,6 +135,79 @@ describe('recurring managed from the grid', () => {
     expect(same).toBe(item.id)
     expect(await postRecurring(store, months)).toBe(0)
     expect((await valuesOf(store, rent.id))[0]).toBe(90000)
+  })
+})
+
+describe('a schedule changed for this and the following months', () => {
+  /** Rent of 1,000.00 every month from January, with August at 1,234.00 and October at 1,111.00 for those months alone. */
+  async function withOwnMonths() {
+    const { store, rent } = await fresh()
+    const item = await addRecurringItem(store, { name: 'Rent', rowId: rent.id, amount: 100000, cadence: { intervalMonths: 1, anchorMonth: 1 }, startMonth: '2026-01' })
+    await postRecurring(store, months)
+    for (const [month, amount] of [['2026-08', 123400], ['2026-10', 111100]] as const) {
+      const cell = (await loadTables(store)).cells.find((c) => c.rowId === rent.id && c.month === month)!
+      await setCellItems(store, rent.id, month, cell.items.map((i) => ({ ...i, amount, pinned: true })), 'this-month')
+    }
+    return { store, rent, item }
+  }
+  const itemOf = async (store: Store, rowId: string, month: string) => (await loadTables(store)).cells.find((c) => c.rowId === rowId && c.month === month)!.items[0]
+
+  it('a new amount replaces a later one-month amount, and the item follows the schedule again', async () => {
+    const { store, rent, item } = await withOwnMonths()
+    expect(oneMonthValuesReplaced(await loadTables(store), item, '2026-06', { amount: 110000 })).toEqual(['2026-08', '2026-10'])
+    await changeRecurringFrom(store, item.id, '2026-06', { amount: 110000 })
+    expect(await postRecurring(store, months)).toBe(0)
+    expect(await valuesOf(store, rent.id)).toEqual([100000, 100000, 100000, 100000, 100000, 110000, 110000, 110000, 110000, 110000, 110000, 110000])
+    expect((await itemOf(store, rent.id, '2026-08')).pinned).toBe(false)
+    // one step: Undo brings August and October back as they were
+    await store.undo()
+    expect(await valuesOf(store, rent.id)).toEqual([100000, 100000, 100000, 100000, 100000, 100000, 100000, 123400, 100000, 111100, 100000, 100000])
+    expect((await itemOf(store, rent.id, '2026-08')).pinned).toBe(true)
+  })
+
+  it('what is paid keeps what was paid, and a month it was left out of stays without it', async () => {
+    const { store, rent, item } = await withOwnMonths()
+    await setRecurringPaid(store, item.id, '2026-08', true)
+    await skipRecurringMonth(store, item.id, '2026-09', true)
+    expect(oneMonthValuesReplaced(await loadTables(store), item, '2026-06', { amount: 110000 })).toEqual(['2026-10'])
+    await changeRecurringFrom(store, item.id, '2026-06', { amount: 110000 })
+    expect(await postRecurring(store, months)).toBe(0)
+    expect(await valuesOf(store, rent.id)).toEqual([100000, 100000, 100000, 100000, 100000, 110000, 110000, 123400, 0, 110000, 110000, 110000])
+    expect(await itemOf(store, rent.id, '2026-08')).toMatchObject({ amount: 123400, status: 'done' })
+    expect(await itemOf(store, rent.id, '2026-09')).toMatchObject({ skipped: true })
+  })
+
+  it('a new rhythm alone replaces nothing: the amount is sent with it, and it is the schedule\'s own', async () => {
+    const { store, rent, item } = await withOwnMonths()
+    const patch = { cadence: { intervalMonths: 2 as const, anchorMonth: 6 }, amount: 100000, fundedBy: 'cash' as const }
+    expect(oneMonthValuesReplaced(await loadTables(store), item, '2026-06', patch)).toEqual([])
+    await changeRecurringFrom(store, item.id, '2026-06', patch)
+    await postRecurring(store, months)
+    // every second month from June: August and October keep the amounts they were given for themselves
+    expect(await valuesOf(store, rent.id)).toEqual([100000, 100000, 100000, 100000, 100000, 100000, 0, 123400, 0, 111100, 0, 100000])
+  })
+
+  it('a new source replaces a later one-month source, and leaves a later one-month amount alone', async () => {
+    const { store, rent, item } = await withOwnMonths()
+    const dec = (await loadTables(store)).cells.find((c) => c.rowId === rent.id && c.month === '2026-12')!
+    await setCellItems(store, rent.id, '2026-12', dec.items.map((i) => ({ ...i, fundedBy: 'savings' as const, pinned: true })), 'this-month')
+    const account = (await loadTables(store)).accounts.find((a) => a.type === 'savings')!
+    const patch = { fundedBy: `account:${account.id}` as const }
+    expect(oneMonthValuesReplaced(await loadTables(store), item, '2026-06', patch)).toEqual(['2026-08', '2026-10', '2026-12'])
+    await changeRecurringFrom(store, item.id, '2026-06', patch)
+    expect(await postRecurring(store, months)).toBe(0)
+    // August keeps its own amount and stays this month's own; December has nothing of its own left
+    expect(await itemOf(store, rent.id, '2026-08')).toMatchObject({ amount: 123400, fundedBy: patch.fundedBy, pinned: true })
+    expect(await itemOf(store, rent.id, '2026-12')).toMatchObject({ amount: 100000, fundedBy: patch.fundedBy, pinned: false })
+  })
+
+  it('a change the app makes by itself replaces nothing a month holds for itself', async () => {
+    const { store, rent, item } = await withOwnMonths()
+    const tables = await loadTables(store)
+    const { mutations } = planChangeRecurringFrom(tables, item, '2026-06', { fundedBy: 'savings', amount: 110000 }, Date.now(), { keepOneMonthValues: true })
+    await store.commit(mutations)
+    expect(await itemOf(store, rent.id, '2026-08')).toMatchObject({ amount: 123400, fundedBy: 'cash', pinned: true })
+    expect(await itemOf(store, rent.id, '2026-07')).toMatchObject({ amount: 110000, fundedBy: 'savings' })
   })
 })
 

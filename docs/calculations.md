@@ -429,7 +429,14 @@ scheduled row does not carry its amount forward (A2 does not apply to it).
 A schedule and what it lands in the months are saved as one step, wherever the schedule is made or changed: one undo
 takes back both (finding F8, closed).
 
-**H3. A scheduled amount can be changed for one month, or for that month and the following ones.**
+**H3. A scheduled amount can be changed for one month, or for that month and the following ones.** Changed for the
+following months, a new amount or a new source replaces what a later month was given for itself ("Only this month"),
+as A3 says for any amount; the dialog names those months before saving. What is ticked as done keeps what was paid,
+and a month the item was left out of stays without it. Only a value that really changes replaces: a new rhythm by
+itself undoes no one-month amount.
+
+> "Rent" lands 1,300.00 every month; August is 1,500.00 for August alone. Changed to 1,400.00 in June, for this and
+> the following months: June to December are 1,400.00. Had August been ticked as done, it would still be 1,500.00.
 
 **H4. A schedule that is stopped lands for the last time in that month.**
 

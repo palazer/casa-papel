@@ -770,7 +770,11 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
     month`. An item set to repeat becomes a schedule from the month on screen when the dialog is saved, named after
     the item. Changing a scheduled item's rhythm counts from the month on screen (`Counts from November 2026; earlier
     months keep what they show.`), and `Only this month` ends it after this month (`Ends after November 2026.`); the
-    question "Apply the change to" is asked only while the rhythm itself is unchanged.
+    question "Apply the change to" is asked only while the rhythm itself is unchanged. A change that counts from
+    this month on replaces what a later month was given of that item for itself, and says so first, under the
+    choice (`data-testid="schedule-replaces"`, muted, `text-xs`): `Replaces what you typed for Aug 2026.` A month in
+    which the item is ticked as done is never named: it keeps what was paid. The same sentence follows `Counts
+    from …` for a schedule that lands in other months.
   - *What lands in other months* is listed too, in every month (`data-testid="elsewhere"`): a dashed box per
     schedule of the row with nothing in this month's list: the symbol and its name muted, its amount as a field, a
     bin (`Stop <name>`: `From <Month> on`, `All occurrences`) and the same `RepeatField` without `Only this month`.

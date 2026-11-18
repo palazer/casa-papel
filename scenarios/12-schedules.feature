@@ -47,6 +47,25 @@ Feature: Schedules: amounts that repeat by themselves
     Then "Rent" is 1,400.00 in June 2026
     And "Rent" is 1,300.00 in every month from July 2026 to December 2026
 
+  @H3 @A3
+  Scenario: A scheduled amount changed for the following months replaces a later one-month amount
+    Given "Rent" is on a schedule of 1,300.00 every month from March 2026
+    And I change the item "Rent" of "Rent" to 1,500.00 in August 2026, only this month
+    When I change the item "Rent" of "Rent" to 1,400.00 in June 2026, this and following months
+    Then "Rent" is 1,300.00 in every month from March 2026 to May 2026
+    And "Rent" is 1,400.00 in every month from June 2026 to December 2026
+    And nothing has changed before June 2026
+
+  @H3 @T3
+  Scenario: A scheduled amount that is ticked as done keeps what was paid
+    Given "Rent" is on a schedule of 1,300.00 every month from March 2026
+    And I change the item "Rent" of "Rent" to 1,500.00 in August 2026, only this month
+    And I mark "Rent" as done in August 2026
+    When I change the item "Rent" of "Rent" to 1,400.00 in June 2026, this and following months
+    Then "Rent" is 1,400.00 in every month from June 2026 to July 2026
+    And "Rent" is 1,500.00 in August 2026
+    And "Rent" is 1,400.00 in every month from September 2026 to December 2026
+
   @H4
   Scenario: A schedule that is stopped lands for the last time in that month
     Given "Rent" is on a schedule of 1,300.00 every month from March 2026

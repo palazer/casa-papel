@@ -382,11 +382,37 @@ export async function endRecurringFrom(store: Store, id: string, month: MonthKey
 /** What a schedule can be given from a month on: another amount, source or name, or another rhythm. */
 export type SchedulePatch = Partial<Pick<RecurringItem, 'amount' | 'fundedBy' | 'name' | 'cadence' | 'dueMonths' | 'endMonth'>>
 
+/** Which of a schedule's values a change really changes: only those replace what later months hold for themselves. */
+const reallyChanges = (item: RecurringItem, patch: SchedulePatch) => ({
+  amount: patch.amount !== undefined && patch.amount !== item.amount,
+  source: patch.fundedBy !== undefined && patch.fundedBy !== item.fundedBy,
+})
+
+/**
+ * The months after `month` in which the schedule's item holds an amount or a source of its own ("Only this month")
+ * that a change from `month` on would replace. A month in which it is ticked as done is not among them: what was
+ * paid stays. The dialog says these months before saving; `planChangeRecurringFrom` is what replaces them.
+ */
+export function oneMonthValuesReplaced(tables: Tables, item: RecurringItem, month: MonthKey, patch: SchedulePatch): MonthKey[] {
+  const changes = reallyChanges(item, patch)
+  if (!changes.amount && !changes.source) return []
+  return tables.cells
+    .filter((c) => c.rowId === item.rowId && compareMonths(c.month, month) > 0 && c.items.some((i) =>
+      i.recurringItemId === item.id && i.pinned && i.status !== 'done' && ((changes.amount && i.amount !== patch.amount) || (changes.source && i.fundedBy !== patch.fundedBy))))
+    .map((c) => c.month).sort()
+}
+
 /**
  * Change amount/funding/name or the rhythm from `month` on. Earlier months keep the old values: the old
  * schedule ends the month before and a copy with the new values starts at `month`. Posted
  * items from `month` on are re-pointed to the copy so paid marks survive and nothing posts twice; what is paid
  * keeps the amount that was paid. Returns the id of the schedule that now covers `month`.
+ *
+ * A value that really changes counts for this month and the following ones, whatever they held (rule A3, for
+ * schedules): a later month's own amount or source ("Only this month") is replaced by it. A value the change leaves
+ * alone keeps what later months hold for themselves, so a new rhythm by itself undoes nothing. `keepOneMonthValues`
+ * is for a change the app makes by itself (an archived account's schedules move to another source): it replaces
+ * nothing a month holds for itself.
  */
 export async function changeRecurringFrom(store: Store, id: string, month: MonthKey, patch: SchedulePatch): Promise<string> {
   const { tables, item } = await findLive(store, id)
@@ -396,9 +422,10 @@ export async function changeRecurringFrom(store: Store, id: string, month: Month
 }
 
 /** The mutations behind `changeRecurringFrom`; archiving a virtual account uses them to move its schedules to savings. */
-export function planChangeRecurringFrom(tables: Tables, item: RecurringItem, month: MonthKey, patch: SchedulePatch, ts: number): { mutations: Mutation[]; targetId: string } {
+export function planChangeRecurringFrom(tables: Tables, item: RecurringItem, month: MonthKey, patch: SchedulePatch, ts: number, opts: { keepOneMonthValues?: boolean } = {}): { mutations: Mutation[]; targetId: string } {
   const mutations: Mutation[] = []
   let targetId = item.id
+  const changes = opts.keepOneMonthValues ? { amount: false, source: false } : reallyChanges(item, patch)
   if (compareMonths(month, item.startMonth) <= 0) {
     mutations.push({ op: 'put', table: 'recurringItems', record: RecurringItemSchema.parse({ ...item, ...patch, updatedAt: ts }) })
   } else {
@@ -410,11 +437,18 @@ export function planChangeRecurringFrom(tables: Tables, item: RecurringItem, mon
   for (const cell of tables.cells) {
     if (cell.rowId !== item.rowId || compareMonths(cell.month, month) < 0) continue
     if (!cell.items.some((i) => i.recurringItemId === item.id)) continue
-    const items = cell.items.map((i) =>
-      i.recurringItemId !== item.id ? i
-        : i.pinned || i.status === 'done' ? { ...i, recurringItemId: targetId }
-        : { ...i, recurringItemId: targetId, amount: patch.amount ?? i.amount, fundedBy: patch.fundedBy ?? i.fundedBy, label: patch.name ?? i.label },
-    )
+    const items = cell.items.map((i): CellItem => {
+      if (i.recurringItemId !== item.id) return i
+      if (i.status === 'done') return { ...i, recurringItemId: targetId }
+      if (i.pinned) {
+        if (!changes.amount && !changes.source) return { ...i, recurringItemId: targetId }
+        const next: CellItem = { ...i, recurringItemId: targetId, amount: changes.amount ? patch.amount! : i.amount, fundedBy: changes.source ? patch.fundedBy! : i.fundedBy }
+        // with nothing of its own left, the item follows the schedule again
+        const own = next.amount !== (patch.amount ?? item.amount) || next.fundedBy !== (patch.fundedBy ?? item.fundedBy)
+        return own ? next : { ...next, pinned: false }
+      }
+      return { ...i, recurringItemId: targetId, amount: patch.amount ?? i.amount, fundedBy: patch.fundedBy ?? i.fundedBy, label: patch.name ?? i.label }
+    })
     mutations.push(cellPut(cell, { rowId: cell.rowId, month: cell.month, items }, ts))
   }
   return { mutations, targetId }

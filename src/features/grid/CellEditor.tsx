@@ -18,7 +18,7 @@ import {
   type CellItem, type Household, type ItemStatus, type MonthKey, type RepeatChoice, type Repeating, type Row, type Tables,
 } from '@/model'
 import {
-  clearCell, derivedRowReason, endRecurringFrom, fetchRatesFor, itemsFromCurrent, planFollowing, saveRowMonth, setCellItems, setCellValue, skipRecurringMonth,
+  clearCell, derivedRowReason, endRecurringFrom, fetchRatesFor, itemsFromCurrent, oneMonthValuesReplaced, planFollowing, saveRowMonth, setCellItems, setCellValue, skipRecurringMonth,
   type EditScope, type RuleTarget,
 } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
@@ -503,6 +503,9 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                   const choice = repeatFor(it)
                   /** The rhythm was changed here: that counts from this month on, so the amount is not asked about separately. */
                   const moved = !!schedule && !sameRepeat(choice, storedRepeat(it))
+                  /** A change of the schedule from this month on replaces what later months hold of it for themselves: said before saving. */
+                  const fromHere = !!schedule && (moved ? choice.kind !== 'none' : edited && applyTo[it.id] === 'from-now-on')
+                  const replaces = schedule && fromHere && Number.isFinite(it.amount) ? followingEffects({ replaced: oneMonthValuesReplaced(tables, schedule, month, { amount: it.amount, fundedBy: it.fundedBy }), kept: [] }, locale) : ''
                   return (
                     <div key={it.id} className={cn('space-y-2 rounded-md border p-2', schedule && 'border-transfer/40')}>
                       {/* the name takes what the other fields leave: they are as narrow as their content allows */}
@@ -555,6 +558,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                           />
                         </div>
                       )}
+                      {replaces && <p className="text-xs text-muted-foreground" data-testid="schedule-replaces">{replaces}</p>}
                       {schedule && removing === it.id && (
                         <div className="flex flex-wrap items-center gap-2 text-xs">
                           <span className="text-muted-foreground">Remove "{it.label}":</span>
@@ -591,7 +595,11 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                         value={draft?.repeat ?? repeatOf(s)} month={month} locale={locale} name={s.name}
                         onChange={(c) => { if (c.kind !== 'none') setOthers((o) => ({ ...o, [s.id]: { ...o[s.id], repeat: c } })) }}
                       />
-                      {touched && <p className="text-xs text-muted-foreground">Counts from {formatMonth(month, locale, 'long')}; earlier months keep what they show.</p>}
+                      {touched && (
+                        <p className="text-xs text-muted-foreground">
+                          {[`Counts from ${formatMonth(month, locale, 'long')}; earlier months keep what they show.`, followingEffects({ replaced: oneMonthValuesReplaced(tables, s, month, { amount: Number.isFinite(otherAmount(s.id)) ? otherAmount(s.id) : undefined }), kept: [] }, locale)].filter(Boolean).join(' ')}
+                        </p>
+                      )}
                       {stopping === s.id && (
                         <div className="flex flex-wrap items-center gap-2 text-xs">
                           <span className="text-muted-foreground">Stop "{s.name}":</span>
