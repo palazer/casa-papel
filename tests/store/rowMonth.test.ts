@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cellKey, computeEngine } from '@/engine'
 import { describeCadence, monthRange, newId, type CellItem } from '@/model'
-import { CasaDb, Store, addCategory, addRecurringItem, addRow, closeMonth, loadTables, planHousekeeping, planRecurringPosts, postRecurring, quickCreateHousehold, saveRowMonth, setCellItems, setCellValue } from '@/store'
+import { CasaDb, Store, addCategory, addRecurringItem, addRow, loadTables, planHousekeeping, planRecurringPosts, postRecurring, quickCreateHousehold, saveRowMonth, setCellItems, setCellValue } from '@/store'
 import { restoreToday, setToday } from '../today'
 
 const months = monthRange('2026-01', '2026-12')
@@ -150,20 +150,19 @@ describe('something that repeats, renamed in the row\'s dialog', () => {
     return months.map((m) => cells.find((c) => c.month === m)?.items.map((i) => i.label).join('+') ?? '')
   }
 
-  it('the name typed over an item renames its schedule and what it posted in every open month, done or not; one undo takes it back', async () => {
+  it('the name typed over an item renames its schedule and what it posted in every month, done or not; one undo takes it back', async () => {
     const { store, row } = await fresh()
     await addRecurringItem(store, { name: 'Getsafe', rowId: row.id, amount: 6000, startMonth: '2026-01' })
     await postRecurring(store, months)
     const feb = (await itemsOf(store, row.id, '2026-02'))[0]
     await saveRowMonth(store, row.id, '2026-02', { items: [{ ...feb, status: 'done' }], scope: 'from-now-on' })
-    await closeMonth(store, '2026-01')
     const before = await valuesOf(store, row.id)
 
     const march = (await itemsOf(store, row.id, '2026-03'))[0]
     await saveRowMonth(store, row.id, '2026-03', { items: [{ ...march, label: '  Liability insurance ' }], scope: 'from-now-on' })
     expect((await schedulesOf(store, row.id)).map((s) => s.name)).toEqual(['Liability insurance'])
-    // January is closed and keeps what it shows; February is done and is renamed all the same
-    expect(await labelsOf(store, row.id)).toEqual(['Getsafe', ...months.slice(1).map(() => 'Liability insurance')])
+    // it is the same thing under a better name: January, which is over, and February, which is done, are renamed too
+    expect(await labelsOf(store, row.id)).toEqual(months.map(() => 'Liability insurance'))
     expect(await valuesOf(store, row.id)).toEqual(before)
     // nothing is left for the poster to put right
     expect(planRecurringPosts(await loadTables(store), months)).toEqual([])

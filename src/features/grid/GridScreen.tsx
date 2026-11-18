@@ -1,5 +1,5 @@
 import { useMemo, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { ChevronDown, ChevronRight, Lock, Repeat } from 'lucide-react'
+import { ChevronDown, ChevronRight, Repeat } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { InfoTip } from '@/components/InfoTip'
@@ -16,8 +16,8 @@ import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useE
 import { useUndoNotice } from '@/app/useUndoNotice'
 import { UndoNotice } from '@/components/UndoNotice'
 import { cellKey, currentAccountsIn, groupRowsByCategory, mainAccountLabel, type EngineOutput } from '@/engine'
-import { isOldPocketShare, isShareRule, monthOfDate, parseMonth, repeatsText, resolveRules, runningSchedules, type Household, type Money, type MonthKey, type Row, type RuleState, type Section, type Tables } from '@/model'
-import { addPlanYear, closeMonth, derivedRowReason, reopenMonth } from '@/store'
+import { isOldPocketShare, isPastMonth, isShareRule, monthOfDate, parseMonth, repeatsText, resolveRules, runningSchedules, type Household, type Money, type MonthKey, type Row, type RuleState, type Section, type Tables } from '@/model'
+import { addPlanYear, derivedRowReason } from '@/store'
 import { AddRowInline } from './AddRowInline'
 import { BalanceDialog } from './BalanceDialog'
 import { MonthBalancesDialog } from './MonthBalancesDialog'
@@ -125,14 +125,14 @@ export function GridScreen() {
       </th>
       {months.map((m) => {
         const v = pick(m)
-        if (v == null) return <td key={m} className={cn('p-0', engine.totals[m]?.closed && 'bg-muted/60')} />
+        if (v == null) return <td key={m} className={cn('p-0', isPastMonth(m, today) && 'bg-muted/60')} />
         const d = amountDisplay(v, flow, opts.currency ?? ccy, locale, neg)
         const text = opts.format ? opts.format(v, m) : d.text
         const marked = opts.mark?.(m) ?? false
         // a balance that needs attention (a virtual account that was asked for more than it held) takes the expense hue and says why
         const warning = opts.warn?.(m) ?? null
         return (
-          <td key={m} title={warning ?? undefined} className={cn('p-0 text-right tabular-nums', toneClass[d.tone], warning && 'text-expense', opts.muted && 'text-[11px]', opts.sub && 'text-muted-foreground', engine.totals[m]?.closed && 'bg-muted/60')}>
+          <td key={m} title={warning ?? undefined} className={cn('p-0 text-right tabular-nums', toneClass[d.tone], warning && 'text-expense', opts.muted && 'text-[11px]', opts.sub && 'text-muted-foreground', isPastMonth(m, today) && 'bg-muted/60')}>
             {opts.onClick ? (
               <button type="button" aria-label={`${label} ${formatMonth(m, locale)}: ${text}`} onClick={() => opts.onClick!(m)} className={cn('w-full px-1.5 py-0.5 text-right hover:bg-muted', marked && 'underline decoration-dotted underline-offset-4')}>
                 {text}
@@ -157,7 +157,7 @@ export function GridScreen() {
           </Button>
         )}
         <Button size="xs" variant="outline" onClick={() => act(() => addPlanYear(store))}>Add {parseMonth(months[months.length - 1]).year + 1}</Button>
-        <span className="text-muted-foreground">Click a cell to edit · arrows move · Enter opens · click a month name to open it in the Statement, to type its balances, or to close or reopen it</span>
+        <span className="text-muted-foreground">Click a cell to edit · arrows move · Enter opens · click a month name to open it in the Statement or to type its balances</span>
         <MarksLegend neg={neg} />
         {engine.warnings.length > 0 && <p role="alert" className="basis-full text-amber-700 dark:text-amber-400">{engine.warnings.join(' · ')}</p>}
         {error && (
@@ -182,9 +182,8 @@ export function GridScreen() {
                   <th key={m} className={cn('sticky top-0 z-20 min-w-24 border-b px-1 py-1 text-right font-medium', isToday ? 'bg-muted' : 'bg-card')}>
                     <DropdownMenu>
                       <DropdownMenuTrigger
-                        render={<button className="inline-flex w-full items-center justify-end gap-1 rounded px-1 py-0.5 hover:bg-muted" aria-label={`${formatMonth(m, locale)}${t?.closed ? ', closed' : ''}`} />}
+                        render={<button className="inline-flex w-full items-center justify-end gap-1 rounded px-1 py-0.5 hover:bg-muted" aria-label={`${formatMonth(m, locale)}${isPastMonth(m, today) ? ', past' : ''}`} />}
                       >
-                        {t?.closed && <Lock className="size-3 text-muted-foreground" aria-hidden />}
                         <span className={cn(isToday ? 'font-semibold text-foreground' : 'text-muted-foreground')}>{formatMonth(m, locale)}</span>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
@@ -195,14 +194,7 @@ export function GridScreen() {
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => { handMonth(m); go('statement') }}>Open in the Statement</DropdownMenuItem>
-                        {t?.closed ? (
-                          <DropdownMenuItem onClick={() => act(() => reopenMonth(store, m))}>Reopen month</DropdownMenuItem>
-                        ) : (
-                          <>
-                            <DropdownMenuItem onClick={() => setBalancesFor(m)}>Balances for {formatMonth(m, locale)}…</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => act(() => closeMonth(store, m))}>Close month</DropdownMenuItem>
-                          </>
-                        )}
+                        <DropdownMenuItem onClick={() => setBalancesFor(m)}>Balances for {formatMonth(m, locale)}…</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </th>
@@ -297,15 +289,15 @@ export function GridScreen() {
       {balanceSel && (() => {
         const acc = tables.accounts.find((a) => a.id === balanceSel.accountId)
         const res = engine.accounts[balanceSel.accountId]?.months[balanceSel.month]
-        return acc && res ? <BalanceDialog key={`${acc.id}:${balanceSel.month}`} account={acc} month={balanceSel.month} tables={tables} household={household} closed={engine.totals[balanceSel.month]?.closed ?? false} onClose={() => setBalanceSel(null)} /> : null
+        return acc && res ? <BalanceDialog key={`${acc.id}:${balanceSel.month}`} account={acc} month={balanceSel.month} tables={tables} household={household} onClose={() => setBalanceSel(null)} /> : null
       })()}
       {currentSel && main?.months[currentSel] && (
         <CurrentBalanceDialog
           key={currentSel} title={mainAccountLabel(main, tables.accounts)} month={currentSel} tables={tables} household={household}
-          closed={engine.totals[currentSel]?.closed ?? false} onClose={() => setCurrentSel(null)}
+          onClose={() => setCurrentSel(null)}
         />
       )}
-      {balancesFor && !engine.totals[balancesFor]?.closed && <MonthBalancesDialog key={balancesFor} month={balancesFor} tables={tables} engine={engine} household={household} onClose={() => setBalancesFor(null)} />}
+      {balancesFor && <MonthBalancesDialog key={balancesFor} month={balancesFor} tables={tables} engine={engine} household={household} onClose={() => setBalancesFor(null)} />}
       {selected && selectedRow && (
         <CellEditor key={`${selectedRow.id}:${selected.month}`} tables={tables} engine={engine} household={household} row={selectedRow} month={selected.month} onClose={() => setSelected(null)} />
       )}
@@ -343,10 +335,9 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
   const deductedFrom = row.deductedFromRowId ? tables.rows.find((r) => r.id === row.deductedFromRowId) : undefined
   const shareTag = row.followShare != null && row.followShare !== 1 ? `${formatPercent(row.followShare, locale)} of ` : ''
   const automatic = derivedRowReason(row, household.closingRule) !== null
-  // "Rule…" opens the row's dialog in a month that can still change: this month when it is shown and open, else the first open one
+  // "Rule…" opens the row's dialog in this month when it is shown, else in the shown month nearest to it
   const thisMonth = monthOfDate()
-  const openMonth = (m: MonthKey) => !engine.totals[m]?.closed
-  const ruleMonth = months.find((m) => m === thisMonth && openMonth(m)) ?? months.find((m) => m > thisMonth && openMonth(m)) ?? months.find(openMonth) ?? months[0]
+  const ruleMonth = months.find((m) => m >= thisMonth) ?? months[months.length - 1]
   /** A row a rule works out says which, the way a follower names its row. */
   const ruleTag = rule && rule.kind !== 'idle' ? ruleText({ ...rule, of: rule.ofRowId ? tables.rows.find((r) => r.id === rule.ofRowId && !r.deletedAt)?.name : undefined }, locale) : null
   /** On a schedule that has not ended: the Statement's repeat symbol, beside the name. */
@@ -379,8 +370,7 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
       {months.map((m, c) => {
         const cell = engine.cells[cellKey(row.id, m)]
         if (!cell) return <td key={m} />
-        const today = monthOfDate()
-        const closed = engine.totals[m]?.closed
+        const past = isPastMonth(m, thisMonth)
         const isDerived = cell.source === 'derived'
         const isEmpty = cell.source === 'empty' || (cell.source === 'items' && cell.items.every((i) => i.skipped))
         const d = amountDisplay(cell.value, flow, cell.currency, locale, neg)
@@ -390,9 +380,9 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
         const net = row.section === 'income' && cell.deductionsBase > 0 ? formatAmount(cell.netBase, ccy, locale, { compact: true }) : null
         const sub = net ? { text: `net ${net}`, label: `net ${net}` } : about ? { text: `≈ ${about}`, label: `about ${about}` } : null
         // One mark only: a green dot for done in any month; the current month also shows red (nothing yet) and amber (partly).
-        const dot = !isEmpty && (!isDerived || cell.value !== 0) && ((m === today && !closed) || cell.status === 'done') ? doneness(cell) : null
+        const dot = !isEmpty && (!isDerived || cell.value !== 0) && (m === thisMonth || cell.status === 'done') ? doneness(cell) : null
         return (
-          <td key={m} className={cn('p-0', closed && 'bg-muted/60')}>
+          <td key={m} className={cn('p-0', past && 'bg-muted/60')}>
             {cell.source === 'archived' ? null : isDerived ? (
               <div className={cn('relative flex flex-col items-end px-1.5 py-0.5 text-right tabular-nums', dot && 'pr-3', toneClass[d.tone])}>
                 {dot && <DoneDot {...dot} className="absolute right-0.5 top-0.5" />}

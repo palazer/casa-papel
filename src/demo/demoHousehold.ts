@@ -46,6 +46,17 @@ const items = (rowId: string, month: string, list: Array<[string, number, Status
   })),
 })
 
+/**
+ * A cell of a month that is over and all done: every item ticked. A third entry names the schedule that posted the
+ * item, so the month agrees with its schedules and nothing is landed in it a second time.
+ */
+const paid = (rowId: string, month: string, list: Array<[string, number, string?]>, fundedBy: string = 'cash') => ({
+  rowId, month, mode: 'items', updatedAt: T0,
+  items: list.map(([label, amount, of], i) => ({
+    id: id(2000 + hash(rowId + month) * 10 + i), label, amount, status: 'done', fundedBy, kind: 'normal', recurringItemId: of ?? null,
+  })),
+})
+
 function hash(s: string): number {
   let h = 0
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 100_000
@@ -84,16 +95,18 @@ export function buildDemoTables(): Tables {
   ]
 
   const cells = [
-    // September 2026 (closed)
-    value(ID.rowSamSalary, '2026-09', 420000), value(ID.rowAlexSalary, '2026-09', 280000), value(ID.rowChildBenefit, '2026-09', 25500),
-    value(ID.rowRent, '2026-09', 165000), value(ID.rowUtilities, '2026-09', 21000), value(ID.rowGroceries, '2026-09', 72000),
-    value(ID.rowTransport, '2026-09', 9800), value(ID.rowDog, '2026-09', 6500), value(ID.rowChildcare, '2026-09', 38000),
-    value(ID.rowSubscriptions, '2026-09', 4200), value(ID.rowHealth, '2026-09', 3000),
+    // September 2026: over, and all of it ticked as done ("Count everything in September as done")
+    paid(ID.rowSamSalary, '2026-09', [['', 420000]]), paid(ID.rowAlexSalary, '2026-09', [['', 280000]]), paid(ID.rowChildBenefit, '2026-09', [['', 25500]]),
+    paid(ID.rowRent, '2026-09', [['Rent', 165000, ID.recRent]]), paid(ID.rowUtilities, '2026-09', [['', 21000]]), paid(ID.rowGroceries, '2026-09', [['', 72000]]),
+    paid(ID.rowTransport, '2026-09', [['', 9800]]), paid(ID.rowDog, '2026-09', [['', 6500]]), paid(ID.rowChildcare, '2026-09', [['', 38000]]),
+    paid(ID.rowSubscriptions, '2026-09', [['Streaming', 1800, ID.recStreaming], ['Cloud storage', 2400]]), paid(ID.rowHealth, '2026-09', [['', 3000]]),
     items(ID.rowSamPersonal, '2026-09', [['Concert tickets', 9000, 'done'], ['Books', 3200, 'done']]),
     items(ID.rowAlexPersonal, '2026-09', [['Gym', 4000, 'done']]),
-    value(ID.rowToInvestment, '2026-09', 50000), value(ID.rowTravelAlloc, '2026-09', 20000), value(ID.rowClothingAlloc, '2026-09', 10000),
+    paid(ID.rowToInvestment, '2026-09', [['', 50000]]), paid(ID.rowTravelAlloc, '2026-09', [['', 20000]]), paid(ID.rowClothingAlloc, '2026-09', [['', 10000]]),
     // pocket money: a fixed amount per adult, carried forward
-    value(ID.rowPocketSam, '2026-09', 50000), value(ID.rowPocketAlex, '2026-09', 50000),
+    paid(ID.rowPocketSam, '2026-09', [['', 50000]]), paid(ID.rowPocketAlex, '2026-09', [['', 50000]]),
+    // the rest that went to savings is worked out, so its tick stands beside it
+    { rowId: ID.rowToSavings, month: '2026-09', mode: 'inherit', value: null, items: [], markedDone: true, updatedAt: T0 },
     // October 2026
     value(ID.rowSamSalary, '2026-10', 420000), value(ID.rowAlexSalary, '2026-10', 280000), value(ID.rowChildBenefit, '2026-10', 25500),
     value(ID.rowGroceries, '2026-10', 70000), value(ID.rowTransport, '2026-10', 9800),
@@ -153,9 +166,7 @@ export function buildDemoTables(): Tables {
       { ...base(ID.poolClothing, 'a1'), name: 'Clothing', accountId: ID.savings, allocationRowId: ID.rowClothingAlloc, openingBalance: 15000 },
     ],
     fxRates: [],
-    monthStates: [
-      { month: '2026-09', closed: true, closedAt: Date.UTC(2026, 9, 2), pocketTotalOverride: null, cashBufferOverride: null, updatedAt: T0 },
-    ],
+    monthStates: [],
   }
   return TablesSchema.parse(tables)
 }

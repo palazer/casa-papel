@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cellKey, computeEngine } from '@/engine'
 import { accountRef, monthRange, newId, poolRef, type CellItem } from '@/model'
 import {
-  CasaDb, Store, addAccount, addPool, addRecurringItem, addRow, archiveAccount, archivePool, closeMonth, describeRemoval, loadTables, postRecurring, quickCreateHousehold,
+  CasaDb, Store, addAccount, addPool, addRecurringItem, addRow, archiveAccount, archivePool, describeRemoval, loadTables, postRecurring, quickCreateHousehold,
   removeAccount, removeIfFree, setCellItems, setCellValue, setRowAccount, setRowFundedBy,
 } from '@/store'
 import { fundingOptions } from '@/features/grid/funding'
@@ -144,14 +144,18 @@ describe('"Comes out of" an account: removing the account', () => {
     expect(t.rows.find((r) => r.id === school.id)).toMatchObject({ accountId: rainy.id, defaultFundedBy: accountRef(rainy.id) })
   })
 
-  it('an account that paid in a closed month can only be archived, tracked or not', async () => {
+  it('an account that paid in a month that is over can be deleted, tracked or not; the dialog says which month changes', async () => {
     const { store, school } = await fresh()
     const stash = await addAccount(store, { name: 'Stash', type: 'other-asset', currency: 'EUR', openingMonth: '2026-01', tracked: false })
     await setCellItems(store, school.id, '2026-01', [item(120_00, accountRef(stash.id))], 'this-month')
-    await closeMonth(store, '2026-01')
     const impact = describeRemoval(await loadTables(store), { kind: 'account', id: stash.id }, OPTS)
-    expect(impact).toMatchObject({ canDelete: false, canArchive: true, closedHistory: 'Jan 2026' })
-    await expect(removeAccount(store, stash.id)).rejects.toThrow(/closed months/)
+    expect(impact).toMatchObject({ canDelete: true, canArchive: true })
+    expect(impact.over).toMatch(/is over \(Jan 2026\)/)
+    await removeAccount(store, stash.id)
+    const t = await loadTables(store)
+    expect(t.accounts.find((a) => a.id === stash.id)?.deletedAt).not.toBeNull()
+    // the payment stays in its month, and comes out of the month's income now
+    expect(t.cells.find((c) => c.rowId === school.id && c.month === '2026-01')!.items.map((i) => [i.amount, i.fundedBy])).toEqual([[120_00, 'cash']])
   })
 
   it('archiving it moves what came out of it to the month\'s income from that month on; earlier months keep the account', async () => {

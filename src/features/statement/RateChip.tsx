@@ -22,13 +22,10 @@ const SOURCE: Record<string, string> = {
 /**
  * The month's rate for one other currency, in the Statement's toolbar (DESIGN.md §7): a chip that says the rate
  * (`1 EUR = 1.08 USD`) in the tone of where it came from, and nothing else on the page. Pressing it opens the rest:
- * where the rate is from, a field to type your own for this month, and "Use the ECB rate again" once it is yours. A
- * closed month shows the same and changes nothing.
+ * where the rate is from, a field to type your own for this month, and "Use the ECB rate again" once it is yours.
  */
-export function RateChip({ tables, household, month, currency, locked = false }: {
+export function RateChip({ tables, household, month, currency }: {
   tables: Tables; household: Household; month: MonthKey; currency: string
-  /** A closed month shows its rate and changes none. */
-  locked?: boolean
 }) {
   const { locale, info, rec, tag, readable, busy, error, setError, save, restore } = useMonthRate(tables, household, month, currency)
   const inputId = useId()
@@ -49,7 +46,7 @@ export function RateChip({ tables, household, month, currency, locked = false }:
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger
-        aria-label={`${said}: ${locked ? 'the rate of this month' : 'change this month\'s rate'}`} title={locked ? 'This month\'s rate' : 'Change this month\'s rate'}
+        aria-label={`${said}: change this month's rate`} title="Change this month's rate"
         data-testid="rate-chip" data-source={tag}
         className={chipClass(TAG_TONE[tag], 'filled', 'cursor-pointer tabular-nums outline-none hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring data-popup-open:brightness-95 pointer-coarse:px-2.5 pointer-coarse:py-1.5')}
       >
@@ -63,17 +60,13 @@ export function RateChip({ tables, household, month, currency, locked = false }:
             <span>{SOURCE[tag]}{rec?.date ? ` Taken on ${formatDay(rec.date, locale)}.` : ''}</span>
           </PopoverDescription>
         </PopoverHeader>
-        {locked ? (
-          <p className="text-muted-foreground">{long} is closed: reopen it to change its rate.</p>
-        ) : (
-          <form className="flex flex-wrap items-center gap-2" onSubmit={(e) => { e.preventDefault(); save(text, close) }}>
-            <Label htmlFor={inputId} className="text-xs">1 {readable.from} =</Label>
-            <Input id={inputId} className="h-7 w-24 text-right text-xs tabular-nums" inputMode="decimal" autoFocus value={text} onChange={(e) => setText(e.target.value)} />
-            <span>{readable.to}</span>
-            <Button size="xs" variant="outline" type="submit" disabled={busy}>Save rate</Button>
-            {tag === 'manual' && <Button size="xs" variant="ghost" type="button" disabled={busy} onClick={() => restore(close)}>Use the ECB rate again</Button>}
-          </form>
-        )}
+        <form className="flex flex-wrap items-center gap-2" onSubmit={(e) => { e.preventDefault(); save(text, close) }}>
+          <Label htmlFor={inputId} className="text-xs">1 {readable.from} =</Label>
+          <Input id={inputId} className="h-7 w-24 text-right text-xs tabular-nums" inputMode="decimal" autoFocus value={text} onChange={(e) => setText(e.target.value)} />
+          <span>{readable.to}</span>
+          <Button size="xs" variant="outline" type="submit" disabled={busy}>Save rate</Button>
+          {tag === 'manual' && <Button size="xs" variant="ghost" type="button" disabled={busy} onClick={() => restore(close)}>Use the ECB rate again</Button>}
+        </form>
         {error && <p role="alert" className="text-destructive">{error}</p>}
         <p className="leading-4 text-muted-foreground">{HELP['statement.rate'].text}</p>
       </PopoverContent>

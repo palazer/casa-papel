@@ -77,12 +77,6 @@ export function ruleMutations(tables: Tables, target: RuleTarget, choice: RuleCh
     throw new Error('The percentage must be above 0 and at most 100.')
   }
   if (compareMonths(from, household.startMonth) < 0) throw new Error(`The household starts in ${household.startMonth}; a rule cannot start before that.`)
-  const closedAfter = tables.monthStates.filter((s) => s.closed && compareMonths(s.month, from) >= 0).map((s) => s.month).sort()
-  if (closedAfter.length) {
-    throw new Error(closedAfter[0] === from
-      ? `${from} is closed. Reopen it, or start the rule in an open month.`
-      : `${closedAfter[0]} is closed, and a rule counts for every month from its start on. Reopen it, or start the rule after it.`)
-  }
 
   const mutations: Mutation[] = []
   let working = tables
@@ -123,7 +117,6 @@ export function ruleMutations(tables: Tables, target: RuleTarget, choice: RuleCh
   // what every month before the start shows now
   const months = compareMonths(household.startMonth, from) < 0 ? monthRange(household.startMonth, addMonths(from, -1)) : []
   const engine: EngineOutput | null = months.length ? computeEngine({ tables: working, months }) : null
-  const closed = new Set(tables.monthStates.filter((s) => s.closed).map((s) => s.month))
   const put = (cell: Cell): void => { mutations.push({ op: 'put', table: 'cells', record: CellSchema.parse({ ...cell, updatedAt: ts }) }) }
   const rowPatches = new Map<string, Partial<Row>>()
 
@@ -142,8 +135,8 @@ export function ruleMutations(tables: Tables, target: RuleTarget, choice: RuleCh
         if (!c || c.source === 'archived' || c.source === 'value' || c.source === 'items') continue
         const cur = stored.get(m)
         const currencyOverride = c.currency === (r.currency ?? household.baseCurrency) ? null : c.currency
-        // an automatic amount ticked as moved in an open month keeps its tick as a done item
-        const moved = c.status === 'done' && !closed.has(m) && c.value !== 0
+        // an automatic amount ticked as moved keeps its tick as a done item
+        const moved = c.status === 'done' && c.value !== 0
         const items: CellItem[] = moved
           ? [{ id: newId(), label: '', amount: c.value, status: 'done', fundedBy: r.defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }]
           : []

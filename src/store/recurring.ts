@@ -23,7 +23,7 @@ const sig = (items: CellItem[]) =>
 
 /**
  * Make the given months agree with the recurring register. Idempotent: running it
- * twice yields no mutations the second time. Closed months are never touched.
+ * twice yields no mutations the second time.
  * - due items missing from a cell are added as managed items
  * - managed items that are not done, skipped or pinned follow the register's amount, label and funding
  * - managed items whose register entry is no longer due are removed unless done
@@ -34,7 +34,6 @@ const sig = (items: CellItem[]) =>
  * rows it touched; nothing else is looked at, so a month nobody named keeps what it holds, whatever the register says.
  */
 export function planRecurringPosts(tables: Tables, months: MonthKey[], only?: Iterable<string>): Mutation[] {
-  const closed = new Set(tables.monthStates.filter((s) => s.closed).map((s) => s.month))
   const items = tables.recurringItems.filter((r) => !r.deletedAt)
   const rowsById = new Map(tables.rows.filter((r) => !r.deletedAt).map((r) => [r.id, r]))
   const byRow = new Map<string, RecurringItem[]>()
@@ -53,7 +52,6 @@ export function planRecurringPosts(tables: Tables, months: MonthKey[], only?: It
   const mutations: Mutation[] = []
 
   for (const m of months) {
-    if (closed.has(m)) continue
     for (const rowId of rowIds) {
       const row = rowsById.get(rowId)
       if (!row) continue
@@ -103,29 +101,11 @@ export async function postRecurring(store: Store, months: MonthKey[]): Promise<n
   return mutations.length
 }
 
-/**
- * What the app does by itself whenever it has the data in front of it: the schedules land in the current month and in
- * the months after it. A month that is over is left alone: the app never changes the past by itself, and whatever
- * reaches further back is somebody's own step, saved with its months. Pure, and idempotent like the poster.
- */
-export function planHousekeeping(tables: Tables, today: MonthKey = monthOfDate()): Mutation[] {
-  const household = tables.household.find((h) => !h.deletedAt)
-  if (!household) return []
-  return planRecurringPosts(tables, defaultMonths(household, tables, today).filter((m) => compareMonths(m, today) >= 0))
-}
-
-/** `planHousekeeping` as a system commit (not undoable). Returns how many records it wrote. */
-export async function keepHouse(store: Store, today: MonthKey = monthOfDate()): Promise<number> {
-  const mutations = planHousekeeping(await loadTables(store), today)
-  if (mutations.length) await store.commitSystem(mutations)
-  return mutations.length
-}
-
 export type RecurringInput = Omit<RecurringItem, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>
 
 /**
- * A row that gets its first schedule stops carrying its amount forward, in every month. The open months before
- * `before` that only carried an amount keep it: it is written into them, the way closing a month writes it down.
+ * A row that gets its first schedule stops carrying its amount forward, in every month. The months before
+ * `before` that only carried an amount keep it: it is written into them.
  * Nothing to do for a row that is on a schedule already.
  */
 export function pinCarriedMonths(tables: Tables, rowId: string, before: MonthKey, ts: number): Mutation[] {
@@ -138,7 +118,7 @@ export function pinCarriedMonths(tables: Tables, rowId: string, before: MonthKey
   const out: Mutation[] = []
   for (const m of months) {
     const c = engine.cells[cellKey(rowId, m)]
-    if (!c || c.source !== 'inherit' || typedAmount(c) === 0 || engine.totals[m]?.closed) continue
+    if (!c || c.source !== 'inherit' || typedAmount(c) === 0) continue
     out.push({ op: 'put', table: 'cells', record: CellSchema.parse({ rowId, month: m, mode: 'value', value: typedAmount(c), items: [], note: c.cell?.note ?? null, currencyOverride: c.cell?.currencyOverride ?? null, updatedAt: ts }) })
   }
   return out
@@ -190,16 +170,15 @@ export async function addRecurringItem(
 /**
  * Another name for something that repeats. It is the same thing under a better name, not a change from a month on:
  * every schedule of the row that carried the old name takes the new one (a rhythm changed earlier left one behind for
- * the months before), and so do the items they posted in the open months, done or not. Closed months keep what they show.
+ * the months before), and so do the items they posted, in every month, done or not.
  */
 export function planRename(tables: Tables, rowId: string, from: string, to: string, ts: number): Mutation[] {
-  const closed = new Set(tables.monthStates.filter((s) => s.closed).map((s) => s.month))
   const renamed = tables.recurringItems.filter((r) => !r.deletedAt && r.rowId === rowId && r.name === from)
   const ids = new Set(renamed.map((r) => r.id))
   const posted = (i: CellItem) => !!i.recurringItemId && ids.has(i.recurringItemId)
   const muts: Mutation[] = renamed.map((r) => ({ op: 'put', table: 'recurringItems', record: RecurringItemSchema.parse({ ...r, name: to, updatedAt: ts }) }))
   for (const c of tables.cells) {
-    if (c.rowId !== rowId || closed.has(c.month) || !c.items.some((i) => posted(i) && i.label !== to)) continue
+    if (c.rowId !== rowId || !c.items.some((i) => posted(i) && i.label !== to)) continue
     muts.push({ op: 'put', table: 'cells', record: CellSchema.parse({ ...c, items: c.items.map((i) => (posted(i) ? { ...i, label: to } : i)), updatedAt: ts }) })
   }
   return muts
@@ -317,14 +296,13 @@ export async function reactivateRecurringItem(store: Store, id: string): Promise
 }
 
 /**
- * What takes a schedule away: its record, and what it posted and was not paid. Nothing else in its months is looked
- * at. Closed months keep what they show.
+ * What takes a schedule away: its record, and what it posted and was not paid, in every month. Nothing else in its
+ * months is looked at.
  */
 export function planDropSchedule(tables: Tables, item: RecurringItem, ts: number): Mutation[] {
-  const closed = new Set(tables.monthStates.filter((s) => s.closed).map((s) => s.month))
   const muts: Mutation[] = [{ op: 'put', table: 'recurringItems', record: RecurringItemSchema.parse({ ...item, deletedAt: ts, updatedAt: ts }) }]
   for (const c of tables.cells) {
-    if (c.rowId !== item.rowId || closed.has(c.month)) continue
+    if (c.rowId !== item.rowId) continue
     if (!c.items.some((i) => i.recurringItemId === item.id && i.status !== 'done')) continue
     muts.push({ op: 'put', table: 'cells', record: CellSchema.parse({ ...c, items: c.items.filter((i) => i.recurringItemId !== item.id || i.status === 'done'), updatedAt: ts }) })
   }
@@ -349,7 +327,6 @@ export async function setRecurringPaid(store: Store, id: string, month: MonthKey
   const row = tables.rows.find((r) => r.id === item.rowId)
   if (!row) throw new Error('Row not found')
   if (!scheduleLive(tables, item, month)) throw new Error(`"${row.name}" is archived in ${month}.`)
-  if (tables.monthStates.find((s) => s.month === month)?.closed) throw new Error(`${month} is closed. Reopen it to edit.`)
   const cell: Cell | undefined = tables.cells.find((c) => c.rowId === item.rowId && c.month === month)
   const items = cell?.mode === 'items' ? [...cell.items] : []
   const idx = items.findIndex((i) => i.recurringItemId === id)
@@ -388,7 +365,6 @@ async function findLive(store: Store, id: string) {
 /** Skip (or restore) one posted occurrence. The schedule keeps running in other months. */
 export async function skipRecurringMonth(store: Store, id: string, month: MonthKey, skipped: boolean): Promise<void> {
   const { tables, item } = await findLive(store, id)
-  if (tables.monthStates.some((s) => s.month === month && s.closed)) throw new Error('Month is closed')
   const cell = tables.cells.find((c) => c.rowId === item.rowId && c.month === month)
   if (!cell) return
   const items = cell.items.map((i) => (i.recurringItemId === id ? { ...i, skipped } : i))
@@ -430,9 +406,8 @@ export function planChangeRecurringFrom(tables: Tables, item: RecurringItem, mon
     mutations.push({ op: 'put', table: 'recurringItems', record: RecurringItemSchema.parse({ ...item, endMonth: addMonths(month, -1), updatedAt: ts }) })
     mutations.push({ op: 'put', table: 'recurringItems', record: fresh })
   }
-  const closed = new Set(tables.monthStates.filter((s) => s.closed).map((s) => s.month))
   for (const cell of tables.cells) {
-    if (cell.rowId !== item.rowId || compareMonths(cell.month, month) < 0 || closed.has(cell.month)) continue
+    if (cell.rowId !== item.rowId || compareMonths(cell.month, month) < 0) continue
     if (!cell.items.some((i) => i.recurringItemId === item.id)) continue
     const items = cell.items.map((i) =>
       i.recurringItemId !== item.id ? i

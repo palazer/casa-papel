@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildStatement, cellKey, computeEngine, type EngineOutput, type StatementLine } from '@/engine'
 import { monthRange, newId, type MonthKey } from '@/model'
-import { CasaDb, Store, addAccount, addPool, closeMonth, loadTables, quickCreateHousehold, setCellValue, setRule, topUpPool } from '@/store'
+import { CasaDb, Store, addAccount, addPool, loadTables, quickCreateHousehold, setCellValue, setRule, topUpPool } from '@/store'
 
 const months = monthRange('2026-01', '2026-04')
 const walk = (lines: StatementLine[]): StatementLine[] => lines.flatMap((l) => [l, ...walk(l.children)])
@@ -162,7 +162,5 @@ describe('a virtual account that is short', () => {
     await expect(topUpPool(store, pool.id, '2026-02', { kind: 'account', accountId: savings.id }, 0)).rejects.toThrow(/more than zero/)
     await expect(topUpPool(store, pool.id, '2026-02', { kind: 'account', accountId: loan.id }, 100)).rejects.toThrow(/savings or an investment account/)
     await expect(topUpPool(store, newId(), '2026-02', { kind: 'income' }, 100)).rejects.toThrow(/no longer exists/)
-    await closeMonth(store, '2026-02')
-    await expect(topUpPool(store, pool.id, '2026-02', { kind: 'income' }, 100)).rejects.toThrow(/2026-02 is closed/)
   })
 })

@@ -68,8 +68,8 @@ Statement frame  full width, space-y-4: the progress line, then dense islands, o
   screen to land on: they are utilities, so a fresh visit opens the household (or the welcome screen when there is
   none); the Guide also opens without a household.
 - **Page header** (`src/components/PageHeader.tsx`): every screen opens with it. The H1 is the screen's name (the rail's
-  label); the subline names the frame of reference (`The Demo Household · Sep 2026 – Nov 2027`, `· closed` as a chip).
-  The toolbar holds Undo and Redo first, then the controls (`MonthPicker`, Close month, Add <year>), then the
+  label); the subline names the frame of reference (`The Demo Household · Sep 2026 – Nov 2027`, `· past` as a chip on the Statement of a month
+  that is over). The toolbar holds Undo and Redo first, then the controls (`MonthPicker`, Balances…, Add <year>), then the
   sync cloud. Errors and warnings are `basis-full` lines: destructive for an action that failed, `text-amber-700` for a
   warning the engine raises.
   **On a long page the toolbar stays in view** (`sticky`, the Statement): from `md` up the toolbar and the line that
@@ -168,15 +168,18 @@ Truncation idiom: a `min-w-0` parent, `truncate` on the name, `shrink-0` on sibl
   upright, in ink. On the Statement a category's subtotal is shaded while a line under it still is. The shade means an
   estimate and nothing else; certain and done are plain, and done has the dot. (Until November 2026 an estimate was
   italic with a dashed underline in the Grid; the Statement's trial settled it.)
-- **Done**: one mark only, the `DoneDot` (8 px): a green disc for done in any month; in the current open month also a
+- **Done**: one mark only, the `DoneDot` (8 px): a green disc for done in any month; in the current month also a
   red ring for nothing done and an amber half disc for partly done.
 - **Chips** (`src/components/ui/chip.tsx`, `rounded px-1.5 leading-4 text-[10px] font-medium`): zinc a neutral fact or
-  idle (`closed`, `automatic`, an account or entity type, `ECB`, `carried`), emerald done or good (`paid`), amber a warning
+  idle (`past`, `automatic`, an account or entity type, `ECB`, `carried`), emerald done or good (`paid`), amber a warning
   or an estimate (`due`, `demo`, `projected`, storage may be evicted), rose missing or late (`missing`), sky information
   or something of yours (`manual` rate, `using +1.50%`), violet a second party. An `outline` variant exists for a
   blocker. Chip copy is lowercase.
 - **Lime** (`--primary`): the pressed control only (§1). Never a status.
-- **Closed months**: the column's cells on `bg-muted/60`, a lock before the month name, `closed` chip in the sublines.
+- **Months that are over** (every month before the current calendar month, `isPastMonth` in `src/model/month.ts`):
+  in the Grid the column's cells on `bg-muted/60` and the month's button named `<Mon YYYY>, past`; on the Statement a
+  zinc `past` chip in the subline, with the title `This month is over. It can still be changed.` Nothing is locked: a
+  month that is over takes every change a later one takes, and it counts as done only where it is ticked.
 - **Adjusted balances** (a real balance entered): a dotted underline on the amount. On the Statement the line also
   says how far it is from the plan in muted `text-[11px]` after the name: `entered, +€270.84 against the plan`.
 - Never `text-red-600` or `text-green-700`; use the tokens or the chip tones above.
@@ -199,7 +202,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   month, and the Σ line stays the all-time total.
 - A month header is a menu button: the month's totals, then `Open in the Statement` (the Statement opens on that month,
   for that visit only: `handMonth` in `src/app/screens.ts`), then `Balances for <Mon YYYY>…` (the month's balances
-  dialog, §8), then `Close month` or `Reopen month`.
+  dialog, §8).
 - A cell in another currency is two lines: the typed amount over a `text-[10px] leading-3` muted `≈ €3,120` in the household
   currency at that month's rate (the cell button becomes `flex-col items-end`; the certainty styling stays on the amount
   line; the `aria-label` says `, about €3,120`). The label keeps the currency code, a follower's too. A foreign account's
@@ -249,7 +252,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   one come last. When the section has categories, each group opens with a label row (`text-[10px] font-semibold
   uppercase tracking-wider text-muted-foreground`, `No category` for the rest) and every other named group sits on the
   section hue's `band` (a 5 % mix, opaque, so sticky label cells can carry it too); the uncategorised group never does.
-  The closed-month grey stays a translucent overlay on the cells, so it reads over a band.
+  The grey of a month that is over stays a translucent overlay on the cells, so it reads over a band.
 - Total rows (`derivedRow` with `band`): the label in the hue on the hue's `tint`, `font-medium`; detail lines under an
   investment account (`Deposited`, `Return`) indented and `text-[11px]` muted.
 - Balances open with what stays in the current accounts: one row named like the Statement's line (the one account's
@@ -291,9 +294,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   way, and what is under such a line (its virtual accounts, a goal's bar, the lines that explain a single current
   account) opens from the arrow alone, a button of its own above the line's button (`What is under <name>`, 26 px,
   38 px for a finger), as an itemized row's items do. The amount stays the month's balances. The heading `Current
-  accounts` stands for several accounts and has no dialog, so it folds like a category. In a closed month no line
-  opens a dialog (it shows no `…` either), and an account that holds something folds from anywhere on its line as
-  before. A group's chevron stands in the column of its categories' chevrons, so
+  accounts` stands for several accounts and has no dialog, so it folds like a category. A group's chevron stands in the column of its categories' chevrons, so
   the names stay in one column and no line moves; every group is open until it is folded, and which ones are folded
   is kept on the device, per household (`statement.folded.<household>`, a preference, never household data). What
   looks for a line inside a folded group opens it: a link symbol, a row that was just added, and the guided setup
@@ -323,12 +324,11 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   shows the goal's name, its bar and the sentence that says how far the plan gets (`goalStatusLine`), with `Edit`
   beside the name; there is no list of all goals. The toolbar holds the `MonthPicker`, `Expand all` / `Collapse all`
   (every group and category at once; not "Open" and "Close", which would read as the month's), the `Suggestions` toggle, the
-  `MarksLegend` and, last, `Balances…` (`sm outline`: the month's balances dialog, §8) and the month's one primary
-  action: `Close month` (`sm`, lime) while it is open, `Reopen month` (`sm outline`) once closed; both are left out
-  while the "Setting up" guide shows. Under the header sits the
+  `MarksLegend` and, last, `Balances…` (`sm outline`: the month's balances dialog, §8), left out
+  while the "Setting up" guide shows. The toolbar has no lime button: no action of a month is more final than
+  another. Under the header sits the
   **progress line** (`monthProgress` and `progressText` in `src/features/statement/progress.ts`): a muted `text-xs`
-  `role="status"` line with an (i), `7 of 21 done · €… still to pay · €… to come in`, then `All 21 done`, and `Closed ·
-  all done` for a closed month; a month with nothing in it shows no line. The month is worked in its upper half: a row and each of its items
+  `role="status"` line with an (i), `7 of 21 done · €… still to pay · €… to come in`, then `All 21 done`; a month with nothing in it shows no line. The month is worked in its upper half: a row and each of its items
   carry the `Tick` before the name (44 px on phones, 24 px with a 12 px dot from 768 px), and the rest of the line is
   a button named `<line>: <amount>` (`, an estimate` when shaded) that opens the row's one dialog, the cell editor
   (§8), for that row and month. For a payment to a loan that counts for less than was planned, the dialog starts
@@ -338,7 +338,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   counts again if a real balance raises what is owed.` The list of schedules shows a zinc `paid off` chip, without a
   tick box, where such a month would say `due`. An itemized row's chevron is a button of its own, `Items of <row>`. An automatic row
   has the tick (it marks the money as moved) and, when a rule works it out, the same button; any other automatic row
-  has none; a closed month has neither. A different amount than planned is typed in the cell
+  has none. A different amount than planned is typed in the cell
   editor ("Only this month", "Done"); there is no quick sheet for it.
   **Per person** (`src/features/statement/PerPerson.tsx`) closes the page when the household has two or more adults:
   a dense island with an (i), as wide as a half's left side from 1024 px (`lg:w-1/2`, so a label is never a screen
@@ -379,8 +379,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   (`10%`), the percentage followed by a 12 px `Banknote` for a share of one income line (its name says which:
   `100% of Robin – Child benefit`), the percentage followed by a 12 px `ArrowDownToLine` for a share of what is left (`20% ↓`), `Equal` for
   a fixed amount, the same sign at half strength for an account no row feeds yet. Muted, 20 px high, 32 px where
-  the pointer is a finger; a button named `Rule for <line>: <rule>` (`Set a rule for <account>` when there is none)
-  and the bare symbol with the same name in a closed month. **A row has one dialog**: the name, the amount and the
+  the pointer is a finger; a button named `Rule for <line>: <rule>` (`Set a rule for <account>` when there is none).
+  **A row has one dialog**: the name, the amount and the
   symbol of a row line all open the cell editor, which starts with "How the amount is set" for a row that can carry
   a rule (§8). The symbol stays a button of its own above the line's stretched button only so that it says the rule
   when pointed at or read out. On an account or a virtual account the symbol opens the dialog of the row that fills
@@ -405,7 +405,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   total` is the same figure as the `Expenses` heading (`expensesTotal`: payments in, pocket money and plain
   transfers out).
   **Add controls stand on the columns of the lines above them.** A line has columns before its name: the arrow's
-  slot (14 px), then, among rows of an open month, the tick's (24 px, 44 px below `md`), 6 px apart; they are
+  slot (14 px), then, among rows, the tick's (24 px, 44 px below `md`), 6 px apart; they are
   defined once, in `src/features/statement/lead.ts`, for the lines and for everything that is added under them. An
   add control (a suggestion, `Add row`, `Add account`, `Add a card or loan`) starts with `AddLead`: a 14 px muted
   `+` in the last of those columns, so the `+` sits under the ticks and the words under the names. Under a group
@@ -429,7 +429,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   end, scrolls it to the middle of the window, moves the keyboard to it and marks the line for two seconds with
   `bg-muted ring-2 ring-inset ring-ring` (`data-marked`), never with the lime. A loan or a card that never had a
   payment row shows `Link2Off` at half strength (`No row pays off <name> yet: add the row that pays it off`):
-  pressing it adds the row and opens its dialog; a closed month shows no open link. Savings, investment and virtual
+  pressing it adds the row and opens its dialog. Savings, investment and virtual
   accounts without a row keep the faint `=` of the rule symbol, which adds theirs, so a line never carries two faint
   marks. A plain row has no link symbol, which is how an unconnected "Car loan" row is told from a payment row. The
   Grid does not draw the symbol.
@@ -452,7 +452,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   and `AddCategoryInline` (`Add category`, a name and Enter), the foot of `From what is left` holds `Add row`, and an
   opened category ends with `Add row to <category>` with that category already chosen. A category is a line from
   the moment it exists, its amount a faint `·` until it has a row, so its first row is added inside it. A new row
-  opens its category and, in an open month, the cell editor for its first amount. In the lower half a line that can
+  opens its category and the cell editor for its first amount. In the lower half a line that can
   have a goal (an account, a virtual account, a debt, Net worth) shows a 20 px ghost `Target` button after its name on
   hover or focus, always where the pointer is a finger, named `Set a goal for <line>`; it opens the goal dialog with
   what the goal watches settled, so the dialog asks for the amount only. A line of something that is archived (shown
@@ -477,7 +477,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   nothing is owed. A new savings or investment account opens the short rule dialog as soon as it is saved, on `The rest`
   for a savings account while nothing takes the rest yet; a new virtual account asks for its monthly amount in its own
   dialog, counting from the month on screen.
-  **Changing and removing.** What is added on the Statement is changed and removed there too. In an open month a
+  **Changing and removing.** What is added on the Statement is changed and removed there too. A
   row, a category, an account and a virtual account carry a `…` after their name and tags: a 20 px ghost icon button
   (`LINE_MENU`: shown while the line is hovered or the control has the focus, always and finger-sized where the
   pointer is a finger), 20 px so the line keeps its height. On a row it is the Grid's own `RowMenu` (`Row menu for
@@ -493,9 +493,9 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   `Current accounts`, whose heading then has none. So that a line can hold these beside its own action, every row line that opens
   something is built the way a line with a rule symbol is: its button is its name, stretched over the whole line,
   and the symbol and the menu sit above it. A menu behind an icon is as wide as its longest entry (`w-max`), never
-  as narrow as the icon. A closed month shows none of this.
+  as narrow as the icon.
   **Suggestions.** `Suggestions` in the toolbar (a pressed button with an (i); on while a household is being set up,
-  off otherwise, disabled in a closed month) shows the rows a household like this one usually has, where they will
+  off otherwise) shows the rows a household like this one usually has, where they will
   appear: above the add controls of Income, Expenses and `From what is left` (pocket money is offered there), and
   inside the category a row belongs to (a loan's payment in the category it is usually found in). A category with a usual suggestion opens by itself. A suggestion is not a row, so it is drawn as an add
   control, not as a line: a muted `+`, the row's name in muted medium weight, an (i) that holds its one-sentence
@@ -548,7 +548,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   **Category estimates.** An expense category can carry an estimate: what it should come to in a month, typed before
   its rows are known. The category line then reads `estimate €1,450.00` in muted `text-[11px]` after its name, and
   its last line is `Not broken down yet` with the `automatic` chip, the estimate minus the category's rows, on the
-  estimate shade until it is ticked or the month closes. It shrinks as rows are added and is gone at zero; once the
+  estimate shade until it is ticked. It shrinks as rows are added and is gone at zero; once the
   rows add up to more, the category shows their sum and still names its estimate, with no mark for being over. The
   line is a button that opens the estimate it comes from, and the category's `…` menu holds `Set estimate…` /
   `Change estimate…` after `Rename…` (not a button at the category's foot, which keeps `Add row to <category>`
@@ -560,7 +560,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 
 ## 8. Controls
 
-- Buttons: `size="sm"` (28 px) for a toolbar's one primary action (`Close month`, `Export now`), `size="xs"` (24 px) for
+- Buttons: `size="sm"` (28 px) for a toolbar's main action (`Balances…`, `Export now`), `size="xs"` (24 px) for
   everything else in toolbars, lists and islands, `icon-xs` for icon buttons in toolbars. Dialog footers keep the default
   size. **A dialog is never taller than the window** (`max-h-[calc(100dvh-2rem)]` on `DialogContent`): what does not
   fit scrolls inside it (`overflow-y-auto overscroll-contain`), and its footer sticks to the foot (`sticky`, on an
@@ -618,7 +618,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   carried, sky yours, amber projected, rose missing), so the page carries one small tag and no line of its own. The
   chip is a button: it opens a popover with the source in words, a field to type a rate for this month (`Save rate`),
   `Use the ECB rate again` once the rate is yours, and the (i) text inline. A household with one currency shows
-  nothing; a closed month's chip opens to the rate and its source and changes nothing.
+  nothing.
 - **An amount field takes a sum.** Every field that asks for money reads what is typed through `parseAmount`
   (`src/app/format.ts`), which adds up a run of `+` and `-` (`7352.21+7.96`, `1200-150+30`, spaces allowed, each
   number in either number format). While the field holds a sum, `AmountHint` (`src/components/AmountHint.tsx`)
@@ -663,7 +663,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   `text-[11px]` `calculated` sits under it. Under a typed end the same line reads `Difference +€270.84`; under the
   start of an account's first month it reads `opening amount` (that start is the account's opening amount and cannot
   be emptied). A real 0 is written as `0`, never as an empty field. The start of a month is the end of the month
-  before, one stored number, so a typed start corrects that month too, closed or not; it runs through the engine as
+  before, one stored number, so a typed start corrects that month too; it runs through the engine as
   it is typed, so the calculated end an empty field shows is the one it will give. Only a field that reads
   differently from when the dialog opened is saved (`setMonthBalances` in `src/store/monthBalances.ts`). There is no
   "use the calculated amount" button: emptying a field is that. The pair is used three ways:
@@ -689,8 +689,6 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
     the muted line `Ticks every line of the month. No amount changes.`; it is set when the dialog opens for a month
     that is over (`isPastMonth`) and not for the current month or a later one. Footer: Cancel, `Save`. What was
     typed and the ticks are one step, so one Undo takes both back (`setMonthBalances` with `done`).
-  A closed month disables the fields, drops `Save` and says where to correct it: `<Month> is closed. Correct what it
-  ended on from the starting amount of <next month>, or reopen the month.`
 - A card whose purchases are expense rows gets, wherever its end is typed above the calculated one, a `rounded-md
   border` block (`data-testid="book-difference"`) under its pair with a `Check` "Count the €400.00 difference as
   spending this month" and one muted sentence saying where it goes (a done item "Not recorded" on the row `<card> –
@@ -702,7 +700,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   amount in the household currency with an (i) (`row.categoryEstimate`), then two read-only lines that follow what
   is typed (`Rows this month`, `Not broken down yet`; a muted sentence when the rows already add up to more), then
   "Applies to" as a `Segmented` (`This month and onwards` / `Only this month`). Footer: a ghost
-  `Remove estimate` when there is one, Cancel, Save. A closed month disables it.
+  `Remove estimate` when there is one, Cancel, Save.
 - **A dialog saves once.** Its buttons are disabled while a save runs, and the save itself refuses a second start
   (`useSave` in `src/features/grid/RowDialogs.tsx`, the cell editor's `run`), because Enter in a field is not a
   button: pressed twice, it must not add a top-up or a virtual account twice. A field that cannot be read says so
@@ -741,8 +739,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
     `Repeat` icon stands before the field of one that is), and so is the name in a box of what lands in other
     months (`Name of <name>`). Typing over the name of something that repeats renames it, not from a month on but
     as the same thing under a better name: every schedule of the row that carried the old name and every item they
-    posted in the open months take it (`planRename`), and a muted line says `Renamed from "Gym" in every open
-    month.` An emptied name keeps the one it has. The name takes what the other fields leave: the dialog is
+    posted take it (`planRename`), and a muted line says `Renamed from "Gym" in every month.` An emptied name keeps the one it has. The name takes what the other fields leave: the dialog is
     `sm:max-w-2xl` and the item grid `minmax(0,1fr) 6.5rem 7rem 8.5rem 2rem`.
   - *Removing what repeats is done at once and never closes the dialog.* An item's bin asks `Only this month`,
     `This and following months` or `All occurrences`; the answer is a step of its own (it does not wait for Save),
@@ -766,7 +763,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   - A percentage or the rest, and any choice in a month the app works out: the rule's fields (`RuleFields`): that
     option's one field (`Amount per month in <CCY>` or the percentage), then "Counts from" as a `MonthField` with an
     (i) and the sentence that earlier months keep their amounts (it starts on the month the dialog was opened from,
-    or on the first month after the last closed one), then two read-only lines that follow what is typed: what the
+    also when that month is over), then two read-only lines that follow what is typed: what the
     row gets in that month, with the sum the percentage is taken of (for pocket money naming whose income, `10% of
     €4,200.00, Sam's take-home income`), and what is then left for the rest (or as leftover). `A percentage of one
     income` adds "Which income" before the percentage: a `NativeSelect` of the live income lines (money taken from
@@ -849,10 +846,10 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   month, "Earlier months stay exactly as they are") and a Delete section ("Deleting removes", with a last line
   `2 of these months are over (Sept–Oct 2026): they change too` where the delete reaches into months before the
   current one, "Also changes", a note,
-  and blockers in a destructive `Alert` "Resolve these first" that says where to fix each). When the thing has amounts
-  in a closed month the Delete section is one sentence saying so, and only Archive remains; an archive month inside
-  that history is refused beside the field. Footer: Cancel, `Archive from <month>` (`outline`, `default` when it is
-  the only choice), `Delete` (`destructive`, disabled with blockers). The words and the write come from the same scan
+  and blockers in a destructive `Alert` "Resolve these first" that says where to fix each). Amounts in months that
+  are over forbid nothing: the list says which months change and the choice is the reader's. An archive can start in
+  any month from the household's first; one before that is refused beside the field. Footer: Cancel, `Archive from
+  <month>` (`outline`), `Delete` (`destructive`, disabled with blockers). The words and the write come from the same scan
   (`describeRemoval` and `planRemoval`/`planArchive` in `src/store/impact.ts`), so they cannot disagree, and every
   removal is one undoable commit ("You can undo this right after"). Archived things are listed with Restore under
   Household: Archived rows, and an Archived line in Accounts, Virtual accounts and People & things. The Archive
@@ -862,7 +859,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   is one click: the entry in the row menu, the category menu and the account and virtual account dialogs opened from
   the Statement reads `Delete` instead of `Archive or delete…` / `Remove…` and deletes at once, with no dialog
   (`removeIfFree` in `src/store/remove.ts`). It does so only when nothing but the thing itself goes: when rows would
-  change, something stands in the way, a goal watches it, or a closed month or a month that is over holds its
+  change, something stands in the way, a goal watches it, or a month that is over holds its
   amounts, the remove dialog opens as always and says what. A household that starts in the current month has no
   month that is over, so its deletes stay one click. After `Done`, and for every household set up before, removing is the dialog again.
   A one-click delete is answered by the floating message.
@@ -890,7 +887,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 - `MarksLegend` ("What the colours and marks mean", an `xs outline` button in the Statement and Grid toolbars) is the legend:
   the six hue dots with their kinds of money, then the marks with a sample each: estimate, certain, done, this month's
   red and amber dots, the negative spending number when that setting is on, the amber draw, the dotted entered balance,
-  the locked closed month, the category band. It ends with a ghost `xs` "More in the Guide" that opens the Guide's
+  the grey month that is over, the category band. It ends with a ghost `xs` "More in the Guide" that opens the Guide's
   Marks & keyboard topic (`#guide-marks`). The welcome screen's quiet links carry "How it works" for the same page.
 
 ## 9. Loading, errors, empty

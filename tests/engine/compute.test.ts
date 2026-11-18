@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { FxRateSchema, poolRef } from '@/model'
 import { cellKey, computeEngine } from '@/engine'
-import { T0, account, actual, cellItems, cellValue, closedMonth, household, pool, row, tables } from './helpers'
+import { T0, account, actual, cellItems, cellValue, household, monthState, pool, row, tables } from './helpers'
 
 const months = ['2026-01', '2026-02', '2026-03']
 
@@ -34,14 +34,15 @@ describe('engine: cell resolution', () => {
     expect(out.cells[cellKey(other.id, '2026-03')].value).toBe(12500)
   })
 
-  it('closed months show done, archived rows vanish from totals', () => {
+  it('the mark of a month an older version had closed is not read; archived rows vanish from totals', () => {
     const h = household()
     const gym = row({ name: 'Gym', section: 'expense', archivedMonth: '2026-03' })
     const out = computeEngine({
-      tables: tables({ household: [h], rows: [gym], cells: [cellValue(gym.id, '2026-01', 4000)], monthStates: [closedMonth('2026-01')] }),
+      tables: tables({ household: [h], rows: [gym], cells: [cellValue(gym.id, '2026-01', 4000)], monthStates: [monthState('2026-01', { closed: true, closedAt: T0 })] }),
       months,
     })
-    expect(out.cells[cellKey(gym.id, '2026-01')].status).toBe('done')
+    // done is what is ticked, nothing else: the store ticks such a month once, when it meets it (`planHousekeeping`)
+    expect(out.cells[cellKey(gym.id, '2026-01')].status).toBe('projected')
     expect(out.cells[cellKey(gym.id, '2026-02')].status).toBe('projected')
     expect(out.cells[cellKey(gym.id, '2026-03')].source).toBe('archived')
     expect(out.totals['2026-02'].expensesTotal).toBe(4000)
@@ -191,11 +192,11 @@ describe('engine: certainty carries forward', () => {
     expect(out.cells[cellKey(rent.id, '2026-04')].status).toBe('projected')
   })
 
-  it('a paid month hands the row default to the next month; closed months show done', () => {
+  it('a paid month hands the row default to the next month', () => {
     const h = household()
     const rent = row({ name: 'Rent', section: 'expense', defaultStatus: 'committed' })
     const cells = [cellItems(rent.id, '2026-01', [{ amount: 150000, status: 'done' }])]
-    const out = computeEngine({ tables: tables({ household: [h], rows: [rent], cells, monthStates: [closedMonth('2026-01')] }), months: ['2026-01', '2026-02'] })
+    const out = computeEngine({ tables: tables({ household: [h], rows: [rent], cells }), months: ['2026-01', '2026-02'] })
     expect(out.cells[cellKey(rent.id, '2026-01')].status).toBe('done')
     expect(out.cells[cellKey(rent.id, '2026-02')].status).toBe('committed')
   })

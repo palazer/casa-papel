@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { cellKey, computeEngine } from '@/engine'
 import { newId } from '@/model'
-import { account, cellValue, closedMonth, household, row, tables } from './helpers'
+import { account, cellValue, household, row, tables } from './helpers'
 
 const months = ['2026-01', '2026-02', '2026-03']
 
@@ -15,11 +15,10 @@ describe('rows that follow another row', () => {
       rows: [longTerm, benefit],
       accounts: [fund],
       cells: [cellValue(benefit.id, '2026-01', 25500), cellValue(benefit.id, '2026-03', 26000), cellValue(longTerm.id, '2026-02', 99)],
-      monthStates: [closedMonth('2026-01')],
     })
     const out = computeEngine({ tables: t, months })
     const c = (m: string) => out.cells[cellKey(longTerm.id, m)]
-    expect(c('2026-01')).toMatchObject({ value: 25500, source: 'derived', status: 'done' })
+    expect(c('2026-01')).toMatchObject({ value: 25500, source: 'derived', status: 'derived' })
     // the follower's own cell (99) is ignored while it follows; the target's inherited value wins
     expect(c('2026-02')).toMatchObject({ value: 25500, source: 'derived', status: 'derived' })
     expect(c('2026-03')).toMatchObject({ value: 26000, source: 'derived' })

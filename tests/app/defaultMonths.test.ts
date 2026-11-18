@@ -39,9 +39,9 @@ describe('defaultMonths', () => {
     const gone = { ...tables, rows: [{ ...row, deletedAt: ts }], cells: [userCell('2028-02')] }
     expect(last(defaultMonths(household, gone, TODAY))).toBe('2027-12')
   })
-  it('a closed month and "Add <year>" raise the end to their December', () => {
+  it('"Add <year>" raises the end to its December; the mark of a month an older version had closed does not', () => {
     const closed = MonthStateSchema.parse({ month: '2028-03', closed: true, closedAt: ts, updatedAt: ts })
-    expect(planEnd(household, { ...tables, monthStates: [closed] }, TODAY)).toBe('2028-12')
+    expect(planEnd(household, { ...tables, monthStates: [closed] }, TODAY)).toBe('2027-12')
     expect(planEnd({ ...household, planUntil: '2029-12' }, tables, TODAY)).toBe('2029-12')
     // the rule still wins when the stored year is behind it
     expect(planEnd({ ...household, planUntil: '2026-12' }, tables, TODAY)).toBe('2027-12')

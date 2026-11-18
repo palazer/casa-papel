@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { cellKey, computeEngine } from '@/engine'
 import { CategorySchema, CellSchema, FxRateSchema, monthRange, newId, poolRef, type Tables } from '@/model'
-import { T0, account, cellItems, cellValue, closedMonth, household, pool, row, tables } from './helpers'
+import { T0, account, cellItems, cellValue, household, pool, row, tables } from './helpers'
 
 const months = monthRange('2026-01', '2026-03')
 const category = (name: string, order = 'a0', section: 'expense' | 'income' = 'expense') => CategorySchema.parse({ id: newId(), createdAt: T0, updatedAt: T0, name, section, order })
@@ -96,11 +96,11 @@ describe('a category\'s estimate', () => {
     expect(computeEngine({ tables: bigger, months: ['2026-01'] }).cells[cellKey(estimate.id, '2026-01')]).toMatchObject({ value: 1620_00, valueBase: 810_00 })
   })
 
-  it('is done once the month is closed or it is ticked as moved', () => {
+  it('is done once it is ticked as moved', () => {
     const { t, estimate } = housing()
     const ticked = CellSchema.parse({ rowId: estimate.id, month: '2026-02', mode: 'inherit', value: null, items: [], markedDone: true, updatedAt: T0 })
-    const out = computeEngine({ tables: { ...t, cells: [...t.cells, ticked], monthStates: [closedMonth('2026-01')] }, months })
-    expect(months.map((m) => out.cells[cellKey(estimate.id, m)].status)).toEqual(['done', 'done', 'derived'])
+    const out = computeEngine({ tables: { ...t, cells: [...t.cells, ticked] }, months })
+    expect(months.map((m) => out.cells[cellKey(estimate.id, m)].status)).toEqual(['derived', 'done', 'derived'])
     expect(out.cells[cellKey(estimate.id, '2026-02')].value).toBe(260_00)
   })
 

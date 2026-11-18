@@ -2,15 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { cellKey, computeEngine } from '@/engine'
 import { monthRange, newId } from '@/model'
 import {
-  CasaDb, FILL_EVERY_CURRENT, Store, addAccount, archiveAccount, closeMonth, loadTables, monthBalances, previewMonthBalances, quickCreateHousehold,
+  CasaDb, FILL_EVERY_CURRENT, Store, addAccount, archiveAccount, loadTables, monthBalances, previewMonthBalances, quickCreateHousehold,
   setManualRate, setMonthBalances, unrecordedRowName,
 } from '@/store'
 import { DEMO_IDS } from '@/demo/demoHousehold'
 import { loadDemo } from '@/demo/loadDemo'
+import { monthProgress } from '@/features/statement/progress'
 
 const DEMO_MONTHS = monthRange('2026-09', '2026-12')
 
-/** The demo household: September 2026 is closed, the savings account and the card have no real balance anywhere. */
+/** The demo household: the savings account and the card have no real balance anywhere. */
 async function demo() {
   const store = new Store(new CasaDb(`test-${newId()}`))
   await loadDemo(store)
@@ -82,13 +83,12 @@ describe('a month\'s balances: the end of a month', () => {
 })
 
 describe('a month\'s balances: the start of a month', () => {
-  it('is the end of the month before, also when that month is closed', async () => {
+  it('is the end of the month before', async () => {
     const { store, read } = await demo()
     const before = await read()
     const septemberEnd = before.out.accounts[DEMO_IDS.savings].months['2026-09'].balance
     const change = before.out.accounts[DEMO_IDS.savings].months['2026-10'].computed - septemberEnd
     expect(before.out.accounts[DEMO_IDS.savings].months['2026-10'].start).toBe(septemberEnd)
-    expect(before.out.totals['2026-09'].closed).toBe(true)
 
     await setMonthBalances(store, '2026-10', { starts: { [DEMO_IDS.savings]: septemberEnd + 250_00 } })
     const { tables, out } = await read()
@@ -96,8 +96,7 @@ describe('a month\'s balances: the start of a month', () => {
     expect(await stored(store, DEMO_IDS.savings, '2026-09')).toBe(septemberEnd + 250_00)
     expect(out.accounts[DEMO_IDS.savings].months['2026-09']).toMatchObject({ entered: true, balance: septemberEnd + 250_00, adjustment: 250_00 })
     expect(out.accounts[DEMO_IDS.savings].months['2026-10']).toMatchObject({ start: septemberEnd + 250_00, computed: septemberEnd + 250_00 + change, entered: false })
-    // September stays closed and its rows are untouched
-    expect(tables.monthStates.find((s) => s.month === '2026-09')?.closed).toBe(true)
+    // September's rows are untouched
     expect(tables.cells).toEqual(before.tables.cells)
 
     await setMonthBalances(store, '2026-10', { starts: { [DEMO_IDS.savings]: null } })
@@ -218,31 +217,32 @@ describe('a month\'s balances: the current accounts', () => {
 })
 
 describe('a month\'s balances: what is refused', () => {
-  it('a closed month, and an account that has no balance in the month', async () => {
+  it('an account that has no balance in the month, a number that cannot be read, a difference booked on anything but a card', async () => {
     const { store } = await demo()
-    await expect(setMonthBalances(store, '2026-09', { ends: { [DEMO_IDS.savings]: 1 } })).rejects.toThrow('2026-09 is closed. Reopen it to change a balance.')
     await expect(setMonthBalances(store, '2026-10', { ends: { [newId()]: 1 } })).rejects.toThrow('That account has no balance in 2026-10.')
     await expect(setMonthBalances(store, '2026-10', { ends: { [DEMO_IDS.savings]: Number.NaN } })).rejects.toThrow('That is not a number I can read.')
     await expect(setMonthBalances(store, '2026-10', { ends: { [DEMO_IDS.savings]: 9000_00 }, book: [DEMO_IDS.savings] })).rejects.toThrow(/Only a card whose purchases are expense rows/)
   })
 })
 
-describe('closing a month with its balances', () => {
-  it('saves them, books the card\'s difference and closes, and one undo takes all of it back', async () => {
+describe('a month\'s balances saved with "Count everything as done"', () => {
+  it('saves them, books the card\'s difference and ticks every line, and one undo takes all of it back', async () => {
     const { store, read } = await demo()
     const before = await read()
     const expected = before.out.accounts[DEMO_IDS.card].months['2026-10'].computed
-    await closeMonth(store, '2026-10', { ends: { [DEMO_IDS.card]: expected + 400_00, [DEMO_IDS.savings]: 9000_00 }, book: [DEMO_IDS.card] })
+    await setMonthBalances(store, '2026-10', { ends: { [DEMO_IDS.card]: expected + 400_00, [DEMO_IDS.savings]: 9000_00 }, book: [DEMO_IDS.card] }, { done: true })
     const { tables, out } = await read()
-    expect(tables.monthStates.find((s) => s.month === '2026-10')?.closed).toBe(true)
+    expect(tables.monthStates.filter((s) => s.closed)).toEqual([])
     expect(out.accounts[DEMO_IDS.savings].months['2026-10']).toMatchObject({ entered: true, balance: 9000_00 })
     const row = tables.rows.find((r) => r.name === unrecordedRowName(tables.accounts.find((a) => a.id === DEMO_IDS.card)!))!
     expect(out.cells[cellKey(row.id, '2026-10')]).toMatchObject({ value: 400_00, status: 'done' })
     // the spending is on the card's row, so the plan expects what the bank says
     expect(out.accounts[DEMO_IDS.card].months['2026-10']).toMatchObject({ entered: true, computed: expected + 400_00, balance: expected + 400_00, adjustment: 0 })
     expect(out.accounts[DEMO_IDS.card].months['2026-11'].start).toBe(expected + 400_00)
-    // the month is frozen as it reads with the balances: what was inherited is a typed value now
-    expect(tables.cells.filter((c) => c.month === '2026-10' && c.mode === 'inherit')).toEqual([])
+    // every line of the month is ticked, the booked difference among them
+    const progress = monthProgress(out.rows, out.cells, '2026-10')
+    expect(progress.done).toBe(progress.total)
+    expect(progress.total).toBeGreaterThan(monthProgress(before.out.rows, before.out.cells, '2026-10').done)
 
     await store.undo()
     const back = await read()
@@ -257,21 +257,11 @@ describe('closing a month with its balances', () => {
     const { store, read } = await demo()
     const before = await read()
     const card = before.out.accounts[DEMO_IDS.card].months['2026-10']
-    await closeMonth(store, '2026-10', { starts: { [DEMO_IDS.card]: card.start + 100_00 }, ends: { [DEMO_IDS.card]: card.computed + 150_00 }, book: [DEMO_IDS.card] })
+    await setMonthBalances(store, '2026-10', { starts: { [DEMO_IDS.card]: card.start + 100_00 }, ends: { [DEMO_IDS.card]: card.computed + 150_00 }, book: [DEMO_IDS.card] }, { done: true })
     const { tables, out } = await read()
     const row = tables.rows.find((r) => r.name === 'Credit card – Not recorded')!
     // 100 more was owed from the start; only the other 50 is spending nobody typed
     expect(out.cells[cellKey(row.id, '2026-10')].value).toBe(50_00)
     expect(await stored(store, DEMO_IDS.card, '2026-09')).toBe(card.start + 100_00)
-  })
-
-  it('without balances does what it always did, and refuses balances for a month that is closed already', async () => {
-    const a = await demo()
-    const b = await demo()
-    await closeMonth(a.store, '2026-10')
-    await closeMonth(b.store, '2026-10', {})
-    const strip = (t: Awaited<ReturnType<typeof loadTables>>) => ({ cells: t.cells.map((c) => ({ ...c, updatedAt: 0, items: c.items.map((i) => ({ ...i, id: '' })) })), states: t.monthStates.map((s) => ({ ...s, updatedAt: 0, closedAt: 0 })), actuals: t.accountMonths })
-    expect(strip((await b.read()).tables)).toEqual(strip((await a.read()).tables))
-    await expect(closeMonth(a.store, '2026-10', { ends: { [DEMO_IDS.savings]: 1 } })).rejects.toThrow('2026-10 is closed. Reopen it to change a balance.')
   })
 })

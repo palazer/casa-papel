@@ -81,7 +81,6 @@ describe('the Statement, the month', () => {
   it('sorts the demo\'s September into its two sides', () => {
     const t = buildDemoTables()
     const { s } = statementFor(t, '2026-09', monthRange('2026-09', '2026-12'))
-    expect(s.closed).toBe(true)
     expect(s.flow.left.lines.map((l) => l.label)).toEqual(['Income', 'From accounts'])
     // the section for money from the household's accounts is always there, empty until something comes out of one
     expect(topLine(s, 'in', 'from-accounts')).toMatchObject({ amount: 0, empty: true, children: [] })

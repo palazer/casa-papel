@@ -4,7 +4,8 @@
  *
  * The rule: a reference the engine needs for correct sums with no safe rewrite is a blocker (a typed row's
  * account, the account a virtual account is held in); a nullable or safely rewritable one is a consequence applied
- * in the same commit. Anything with amounts in a closed month cannot be deleted, only archived from a later month.
+ * in the same commit. Nothing is refused because of the month it lies in: where a delete reaches into months that
+ * are over, the impact says which (`over`).
  */
 import { computeEngine, cellKey, type CellResult, type EngineOutput } from '@/engine'
 import {
@@ -59,11 +60,7 @@ export interface Impact {
    * Deleting changes those months as well, and the dialog says so before the button is pressed.
    */
   over: string | null
-  /** The closed months it has amounts in, e.g. `Sept–Oct 2026`, or null. Non-null means archive only. */
-  closedHistory: string | null
-  /** The last closed month with amounts, or null. */
-  closedUntil: MonthKey | null
-  /** Archiving earlier than this would change a closed month. */
+  /** The household's first month: an archive cannot start before it. */
   archiveNotBefore: MonthKey
   /** The month the archive texts describe. */
   archiveFrom: MonthKey
@@ -111,7 +108,6 @@ interface Ctx {
   today: MonthKey
   months: MonthKey[]
   engine: EngineOutput
-  closed: Set<MonthKey>
   rows: Row[]
   accounts: Account[]
   pools: Pool[]
@@ -129,7 +125,6 @@ function context(tables: Tables, opts: ImpactOptions): Ctx {
   return {
     tables, household, locale: opts.locale ?? household.locale, today, months,
     engine: computeEngine({ tables, months }),
-    closed: new Set(tables.monthStates.filter((s) => s.closed).map((s) => s.month)),
     rows: live(tables.rows), accounts: live(tables.accounts), pools: live(tables.pools), entities: live(tables.entities),
     schedules: live(tables.recurringItems), goals: live(tables.goals),
   }
@@ -148,7 +143,7 @@ interface Described {
   changes: string[]
   blockers: Blocker[]
   note: string | null
-  /** Months the thing has amounts or a balance in; the closed ones among them make it archive-only. */
+  /** Months the thing has amounts or a balance in; the ones that are over are named before a delete. */
   activity: MonthKey[]
   canArchive: boolean
   archive: (from: MonthKey) => string[]
@@ -312,12 +307,12 @@ function describeEntity(ctx: Ctx, e: Entity): Described {
 }
 
 function describeSchedule(ctx: Ctx, item: RecurringItem): Described {
-  const posted = ctx.tables.cells.filter((c) => !ctx.closed.has(c.month) && c.items.some((i) => i.recurringItemId === item.id && i.status !== 'done' && !i.skipped))
-  const loses = posted.length ? [`Its posted amount in ${plural(posted.length, 'open month')} (${monthSpan(posted.map((c) => c.month), ctx.locale)}); what was already paid stays`] : []
+  const posted = ctx.tables.cells.filter((c) => c.items.some((i) => i.recurringItemId === item.id && i.status !== 'done' && !i.skipped))
+  const loses = posted.length ? [`Its posted amount in ${plural(posted.length, 'month')} (${monthSpan(posted.map((c) => c.month), ctx.locale)}); what was already paid stays`] : []
   return {
     kindLabel: 'Schedule', subject: item.name, loses, changes: [], blockers: [],
     note: `${posted.length ? 'Nothing more is posted.' : 'Nothing more is posted; what was already paid stays.'} To stop it from a month on instead, use "End after" in the schedules list.`,
-    // the months its unpaid postings go from; none of them is closed, so they never stand in the way of the delete
+    // the months its unpaid postings go from
     activity: posted.map((c) => c.month), canArchive: false, archive: () => [],
   }
 }
@@ -355,10 +350,7 @@ function describe(ctx: Ctx, target: RemovalTarget): Described {
 
 function impactOf(ctx: Ctx, target: RemovalTarget, opts: ImpactOptions): Impact {
   const d = describe(ctx, target)
-  const closedActivity = d.activity.filter((m) => ctx.closed.has(m)).sort()
-  const closedUntil = closedActivity.length ? closedActivity[closedActivity.length - 1] : null
-  const notBefore = closedUntil ? addMonths(closedUntil, 1) : ctx.household.startMonth
-  const archiveNotBefore = compareMonths(notBefore, ctx.household.startMonth) < 0 ? ctx.household.startMonth : notBefore
+  const archiveNotBefore = ctx.household.startMonth
   const archiveFrom = opts.archiveFrom ?? (compareMonths(ctx.today, archiveNotBefore) > 0 ? ctx.today : archiveNotBefore)
   const over = [...new Set(d.activity.filter((m) => compareMonths(m, ctx.today) < 0))]
   // a row and a schedule count their months in the line above; an account, a virtual account and a person do not
@@ -366,9 +358,9 @@ function impactOf(ctx: Ctx, target: RemovalTarget, opts: ImpactOptions): Impact 
   return {
     kind: target.kind, kindLabel: d.kindLabel, subject: d.subject, loses: d.loses, changes: d.changes, blockers: d.blockers, note: d.note,
     over: over.length ? `${over.length} of ${which} months ${pick(over.length, 'is', 'are')} over (${monthSpan(over, ctx.locale)}): ${pick(over.length, 'it changes', 'they change')} too` : null,
-    closedHistory: closedActivity.length ? monthSpan(closedActivity, ctx.locale) : null, closedUntil, archiveNotBefore, archiveFrom,
+    archiveNotBefore, archiveFrom,
     archiveChanges: d.canArchive ? d.archive(archiveFrom) : [], canArchive: d.canArchive,
-    canDelete: closedActivity.length === 0 && d.blockers.length === 0,
+    canDelete: d.blockers.length === 0,
   }
 }
 
@@ -380,9 +372,7 @@ export function describeRemoval(tables: Tables, target: RemovalTarget, opts: Imp
 /** Why `month` is too early to archive from, or null when it is fine. */
 export function archiveMonthProblem(impact: Impact, month: MonthKey, locale: string): string | null {
   if (compareMonths(month, impact.archiveNotBefore) >= 0) return null
-  return impact.closedUntil
-    ? `${monthLabel(impact.closedUntil, locale)} is closed and has amounts in it. Archive from ${monthLabel(impact.archiveNotBefore, locale)} or later.`
-    : `Archive from ${monthLabel(impact.archiveNotBefore, locale)} or later, the household's first month.`
+  return `Archive from ${monthLabel(impact.archiveNotBefore, locale)} or later, the household's first month.`
 }
 
 // ---------- mutations ----------
@@ -436,10 +426,8 @@ function pinFollowers(ctx: Ctx, row: Row, from: MonthKey, ts: number): Mutation[
   if (followers.length === 0) return []
   const muts: Mutation[] = []
   if (compareMonths(ctx.household.startMonth, from) < 0) {
-    // closed flags lifted, so the value we store is the real one
-    const open: Tables = { ...ctx.tables, monthStates: ctx.tables.monthStates.map((s) => ({ ...s, closed: false })) }
     const months = monthRange(ctx.household.startMonth, addMonths(from, -1))
-    const eng = computeEngine({ tables: open, months })
+    const eng = computeEngine({ tables: ctx.tables, months })
     for (const f of followers) {
       for (const m of months) {
         const c = eng.cells[cellKey(f.id, m)]
@@ -530,7 +518,7 @@ function moveItemSources(ctx: Ctx, ref: FundedBy, to: FundedBy, ts: number, skip
  * builds on the ones before it (`start` is the tables as the caller left them), so several sources retired at once
  * cannot write over each other.
  */
-function moveSourcesFrom(start: Tables, closed: Set<MonthKey>, refs: FundedBy[], to: FundedBy, from: MonthKey, ts: number): { mutations: Mutation[]; moved: ArchiveMemo['sources'] } {
+function moveSourcesFrom(start: Tables, refs: FundedBy[], to: FundedBy, from: MonthKey, ts: number): { mutations: Mutation[]; moved: ArchiveMemo['sources'] } {
   const muts: Mutation[] = []
   let work = start
   const add = (ms: Mutation[]) => {
@@ -565,10 +553,10 @@ function moveSourcesFrom(start: Tables, closed: Set<MonthKey>, refs: FundedBy[],
       of(s.fundedBy).schedules.push(split.targetId)
     }
   }
-  // whatever still comes out of them in open months from `from` on
+  // whatever still comes out of them from `from` on
   const rewrites: Mutation[] = []
   for (const c of work.cells) {
-    if (compareMonths(c.month, from) < 0 || closed.has(c.month) || !c.items.some((i) => refs.includes(i.fundedBy))) continue
+    if (compareMonths(c.month, from) < 0 || !c.items.some((i) => refs.includes(i.fundedBy))) continue
     rewrites.push(putCell({ ...c, items: c.items.map((i) => (refs.includes(i.fundedBy) ? { ...i, fundedBy: to } : i)) }, ts))
   }
   add(rewrites)
@@ -619,7 +607,7 @@ function accountArchive(ctx: Ctx, acc: Account, from: MonthKey, ts: number): Mut
   // its virtual accounts go with it, and what they and the account paid comes out of the month's income from then on
   const pools = ctx.pools.filter((p) => p.accountId === acc.id && !(p.archivedMonth && compareMonths(p.archivedMonth, from) <= 0))
   for (const p of pools) add(poolShelve(ctx, p, from, ts))
-  const sources = moveSourcesFrom(work, ctx.closed, [accountRef(acc.id), ...pools.map((p) => poolRef(p.id))], 'cash', from, ts)
+  const sources = moveSourcesFrom(work, [accountRef(acc.id), ...pools.map((p) => poolRef(p.id))], 'cash', from, ts)
   add(sources.mutations)
   // what the archive changed with the account, kept on the account for the day it is restored
   const memo: ArchiveMemo = { ...emptyMemo(from), with: pools.map((p) => ({ table: 'pools' as const, id: p.id, was: p.archivedMonth })), sources: sources.moved }
@@ -653,7 +641,7 @@ function poolShelve(ctx: Ctx, pool: Pool, from: MonthKey, ts: number, sources: A
 
 function poolArchive(ctx: Ctx, pool: Pool, from: MonthKey, ts: number): Mutation[] {
   const shelved = poolShelve(ctx, pool, from, ts)
-  const sources = moveSourcesFrom(applyMutations(ctx.tables, shelved), ctx.closed, [poolRef(pool.id)], poolFallback(ctx, pool), from, ts)
+  const sources = moveSourcesFrom(applyMutations(ctx.tables, shelved), [poolRef(pool.id)], poolFallback(ctx, pool), from, ts)
   // the same record once more, now that what it paid has been moved and can be remembered
   return [...shelved, ...sources.mutations, poolShelve(ctx, pool, from, ts, sources.moved)[0]]
 }
@@ -676,7 +664,6 @@ const scheduleRemoval = (ctx: Ctx, item: RecurringItem, ts: number): Mutation[] 
 export function planRemoval(tables: Tables, target: RemovalTarget, ts: number, opts: ImpactOptions = {}): Mutation[] {
   const ctx = context(tables, opts)
   const impact = impactOf(ctx, target, opts)
-  if (impact.closedHistory) throw new Error(`"${impact.subject}" has amounts in closed months (${impact.closedHistory}). Archive it instead.`)
   if (impact.blockers.length) throw new Error(`Resolve this first: ${impact.blockers.map((b) => b.text).join('; ')}.`)
   switch (target.kind) {
     case 'row': return rowRemoval(ctx, find(ctx.rows, target.id, 'row'), ts)
@@ -732,14 +719,12 @@ export function restoredText(r: Restored): string {
  * so one undo archives it again.
  *
  * Only what still shows what archiving left is put back: a schedule that still ends where the archive ended it, a
- * row or an item that still comes out of the fallback the archive gave it. Whatever was changed in between stays, and
- * so does every month that was closed since.
+ * row or an item that still comes out of the fallback the archive gave it. Whatever was changed in between stays.
  */
 export function planRestore(tables: Tables, target: RemovalTarget, ts: number, opts: ImpactOptions = {}): { mutations: Mutation[] } & Restored {
   const household = tables.household.find((h) => !h.deletedAt)
   if (!household) throw new Error('No household yet')
   const months = defaultMonths(household, tables, opts.today ?? monthOfDate())
-  const closed = new Set(tables.monthStates.filter((s) => s.closed).map((s) => s.month))
   const muts: Mutation[] = []
   let work = tables
   const add = (ms: Mutation[]) => {
@@ -763,9 +748,7 @@ export function planRestore(tables: Tables, target: RemovalTarget, ts: number, o
    * `own` is the source that is the restored thing itself ("it" in the sentence); any other is named.
    */
   const sourcesBack = (memo: ArchiveMemo, own: FundedBy | null) => {
-    // the first month that is still open: months closed since keep the source they were closed with
-    let from = memo.month
-    while (closed.has(from)) from = addMonths(from, 1)
+    const from = memo.month
     for (const entry of memo.sources) {
       const rowNames: string[] = []
       let other = 0
@@ -800,7 +783,7 @@ export function planRestore(tables: Tables, target: RemovalTarget, ts: number, o
       for (const [key, ids] of byCell) {
         const [rowId, month] = key.split('|')
         const cell = cellOf(work, rowId, month)
-        if (!cell || closed.has(month)) continue
+        if (!cell) continue
         const mine = cell.items.filter((i) => ids.includes(i.id))
         const still = mine.filter((i) => i.fundedBy === entry.to)
         changed += mine.length - still.length

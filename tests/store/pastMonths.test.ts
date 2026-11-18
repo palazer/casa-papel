@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cellKey, computeEngine } from '@/engine'
-import { MonthStateSchema, newId } from '@/model'
+import { CellSchema, newId } from '@/model'
 import {
   CasaDb, Store, archiveRow, defaultMonths, followRow, keepHouse, loadTables, planHousekeeping, removeRecurringItem, restoreRow, saveRowMonth, setCellDone,
   setCellValue, setDerivedDone, setRule,
@@ -13,15 +13,15 @@ import { restoreToday, setToday } from '../today'
 const TODAY = '2026-11'
 
 /**
- * The demo in November 2026 with nothing locking its September: a month that is over and holds, on a row with a
- * schedule, an amount that was typed as one figure ("Subscriptions" 42.00, while "Streaming" is 18.00 a month).
- * Landing the schedule there as well would make it 60.00.
+ * The demo in November 2026, with its September as older data can hold it: on a row with a schedule, an amount that
+ * was typed as one figure ("Subscriptions" 42.00, while "Streaming" is 18.00 a month), and nothing of the schedule
+ * in the month, not even the note that it was left out. Landing the schedule there as well would make it 60.00.
  */
 async function demo() {
   const store = new Store(new CasaDb(`test-${newId()}`))
   await loadDemo(store)
-  const september = (await loadTables(store)).monthStates.find((s) => s.month === '2026-09')!
-  await store.commitSystem([{ op: 'put', table: 'monthStates', record: MonthStateSchema.parse({ ...september, closed: false, closedAt: null }) }])
+  const september = (await loadTables(store)).cells.find((c) => c.rowId === DEMO_IDS.rowSubscriptions && c.month === '2026-09')!
+  await store.commitSystem([{ op: 'put', table: 'cells', record: CellSchema.parse({ ...september, mode: 'value', value: 42_00, items: [] }) }])
   const read = async () => {
     const tables = await loadTables(store)
     const out = computeEngine({ tables, months: defaultMonths(tables.household[0], tables, TODAY) })

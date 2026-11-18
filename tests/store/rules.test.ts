@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { buildStatement, cellKey, computeEngine, type EngineOutput, type StatementLine } from '@/engine'
 import { monthRange, newId, type MonthKey, type Row } from '@/model'
 import {
-  CasaDb, Store, addAccount, addPool, addRow, addRowOfKind, archiveRow, closeMonth, derivedRowReason, describeRemoval, followRow, loadTables, planRemoval, previewRule,
+  CasaDb, Store, addAccount, addPool, addRow, addRowOfKind, archiveRow, derivedRowReason, describeRemoval, followRow, loadTables, planRemoval, previewRule,
   quickCreateHousehold, removeThing, setCellValue, setDerivedDone, setRowDeductedFrom, setRule,
 } from '@/store'
 
@@ -195,7 +195,7 @@ describe('setRule', () => {
   })
 
   it('says on the spot what cannot be', async () => {
-    const { store, toBroker, toSavings, rent, broker, rainy } = await fresh()
+    const { store, toBroker, rent, broker, rainy } = await fresh()
     const loan = await addAccount(store, { name: 'Car loan', type: 'loan', currency: 'EUR', openingMonth: '2026-01' })
     const rule = (target: Parameters<typeof setRule>[1], choice: Parameters<typeof setRule>[2], from: MonthKey = '2026-02') => setRule(store, target, choice, from)
     await expect(rule({ rowId: toBroker.id }, { kind: 'share-of-income', share: 0 })).rejects.toThrow(/above 0 and at most 100/)
@@ -211,10 +211,6 @@ describe('setRule', () => {
     // two rows into one account: the account cannot say which
     await addRowOfKind(store, { section: 'transfer', name: 'Bonus to Broker', categoryId: null, kind: 'to-investment', accountId: broker.id })
     await expect(rule({ accountId: broker.id }, { kind: 'fixed', amount: 100 })).rejects.toThrow(/Several rows move money to "Broker": To Broker, Bonus to Broker/)
-    // a closed month cannot start a rule, and a rule cannot start before one
-    await closeMonth(store, '2026-02')
-    await expect(rule({ rowId: toSavings.id }, { kind: 'share-of-rest', share: 0.1 }, '2026-02')).rejects.toThrow(/2026-02 is closed\. Reopen it, or start the rule in an open month/)
-    await expect(rule({ rowId: toSavings.id }, { kind: 'share-of-rest', share: 0.1 }, '2026-01')).rejects.toThrow(/2026-02 is closed, and a rule counts for every month from its start on/)
   })
 
   it('a row with a rule is automatic: it cannot follow, be followed or be typed over as paid', async () => {

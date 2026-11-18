@@ -1,17 +1,17 @@
 import { expect, test } from './test'
 
-/** The one dialog for removing things: what deleting loses, archive-only for closed history, blockers, Restore. */
+/** The one dialog for removing things: what deleting loses, which months that are over change with it, blockers, Restore. */
 test.describe('archive or delete', () => {
   test.use({ viewport: { width: 1440, height: 900 } })
 
-  test('a row: delete with its impact and undo, archive one with closed history and restore it', async ({ page }) => {
+  test('a row: delete with its impact and undo, archive one with amounts in months that are over and restore it', async ({ page }) => {
     await page.goto('?demo=1&screen=grid')
     await page.getByRole('button', { name: 'Load the demo household' }).click()
     await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })).toBeVisible()
     await page.getByRole('button', { name: 'Earlier months (2)' }).click()
     const dlg = page.getByRole('dialog')
 
-    // Other income has no closed history: the dialog says what goes, Delete removes it, Undo brings it back
+    // Other income begins in the current month: the dialog says what goes, Delete removes it, Undo brings it back
     await page.getByRole('button', { name: 'Row menu for Other income' }).click()
     await page.getByRole('menuitem', { name: 'Archive or delete…' }).click()
     await expect(dlg.getByRole('heading', { name: 'Row "Other income"' })).toBeVisible()
@@ -34,18 +34,19 @@ test.describe('archive or delete', () => {
     await dlg.getByRole('button', { name: 'Cancel' }).click()
     await expect(dlg).toBeHidden()
 
-    // Groceries has amounts in September, which is closed: no Delete, only Archive
+    // Groceries has amounts in September and October, which are over: the dialog says so, and still offers both ways
     await page.getByRole('button', { name: 'Row menu for Groceries' }).click()
     await page.getByRole('menuitem', { name: 'Archive or delete…' }).click()
     await expect(dlg.getByRole('heading', { name: 'Row "Groceries"' })).toBeVisible()
-    await expect(dlg.getByText(/has amounts in closed months \(Sept 2026\), so it cannot be deleted/)).toBeVisible()
-    await expect(dlg.getByRole('button', { name: 'Delete', exact: true })).toHaveCount(0)
-    // September itself is refused as the archive month
+    await expect(dlg.getByText('2 of these months are over (Sept–Oct 2026): they change too')).toBeVisible()
+    await expect(dlg.getByText(/cannot be deleted/)).toHaveCount(0)
+    await expect(dlg.getByRole('button', { name: 'Delete', exact: true })).toBeEnabled()
+    // an archive can start in any month of the household, its first one too
     await dlg.getByLabel('Archive from: month').selectOption({ label: 'September' })
-    await expect(dlg.getByText('Sept 2026 is closed and has amounts in it. Archive from Oct 2026 or later.')).toBeVisible()
-    await expect(dlg.getByRole('button', { name: 'Archive from Sept 2026' })).toBeDisabled()
+    await expect(dlg.getByRole('alert')).toHaveCount(0)
+    await expect(dlg.getByRole('button', { name: 'Archive from Sept 2026' })).toBeEnabled()
     await dlg.getByLabel('Archive from: month').selectOption({ label: 'November' })
-    await page.screenshot({ path: 'e2e/output/remove-archive-only.png' })
+    await page.screenshot({ path: 'e2e/output/remove-archive-or-delete.png' })
     await dlg.getByRole('button', { name: 'Archive from Nov 2026' }).click()
     await expect(dlg).toBeHidden()
     // the row stays on the grid with its earlier months; from November the cells are blank
@@ -132,7 +133,7 @@ test.describe('archive or delete', () => {
     await page.getByRole('link', { name: 'Household' }).click()
     const dlg = page.getByRole('dialog')
 
-    // a new savings account opened this month (so no closed history) holding a new virtual account
+    // a new savings account opened this month (so nothing of it is over) holding a new virtual account
     await page.getByRole('button', { name: 'Add account' }).click()
     await dlg.getByLabel('Name').fill('Holiday')
     await dlg.getByLabel('Type').selectOption({ label: 'Savings' })

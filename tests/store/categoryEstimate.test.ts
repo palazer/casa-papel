@@ -54,9 +54,15 @@ describe('a category\'s estimate in the store', () => {
     expect(['2026-11', '2026-12'].map((m) => out.cells[cellKey(row.id, m)].estimate)).toEqual([1500_00, 0])
   })
 
-  it('refuses a closed month, an income category, an amount below zero and a category that is gone', async () => {
+  it('takes a month that is over like any other', async () => {
+    const { store, read } = await world()
+    const row = await setCategoryEstimate(store, DEMO_IDS.catHousing, '2026-09', 2500_00, 'this-month')
+    const { out } = await read()
+    expect(['2026-09', '2026-10'].map((m) => out.cells[cellKey(row.id, m)].estimate)).toEqual([2500_00, 0])
+  })
+
+  it('refuses an income category, an amount below zero and a category that is gone', async () => {
     const { store } = await world()
-    await expect(setCategoryEstimate(store, DEMO_IDS.catHousing, '2026-09', 100_00)).rejects.toThrow(/closed/)
     await expect(setCategoryEstimate(store, DEMO_IDS.catHousing, '2026-11', -1)).rejects.toThrow(/below zero/)
     await expect(setCategoryEstimate(store, newId(), '2026-11', 100_00)).rejects.toThrow(/no longer exists/)
     const pay = await addCategory(store, { name: 'Pay', section: 'income' })

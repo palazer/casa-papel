@@ -22,8 +22,6 @@ export interface LineContext {
   isOpen: (line: Line) => boolean
   onToggle: (line: Line) => void
   goalText: (g: GoalProgress) => { text: string; cls: string }
-  /** A closed month is locked: no ticks, no editor. */
-  closed?: boolean
   /** How much of a row or an item is done; null when there is nothing to tick. Leave out for a side without ticks. */
   doneOf?: (line: Line) => { done: number; total: number; state: DoneState } | null
   onTick?: (line: Line, done: boolean) => void
@@ -212,18 +210,18 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
   )
 
   if (rowLike) {
-    const working = !ctx.closed && !!ctx.doneOf
+    const working = !!ctx.doneOf
     const d = working ? ctx.doneOf!(line) : null
     // one dialog per row: a line the app works out opens it too when a rule does the working out (the dialog then
     // shows the rule); any other automatic line has nothing to change
-    const editable = !ctx.closed && !!ctx.onEdit && !!line.rowId && (!line.automatic || !!line.rule)
+    const editable = !!ctx.onEdit && !!line.rowId && (!line.automatic || !!line.rule)
     // what is left of a category's estimate is worked out, so the line opens the estimate it comes from
-    const estimateOf = !ctx.closed && ctx.onEstimate ? line.estimateFor : undefined
+    const estimateOf = ctx.onEstimate ? line.estimateFor : undefined
     const busy = ctx.busy != null && (ctx.busy === line.id || ctx.busy === line.rowId || ctx.busy.startsWith(`${line.rowId}:`))
     const comes = upcomingText && line.nextDue ? `, ${upcomingText} next in ${formatMonth(line.nextDue, locale)}` : ''
     const said = `${fullLabel}: ${line.empty ? `empty${comes}` : amountText}${shaded ? ', an estimate' : ''}`
-    // a row carries its menu; what is left of an estimate is not a row of its own, and a closed month changes nothing
-    const menu = !ctx.closed && line.kind === 'row' && line.rowId && line.estimateFor == null ? ctx.rowMenu?.(line.rowId) : null
+    // a row carries its menu; what is left of an estimate is not a row of its own
+    const menu = line.kind === 'row' && line.rowId && line.estimateFor == null ? ctx.rowMenu?.(line.rowId) : null
     const press = estimateOf ? () => ctx.onEstimate!(estimateOf) : editable ? () => ctx.onEdit!(line.rowId!) : null
     // A line that opens something can hold more controls: the rule symbol, the menu. So the line's button is its name,
     // stretched over the whole line, and the other controls sit above it. The rule symbol opens the same dialog: it
@@ -280,7 +278,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
   // Among rows that carry a tick, a line without one keeps the tick's place, so the names of a group stay in one
   // column; what such a line opens to follows it, so it stays further in than its heading.
   const untickedAmongRows = line.kind === 'source' || line.kind === 'figure' || (line.kind === 'note' && parent?.kind === 'source')
-  const tickGap = !ctx.closed && !!ctx.doneOf && untickedAmongRows ? <span className={TICK_GAP} aria-hidden /> : null
+  const tickGap = !!ctx.doneOf && untickedAmongRows ? <span className={TICK_GAP} aria-hidden /> : null
   // The name carries its arrow (and the tick's place) in front of it. What does not fit beside the name goes to a
   // second line, and that line starts under the name, not under the arrow: the label is padded by the arrow's
   // columns and the name's box hangs back over the padding.
@@ -340,7 +338,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
               <Target className="size-3.5" aria-hidden />
             </button>
           )}
-          {!ctx.closed && ctx.menu && <span className={cn(ABOVE, 'inline-flex empty:hidden')}>{ctx.menu(line)}</span>}
+          {ctx.menu && <span className={cn(ABOVE, 'inline-flex empty:hidden')}>{ctx.menu(line)}</span>}
         </div>
         {ctx.withChange && <span className={cn(CHANGE_COL, 'text-muted-foreground', group && 'font-medium')}>{line.change != null ? changeText(line.change, ccy, locale) : ''}</span>}
         {(ctx.onBalance && line.accountId) || (ctx.onCurrentBalance && line.currentAccountIds?.length) ? (
@@ -402,7 +400,7 @@ function LinkMark({ line, ctx, className }: { line: Line; ctx: LineContext; clas
   const link = line.link
   if (!link) return null
   const act = link.open ? ctx.onLinkOpen : link.to.length ? ctx.onLink : undefined
-  // an open link that cannot be closed from here (a closed month) has nothing to say
+  // an open link that cannot be closed from here has nothing to say
   if (link.open && !act) return null
   const said = link.open ? `${link.text}: add the row that pays it off` : `${link.text}: go there`
   const look = cn('inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded text-muted-foreground', link.open && 'text-muted-foreground/50', className)

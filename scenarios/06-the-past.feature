@@ -1,7 +1,7 @@
 Feature: The past
-  The past is every month before the current one. Decided in November 2026, not built yet: closing and reopening a
-  month go away, the app never changes the past by itself, and a change that reaches into the past asks first.
-  Rules T1 to T4 of docs/calculations.md.
+  The past is every month before the current one. No month is closed: a month that is over can still be corrected,
+  and the app never changes it by itself. Decided in November 2026 and not built yet: a change that reaches into
+  the past asks first. Rules T1 to T4 of docs/calculations.md.
 
   Background:
     Given today is 15 June 2026
@@ -26,13 +26,41 @@ Feature: The past
     When I type 1,300.00 for "Rent" in June 2026, every month
     Then nothing has changed before June 2026
 
-  # ---------- step 2: closing replaced by the calendar ----------
+  # ---------- no month is closed ----------
 
-  @T2 @planned
+  @T2
   Scenario: There is nothing to close: a month that is over can still be corrected
     When I type 1,250.00 for "Rent" in March 2026, only this month
     Then "Rent" is 1,250.00 in March 2026
     And no month can be closed or reopened
+
+  @T2
+  Scenario: A month that an older version of the app had closed counts as done and keeps its amounts
+    When the app opens data in which an older version had closed March 2026
+    Then every amount of March 2026 is done
+    And nothing has changed
+    And "Rent" can still be changed in March 2026
+    And no month can be closed or reopened
+
+  @T2
+  Scenario: A month that was closed stays as it was when the calendar moves on
+    Given the app opens data in which an older version had closed March 2026
+    When the calendar moves on to October 2026
+    Then every amount of March 2026 is done
+    And nothing has changed before January 2027
+
+  @T2
+  Scenario: Something with amounts in months that are over can be deleted
+    When I delete the row "Rent"
+    Then the Statement of March 2026 has no line "Rent"
+    And "Current account" ends January 2026 with 3,500.00
+
+  @T2
+  Scenario: A rule can start in a month that is over
+    When "Savings" gets 10% of the income from March 2026
+    Then "To Savings" is 300.00 in March 2026
+    And "To Savings" is 500.00 in February 2026
+    And nothing has changed before March 2026
 
   @T3
   Scenario: "Count everything as done" marks a whole month done, and changes no amount

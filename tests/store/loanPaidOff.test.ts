@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cellKey, computeEngine } from '@/engine'
 import { monthRange, newId } from '@/model'
 import {
-  CasaDb, Store, addAccountWithRow, addRecurringItem, closeMonth, itemsFromCurrent, loadTables, quickCreateHousehold, setCellDone, setCellValue, setRowFundedBy,
+  CasaDb, Store, addAccountWithRow, addRecurringItem, itemsFromCurrent, keepHouse, loadTables, quickCreateHousehold, setCellDone, setCellValue, setMonthBalances, setRowFundedBy,
 } from '@/store'
+import { legacyClose } from '../legacyClose'
 import { restoreToday, setToday } from '../today'
 
 const months = monthRange('2026-01', '2026-06')
@@ -42,10 +43,19 @@ describe('a loan that is paid off: the store writes what was planned, not what c
     expect(await counted(store, pay.id)).toEqual([25000, 25000, 5000, 5000, 0, 0])
   })
 
-  it('closing a cut month writes the planned amount down', async () => {
+  it('counting a cut month as done writes the planned amount down, in its item', async () => {
     const { store, pay } = await fresh()
-    for (const m of ['2026-01', '2026-02', '2026-03']) await closeMonth(store, m)
+    for (const m of ['2026-01', '2026-02', '2026-03']) await setMonthBalances(store, m, {}, { done: true })
+    expect((await stored(store, pay.id, '2026-03'))!.items.map((i) => [i.amount, i.status])).toEqual([[25000, 'done']])
+    expect(await counted(store, pay.id)).toEqual([25000, 25000, 10000, 0, 0, 0])
+  })
+
+  it('a cut month an older version had closed keeps the planned amount when the app opens it', async () => {
+    const { store, pay } = await fresh()
+    for (const m of ['2026-01', '2026-02', '2026-03']) await legacyClose(store, m)
     expect(await stored(store, pay.id, '2026-03')).toMatchObject({ mode: 'value', value: 25000 })
+    await keepHouse(store, '2026-06')
+    expect((await stored(store, pay.id, '2026-03'))!.items.map((i) => [i.amount, i.status])).toEqual([[25000, 'done']])
     expect(await counted(store, pay.id)).toEqual([25000, 25000, 10000, 0, 0, 0])
   })
 

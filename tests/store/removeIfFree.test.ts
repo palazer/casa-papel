@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { newId } from '@/model'
 import {
-  CasaDb, Store, addAccount, addCategory, addGoal, addRow, addSuggestion, closeMonth, createHouseholdFromSetup, loadTables, removeIfFree, rowSuggestions,
+  CasaDb, Store, addAccount, addCategory, addGoal, addRow, addSuggestion, createHouseholdFromSetup, loadTables, removeIfFree, rowSuggestions,
   describeRemoval, setCellValue, setRule,
 } from '@/store'
 import { restoreToday, setToday } from '../today'
@@ -88,14 +88,5 @@ describe('the cheap delete of a household that is being set up', () => {
     const fresh2 = await addRow(store, { name: 'Gym', section: 'expense' })
     await setCellValue(store, fresh2.id, '2026-11', 30_00, 'from-now-on')
     expect(await removeIfFree(store, { kind: 'row', id: fresh2.id })).toBe('Gym')
-  })
-
-  it('never deletes what has amounts in a closed month', async () => {
-    const store = await fresh()
-    const row = await addRow(store, { name: 'Rent', section: 'expense' })
-    await setCellValue(store, row.id, '2026-09', 900_00, 'this-month')
-    await closeMonth(store, '2026-09')
-    expect(await removeIfFree(store, { kind: 'row', id: row.id })).toBeNull()
-    expect((await live(store)).rows).toEqual(['Rent'])
   })
 })

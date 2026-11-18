@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { computeEngine } from '@/engine'
 import { CellSchema } from '@/model'
 import { monthProgress, nearestMonth, progressText } from '@/features/statement/progress'
-import { T0, cellItems, cellValue, closedMonth, household, row, tables } from '../engine/helpers'
+import { T0, cellItems, cellValue, household, row, tables } from '../engine/helpers'
 
 const month = '2026-01'
 
@@ -28,7 +28,7 @@ describe('month progress', () => {
     const p = monthProgress(out.rows, out.cells, month)
     // Salary, Rent, Bills (two live items), the savings plug of 300,000 − 126,500; the empty Gym row is not a line
     expect(p).toEqual({ lines: 4, done: 1, total: 5, toPay: 120000 + 2500 + 173500, toComeIn: 300000 })
-    expect(progressText(p, false, 'EUR', 'en-IE')).toBe('1 of 5 done · €2,960.00 still to pay · €3,000.00 to come in')
+    expect(progressText(p, 'EUR', 'en-IE')).toBe('1 of 5 done · €2,960.00 still to pay · €3,000.00 to come in')
   })
 
   it('a draw on savings is nothing to pay, and a ticked automatic row counts as done', () => {
@@ -40,16 +40,18 @@ describe('month progress', () => {
     expect(p).toEqual({ lines: 4, done: 2, total: 5, toPay: 320000 + 2500, toComeIn: 300000 })
   })
 
-  it('says it in words: all done, closed, nothing yet', () => {
+  it('says it in words: all done, nothing yet', () => {
     const s = setup()
-    // closing a month marks every item done (closeMonth does that); here the fixture does it by hand
-    const cells = s.cells.map((c) => (c.mode === 'items' ? { ...c, items: c.items.map((i) => ({ ...i, status: 'done' as const })) } : c))
-    const closed = computeEngine({ tables: tables({ household: [s.h], rows: s.rows, cells, monthStates: [closedMonth(month)] }), months: [month] })
-    const p = monthProgress(closed.rows, closed.cells, month)
+    // every line ticked, the way "Count everything in <Month> as done" leaves a month: items done, the rest marked
+    const cells = [
+      ...s.cells.map((c) => (c.mode === 'items' ? { ...c, items: c.items.map((i) => ({ ...i, status: 'done' as const })) } : cellItems(c.rowId, month, [{ amount: c.value ?? 0, status: 'done' }]))),
+      CellSchema.parse({ rowId: s.toSav.id, month, mode: 'inherit', markedDone: true, updatedAt: T0 }),
+    ]
+    const ticked = computeEngine({ tables: tables({ household: [s.h], rows: s.rows, cells }), months: [month] })
+    const p = monthProgress(ticked.rows, ticked.cells, month)
     expect(p.done).toBe(p.total)
-    expect(progressText(p, false, 'EUR', 'en-IE')).toBe('All 5 done')
-    expect(progressText(p, true, 'EUR', 'en-IE')).toBe('Closed · all done')
-    expect(progressText({ lines: 0, done: 0, total: 0, toPay: 0, toComeIn: 0 }, false, 'EUR', 'en-IE')).toBe('Nothing in this month yet')
+    expect(progressText(p, 'EUR', 'en-IE')).toBe('All 5 done')
+    expect(progressText({ lines: 0, done: 0, total: 0, toPay: 0, toComeIn: 0 }, 'EUR', 'en-IE')).toBe('Nothing in this month yet')
   })
 })
 

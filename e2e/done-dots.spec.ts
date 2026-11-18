@@ -11,11 +11,11 @@ test.describe('done dots', () => {
 
   test('this month shows a dot per cell; itemized cells go from partly to all done', async ({ page }) => {
     await loadDemo(page)
-    // the Grid starts at the current month; the closed September is one button away
+    // the Grid starts at the current month; September, which is over and ticked, is one button away
     await page.getByRole('button', { name: 'Earlier months (2)' }).click()
     const rent = page.getByRole('button', { name: /^The flat – Rent Nov 2026/ })
     await expect(rent.getByRole('img', { name: 'Not done yet' })).toBeVisible()
-    // a closed month is done, so it carries the green dot; future months carry none
+    // what is ticked carries the green dot in any month; future months carry none
     await expect(page.getByRole('button', { name: /^The flat – Rent Sept 2026/ }).getByRole('img', { name: 'Done' })).toBeVisible()
     await expect(page.getByRole('button', { name: /^The flat – Rent Dec 2026/ }).getByRole('img')).toHaveCount(0)
 

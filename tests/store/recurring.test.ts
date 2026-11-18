@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cellKey, computeEngine } from '@/engine'
 import { monthRange, newId } from '@/model'
 import {
-  CasaDb, Store, addRecurringItem, addRow, closeMonth, deleteRecurringItem, endRecurringItem, keepHouse, loadTables, planRecurringPosts, postRecurring,
+  CasaDb, Store, addRecurringItem, addRow, deleteRecurringItem, endRecurringItem, keepHouse, loadTables, planRecurringPosts, postRecurring,
   changeRecurringFrom, endRecurringFrom, quickCreateHousehold, reactivateRecurringItem, recurringStatus, setCellItems, setCellValue, setRecurringPaid, skipRecurringMonth,
   updateRecurringItem,
 } from '@/store'
@@ -44,14 +44,13 @@ describe('recurring posting', () => {
     const item = await addRecurringItem(store, { name: 'Rent', rowId: rent.id, amount: 100000, startMonth: '2026-01' })
     await setRecurringPaid(store, item.id, '2026-02', true)
     await setRecurringPaid(store, item.id, '2026-06', true)
-    await closeMonth(store, '2026-01')
     expect(recurringStatus(await loadTables(store), item, '2026-02')).toBe('paid')
     expect(recurringStatus(await loadTables(store), item, '2026-03')).toBe('due')
 
     await updateRecurringItem(store, item.id, { amount: 110000 })
     expect(await keepHouse(store)).toBe(0)
     const v = await valuesOf(store, rent.id)
-    expect(v[0]).toBe(100000) // closed January untouched
+    expect(v[0]).toBe(100000) // January is over: untouched
     expect(v[1]).toBe(100000) // paid February keeps what was paid
     expect(v[2]).toBe(100000) // March is over and was not paid: it keeps what it had all the same
     expect(v[3]).toBe(110000) // April, the current month

@@ -19,7 +19,7 @@ const byOrder = (a: Category, b: Category) => (a.order < b.order ? -1 : a.order 
  */
 export function CategoryMenu({ category, tables, household, onError, onDeleted, onEstimate, hasEstimate = false, triggerClassName }: {
   category: Category; tables: Tables; household: Household; onError: (msg: string) => void
-  /** An expense category in an open month: open its estimate for the month on screen. Left out, the menu has no such item. */
+  /** An expense category: open its estimate for the month on screen. Left out, the menu has no such item. */
   onEstimate?: () => void
   /** The category has an estimate in that month, so the item changes it. */
   hasEstimate?: boolean

@@ -18,7 +18,7 @@ import {
   type CellItem, type Household, type ItemStatus, type MonthKey, type RepeatChoice, type Repeating, type Row, type Tables,
 } from '@/model'
 import {
-  clearCell, derivedRowReason, endRecurringFrom, fetchRatesFor, itemsFromCurrent, reopenMonth, saveRowMonth, setCellItems, setCellValue, skipRecurringMonth,
+  clearCell, derivedRowReason, endRecurringFrom, fetchRatesFor, itemsFromCurrent, saveRowMonth, setCellItems, setCellValue, skipRecurringMonth,
   type EditScope, type RuleTarget,
 } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
@@ -60,7 +60,6 @@ const STATUS_LABEL: Record<ItemStatus, string> = { projected: 'Estimate', commit
 export function CellEditor({ tables, engine, household, row, month, startRule, onClose, onMoved }: Props) {
   const store = useStore()
   const cell = engine.cells[cellKey(row.id, month)]
-  const closed = engine.totals[month]?.closed ?? false
   // ----- the rule, for a row that can carry one -----
   const ruleTarget = useMemo<RuleTarget>(() => ({ rowId: row.id }), [row.id])
   const facts = useMemo(() => (canCarryRule(row) ? ruleFacts(tables, household, ruleTarget) : null), [tables, household, row, ruleTarget])
@@ -363,12 +362,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
           </p>
         )}
 
-        {closed ? (
-          <div className="space-y-3">
-            <p className="text-sm">This month is closed. Reopen it to make changes.</p>
-            <Button variant="outline" onClick={() => void run(() => reopenMonth(store, month))} disabled={busy}>Reopen {formatMonth(month, locale)}</Button>
-          </div>
-        ) : showRuleFields && facts ? (
+        {showRuleFields && facts ? (
           <>
             <RulePicker facts={facts} kind={ruleKind} onKind={setRuleKind} />
             <RuleFields tables={tables} household={household} target={ruleTarget} facts={facts} month={month} kind={ruleKind} onClose={onClose} />
@@ -500,7 +494,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                     <div key={it.id} className={cn('space-y-2 rounded-md border p-2', schedule && 'border-transfer/40')}>
                       {/* the name takes what the other fields leave: they are as narrow as their content allows */}
                       <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] items-start gap-2 sm:grid-cols-[minmax(0,1fr)_6.5rem_7rem_8.5rem_2rem]">
-                        {/* a name can always be typed over; for something that repeats it is the schedule's name, in every open month */}
+                        {/* a name can always be typed over; for something that repeats it is the schedule's name, in every month */}
                         <div className="flex min-w-0 items-center gap-1.5">
                           {schedule && <Repeat className="size-3.5 shrink-0 text-transfer" aria-hidden />}
                           <Input aria-label="Item label" placeholder={schedule?.name ?? 'What'} value={it.label} onChange={(e) => updateItem(it.id, { label: e.target.value })} />
@@ -528,7 +522,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                         <Button size="icon" variant="ghost" aria-label="Remove item" onClick={() => (schedule ? setRemoving(removing === it.id ? null : it.id) : removePlain(it.id))}><Trash2 /></Button>
                       </div>
                       {schedule && it.label.trim() !== '' && it.label.trim() !== schedule.name && (
-                        <p className="text-xs text-muted-foreground" data-testid="rename-note">Renamed from "{schedule.name}" in every open month.</p>
+                        <p className="text-xs text-muted-foreground" data-testid="rename-note">Renamed from "{schedule.name}" in every month.</p>
                       )}
                       {(schedule || canSchedule) && (
                         <RepeatField value={choice} onChange={(c) => setRepeats((r) => ({ ...r, [it.id]: c }))} month={month} locale={locale} name={it.label.trim() || schedule?.name || row.name} none="Only this month" />
@@ -643,7 +637,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
           </div>
         )}
 
-        {!closed && !showRuleFields && (
+        {!showRuleFields && (
           <DialogFooter className="flex-row flex-wrap gap-2 sm:justify-between">
             <div className="flex gap-2">
               {!isRecurringRow && <Button variant="ghost" onClick={() => void run(() => clearCell(store, row.id, month))} disabled={busy || !cell?.cell}>{ruleRuns ? 'Clear (back to the rule)' : 'Clear (inherit)'}</Button>}

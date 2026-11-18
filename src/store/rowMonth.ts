@@ -17,7 +17,7 @@ export interface RowMonthSave {
   repeats?: Record<string, RepeatChoice>
   /** For a scheduled item whose amount or source was edited and whose rhythm was not: this month alone, or from here on. */
   applyTo?: Record<string, EditScope>
-  /** The row's schedules that do not land this month, where one was changed, by schedule id: from this month on (a new name: in every open month). */
+  /** The row's schedules that do not land this month, where one was changed, by schedule id: from this month on (a new name: in every month). */
   others?: Record<string, { amount?: Money; repeat?: Repeating; name?: string }>
   /** While nothing in the row repeats by itself: what later months do with the total. */
   scope: EditScope
@@ -34,12 +34,11 @@ const isCellPut = (m: Mutation, rowId: string, month: MonthKey) =>
  * schedule whose rhythm or amount changed is changed from this month on (`planChangeRecurringFrom`), so earlier
  * months keep what they show; "only this month" on a scheduled item ends its schedule after this month. A row that
  * gets its first schedule here keeps the amounts its earlier months carried (`pinCarriedMonths`). A scheduled item
- * whose name was typed over is renamed (`planRename`), in every open month.
+ * whose name was typed over is renamed (`planRename`), in every month.
  */
 export function planRowMonthSave(tables: Tables, engine: EngineOutput, rowId: string, month: MonthKey, save: RowMonthSave, ts: number): Mutation[] {
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
   if (!row) throw new Error('That row is gone.')
-  if (tables.monthStates.find((s) => s.month === month)?.closed) throw new Error(`${month} is closed. Reopen it to edit.`)
   const existing = tables.cells.find((c) => c.rowId === rowId && c.month === month)
   const before = new Map((existing?.items ?? []).map((i) => [i.id, i]))
   const muts: Mutation[] = []

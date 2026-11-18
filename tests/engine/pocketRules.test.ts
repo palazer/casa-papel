@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildStatement, cellKey, computeEngine, type EngineOutput, type StatementLine } from '@/engine'
 import { EntitySchema, monthRange, newId, resolveRules, type Entity, type Row, type Tables } from '@/model'
-import { T0, account, cellValue, closedMonth, household, row, tables } from './helpers'
+import { T0, account, cellValue, household, monthState, row, tables } from './helpers'
 
 const months = monthRange('2026-01', '2026-03')
 const adult = (name: string, order: string): Entity => EntitySchema.parse({ id: newId(), createdAt: T0, updatedAt: T0, kind: 'adult', name, order })
@@ -123,9 +123,9 @@ describe('pocket money by rule', () => {
   it('a row from before rules still reads the household\'s pocket total, until it gets a rule', () => {
     const old = (scope: string) => ({ scope, pocketMode: 'share-of-pocket-total' as const, pocketShare: 0.5 })
     const { t, pockets } = world(({ ana, ben }) => [{ name: 'Ana – Pocket', ...old(ana) }, { name: 'Ben – Pocket', ...old(ben), rule: 'share-of-income', ruleShare: 0.02 }], { household: { pocketTotal: 100000 } })
-    t.monthStates.push(closedMonth('2026-01', { pocketTotalOverride: 80000 }))
+    t.monthStates.push(monthState('2026-01', { pocketTotalOverride: 80000 }))
     const out = run(t)
-    expect(value(out, pockets[0], '2026-01')).toBe(40000) // the total the month was closed with
+    expect(value(out, pockets[0], '2026-01')).toBe(40000) // the total the month keeps for itself
     expect(value(out, pockets[0], '2026-02')).toBe(50000)
     expect(value(out, pockets[1], '2026-02')).toBe(10500) // its own rule, not the total
     expectBalanced(t, out)

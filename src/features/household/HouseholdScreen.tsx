@@ -87,7 +87,7 @@ function SettingsCard({ household: h, tables, onSave, onBuffer }: { household: H
     if (v !== bufferNow) onBuffer(v, scope)
   }
   return (
-    <Island air title="Household settings" description="Closed months keep the values they were closed with.">
+    <Island air title="Household settings">
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="s-name">Household name</Label>
@@ -109,9 +109,9 @@ function SettingsCard({ household: h, tables, onSave, onBuffer }: { household: H
           <NativeSelect id="s-scope" className="w-full" value={scope} onChange={(e) => setScope(e.target.value as MonthlyDefaultScope)}>
             <option value="from-now-on">This month and onwards (earlier months keep what they show)</option>
             <option value="this-month">Only this month</option>
-            <option value="all-open">Every open month</option>
+            <option value="all-months">Every month</option>
           </NativeSelect>
-          <p className="text-muted-foreground">Closed months are never changed. "This month" is {formatMonth(thisMonth, h.locale)}.</p>
+          <p className="text-muted-foreground">"This month" is {formatMonth(thisMonth, h.locale)}.</p>
         </div>
         <div className="sm:col-span-2">
           <Check label="Show expenses as negative red numbers" checked={h.displayExpensesNegative} onChange={(e) => onSave({ displayExpensesNegative: e.target.checked })} />

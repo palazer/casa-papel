@@ -18,12 +18,6 @@ async function goToMonth(page: Page, name: string) {
 
 const total = (page: Page, side: 'in' | 'out' | 'assets' | 'claims') => page.getByTestId(`total-${side}`)
 
-/** "Close month" closes at once; what the accounts really held is typed under "Balances…". */
-async function closeMonth(page: Page) {
-  await page.getByRole('button', { name: 'Close month' }).click()
-  await expect(page.getByRole('button', { name: 'Reopen month' })).toBeVisible()
-}
-
 /** The "…" on an account's or a virtual account's line, and "Edit…" in it: the way into its dialog. */
 async function editFrom(page: Page, side: Locator, name: string, what: 'Account' | 'Virtual account' = 'Account') {
   await side.getByRole('button', { name: `${what} menu for ${name}` }).click()
@@ -40,11 +34,13 @@ const middleOf = async (l: Locator) => { const b = (await l.boundingBox())!; ret
 test.describe('the Statement', () => {
   test.use({ viewport: { width: 1440, height: 900 } })
 
-  test('a closed month: both halves balance, categories open to rows and items', async ({ page }) => {
+  test('a month that is over: both halves balance, categories open to rows and items, and it is worked like any other', async ({ page }) => {
     await openStatement(page)
     await expect(page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' })).toHaveAttribute('aria-current', 'page')
     await goToMonth(page, 'September 2026')
-    await expect(page.getByText('closed', { exact: true })).toBeVisible()
+    // the month is over and says so beside the household's name
+    await expect(page.getByText('past', { exact: true })).toBeVisible()
+    await expect(page.getByText('past', { exact: true })).toHaveAttribute('title', 'This month is over. It can still be changed.')
 
     // the month: money in equals money out
     await expect(total(page, 'in')).toHaveText('Total in€7,255.00')
@@ -85,10 +81,10 @@ test.describe('the Statement', () => {
     await expect(moneyOut.getByText('Sam – Personal')).toHaveCount(0)
     await personal.click({ position: { x: box.width / 2, y: box.height / 2 } })
     await expect(moneyOut.getByText('Sam – Personal')).toBeVisible()
-    // a closed month is locked: nothing to tick, no line opens the editor
-    await expect(page.getByRole('checkbox')).toHaveCount(0)
-    await expect(moneyOut.getByRole('button', { name: /^Alex – Personal:/ })).toHaveCount(0)
-    await page.screenshot({ path: 'e2e/output/statement-closed.png', fullPage: true })
+    // nothing is locked: the lines carry their ticks, set in September, and open their dialog
+    await expect(moneyOut.getByRole('checkbox', { name: 'Sam – Personal done' })).toBeChecked()
+    await expect(moneyOut.getByRole('button', { name: /^Alex – Personal:/ })).toBeVisible()
+    await page.screenshot({ path: 'e2e/output/statement-past.png', fullPage: true })
 
     // "Expand all" and "Collapse all"
     await page.getByRole('button', { name: 'Expand all' }).click()
@@ -97,26 +93,29 @@ test.describe('the Statement', () => {
     await expect(moneyOut.getByText('The flat – Rent')).toHaveCount(0)
     await expect(assetsSide.getByText('Not set aside')).toHaveCount(0)
 
-    // a closed month counts as done and can be reopened from here; the legend sits in the toolbar
-    await expect(page.getByTestId('progress')).toHaveText('Closed · all done')
-    await expect(page.getByRole('button', { name: 'Close month' })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: 'Reopen month' })).toBeVisible()
+    // every line of September is ticked, so it counts as done. Nothing closes or reopens a month; the legend sits in the toolbar
+    const progress = page.getByTestId('progress')
+    await expect(progress).toHaveText(/^All \d+ done$/)
+    await expect(page.getByRole('button', { name: /Close month|Reopen month/ })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Balances…' })).toBeVisible()
     await page.getByRole('button', { name: 'What the colours and marks mean' }).click()
     await expect(page.getByRole('dialog').getByText('An estimate: on the yellow shade', { exact: false })).toBeVisible()
+    await expect(page.getByRole('dialog').getByText('A month that is over: grey in the Grid, "past" on the Statement. It can still be changed')).toBeVisible()
     await page.keyboard.press('Escape')
-    // reopened, the month can be worked and closed again
-    await page.getByRole('button', { name: 'Reopen month' }).click()
-    await expect(page.getByText('closed', { exact: true })).toHaveCount(0)
-    await expect(page.getByTestId('progress')).toHaveText(/^(\d+ of \d+ done|All \d+ done)/)
-    // "Collapse all" folded the headings too: the one that holds the row is opened again
-    await expect(page.getByRole('checkbox', { name: 'To savings done' })).toHaveCount(0)
+    // the month is worked like any other: a tick comes off and goes back on, and no amount moves
+    // ("Collapse all" folded the headings too: the one that holds the row is opened again)
+    const moved = page.getByRole('checkbox', { name: 'To savings done' })
+    await expect(moved).toHaveCount(0)
     await moneyOut.getByRole('button', { name: 'From what is left', exact: true }).click()
-    await expect(page.getByRole('checkbox', { name: 'To savings done' })).toBeVisible()
-    await closeMonth(page)
-    await expect(page.getByText('closed', { exact: true })).toBeVisible()
-    await expect(page.getByTestId('progress')).toHaveText('Closed · all done')
-    await expect(page.getByRole('checkbox')).toHaveCount(0)
+    await expect(moved).toBeChecked()
+    await moved.click()
+    await expect(progress).toHaveText(/^\d+ of \d+ done · /)
+    await moved.click()
+    await expect(progress).toHaveText(/^All \d+ done$/)
     await expect(total(page, 'in')).toHaveText('Total in€7,255.00')
+    // the current month is not over
+    await goToMonth(page, 'November 2026')
+    await expect(page.getByText('past', { exact: true })).toHaveCount(0)
   })
 
   test('spending from a virtual account shows on both sides', async ({ page }) => {
@@ -438,8 +437,8 @@ test.describe('working the month in the Statement', () => {
     // 800 of 10,000
     await expect(assets.locator('[data-line^="pool:"]').filter({ hasText: 'Travel' })).toContainText('Goal Travel fund:8%')
     await expect(page.getByRole('progressbar', { name: 'Travel fund' })).toHaveCount(0)
-    // September is closed: no line opens a dialog there, so the line itself still folds
-    await assets.getByRole('button', { name: 'Travel', exact: true }).click()
+    // the line opens its dialog; the arrow opens what is under it, the goal
+    await assets.getByRole('button', { name: 'What is under Travel' }).click()
     await expect(page.getByRole('progressbar', { name: 'Travel fund' })).toHaveAttribute('aria-valuenow', '8')
     await expect(assets.getByText(/€800\.00 of €10,000\.00/)).toBeVisible()
     await page.screenshot({ path: 'e2e/output/statement-goal.png', fullPage: true })
@@ -573,13 +572,6 @@ test.describe('working the month in the Statement', () => {
     await details.click()
     await expect(details).toHaveAttribute('aria-expanded', 'false')
     await expect(assets.getByText('At the start of the month')).toHaveCount(0)
-
-    // a closed month changes nothing: no line opens a dialog, and an account that holds something folds from anywhere on its line
-    await closeMonth(page)
-    await expect(page.getByRole('button', { name: /^Edit / })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: /^What is under / })).toHaveCount(0)
-    await assets.getByRole('button', { name: 'Savings', exact: true }).click()
-    await expect(pools).toHaveCount(0)
   })
 
   test('an account can be left out of net worth: it keeps its line, marked and grey, no total counts it, and pocket money lands in it', async ({ page }) => {
@@ -776,14 +768,6 @@ test.describe('working the month in the Statement', () => {
     await expect(line).toContainText('calculated')
     await page.getByRole('button', { name: 'Undo' }).click()
     await expect(assets.getByRole('button', { name: 'Current accounts balance: €1,450.00, entered' })).toBeVisible()
-
-    // a closed month shows the numbers and takes no change
-    await closeMonth(page)
-    await assets.getByRole('button', { name: 'Current accounts balance: €1,450.00, entered' }).click()
-    await expect(mainEnd).toBeDisabled()
-    await expect(dlg.getByLabel('Main account: at the start of November 2026 (EUR)')).toBeDisabled()
-    await expect(dlg.getByText('November 2026 is closed. Correct what it ended on from the starting amount of December 2026, or reopen the month.')).toBeVisible()
-    await expect(dlg.getByRole('button', { name: 'Save' })).toHaveCount(0)
   })
 
   test('"Balances…" asks what every account held at the start and at the end, counts a month that is over as done, and the next month starts with it', async ({ page }) => {
@@ -985,10 +969,10 @@ test.describe('working the month in the Statement', () => {
     await expect(moneyOut.getByRole('button', { name: 'To investments: €740.50' })).toBeVisible()
     await balanced()
 
-    // a closed month shows its rules and changes none
+    // a month that is over shows its rules and offers the same dialog
     await goToMonth(page, 'September 2026')
     await expect(moneyOut.locator('[data-rule="rest"]')).toBeVisible()
-    await expect(page.getByRole('button', { name: /^Rule for / })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /^Rule for / })).not.toHaveCount(0)
 
     // the Grid says the same and offers the same dialog
     await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Grid' }).click()
@@ -1350,10 +1334,10 @@ test.describe('working the month in the Statement', () => {
     await page.getByRole('button', { name: 'Undo' }).click()
     await expect(moneyOut.getByRole('button', { name: /^Transport: / })).toHaveCount(0)
 
-    // a closed month takes no new rows, so it offers none
+    // a month that is over takes new rows like any other, so it offers them too
     await goToMonth(page, 'September 2026')
-    await expect(page.getByTestId('suggestions')).toHaveCount(0)
-    await expect(toggle).toBeDisabled()
+    await expect(toggle).toBeEnabled()
+    await expect(page.getByTestId('suggestions')).not.toHaveCount(0)
     await goToMonth(page, 'November 2026')
     await toggle.click()
     await expect(page.getByTestId('suggestions')).toHaveCount(0)
@@ -1487,13 +1471,13 @@ test.describe('working the month in the Statement', () => {
     await expect(menu).toBeHidden()
     await page.screenshot({ path: 'e2e/output/statement-current-accounts-listed.png', fullPage: true })
 
-    // a closed month changes nothing, so it offers no menus
+    // a month that is over is changed the same way: it offers the same menus
     await goToMonth(page, 'September 2026')
-    // (Living is still open from before; in a closed month its rows are plain lines)
+    // (Living is still open from before)
     await expect(moneyOut.getByText('Food', { exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: /^Row menu for / })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: /^Category menu for / })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: /^(Account|Virtual account) menu for |^Edit / })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /^Row menu for / })).not.toHaveCount(0)
+    await expect(page.getByRole('button', { name: /^Category menu for / })).not.toHaveCount(0)
+    await expect(page.getByRole('button', { name: /^(Account|Virtual account) menu for / })).not.toHaveCount(0)
   })
 
   test('one section for money from the accounts: what an expense took is marked calculated, what is taken by hand is a row with no tag', async ({ page }) => {
@@ -1950,7 +1934,7 @@ test.describe('working the month in the Statement', () => {
     expect((await name.boundingBox())!.width).toBeGreaterThan(170)
     await expect(dlg.getByTestId('rename-note')).toHaveCount(0)
     await name.fill('Sports club membership')
-    await expect(dlg.getByTestId('rename-note')).toHaveText('Renamed from "Gym" in every open month.')
+    await expect(dlg.getByTestId('rename-note')).toHaveText('Renamed from "Gym" in every month.')
     await expect(dlg.getByLabel('Repeats, Sports club membership')).toHaveValue('1')
     await settled(dlg)
     await dlg.screenshot({ path: 'e2e/output/cell-rename.png' })
@@ -2067,10 +2051,10 @@ test.describe('working the month in the Statement', () => {
     const dlg = page.getByRole('dialog')
     const line = (side: typeof assets, name: string) => side.locator('[data-line]').filter({ hasText: name }).first()
 
-    // a closed month still shows what is linked, and offers nothing to add
+    // a month that is over shows what is linked, and the link that is still open, as any month does
     await goToMonth(page, 'September 2026')
     await expect(moneyOut.getByRole('button', { name: 'Goes into Index fund: go there' })).toBeVisible()
-    await expect(page.locator('[data-link="open"]')).toHaveCount(0)
+    await expect(page.locator('[data-link="open"]')).toHaveCount(1)
 
     await goToMonth(page, 'November 2026')
     // income and plain expenses move no account of the lower half: no symbol

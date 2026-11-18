@@ -82,7 +82,6 @@ export const typedAmount = (c: Pick<CellResult, 'value' | 'estimate' | 'asked'>)
 
 export interface MonthTotals {
   month: MonthKey
-  closed: boolean
   income: Money
   cashExpense: Money
   savingsFunded: Money

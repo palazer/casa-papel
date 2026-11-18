@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { cellKey, computeEngine } from '@/engine'
 import { monthRange, newId } from '@/model'
 import {
-  CasaDb, Store, addRow, archiveRow, clearCell, closeMonth, itemsFromCurrent, loadTables, moveRow, quickCreateHousehold,
-  renameRow, reopenMonth, setCellItems, setCellValue, setItemStatus,
+  CasaDb, Store, addRow, archiveRow, clearCell, itemsFromCurrent, keepHouse, loadTables, moveRow, quickCreateHousehold,
+  renameRow, setCellItems, setCellValue, setItemStatus,
 } from '@/store'
+import { legacyClose } from '../legacyClose'
 
 const months = monthRange('2026-01', '2026-04')
 
@@ -109,37 +110,37 @@ describe('actions: rows', () => {
   })
 })
 
-describe('actions: month close', () => {
-  it('freezes inherited values, marks items done, pins settings, and refuses edits until reopened', async () => {
+describe('actions: a month an older version had closed', () => {
+  it('is opened by the app\'s own pass: every line ticked, every amount kept, and it takes changes again', async () => {
     const { store, rent, salary } = await fresh()
     await setCellValue(store, salary.id, '2026-01', 300000, 'from-now-on')
     await setCellValue(store, rent.id, '2026-01', 100000, 'from-now-on')
     await setCellItems(store, rent.id, '2026-02', [
       { id: newId(), label: 'Rent', amount: 100000, status: 'committed', fundedBy: 'cash', date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false },
     ])
-    await closeMonth(store, '2026-02')
+    await legacyClose(store, '2026-02')
+    const closed = await loadTables(store)
+    expect(closed.monthStates.find((s) => s.month === '2026-02')).toMatchObject({ closed: true, pocketTotalOverride: 0, cashBufferOverride: 0 })
+    const before = [await values(store, salary.id), await values(store, rent.id)]
+
+    expect(await keepHouse(store, '2026-04')).toBeGreaterThan(0)
     const t = await loadTables(store)
-    expect(t.monthStates.find((s) => s.month === '2026-02')).toMatchObject({ closed: true, pocketTotalOverride: 0, cashBufferOverride: 0 })
-    const salaryFeb = t.cells.find((c) => c.rowId === salary.id && c.month === '2026-02')
-    expect(salaryFeb).toMatchObject({ mode: 'value', value: 300000 })
-    const rentFeb = t.cells.find((c) => c.rowId === rent.id && c.month === '2026-02')!
-    expect(rentFeb.items.every((i) => i.status === 'done')).toBe(true)
-
+    // the mark is gone, what the month kept for itself stays
+    expect(t.monthStates.find((s) => s.month === '2026-02')).toMatchObject({ closed: false, closedAt: null, pocketTotalOverride: 0, cashBufferOverride: 0 })
     const out = computeEngine({ tables: t, months })
-    expect(out.cells[cellKey(salary.id, '2026-02')].status).toBe('done')
-    expect(out.totals['2026-02'].closed).toBe(true)
+    for (const row of out.rows) {
+      const c = out.cells[cellKey(row.id, '2026-02')]
+      if (c.source !== 'empty' && c.value !== 0) expect(c.status, row.name).toBe('done')
+    }
+    expect([await values(store, salary.id), await values(store, rent.id)]).toEqual(before)
+    // the month after carries on, and is not ticked with it
+    expect(out.cells[cellKey(salary.id, '2026-03')]).toMatchObject({ source: 'inherit', value: 300000 })
+    expect(out.cells[cellKey(salary.id, '2026-03')].status).not.toBe('done')
+    // a second pass has nothing left to do
+    expect(await keepHouse(store, '2026-04')).toBe(0)
 
-    await expect(setCellValue(store, rent.id, '2026-02', 1, 'from-now-on')).rejects.toThrow(/closed/)
-    await reopenMonth(store, '2026-02')
+    // nothing is locked
     await setCellValue(store, rent.id, '2026-02', 1, 'from-now-on')
     expect((await values(store, rent.id))[1]).toBe(1)
-
-    // the whole close was one undoable step
-    await store.undo() // the edit
-    await store.undo() // reopen
-    await store.undo() // close
-    const t2 = await loadTables(store)
-    expect(t2.monthStates.find((s) => s.month === '2026-02')).toBeUndefined()
-    expect(t2.cells.find((c) => c.rowId === salary.id && c.month === '2026-02')).toBeUndefined()
   })
 })

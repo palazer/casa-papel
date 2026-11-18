@@ -9,7 +9,7 @@ function isManagedOnly(c: Tables['cells'][number]): boolean {
 /**
  * The last month the plan reaches, always a December: this year's, or next year's from October on (under three months
  * left, applied every day so the current month is never outside the range after New Year). Raised to the December of
- * `planUntil` ("Add <year>"), of the latest month the user filled in a live row, and of the latest closed month; never
+ * `planUntil` ("Add <year>") and of the latest month the user filled in a live row; never
  * before the household's first month (a start after the end makes the end that year's December). Cells of removed rows
  * do not count; a stale device may still hold some.
  */
@@ -22,7 +22,6 @@ export function planEnd(household: Household, tables: Tables, today: MonthKey = 
   raise(household.planUntil)
   const live = new Set(tables.rows.filter((r) => !r.deletedAt).map((r) => r.id))
   for (const c of tables.cells) if (live.has(c.rowId) && !isManagedOnly(c)) raise(c.month)
-  for (const s of tables.monthStates) if (s.closed) raise(s.month)
   raise(household.startMonth)
   return end
 }

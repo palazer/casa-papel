@@ -6,24 +6,23 @@ import { useStore } from '@/app/store'
 import type { Account, Household, MonthKey, Tables } from '@/model'
 import { setMonthBalances } from '@/store'
 import { BalanceFields } from './BalanceFields'
-import { closedBalanceNote, useMonthBalances } from './useMonthBalances'
+import { useMonthBalances } from './useMonthBalances'
 
 interface Props {
   account: Account
   month: MonthKey
   tables: Tables
   household: Household
-  closed: boolean
   onClose: () => void
 }
 
 /**
  * What an account really held when a month began and when it ended (DESIGN.md §8). The start is the end of the month
- * before, so changing it corrects that month too, closed or not; the engine shows the gap and continues from the real
+ * before, so changing it corrects that month too; the engine shows the gap and continues from the real
  * numbers. For a card whose purchases are expense rows, owing more than the plan expects means spending that was
  * never typed: the dialog offers to count the difference as that month's spending, so expenses and the debt agree.
  */
-export function BalanceDialog({ account, month, tables, household, closed, onClose }: Props) {
+export function BalanceDialog({ account, month, tables, household, onClose }: Props) {
   const store = useStore()
   const form = useMonthBalances(tables, household, month, (l) => l.account.id === account.id)
   const [busy, setBusy] = useState(false)
@@ -65,12 +64,11 @@ export function BalanceDialog({ account, month, tables, household, closed, onClo
           {isInvestment && <><dt className="text-muted-foreground">Deposited so far</dt><dd className="text-right tabular-nums">{formatAmount(line.result?.capital ?? 0, ccy, locale)}</dd></>}
           {isInvestment && <><dt className="text-muted-foreground">Return so far</dt><dd className="text-right tabular-nums">{formatPercent(line.result?.totalReturn ?? 0, locale)}</dd></>}
         </dl>
-        <BalanceFields form={form} groups={[{ lines: [line] }]} month={month} base={household.baseCurrency} named={false} disabled={closed} onEnter={() => void submit()} />
-        {closed && <p className="text-xs text-muted-foreground">{closedBalanceNote(month, locale)}</p>}
+        <BalanceFields form={form} groups={[{ lines: [line] }]} month={month} base={household.baseCurrency} named={false} onEnter={() => void submit()} />
         {form.error && <p className="text-sm text-destructive" role="alert">{form.error}</p>}
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={busy}>{closed ? 'Close' : 'Cancel'}</Button>
-          {!closed && <Button onClick={() => void submit()} disabled={busy}>Save</Button>}
+          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button onClick={() => void submit()} disabled={busy}>Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

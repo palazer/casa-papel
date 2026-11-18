@@ -1,10 +1,10 @@
 import { expect, test } from './test'
 
-/** Working the month on the Statement from the phone: ticks, the progress line, the real amount, items, automatic rows, a closed month. */
+/** Working the month on the Statement from the phone: ticks, the progress line, the real amount, items, automatic rows, the whole month counted as done. */
 test.describe('tracking the month on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
 
-  test('ticks and the progress line, what it really was, items, automatic rows and a closed month', async ({ page }) => {
+  test('ticks and the progress line, what it really was, items, automatic rows and the whole month counted as done', async ({ page }) => {
     await page.goto('?demo=1')
     await page.getByRole('button', { name: 'Load the demo household' }).click()
     // the Statement is the first screen on a phone too, on the current month
@@ -12,7 +12,7 @@ test.describe('tracking the month on a phone', () => {
     await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
     const progress = page.getByTestId('progress')
     await expect(progress).toHaveText('0 of 21 done · €8,065.00 still to pay · €7,405.00 to come in')
-    await expect(page.getByRole('button', { name: 'Close month' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Balances…' })).toBeVisible()
     await page.screenshot({ path: 'e2e/output/statement-track-phone.png', fullPage: true })
     const moneyOut = page.getByRole('region', { name: 'Money out' })
 
@@ -86,25 +86,32 @@ test.describe('tracking the month on a phone', () => {
     await tabs.getByRole('link', { name: 'Statement' }).tap()
     await expect(progress).toHaveText(/^5 of 22 done/)
 
-    // a closed month: everything counts as done, nothing to tick. Reopening brings the ticks back; the items closing
-    // marked as done (a schedule's posting, an itemized row) stay done
-    // what the accounts really held is typed under "Balances…", which fits a phone
+    // what the accounts really held is typed under "Balances…", which fits a phone. Its tick counts the whole month as
+    // done; it is not set for the current month, and it locks nothing
     await page.getByRole('button', { name: 'Balances…' }).tap()
-    await expect(page.getByTestId('month-balances-dialog').getByLabel('Savings: at the end of November 2026 (EUR)')).toBeVisible()
-    await expect(page.getByTestId('month-balances-dialog')).toHaveCSS('opacity', '1')
+    const balances = page.getByTestId('month-balances-dialog')
+    await expect(balances.getByLabel('Savings: at the end of November 2026 (EUR)')).toBeVisible()
+    await expect(balances).toHaveCSS('opacity', '1')
     await page.screenshot({ path: 'e2e/output/month-balances-phone.png' })
-    await page.getByTestId('month-balances-dialog').getByRole('button', { name: 'Cancel' }).tap()
-    await page.getByRole('button', { name: 'Close month' }).tap()
-    await expect(progress).toHaveText('Closed · all done')
-    await expect(page.getByText('closed', { exact: true })).toBeVisible()
-    await expect(page.getByRole('checkbox')).toHaveCount(0)
-    await expect(page.getByRole('button', { name: 'Close month' })).toHaveCount(0)
-    await page.screenshot({ path: 'e2e/output/statement-closed-phone.png' })
-    await page.getByRole('button', { name: 'Reopen month' }).tap()
-    await expect(progress).toHaveText(/^\d+ of 22 done/)
-    await expect(page.getByRole('button', { name: 'Close month' })).toBeVisible()
-    await expect(page.getByRole('checkbox', { name: 'To savings done' })).toBeChecked()
-    await expect(page.getByRole('checkbox', { name: 'To savings done' })).toBeEnabled()
+    const all = balances.getByRole('checkbox', { name: 'Count everything in November as done' })
+    await expect(all).not.toBeChecked()
+    await all.tap()
+    await expect(all).toBeChecked()
+    await balances.getByRole('button', { name: 'Save' }).tap()
+    await expect(balances).toBeHidden()
+    await expect(progress).toHaveText('All 22 done')
+    await expect(page.getByRole('button', { name: /Close month|Reopen month/ })).toHaveCount(0)
+    await page.screenshot({ path: 'e2e/output/statement-all-done-phone.png' })
+    // every tick is there to be taken off again
+    const moved = page.getByRole('checkbox', { name: 'To savings done' })
+    await expect(moved).toBeChecked()
+    await expect(moved).toBeEnabled()
+
+    // a month that is over says so beside the household's name; the current one does not
+    await expect(page.getByText('past', { exact: true })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Previous month' }).tap()
+    await expect(page.getByRole('heading', { level: 2, name: 'October 2026' })).toBeVisible()
+    await expect(page.getByText('past', { exact: true })).toBeVisible()
   })
 })
 
@@ -116,7 +123,7 @@ test.describe('automatic rows on the desktop', () => {
     await page.getByRole('button', { name: 'Load the demo household' }).click()
     await page.getByRole('button', { name: 'Earlier months (2)' }).click()
     const toSavings = page.getByRole('row').filter({ has: page.getByRole('rowheader', { name: /^To savings/ }) })
-    // the closed September already counts as done; November gets its dot from the tick ("Not done yet" also contains "done", hence exact)
+    // September is ticked from the start; November gets its dot from the tick ("Not done yet" also contains "done", hence exact)
     const dots = toSavings.getByRole('img', { name: 'Done', exact: true })
     await expect(dots).toHaveCount(1)
     const dotsBefore = 1

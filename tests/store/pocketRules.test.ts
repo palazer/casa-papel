@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { cellKey, computeEngine, type EngineOutput } from '@/engine'
 import { MonthStateSchema, RowSchema, monthRange, newId, type MonthKey, type Row } from '@/model'
 import {
-  CasaDb, Store, addAccount, addEntity, addRow, addRowOfKind, closeMonth, loadTables, previewRule, quickCreateHousehold, setCellValue, setRowScope, setRule, updateHousehold,
+  CasaDb, Store, addAccount, addEntity, addRow, addRowOfKind, keepHouse, loadTables, previewRule, quickCreateHousehold, setCellValue, setRowScope, setRule, updateHousehold,
 } from '@/store'
+import { legacyClose } from '../legacyClose'
 
 const months = monthRange('2026-01', '2026-06')
 
@@ -100,7 +101,9 @@ describe('pocket money that was a share of the pocket total', () => {
       ...t.cells.filter((c) => c.rowId === anaPocket.id || c.rowId === benPocket.id).map((c) => ({ op: 'delete' as const, table: 'cells' as const, key: [c.rowId, c.month] })),
       { op: 'put' as const, table: 'monthStates' as const, record: MonthStateSchema.parse({ month: '2026-02', pocketTotalOverride: 80000, updatedAt: Date.now() }) },
     ])
-    await closeMonth(store, '2026-01')
+    // January as an older version of the app had closed it, opened by the app's own pass: the month keeps its total
+    await legacyClose(store, '2026-01')
+    await keepHouse(store, '2026-06')
     return made
   }
 
@@ -108,9 +111,11 @@ describe('pocket money that was a share of the pocket total', () => {
     const { store, anaPocket } = await old()
     const out = await engineOf(store)
     expect(months.map((m) => value(out, anaPocket, m))).toEqual([50000, 40000, 50000, 50000, 50000, 50000])
+    // January was closed by an older version: its share reads as done, the later ones do not
+    expect(months.slice(0, 2).map((m) => out.cells[cellKey(anaPocket.id, m)].status)).toEqual(['done', 'derived'])
   })
 
-  it('a fixed amount from a month on keeps every earlier month, the closed one too, and makes it an ordinary line', async () => {
+  it('a fixed amount from a month on keeps every earlier month, the one that was closed too, and makes it an ordinary line', async () => {
     const { store, anaPocket, benPocket, toSavings } = await old()
     const was = await engineOf(store)
     await setRule(store, { rowId: anaPocket.id }, { kind: 'fixed', amount: 30000 }, '2026-04')

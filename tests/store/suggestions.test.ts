@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { cellKey, computeEngine } from '@/engine'
 import { monthRange, newId } from '@/model'
 import {
-  CasaDb, Store, accountSuggestions, addAccount, addEntity, addPool, addRow, addSuggestion, applyTemplates, closeMonth, createHouseholdFromSetup,
+  CasaDb, Store, accountSuggestions, addAccount, addEntity, addPool, addRow, addSuggestion, applyTemplates, createHouseholdFromSetup,
   dismissSuggestion, loadTables, removeThing, rowSuggestions, setRule, setupFocus, setupSteps, shownRowSuggestions, stepSuggestions, suggestionId, updateRow,
 } from '@/store'
 
@@ -147,14 +147,13 @@ describe('suggestions for setting up on the Statement', () => {
     expect(titles(rowSuggestions(t))).not.toContain('Alex – Pocket')
   })
 
-  it('an amount cannot start in a closed month or before the first one', async () => {
+  it('an amount cannot start before the first month; a month that is over takes it like any other', async () => {
     const store = await fresh()
     await expect(addSuggestion(store, 'household:h.groceries', { amount: 100_00, month: '2026-08' })).rejects.toThrow(/starts in 2026-09/)
     await expect(addSuggestion(store, 'household:h.groceries', { amount: -1 })).rejects.toThrow(/below zero/)
-    await closeMonth(store, '2026-09')
-    await expect(addSuggestion(store, 'household:h.groceries', { amount: 100_00, month: '2026-09' })).rejects.toThrow(/closed/)
-    // without an amount nothing is written into the month, so the row can still be added
-    expect((await addSuggestion(store, 'household:h.groceries', { month: '2026-09' })).name).toBe('Groceries')
+    const row = await addSuggestion(store, 'household:h.groceries', { amount: 100_00, month: '2026-09' })
+    expect(row.name).toBe('Groceries')
+    expect((await loadTables(store)).cells.find((c) => c.rowId === row.id && c.month === '2026-09')).toMatchObject({ value: 100_00 })
   })
 
   it('a new person or thing brings its own suggestions; an archived one takes them away', async () => {

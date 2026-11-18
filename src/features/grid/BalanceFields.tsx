@@ -21,21 +21,19 @@ export interface BalanceGroup {
  * field with a number is a real balance; an empty one shows the calculated amount in grey and keeps it. With `named`
  * every pair stands beside its account's name (on a phone: under it); without, the one pair fills the width.
  */
-export function BalanceFields({ form, groups, month, base, named, disabled, onEnter }: {
+export function BalanceFields({ form, groups, month, base, named, onEnter }: {
   form: MonthBalancesForm
   groups: BalanceGroup[]
   month: MonthKey
   /** The household currency: an account in another one says so after its name. */
   base: string
   named: boolean
-  /** A closed month shows its balances and changes none. */
-  disabled: boolean
   onEnter: () => void
 }) {
   const { locale } = form
   const long = formatMonth(month, locale, 'long')
   // the cursor waits in the first end field: the number a bank statement closes on
-  const focusId = disabled ? undefined : groups.flatMap((g) => g.lines)[0]?.account.id
+  const focusId = groups.flatMap((g) => g.lines)[0]?.account.id
 
   function field(side: BalanceSide, line: BalanceLine) {
     const { account } = line
@@ -52,7 +50,7 @@ export function BalanceFields({ form, groups, month, base, named, disabled, onEn
     return (
       <div className="min-w-0 space-y-0.5" data-testid={`balance-${side}`}>
         <Input
-          aria-label={label} inputMode="decimal" autoFocus={side === 'end' && account.id === focusId} disabled={disabled} className="h-8 text-right tabular-nums"
+          aria-label={label} inputMode="decimal" autoFocus={side === 'end' && account.id === focusId} className="h-8 text-right tabular-nums"
           value={text} onChange={(e) => form.setText(side, account.id, e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') onEnter() }}
           placeholder={!opening && calculated != null ? formatAmount(calculated, ccy, locale) : undefined}
         />
@@ -80,7 +78,7 @@ export function BalanceFields({ form, groups, month, base, named, disabled, onEn
               )}
               {field('start', line)}
               {field('end', line)}
-              {!disabled && form.canBook(line) && (
+              {form.canBook(line) && (
                 <div className="col-span-full space-y-1 rounded-md border p-2.5" data-testid="book-difference">
                   <Check
                     label={`Count the ${formatAmount(form.difference(line) ?? 0, line.account.currency, locale)} difference as spending this month`}

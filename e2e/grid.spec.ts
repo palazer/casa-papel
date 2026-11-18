@@ -12,24 +12,24 @@ test.describe('grid', () => {
   test('"Expenses total" is what the month costs, the figure the Statement shows for Expenses', async ({ page }) => {
     await loadDemo(page)
     await page.getByRole('button', { name: 'Earlier months (2)' }).click()
-    // September, the closed month: 3,357 of expenses. The 1,000 of pocket money stands under Transfers and is not in it
+    // September, a month that is over: 3,357 of expenses. The 1,000 of pocket money stands under Transfers and is not in it
     await expect(page.getByRole('rowheader', { name: /^Sam – Pocket/ })).toBeVisible()
     await expect(page.getByRole('row', { name: /^Expenses total/ }).getByRole('cell').first()).toContainText('3,357.00')
     // the month's own menu says the same
-    await page.getByRole('button', { name: /^Sept? 2026, closed$/ }).click()
+    await page.getByRole('button', { name: /^Sept? 2026, past$/ }).click()
     await expect(page.getByRole('menu')).toContainText('Expenses €3,357')
     await page.getByRole('menuitem', { name: 'Open in the Statement' }).click()
     await expect(page.getByRole('heading', { level: 2, name: 'September 2026' })).toBeVisible()
     await expect(page.getByRole('region', { name: 'Money out' }).locator('[data-line="expenses"]')).toContainText('€3,357.00')
   })
 
-  test('edit a cell, itemize, close and reopen a month', async ({ page }) => {
+  test('edit a cell, itemize, and change a month that is over', async ({ page }) => {
     await loadDemo(page)
     await page.screenshot({ path: 'e2e/output/grid.png' })
     // an estimate sits on the yellow shade here as on the Statement; a certain amount is plain
     await expect(page.getByRole('button', { name: /^The flat – Utilities Nov 2026/ }).locator('.bg-estimate')).toHaveText(/210/)
     await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ }).locator('.bg-estimate')).toHaveCount(0)
-    // the months before the current one are needed here: September is the closed month, October the one that keeps its amount
+    // the months before the current one are needed here: October is the one that keeps its amount
     await page.getByRole('button', { name: 'Earlier months (2)' }).click()
 
     // Utilities carry 210 forward from September (Rent is recurring-driven now); change November onwards to 250
@@ -82,19 +82,27 @@ test.describe('grid', () => {
     await page.keyboard.press('ControlOrMeta+z')
     await expect(page.getByRole('button', { name: /^Groceries Nov 2026/ })).toContainText('700')
 
-    // close November via the month header
+    // a month's name opens its menu: the Statement of that month, and its balances. Nothing closes a month
     await page.getByRole('button', { name: 'Nov 2026', exact: true }).click()
-    // the month's balances are typed from here too
+    await expect(page.getByRole('menuitem')).toHaveText(['Open in the Statement', 'Balances for Nov 2026…'])
     await page.getByRole('menuitem', { name: 'Balances for Nov 2026…' }).click()
     await expect(page.getByRole('heading', { name: 'Balances for November 2026' })).toBeVisible()
     await page.getByTestId('month-balances-dialog').getByRole('button', { name: 'Cancel' }).click()
-    await page.getByRole('button', { name: 'Nov 2026', exact: true }).click()
-    await page.getByRole('menuitem', { name: 'Close month' }).click()
-    await expect(page.getByRole('button', { name: 'Nov 2026, closed', exact: true })).toBeVisible()
-    await page.getByRole('button', { name: /^The flat – Utilities Nov 2026/ }).click()
-    await expect(page.getByText('This month is closed.')).toBeVisible()
-    await page.getByRole('button', { name: /^Reopen Nov 2026/ }).click()
-    await expect(page.getByRole('button', { name: 'Nov 2026', exact: true })).toBeVisible()
+
+    // a month that is over says so and is grey, the current one is not; it takes a change like any other
+    await expect(page.getByRole('button', { name: /^Sept? 2026, past$/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Oct 2026, past', exact: true })).toBeVisible()
+    const utilOct = page.getByRole('button', { name: /^The flat – Utilities Oct 2026/ })
+    await expect(utilOct.locator('xpath=ancestor::td[1]')).toHaveClass(/bg-muted\/60/)
+    await expect(page.getByRole('button', { name: /^The flat – Utilities Nov 2026/ }).locator('xpath=ancestor::td[1]')).not.toHaveClass(/bg-muted\/60/)
+    await utilOct.click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await page.getByLabel('Amount in EUR').fill('215')
+    await page.getByRole('radio', { name: 'Only this month' }).click()
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByRole('dialog')).toBeHidden()
+    await expect(utilOct).toContainText('215')
+    await expect(page.getByRole('button', { name: /^The flat – Utilities Nov 2026/ })).toContainText('250')
 
     // keyboard navigation between cells
     await page.getByRole('button', { name: /^Sam – Salary Oct 2026/ }).focus()

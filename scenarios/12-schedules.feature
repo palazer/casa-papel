@@ -69,6 +69,23 @@ Feature: Schedules: amounts that repeat by themselves
     When I add a year to the plan
     Then "Insurance" is 300.00 in February 2027
 
+  @H5
+  Scenario: Months that began while the app was not opened get the schedule's amounts
+    Given "Insurance" is on a schedule of 300.00 every 3 months from February 2026
+    When the calendar moves on to March 2027
+    Then "Insurance" is 300.00 in February 2027
+    And "Insurance" is 300.00 in May 2027
+    And nothing has changed before January 2027
+
+  @H5 @T2
+  Scenario: By itself the app fills no month that its schedules had reached before
+    Given "Insurance" is on a schedule of 300.00 every 3 months from February 2026
+    And the calendar moves on to June 2026
+    And a month of "Insurance" that is over has lost its amount without a note: May 2026
+    When the calendar moves on to July 2026
+    Then "Insurance" is 0.00 in May 2026
+    And "Insurance" is 300.00 in August 2026
+
   @H6
   Scenario: An item that repeats beside one that does not
     When I add the item "Liability" of 90.00 to "Insurance" in March 2026, repeating once a year

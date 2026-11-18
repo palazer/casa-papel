@@ -121,8 +121,10 @@ export function computeEngine(input: EngineInput): EngineOutput {
   const warned = new Set<string>()
   const warnOnce = (key: string, message: string) => { if (!warned.has(key)) { warned.add(key); warnings.push(message) } }
 
+  // what a month keeps for itself: the cash buffer and the old pocket total it was given. A month has no state
+  // beyond that: the mark of a month that an older version of the app had closed is not read (the store turns it
+  // into ticks once, `planHousekeeping`)
   const states = new Map(tables.monthStates.map((s) => [s.month, s]))
-  const isClosed = (m: MonthKey) => states.get(m)?.closed ?? false
   const pocketTotalFor = (m: MonthKey) => states.get(m)?.pocketTotalOverride ?? household.pocketTotal
   const bufferFor = (m: MonthKey) => states.get(m)?.cashBufferOverride ?? household.cashBuffer
 
@@ -174,7 +176,6 @@ export function computeEngine(input: EngineInput): EngineOutput {
       const archived = row.archivedMonth != null && compareMonths(m, row.archivedMonth) >= 0
       const cell = rowCells?.get(m) ?? null
       let currency = cell?.currencyOverride ?? row.currency ?? base
-      const closed = isClosed(m)
       let value: Money = 0
       let source: CellResult['source'] = 'empty'
       let baseStatus: CellStatus = row.defaultStatus
@@ -239,8 +240,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
         baseStatus = live.length === 0 ? row.defaultStatus : anyProjected ? 'projected' : allDone ? 'done' : 'committed'
       }
 
-      // an automatic amount is done once the month is closed or the user ticked it as moved (`markedDone`)
-      const status: CellStatus = baseStatus === 'derived' ? (closed || cell?.markedDone ? 'done' : 'derived') : closed || archived ? 'done' : baseStatus
+      // an automatic amount is done once the user ticked it as moved (`markedDone`)
+      const status: CellStatus = baseStatus === 'derived' ? (cell?.markedDone ? 'done' : 'derived') : archived ? 'done' : baseStatus
 
       const conv = convertMoney(fx, value, currency, base, m)
       if (conv.missingRate) warnOnce(row.id, `No ${currency}→${base} rate for ${m} (${row.name})`)
@@ -407,7 +408,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
       c.fundingOwn = { ...zeroFunding(), cash: c.value }
       if (c.source !== 'empty') {
         c.source = 'derived'
-        c.status = isClosed(m) || c.cell?.markedDone ? 'done' : 'derived'
+        c.status = c.cell?.markedDone ? 'done' : 'derived'
       }
     }
   }
@@ -435,7 +436,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
   const totals: Record<MonthKey, MonthTotals> = {}
   for (const m of months) {
     const t: MonthTotals = {
-      month: m, closed: isClosed(m), income: 0, cashExpense: 0, savingsFunded: 0, poolFunded: 0, poolFundedByPool: {}, accountFunded: 0, accountFundedByAccount: {}, fundedOwn: {},
+      month: m, income: 0, cashExpense: 0, savingsFunded: 0, poolFunded: 0, poolFundedByPool: {}, accountFunded: 0, accountFundedByAccount: {}, fundedOwn: {},
       allocations: 0, allocationsByPool: {}, toInvestment: 0, pocket: 0, debt: 0, moved: 0, movedToAccounts: 0,
       buffer: bufferFor(m), toSavings: 0, leftover: 0, fromSavingsDerived: 0, expensesTotal: 0, transfersTotal: 0,
       fromAccounts: 0, takeHome: 0, takeHomeBy: {}, leftForShares: 0, rest: null,

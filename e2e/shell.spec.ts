@@ -88,7 +88,7 @@ test.describe('shell', () => {
     await expect(bar).toHaveAttribute('data-stuck', 'true')
     await expect(title).not.toBeInViewport()
     await expect(month).toBeInViewport()
-    await expect(page.getByRole('button', { name: 'Close month' })).toBeInViewport()
+    await expect(page.getByRole('button', { name: 'Balances…' })).toBeInViewport()
     await expect(page.getByTestId('progress')).toBeInViewport()
     const box = (await bar.boundingBox())!
     expect(box.y).toBe(0)

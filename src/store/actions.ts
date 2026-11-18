@@ -31,10 +31,6 @@ export function engineFor(tables: Tables, household: Household, month: MonthKey)
   return computeEngine({ tables, months: monthRange(start, addMonths(month, 1)) })
 }
 
-function assertOpen(tables: Tables, month: MonthKey): void {
-  if (tables.monthStates.find((s) => s.month === month)?.closed) throw new Error(`${month} is closed. Reopen it to edit.`)
-}
-
 function cellOf(tables: Tables, rowId: string, month: MonthKey): Cell | undefined {
   return tables.cells.find((c) => c.rowId === rowId && c.month === month)
 }
@@ -99,7 +95,6 @@ export function rowChangePut(tables: Tables, rowId: string, change: RowChange | 
 
 export async function setCellValue(store: Store, rowId: string, month: MonthKey, value: Money, scope: EditScope, rowChange?: RowChange): Promise<void> {
   const { tables, engine } = await engineUpTo(store, month)
-  assertOpen(tables, month)
   const mutations: Mutation[] = scope === 'this-month' ? freezeNext(tables, engine, rowId, month) : []
   const existing = cellOf(tables, rowId, month)
   mutations.push(putCell({ rowId, month, mode: 'value', value, items: [], note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, updatedAt: now() }))
@@ -109,7 +104,6 @@ export async function setCellValue(store: Store, rowId: string, month: MonthKey,
 
 export async function setCellItems(store: Store, rowId: string, month: MonthKey, items: CellItem[], scope: EditScope = 'from-now-on', rowChange?: RowChange): Promise<void> {
   const { tables, engine } = await engineUpTo(store, month)
-  assertOpen(tables, month)
   const mutations: Mutation[] = scope === 'this-month' ? freezeNext(tables, engine, rowId, month) : []
   const existing = cellOf(tables, rowId, month)
   mutations.push(putCell({ rowId, month, mode: 'items', value: null, items, note: existing?.note ?? null, currencyOverride: existing?.currencyOverride ?? null, updatedAt: now() }))
@@ -120,7 +114,6 @@ export async function setCellItems(store: Store, rowId: string, month: MonthKey,
 /** Back to inheriting from the previous month. Stored as an inherit record (not a delete) so the change travels between devices. */
 export async function clearCell(store: Store, rowId: string, month: MonthKey): Promise<void> {
   const tables = await loadTables(store)
-  assertOpen(tables, month)
   const existing = cellOf(tables, rowId, month)
   if (!existing || existing.mode === 'inherit') return
   await store.commit([putCell({ rowId, month, mode: 'inherit', value: null, items: [], note: existing.note, currencyOverride: existing.currencyOverride, updatedAt: now() })])
@@ -139,7 +132,6 @@ export function itemsFromCurrent(engineCell: { source: string; value: Money; ask
 
 export async function setItemStatus(store: Store, rowId: string, month: MonthKey, itemId: string, status: ItemStatus): Promise<void> {
   const tables = await loadTables(store)
-  assertOpen(tables, month)
   const cell = cellOf(tables, rowId, month)
   if (!cell || cell.mode !== 'items') throw new Error('Cell has no items')
   if (!cell.items.some((it) => it.id === itemId)) throw new Error('That item is gone.')
@@ -368,7 +360,6 @@ export function categoryEstimateMutations(tables: Tables, category: Category, mo
  */
 export async function setCategoryEstimate(store: Store, categoryId: string, month: MonthKey, amount: Money, scope: EditScope = 'from-now-on'): Promise<Row> {
   const { tables, engine } = await engineUpTo(store, month)
-  assertOpen(tables, month)
   const category = tables.categories.find((c) => c.id === categoryId && !c.deletedAt)
   if (!category) throw new Error('That category no longer exists.')
   const known = estimateRowOf(tables, categoryId)
@@ -398,7 +389,6 @@ export async function setCardBalanceBooked(store: Store, accountId: string, mont
 
 /** What `setCardBalanceBooked` writes, and how much of it is booked as spending. Pure, so closing a month can carry it in the same step. */
 export function cardBookingMutations(tables: Tables, engine: EngineOutput, household: Household, accountId: string, month: MonthKey, actualBalance: Money): { mutations: Mutation[]; booked: Money } {
-  assertOpen(tables, month)
   const card = tables.accounts.find((a) => a.id === accountId && !a.deletedAt)
   if (!card || !cardIsItemized(card)) throw new Error('Only a card whose purchases are expense rows can count a difference as spending.')
   const expected = engine.accounts[card.id]?.months[month]?.computed
@@ -449,45 +439,6 @@ export async function moveRow(store: Store, rowId: string, direction: 'up' | 'do
   const far = direction === 'up' ? list[j - 1]?.order ?? null : list[j + 1]?.order ?? null
   const order = direction === 'up' ? generateKeyBetween(far, list[j].order) : generateKeyBetween(list[j].order, far)
   await store.commit([{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, order, updatedAt: now() }) }])
-}
-
-// ---------- months ----------
-
-/**
- * What freezing a month writes: inherited values become explicit, items become done, settings are pinned. Pure;
- * `closeMonth` (in `monthBalances.ts`) commits it, together with the real balances typed while closing.
- */
-export function closeMonthMutations(tables: Tables, engine: EngineOutput, household: Household, month: MonthKey): Mutation[] {
-  const mutations: Mutation[] = []
-  for (const row of engine.rows) {
-    const c = engine.cells[cellKey(row.id, month)]
-    if (!c || c.source === 'derived' || c.source === 'archived' || c.source === 'empty') continue
-    if (c.source === 'inherit') {
-      mutations.push(putCell({ rowId: row.id, month, mode: 'value', value: typedAmount(c), items: [], note: null, currencyOverride: null, updatedAt: now() }))
-    } else if (c.source === 'items' && c.cell) {
-      if (c.cell.items.some((it) => it.status !== 'done' && !it.skipped)) {
-        mutations.push(putCell({ ...c.cell, items: c.cell.items.map((it) => (it.skipped ? it : { ...it, status: 'done' })) }))
-      }
-    }
-  }
-  const state = tables.monthStates.find((s) => s.month === month)
-  mutations.push({
-    op: 'put', table: 'monthStates',
-    record: MonthStateSchema.parse({
-      month, closed: true, closedAt: now(),
-      pocketTotalOverride: state?.pocketTotalOverride ?? household.pocketTotal,
-      cashBufferOverride: state?.cashBufferOverride ?? household.cashBuffer,
-      updatedAt: now(),
-    }),
-  })
-  return mutations
-}
-
-export async function reopenMonth(store: Store, month: MonthKey): Promise<void> {
-  const tables = await loadTables(store)
-  const state = tables.monthStates.find((s) => s.month === month)
-  if (!state?.closed) return
-  await store.commit([{ op: 'put', table: 'monthStates', record: MonthStateSchema.parse({ ...state, closed: false, closedAt: null, updatedAt: now() }) }])
 }
 
 // ---------- household ----------
@@ -595,7 +546,6 @@ export function countDoneMutations(tables: Tables, engine: EngineOutput, month: 
 
 export async function setCellDone(store: Store, rowId: string, month: MonthKey, done: boolean): Promise<void> {
   const { tables, engine } = await engineUpTo(store, month)
-  assertOpen(tables, month)
   const row = tables.rows.find((r) => r.id === rowId)
   if (!row) throw new Error('Row not found')
   const mutations = lineDoneMutations(tables, engine, row, month, done, now())
@@ -603,7 +553,6 @@ export async function setCellDone(store: Store, rowId: string, month: MonthKey, 
 }
 export async function setDerivedDone(store: Store, rowId: string, month: MonthKey, done: boolean): Promise<void> {
   const tables = await loadTables(store)
-  assertOpen(tables, month)
   const existing = cellOf(tables, rowId, month)
   if ((existing?.markedDone ?? false) === done) return
   await store.commit([putCell({
@@ -614,13 +563,13 @@ export async function setDerivedDone(store: Store, rowId: string, month: MonthKe
 
 // ---------- monthly defaults with a scope ----------
 
-export type MonthlyDefaultScope = 'from-now-on' | 'this-month' | 'all-open'
+export type MonthlyDefaultScope = 'from-now-on' | 'this-month' | 'all-months'
 
 /**
- * Change the cash buffer (the cash kept in the account at month end). Closed months are never touched.
+ * Change the cash buffer (the cash kept in the account at month end).
  * - 'this-month': an override for that month only; the default stays
- * - 'from-now-on': earlier open months are frozen at what they show now, the default changes
- * - 'all-open': every open month follows the new default (overrides dropped)
+ * - 'from-now-on': the months before `month` are held at what they show now, the default changes
+ * - 'all-months': every month follows the new default, the months before as well (overrides dropped)
  */
 export async function setMonthlyDefault(store: Store, value: Money, scope: MonthlyDefaultScope, month: MonthKey): Promise<void> {
   const tables = await loadTables(store)
@@ -631,22 +580,20 @@ export async function setMonthlyDefault(store: Store, value: Money, scope: Month
   const mutations: Mutation[] = []
   const putState = (m: MonthKey, override: Money | null) => {
     const prev = states.get(m)
-    mutations.push({ op: 'put', table: 'monthStates', record: MonthStateSchema.parse({ month: m, closed: false, closedAt: null, ...prev, cashBufferOverride: override, updatedAt: ts }) })
+    mutations.push({ op: 'put', table: 'monthStates', record: MonthStateSchema.parse({ month: m, ...prev, cashBufferOverride: override, updatedAt: ts }) })
   }
   if (scope === 'this-month') {
-    if (states.get(month)?.closed) throw new Error('Month is closed')
     putState(month, value)
   } else {
     if (scope === 'from-now-on' && compareMonths(month, household.startMonth) > 0) {
       for (const m of monthRange(household.startMonth, addMonths(month, -1))) {
-        const s = states.get(m)
-        if (s?.closed || s?.cashBufferOverride != null) continue
+        if (states.get(m)?.cashBufferOverride != null) continue
         putState(m, household.cashBuffer)
       }
     }
     for (const s of tables.monthStates) {
-      if (s.closed || s.cashBufferOverride == null) continue
-      if (scope === 'all-open' || compareMonths(s.month, month) >= 0) putState(s.month, null)
+      if (s.cashBufferOverride == null) continue
+      if (scope === 'all-months' || compareMonths(s.month, month) >= 0) putState(s.month, null)
     }
     mutations.push({ op: 'put', table: 'household', record: HouseholdSchema.parse({ ...household, cashBuffer: value, updatedAt: ts }) })
   }
@@ -685,10 +632,8 @@ export function planRowFundedBy(tables: Tables, row: Row, fundedBy: FundedBy, sc
     const household = tables.household.find((h) => !h.deletedAt)
     if (!household) throw new Error('No household yet')
     if (compareMonths(household.startMonth, scope.from) < 0) {
-      // Compute with closed flags lifted so the certainty we store is the real one, not "done because closed".
-      const open: Tables = { ...tables, monthStates: tables.monthStates.map((s) => ({ ...s, closed: false })) }
       const months = monthRange(household.startMonth, addMonths(scope.from, -1))
-      const engine = computeEngine({ tables: open, months })
+      const engine = computeEngine({ tables, months })
       for (const m of months) {
         const c = engine.cells[cellKey(row.id, m)]
         if (!c || (c.source !== 'value' && c.source !== 'inherit') || typedAmount(c) === 0) continue

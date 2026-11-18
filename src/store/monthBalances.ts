@@ -3,15 +3,15 @@
  * is the end of the month before (`AccountMonth.actualBalance` of that month), or the account's opening amount in its
  * first month. A number that is stored is real; without one the engine works the amount out and carries it on.
  *
- * The balance dialogs and "Close month" both write through here, so a month's real balances and its closing can be
- * one step.
+ * Every balance dialog writes through here. "Balances…" can tick every line of the month in the same step
+ * (`opts.done`).
  */
 import { currentAccountsIn, type AccountMonthResult, type EngineOutput, type MainAccountMonth } from '@/engine'
 import {
   AccountMonthSchema, AccountSchema, accountGroup, addMonths, cardIsItemized, compareMonths,
   type Account, type AccountGroup, type Household, type Money, type MonthKey, type Tables,
 } from '@/model'
-import { cardBookingMutations, closeMonthMutations, countDoneMutations, engineFor, engineUpTo, loadTables } from './actions'
+import { cardBookingMutations, countDoneMutations, engineFor, loadTables } from './actions'
 import { applyMutations } from './impact'
 import type { Mutation, Store } from './store'
 
@@ -148,15 +148,14 @@ function assertAllOrNone(tables: Tables, month: MonthKey, listed: ReadonlySet<st
 
 /**
  * Everything a month's typed balances write, in order: the starts first, because a start moves the calculated end
- * that a card's difference is measured against. Pure. Refuses a closed month; a start may land in a closed month
- * before it, since it only says what the account really held and leaves that month's rows alone.
+ * that a card's difference is measured against. Pure. A start is the end of the month before, so typing it corrects
+ * that month too: it says what the account really held and leaves that month's rows alone.
  */
 export function monthBalanceMutations(tables: Tables, household: Household, month: MonthKey, entry: BalanceEntry): Mutation[] {
   const starts = entry.starts ?? {}
   const ends = entry.ends ?? {}
   const touched = [...Object.keys(starts), ...Object.keys(ends)]
   if (touched.length === 0) return []
-  if (tables.monthStates.find((s) => s.month === month)?.closed) throw new Error(`${month} is closed. Reopen it to change a balance.`)
   for (const v of [...Object.values(starts), ...Object.values(ends)]) if (v != null && !Number.isFinite(v)) throw new Error('That is not a number I can read.')
   const ts = Date.now()
   const prev = addMonths(month, -1)
@@ -209,17 +208,4 @@ export async function setMonthBalances(store: Store, month: MonthKey, entry: Bal
     mutations.push(...countDoneMutations(after, engineFor(after, household, month), month, Date.now()))
   }
   if (mutations.length) await store.commit(mutations)
-}
-
-/**
- * Freeze a month: inherited values become explicit, items become done, settings are pinned. With `entry`, the real
- * balances typed while closing are saved first and the month is frozen as it reads with them; all of it is one
- * commit, so one undo takes the closing and the balances back together.
- */
-export async function closeMonth(store: Store, month: MonthKey, entry?: BalanceEntry): Promise<void> {
-  const first = await engineUpTo(store, month)
-  const typed = entry ? monthBalanceMutations(first.tables, first.household, month, entry) : []
-  const tables = typed.length ? applyMutations(first.tables, typed) : first.tables
-  const engine = typed.length ? engineFor(tables, first.household, month) : first.engine
-  await store.commit([...typed, ...closeMonthMutations(tables, engine, first.household, month)])
 }

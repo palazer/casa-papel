@@ -11,7 +11,7 @@ import { AmountHint } from '@/components/AmountHint'
 import { amountToInput, formatAmount, formatMonth, formatShare, parseAmount, unreadableAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import { cellKey, computeEngine } from '@/engine'
-import { addMonths, compareMonths, isShareRule, parseMonth, poolRowName, type Household, type MonthKey, type Tables } from '@/model'
+import { compareMonths, isShareRule, parseMonth, poolRowName, type Household, type MonthKey, type Tables } from '@/model'
 import { previewRule, setRule, type RuleChoice, type RuleTarget } from '@/store'
 import { useSave } from '@/features/grid/RowDialogs'
 import { ruleFacts, type RuleFacts, type RuleKind } from './ruleFacts'
@@ -81,10 +81,8 @@ export function RuleFields({ tables, household, target, facts, month, kind, onCl
   const { locale, baseCurrency: base } = household
   const { row, name, adult, ccy, hasRest, othersOfRest, restRowName } = facts
 
-  // a closed month cannot start a rule: begin after the last closed month
-  const lastClosed = tables.monthStates.filter((s) => s.closed).map((s) => s.month).sort().at(-1)
-  const earliest = compareMonths(month, household.startMonth) < 0 ? household.startMonth : month
-  const [from, setFrom] = useState<MonthKey>(lastClosed && compareMonths(lastClosed, earliest) >= 0 ? addMonths(lastClosed, 1) : earliest)
+  // a rule can start in any month of the household, also one that is over: it begins in the month on screen
+  const [from, setFrom] = useState<MonthKey>(compareMonths(month, household.startMonth) < 0 ? household.startMonth : month)
   /** What the row shows in the month the dialog was opened from: the amount a fixed rule starts from. */
   const shown = useMemo(() => (row ? computeEngine({ tables, months: [month] }).cells[cellKey(row.id, month)] : undefined), [tables, row, month])
   const [amountText, setAmountText] = useState(facts.current === 'fixed' && shown && shown.value > 0 ? amountToInput(shown.value, shown.currency, locale) : '')

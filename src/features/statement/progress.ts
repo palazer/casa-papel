@@ -36,8 +36,7 @@ export function monthProgress(rows: Row[], cells: Record<string, CellResult>, mo
   return p
 }
 
-export function progressText(p: MonthProgress, closed: boolean, currency: string, locale: string): string {
-  if (closed) return 'Closed · all done'
+export function progressText(p: MonthProgress, currency: string, locale: string): string {
   if (p.total === 0) return 'Nothing in this month yet'
   if (p.done === p.total) return `All ${p.total} done`
   const parts = [`${p.done} of ${p.total} done`]

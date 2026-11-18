@@ -10,13 +10,14 @@ test.describe('archiving people and things', () => {
     await page.getByRole('link', { name: 'Household' }).click()
     const dlg = page.getByRole('dialog')
 
-    // Robin's rows have amounts in the closed September: archive only
+    // Robin's rows have amounts in months that are over: that forbids nothing, both ways are offered
     const robin = page.getByRole('listitem').filter({ hasText: 'Robin' }).first()
     await robin.getByRole('button', { name: 'Archive or delete…' }).click()
     await expect(dlg.getByRole('heading', { name: 'Child "Robin"' })).toBeVisible()
     await expect(dlg.getByText('Hidden from People & things from Nov 2026; its rows and earlier months stay as they are')).toBeVisible()
-    await expect(dlg.getByText(/"Robin" has amounts in closed months \(Sept 2026\)/)).toBeVisible()
-    await expect(dlg.getByRole('button', { name: 'Delete', exact: true })).toHaveCount(0)
+    await expect(dlg.getByText(/closed months/)).toHaveCount(0)
+    await expect(dlg.getByRole('button', { name: 'Archive from Nov 2026' })).toBeEnabled()
+    await expect(dlg.getByRole('button', { name: 'Delete', exact: true })).toBeEnabled()
     await dlg.getByRole('button', { name: 'Cancel' }).click()
     await expect(dlg).toBeHidden()
     await expect(page.getByText('Archived', { exact: true })).toHaveCount(0)
@@ -44,7 +45,7 @@ test.describe('archiving people and things', () => {
     await expect(said).toHaveText(/^Restored "Robin"\./)
     await expect(page.getByText('Archived', { exact: true })).toHaveCount(0)
 
-    // The car has nothing in a closed month: it can be deleted, and the dialog says what changes
+    // The car can be deleted too, and the dialog says what changes
     const car = page.getByRole('listitem').filter({ hasText: 'The car' }).first()
     await car.getByRole('button', { name: 'Archive or delete…' }).click()
     await expect(dlg.getByRole('heading', { name: 'Vehicle "The car"' })).toBeVisible()

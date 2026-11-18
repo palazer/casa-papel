@@ -8,7 +8,7 @@ import { FUNDED_BY_PATTERN, type FundedBy } from './fundedBy'
 z.config({ jitless: true })
 
 /** Bump when the shape of stored data changes; add a migration in migrations.ts. */
-export const SCHEMA_VERSION = 14
+export const SCHEMA_VERSION = 15
 
 // ---------- primitives ----------
 export const IdSchema = z.string().regex(ID_PATTERN, 'expected ULID')
@@ -311,6 +311,11 @@ export const FxRateSchema = z.object({
   updatedAt: TimestampSchema,
 })
 
+/**
+ * What a month keeps for itself: its cash buffer, and the pocket total of the old pocket share. `closed` and
+ * `closedAt` are what versions before schema 15 wrote when a month was closed; nothing closes a month any more, and
+ * the app clears the mark where it meets it (`planHousekeeping`).
+ */
 export const MonthStateSchema = z.object({
   month: MonthKeySchema,
   closed: z.boolean().default(false),

@@ -67,7 +67,7 @@ export function MonthBalancesDialog({ month, tables, engine, household, onClose 
           </DialogDescription>
         </DialogHeader>
         {lines.length > 0
-          ? <BalanceFields form={form} groups={groups} month={month} base={base} named disabled={false} onEnter={() => void submit()} />
+          ? <BalanceFields form={form} groups={groups} month={month} base={base} named onEnter={() => void submit()} />
           : <p className="text-sm text-muted-foreground">No account keeps a balance yet.</p>}
         {lines.some((l) => l.account.currency !== base) && <p className="text-xs text-muted-foreground">An account in another currency is typed in its own currency and counted in {base} at this month's rate.</p>}
         {open > 0 && (

@@ -40,7 +40,6 @@ export async function addCategory(store: Store, input: { name: string; section: 
     mutations.push({ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, categoryId: category.id, updatedAt: ts }) })
   }
   if (input.estimate && input.estimate.amount > 0) {
-    if (tables.monthStates.find((s) => s.month === input.estimate!.month)?.closed) throw new Error(`${input.estimate.month} is closed. Reopen it to edit.`)
     mutations.push(...categoryEstimateMutations({ ...tables, categories: [...tables.categories, category] }, category, input.estimate.month, input.estimate.amount, 'from-now-on').mutations)
   }
   await store.commit(mutations)

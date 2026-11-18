@@ -3,7 +3,7 @@ import { buildDemoTables } from '@/demo/demoHousehold'
 import { GoalSchema, RowSchema, newId, type Tables } from '@/model'
 import { describeRemoval, monthSpan, planArchive, planRemoval, quoteNames } from '@/store'
 
-/** The demo household as of November 2026: September is closed, October open with amounts, November the current month. */
+/** The demo household as of November 2026: September and October are over, with amounts in them, November is the current month. */
 const OPTS = { today: '2026-11', locale: 'en-IE' }
 const T0 = Date.UTC(2026, 10, 1)
 
@@ -15,17 +15,16 @@ const idOf = (t: Tables, table: Named, name: string) => {
 }
 
 describe('describeRemoval', () => {
-  it('a row with amounts in a closed month can only be archived; one without can be deleted', () => {
+  it('a row with amounts in months that are over can be deleted like any other, and the list says which months', () => {
     const t = buildDemoTables()
     const groceries = describeRemoval(t, { kind: 'row', id: idOf(t, 'rows', 'Groceries') }, OPTS)
-    expect(groceries).toMatchObject({ kindLabel: 'Row', subject: 'Groceries', closedHistory: 'Sept 2026', closedUntil: '2026-09', canDelete: false, canArchive: true, archiveNotBefore: '2026-10', archiveFrom: '2026-11' })
+    expect(groceries).toMatchObject({ kindLabel: 'Row', subject: 'Groceries', canDelete: true, canArchive: true, archiveNotBefore: '2026-09', archiveFrom: '2026-11' })
     expect(groceries.archiveChanges).toEqual(['Hidden from Nov 2026 on; its amounts in 14 later months no longer count'])
 
     // what of it lies in months that are over: September and October
     expect(groceries.over).toBe('2 of these months are over (Sept–Oct 2026): they change too')
 
     const other = describeRemoval(t, { kind: 'row', id: idOf(t, 'rows', 'Other income') }, OPTS)
-    expect(other.closedHistory).toBeNull()
     expect(other.canDelete).toBe(true)
     expect(other.loses).toEqual(['Its amounts in 14 months (Nov 2026 – Dec 2027)'])
     // it begins in the current month: nothing of it is over
@@ -69,12 +68,12 @@ describe('describeRemoval', () => {
     expect(unlinked(planArchive(t, { kind: 'row', id: other }, '2026-11', T0, OPTS))).toBeUndefined()
   })
 
-  it('accounts: typed rows and virtual accounts block, plain rows and schedules are consequences, a tracked balance in a closed month is history', () => {
+  it('accounts: typed rows and virtual accounts block, plain rows and schedules are consequences', () => {
     const t = buildDemoTables()
     const savings = describeRemoval(t, { kind: 'account', id: idOf(t, 'accounts', 'Savings') }, OPTS)
     expect(savings.blockers.map((b) => b.text)).toEqual(['"To savings" sends money to it', 'The virtual account "Travel" is held in it', 'The virtual account "Clothing" is held in it'])
     expect(savings.blockers[1].where).toMatch(/Virtual accounts/)
-    expect(savings).toMatchObject({ kindLabel: 'Account', closedHistory: 'Sept 2026', canDelete: false, canArchive: true })
+    expect(savings).toMatchObject({ kindLabel: 'Account', canDelete: false, canArchive: true })
     expect(savings.archiveChanges).toEqual([
       'Its balance stops at Oct 2026; from Nov 2026 it is hidden and no longer counts towards net worth',
       '"To savings" keeps moving money, but the balance is no longer tracked from Nov 2026',
@@ -83,7 +82,7 @@ describe('describeRemoval', () => {
     ])
 
     const main = describeRemoval(t, { kind: 'account', id: idOf(t, 'accounts', 'Main account') }, OPTS)
-    expect(main).toMatchObject({ closedHistory: null, canDelete: true, blockers: [] })
+    expect(main).toMatchObject({ canDelete: true, blockers: [] })
     expect(main.changes).toEqual([
       '"The flat – Rent", "The flat – Utilities", "Public transport", "The car – Insurance" and 5 more no longer name it as the paying account',
       '3 schedules no longer name it',
@@ -91,10 +90,10 @@ describe('describeRemoval', () => {
     expect(main.archiveChanges[0]).toBe('Hidden from Nov 2026 on; rows that name it keep working')
   })
 
-  it('virtual accounts: closed allocations make them archive-only; archiving moves spending to the account it was held in from that month', () => {
+  it('virtual accounts: deleting says what goes with it; archiving moves spending to the account it was held in from that month', () => {
     const t = buildDemoTables()
     const travel = describeRemoval(t, { kind: 'pool', id: idOf(t, 'pools', 'Travel') }, OPTS)
-    expect(travel).toMatchObject({ kindLabel: 'Virtual account', closedHistory: 'Sept 2026', canDelete: false, canArchive: true })
+    expect(travel).toMatchObject({ kindLabel: 'Virtual account', canDelete: true, canArchive: true })
     expect(travel.loses[0]).toMatch(/^Its balance \(Sept 2026 – /)
     expect(travel.loses[1]).toMatch(/^The row "To Travel" that fills it, with its amounts in \d+ months$/)
     expect(travel.changes).toEqual(['"Travel" comes out of "Savings" instead', 'Spending that came out of it in 1 month counts as spent from "Savings"'])
@@ -105,16 +104,16 @@ describe('describeRemoval', () => {
     ])
   })
 
-  it('people & things: rows with closed amounts make them archive-only; a thing without them can go', () => {
+  it('people & things: deleting leaves their rows shared or untagged', () => {
     const t = buildDemoTables()
     const robin = describeRemoval(t, { kind: 'entity', id: idOf(t, 'entities', 'Robin') }, OPTS)
-    expect(robin).toMatchObject({ kindLabel: 'Child', closedHistory: 'Sept 2026', canDelete: false })
+    expect(robin).toMatchObject({ kindLabel: 'Child', canDelete: true })
     expect(robin.changes).toEqual(['"Robin – Child benefit" and "Robin – Childcare" become shared'])
     expect(robin.archiveChanges).toEqual(['Hidden from People & things from Nov 2026; its rows and earlier months stay as they are'])
     const alex = describeRemoval(t, { kind: 'entity', id: idOf(t, 'entities', 'Alex') }, OPTS)
     expect(alex.changes).toEqual(['"Alex – Salary", "Alex – Personal" and "Alex – Pocket" become shared'])
     const car = describeRemoval(t, { kind: 'entity', id: idOf(t, 'entities', 'The car') }, OPTS)
-    expect(car).toMatchObject({ kindLabel: 'Vehicle', closedHistory: null, canDelete: true, loses: [] })
+    expect(car).toMatchObject({ kindLabel: 'Vehicle', canDelete: true, loses: [] })
     expect(car.changes).toEqual(['"The car – Insurance" loses its tag'])
   })
 
@@ -135,9 +134,12 @@ describe('describeRemoval', () => {
 
   it('the plans refuse what the impact refuses', () => {
     const t = buildDemoTables()
-    expect(() => planRemoval(t, { kind: 'row', id: idOf(t, 'rows', 'Groceries') }, T0, OPTS)).toThrow(/amounts in closed months \(Sept 2026\)\. Archive it instead/)
+    // months that are over forbid nothing: a delete goes through, and an archive can start in the household's first month
+    expect(() => planRemoval(t, { kind: 'row', id: idOf(t, 'rows', 'Groceries') }, T0, OPTS)).not.toThrow()
     expect(() => planRemoval(t, { kind: 'account', id: idOf(t, 'accounts', 'Main account') }, T0, OPTS)).not.toThrow()
-    expect(() => planArchive(t, { kind: 'row', id: idOf(t, 'rows', 'Groceries') }, '2026-09', T0, OPTS)).toThrow(/Sept 2026 is closed and has amounts in it\. Archive from Oct 2026 or later/)
+    expect(() => planRemoval(t, { kind: 'account', id: idOf(t, 'accounts', 'Savings') }, T0, OPTS)).toThrow(/"To savings" sends money to it/)
+    expect(() => planArchive(t, { kind: 'row', id: idOf(t, 'rows', 'Groceries') }, '2026-09', T0, OPTS)).not.toThrow()
+    expect(() => planArchive(t, { kind: 'row', id: idOf(t, 'rows', 'Groceries') }, '2026-08', T0, OPTS)).toThrow(/Archive from Sept 2026 or later, the household's first month/)
     expect(() => planArchive(t, { kind: 'schedule', id: idOf(t, 'recurringItems', 'Rent') }, '2026-11', T0, OPTS)).toThrow(/cannot be archived/)
     expect(() => describeRemoval(t, { kind: 'row', id: newId() }, OPTS)).toThrow(/That row no longer exists/)
   })

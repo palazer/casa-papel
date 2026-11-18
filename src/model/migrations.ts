@@ -52,6 +52,10 @@ const STEPS: Record<number, Step> = {
   // can put it back). It fills in from its default; the version keeps an older app from dropping the memo when it
   // writes an archived record back.
   13: (raw) => raw,
+  // 14 → 15: closing a month went away. No field changes: `MonthState.closed` and `closedAt` stay for what older
+  // versions wrote, and the app turns a closed month into a month with everything ticked when it meets one
+  // (`planHousekeeping`). The version keeps an older app, which would lock those months again, from syncing.
+  14: (raw) => raw,
 }
 
 export function migrateExport(raw: unknown): unknown {

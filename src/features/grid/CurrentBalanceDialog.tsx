@@ -6,7 +6,7 @@ import { useStore } from '@/app/store'
 import type { Household, MonthKey, Tables } from '@/model'
 import { setMonthBalances } from '@/store'
 import { BalanceFields } from './BalanceFields'
-import { closedBalanceNote, useMonthBalances, type MonthBalancesForm } from './useMonthBalances'
+import { useMonthBalances, type MonthBalancesForm } from './useMonthBalances'
 
 interface Props {
   /** The line's name: the one current account's, or "Current accounts". */
@@ -14,7 +14,6 @@ interface Props {
   month: MonthKey
   tables: Tables
   household: Household
-  closed: boolean
   onClose: () => void
 }
 
@@ -33,7 +32,7 @@ export function CurrentTogether({ form, base }: { form: MonthBalancesForm; base:
  * they hold together, so each moment takes every one of them or none: their sum takes the place of the calculated
  * amount, the line shows the difference and later months continue from the real numbers.
  */
-export function CurrentBalanceDialog({ title, month, tables, household, closed, onClose }: Props) {
+export function CurrentBalanceDialog({ title, month, tables, household, onClose }: Props) {
   const store = useStore()
   const form = useMonthBalances(tables, household, month, (l) => l.group === 'current')
   const [busy, setBusy] = useState(false)
@@ -73,7 +72,7 @@ export function CurrentBalanceDialog({ title, month, tables, household, closed, 
           </DialogDescription>
         </DialogHeader>
         {!alone && main && <p className="text-sm text-muted-foreground" data-testid="current-together"><CurrentTogether form={form} base={base} /></p>}
-        <BalanceFields form={form} groups={[{ lines }]} month={month} base={base} named={several} disabled={closed} onEnter={() => void submit()} />
+        <BalanceFields form={form} groups={[{ lines }]} month={month} base={base} named={several} onEnter={() => void submit()} />
         {lines.some((l) => l.account.currency !== base) && <p className="text-xs text-muted-foreground">An account in another currency is counted in {base} at this month's rate.</p>}
         {together != null && main && several && (
           <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm" data-testid="current-balance-sum">
@@ -81,11 +80,10 @@ export function CurrentBalanceDialog({ title, month, tables, household, closed, 
             <dt className="text-muted-foreground">Difference</dt><dd className="text-right tabular-nums">{formatAmount(together - main.computed, base, locale, { sign: 'exceptZero' })}</dd>
           </dl>
         )}
-        {closed && <p className="text-xs text-muted-foreground">{closedBalanceNote(month, locale)}</p>}
         {form.error && <p className="text-sm text-destructive" role="alert">{form.error}</p>}
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={busy}>{closed ? 'Close' : 'Cancel'}</Button>
-          {!closed && <Button onClick={() => void submit()} disabled={busy}>Save</Button>}
+          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button onClick={() => void submit()} disabled={busy}>Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

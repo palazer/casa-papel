@@ -53,16 +53,29 @@ describe('remove', () => {
     expect(t.rows.find((r) => r.id === mirror.id)?.followsRowId).toBe(car)
   })
 
-  it('refuses to delete or archive into closed history', async () => {
-    const { store, tables } = await demo()
+  it('months that are over forbid nothing: a row is archived from any month of the household, or deleted with all its amounts', async () => {
+    const { store, tables, engine } = await demo()
     const groceries = idOf(await tables(), 'rows', 'Groceries')
-    await expect(removeRow(store, groceries)).rejects.toThrow(/closed months \(Sept 2026\)/)
-    await expect(archiveRow(store, groceries, '2026-09')).rejects.toThrow(/Sept 2026 is closed/)
+    const before = await engine()
+    expect(before.cells[cellKey(groceries, '2026-09')].value).toBeGreaterThan(0)
+    // only a month before the household's first is refused
+    await expect(archiveRow(store, groceries, '2026-08')).rejects.toThrow(/Archive from Sept 2026 or later, the household's first month/)
     await expect(archiveRow(store, groceries, '2026-10')).resolves.toBeUndefined()
     expect((await tables()).rows.find((r) => r.id === groceries)?.archivedMonth).toBe('2026-10')
+    expect((await engine()).cells[cellKey(groceries, '2026-09')].value).toBe(before.cells[cellKey(groceries, '2026-09')].value)
+    await store.undo()
+
+    await removeRow(store, groceries)
+    const t = await tables()
+    expect(t.rows.find((r) => r.id === groceries)?.deletedAt).not.toBeNull()
+    expect(t.cells.filter((c) => c.rowId === groceries)).toHaveLength(0)
+    // September no longer counts it; one undo brings every month back
+    expect((await engine()).totals['2026-09'].expensesTotal).toBe(before.totals['2026-09'].expensesTotal - before.cells[cellKey(groceries, '2026-09')].valueBase)
+    await store.undo()
+    expect((await engine()).totals).toEqual(before.totals)
   })
 
-  it('archiving a row pins what its followers mirrored, ends its schedules and leaves closed months alone', async () => {
+  it('archiving a row pins what its followers mirrored, ends its schedules and leaves earlier months alone', async () => {
     const { store, tables, engine } = await demo()
     let t = await tables()
     const benefit = idOf(t, 'rows', 'Robin – Child benefit')
@@ -78,7 +91,7 @@ describe('remove', () => {
     expect(follower.followsRowId).toBeNull()
     expect(t.cells.filter((c) => c.rowId === saver.id).map((c) => [c.month, c.mode, c.value])).toEqual([['2026-09', 'value', 25500], ['2026-10', 'value', 25500]])
     const after = await engine()
-    expect(after.totals['2026-09'].income).toBe(725500) // the closed month did not move
+    expect(after.totals['2026-09'].income).toBe(725500) // an earlier month did not move
     expect(after.cells[cellKey(benefit, TODAY)].source).toBe('archived')
     expect(after.cells[cellKey(saver.id, TODAY)]).toMatchObject({ value: 25500, source: 'inherit' })
     expect(after.totals[TODAY].income).toBe(715000) // no benefit, but the other income
@@ -121,7 +134,7 @@ describe('remove', () => {
     expect(t.rows.find((r) => r.name === 'The flat – Rent')?.accountId).toBe(main)
 
     const savings = idOf(t, 'accounts', 'Savings')
-    await expect(removeAccount(store, savings)).rejects.toThrow(/closed months/)
+    await expect(removeAccount(store, savings)).rejects.toThrow(/"To savings" sends money to it/)
     const asItWas = await engine()
     await archiveAccount(store, savings, TODAY)
     t = await tables()
@@ -175,7 +188,7 @@ describe('remove', () => {
     expect(t.rows.find((r) => r.id === spend.id)?.defaultFundedBy).toBe(accountRef(idOf(t, 'accounts', 'Savings')))
   })
 
-  it('deleting a thing untags its rows; a person with closed amounts is archived instead', async () => {
+  it('deleting a thing untags its rows; a person can be archived, or deleted with their rows left shared', async () => {
     const { store, tables } = await demo()
     let t = await tables()
     const car = idOf(t, 'entities', 'The car')
@@ -186,9 +199,16 @@ describe('remove', () => {
     expect(t.rows.find((r) => r.name === 'The car – Insurance')?.entityTags).toEqual([])
 
     const alex = idOf(t, 'entities', 'Alex')
-    await expect(removeEntity(store, alex)).rejects.toThrow(/closed months/)
     await archiveEntity(store, alex, TODAY)
     expect((await tables()).entities.find((e) => e.id === alex)?.archivedMonth).toBe(TODAY)
+    await store.undo()
+    // amounts in months that are over do not stand in the way
+    expect(t.rows.filter((r) => !r.deletedAt && r.scope === alex).length).toBeGreaterThan(0)
+    await removeEntity(store, alex)
+    t = await tables()
+    expect(t.entities.find((e) => e.id === alex)?.deletedAt).not.toBeNull()
+    expect(t.rows.filter((r) => !r.deletedAt && r.scope === alex)).toEqual([])
+    expect(t.rows.find((r) => r.name === 'Alex – Salary')).toMatchObject({ deletedAt: null, scope: 'shared' })
   })
 
   it('deleting a schedule removes its open postings and keeps what was paid', async () => {
@@ -202,6 +222,7 @@ describe('remove', () => {
     expect(t.recurringItems.find((r) => r.id === rentSchedule)?.deletedAt).not.toBeNull()
     expect(t.cells.find((c) => c.rowId === rent && c.month === '2026-10')?.items.map((i) => [i.amount, i.status])).toEqual([[165000, 'done']])
     expect(t.cells.find((c) => c.rowId === rent && c.month === TODAY)?.items ?? []).toEqual([])
-    expect(t.cells.find((c) => c.rowId === rent && c.month === '2026-09')?.value).toBe(165000) // closed, untouched
+    // September was paid: it keeps its amount too
+    expect(t.cells.find((c) => c.rowId === rent && c.month === '2026-09')?.items.map((i) => [i.amount, i.status])).toEqual([[165000, 'done']])
   })
 })

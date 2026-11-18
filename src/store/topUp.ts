@@ -31,7 +31,6 @@ export function topUpMutations(tables: Tables, poolId: string, month: MonthKey, 
   if (pool.archivedMonth && compareMonths(pool.archivedMonth, month) <= 0) throw new Error(`"${pool.name}" is archived in ${month}.`)
   if (!Number.isFinite(amount) || !(amount > 0)) throw new Error('The top-up must be more than zero.')
   if (compareMonths(month, household.startMonth) < 0) throw new Error(`The household starts in ${household.startMonth}.`)
-  if (tables.monthStates.find((s) => s.month === month)?.closed) throw new Error(`${month} is closed. Reopen it to edit.`)
 
   const mutations: Mutation[] = []
   let working = tables

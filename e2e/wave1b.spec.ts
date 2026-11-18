@@ -544,7 +544,7 @@ test.describe('recurring from the grid', () => {
     await page.getByRole('button', { name: 'All occurrences' }).click()
     // "All occurrences" hands the schedule to the remove dialog, on top of the editor
     const remove = page.getByRole('dialog', { name: 'Schedule "Car insurance"' })
-    await expect(remove.getByText(/Its posted amount in \d+ open months/)).toBeVisible()
+    await expect(remove.getByText(/Its posted amount in \d+ months/)).toBeVisible()
     await remove.getByRole('button', { name: 'Delete', exact: true }).click()
     // the removal is done; the editor stays open and says so, in case more was typed in it
     await expect(remove).toBeHidden()

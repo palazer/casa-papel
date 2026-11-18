@@ -61,9 +61,8 @@ describe('a card\'s real balance, with the difference counted as spending', () =
     expect(out.accounts[DEMO_IDS.card].months['2026-10']).toMatchObject({ balance: expected - 10_00, adjustment: -10_00 })
   })
 
-  it('refuses a closed month and anything that is not a card recording its purchases', async () => {
+  it('refuses anything that is not a card recording its purchases', async () => {
     const { store, read } = await world()
-    await expect(setCardBalanceBooked(store, DEMO_IDS.card, '2026-09', 500_00)).rejects.toThrow(/closed/)
     await expect(setCardBalanceBooked(store, DEMO_IDS.savings, '2026-10', 500_00)).rejects.toThrow(/Only a card whose purchases are expense rows/)
     // the plain way still works for every account
     await setAccountActual(store, DEMO_IDS.savings, '2026-10', 900_000)

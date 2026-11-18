@@ -34,8 +34,9 @@ export function pool(over: Partial<Pool> & { name: string; accountId: string }):
   return PoolSchema.parse({ id: newId(), createdAt: T0, updatedAt: T0, ...over })
 }
 
-export function closedMonth(month: string, over: Record<string, unknown> = {}) {
-  return MonthStateSchema.parse({ month, closed: true, closedAt: T0, updatedAt: T0, ...over })
+/** What a month keeps for itself (its cash buffer, the old pocket total), or the mark an older version left on it. */
+export function monthState(month: string, over: Record<string, unknown> = {}) {
+  return MonthStateSchema.parse({ month, updatedAt: T0, ...over })
 }
 
 export function actual(accountId: string, month: string, actualBalance: number) {

@@ -41,10 +41,10 @@ test('the plan ends in a December and "Add <year>" appends a calendar year on ev
   await earlier.click()
   await expect(earlier).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByText(/Sept? 2026 – Dec 2027/)).toBeVisible()
-  await expect(page.getByRole('button', { name: /^Sept? 2026, closed/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Sept? 2026, past/ })).toBeVisible()
   // it stays as it was left on this device, and goes back with a second press
   await page.reload()
-  await expect(page.getByRole('button', { name: /^Sept? 2026, closed/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Sept? 2026, past/ })).toBeVisible()
   await earlier.click()
   await expect(page.getByText('Nov 2026 – Dec 2027')).toBeVisible()
   // a month's header opens that month on the Statement
@@ -189,18 +189,17 @@ test('the Statement shows the month\'s rate as a chip in its toolbar: pressed, i
   await expect(other).toContainText('€100.00')
   await page.screenshot({ path: 'e2e/output/statement-rate.png' })
 
-  // the month before keeps its own rate; a closed month's chip opens to the rate and changes none
+  // the month before keeps its own rate; a month that is over takes a rate of its own like any other
   await page.getByRole('button', { name: 'Previous month' }).click()
   await expect(page.getByRole('heading', { level: 2, name: 'October 2026' })).toBeVisible()
   await expect(chip).toHaveText('1 EUR = 1.10 USD')
   await page.getByRole('button', { name: 'Previous month' }).click()
   await expect(page.getByRole('heading', { level: 2, name: 'September 2026' })).toBeVisible()
-  await expect(page.getByText('closed', { exact: true })).toBeVisible()
+  await expect(page.getByText('past', { exact: true })).toBeVisible()
   await expect(chip).toHaveText('1 EUR = 1.10 USD')
   await chip.click()
-  await expect(pop).toContainText('September 2026 is closed: reopen it to change its rate.')
-  await expect(pop.getByRole('textbox')).toHaveCount(0)
-  await expect(pop.getByRole('button')).toHaveCount(0)
+  await expect(pop.getByRole('textbox')).toHaveValue('1.10')
+  await expect(pop.getByRole('button', { name: 'Save rate' })).toBeEnabled()
   await page.keyboard.press('Escape')
   await expect(pop).toBeHidden()
 

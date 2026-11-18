@@ -23,9 +23,8 @@ interface Props {
 /**
  * The one way anything is removed (DESIGN.md §8): a row, an account, a virtual account, a person or thing, a schedule,
  * a goal or a category. It says what archiving from a month does and what deleting removes, lists what else changes
- * and what has to be resolved first, and offers only what is possible: a thing with amounts in a closed month can be
- * archived but not deleted. Where deleting reaches into months that are over, the list says which. Everything it
- * does is one undoable commit.
+ * and what has to be resolved first. Where deleting reaches into months that are over, the list says which.
+ * Everything it does is one undoable commit.
  */
 export function RemoveDialog({ target, tables, household, onClose, onDone }: Props) {
   const store = useStore()
@@ -58,7 +57,6 @@ export function RemoveDialog({ target, tables, household, onClose, onDone }: Pro
   const month = impact.archiveFrom
   const problem = archiveMonthProblem(impact, month, locale)
   const kindWord = impact.kindLabel.toLowerCase()
-  const showDelete = !impact.closedHistory
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
@@ -82,32 +80,26 @@ export function RemoveDialog({ target, tables, household, onClose, onDone }: Pro
           )}
           <section className="space-y-2" aria-labelledby="rm-delete">
             {impact.canArchive && <h3 id="rm-delete" className="font-medium">Delete</h3>}
-            {impact.closedHistory ? (
-              <p className="text-muted-foreground">"{impact.subject}" has amounts in closed months ({impact.closedHistory}), so it cannot be deleted. Archive it instead.</p>
-            ) : (
+            <p className="text-xs text-muted-foreground">Deleting removes</p>
+            <Lines items={[...(impact.loses.length ? impact.loses : [`Only the ${kindWord} itself`]), ...(impact.over ? [impact.over] : [])]} />
+            {impact.changes.length > 0 && (
               <>
-                <p className="text-xs text-muted-foreground">Deleting removes</p>
-                <Lines items={[...(impact.loses.length ? impact.loses : [`Only the ${kindWord} itself`]), ...(impact.over ? [impact.over] : [])]} />
-                {impact.changes.length > 0 && (
-                  <>
-                    <p className="text-xs text-muted-foreground">Also changes</p>
-                    <Lines items={impact.changes} />
-                  </>
-                )}
-                {impact.note && <p className="text-xs text-muted-foreground">{impact.note}</p>}
-                {impact.blockers.length > 0 && (
-                  <Alert variant="destructive">
-                    <AlertTitle>Resolve these first</AlertTitle>
-                    <AlertDescription>
-                      <ul className="list-disc space-y-1 pl-4">
-                        {impact.blockers.map((b) => (
-                          <li key={b.text}>{b.text}. <span className="text-muted-foreground">{b.where}</span></li>
-                        ))}
-                      </ul>
-                    </AlertDescription>
-                  </Alert>
-                )}
+                <p className="text-xs text-muted-foreground">Also changes</p>
+                <Lines items={impact.changes} />
               </>
+            )}
+            {impact.note && <p className="text-xs text-muted-foreground">{impact.note}</p>}
+            {impact.blockers.length > 0 && (
+              <Alert variant="destructive">
+                <AlertTitle>Resolve these first</AlertTitle>
+                <AlertDescription>
+                  <ul className="list-disc space-y-1 pl-4">
+                    {impact.blockers.map((b) => (
+                      <li key={b.text}>{b.text}. <span className="text-muted-foreground">{b.where}</span></li>
+                    ))}
+                  </ul>
+                </AlertDescription>
+              </Alert>
             )}
           </section>
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
@@ -115,13 +107,11 @@ export function RemoveDialog({ target, tables, household, onClose, onDone }: Pro
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
           {impact.canArchive && (
-            <Button variant={showDelete ? 'outline' : 'default'} disabled={busy || !!problem} onClick={() => void save(() => archiveThing(store, target, month))}>
+            <Button variant="outline" disabled={busy || !!problem} onClick={() => void save(() => archiveThing(store, target, month))}>
               Archive from {formatMonth(month, locale)}
             </Button>
           )}
-          {showDelete && (
-            <Button variant="destructive" disabled={busy || !impact.canDelete} onClick={() => void save(() => removeThing(store, target))}>Delete</Button>
-          )}
+          <Button variant="destructive" disabled={busy || !impact.canDelete} onClick={() => void save(() => removeThing(store, target))}>Delete</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

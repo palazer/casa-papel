@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { cellKey, computeEngine } from '@/engine'
 import { monthRange, newId, poolRef } from '@/model'
 import {
-  CasaDb, Store, addAccount, addEntity, addPool, addRow, closeMonth, derivedRowReason, followRow, loadTables, quickCreateHousehold, setCellValue, setRowAccount, setRowDeductedFrom, setRowFundedBy, setRowScope,
+  CasaDb, Store, addAccount, addEntity, addPool, addRow, derivedRowReason, setCellDone, followRow, loadTables, quickCreateHousehold, setCellValue, setRowAccount, setRowDeductedFrom, setRowFundedBy, setRowScope,
 } from '@/store'
 
 const months = monthRange('2026-01', '2026-04')
@@ -28,7 +28,7 @@ describe('setRowFundedBy', () => {
     const pool = await addPool(store, { name: 'Travel', accountId: savings.id, openingBalance: 100000 })
     const trips = await addRow(store, { name: 'Trips', section: 'expense' })
     await setCellValue(store, trips.id, '2026-01', 30000, 'from-now-on')
-    await closeMonth(store, '2026-01')
+    await setCellDone(store, trips.id, '2026-01', true)
     await setRowFundedBy(store, trips.id, poolRef(pool.id), { from: '2026-03' })
 
     const t = await loadTables(store)
@@ -47,7 +47,7 @@ describe('setRowFundedBy', () => {
     expect(months.map((m) => out.totals[m].cashExpense)).toEqual([30000, 30000, 0, 0])
     expect(out.pools[pool.id].months['2026-02'].balance).toBe(100000)
     expect(out.pools[pool.id].months['2026-04'].balance).toBe(40000)
-    // the closed month stays closed and done
+    // a month that was ticked stays ticked
     expect(out.cells[cellKey(trips.id, '2026-01')].status).toBe('done')
   })
 

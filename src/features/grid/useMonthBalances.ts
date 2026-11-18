@@ -1,17 +1,12 @@
 import { useMemo, useState } from 'react'
-import { amountToInput, formatMonth, parseAmount, unreadableAmount } from '@/app/format'
-import { addMonths, type Household, type Money, type MonthKey, type Tables } from '@/model'
+import { amountToInput, parseAmount, unreadableAmount } from '@/app/format'
+import type { Household, Money, MonthKey, Tables } from '@/model'
 import { previewMonthBalances, type BalanceEntry, type BalanceLine } from '@/store'
 
 export type BalanceSide = 'start' | 'end'
 const keyOf = (side: BalanceSide, id: string) => `${side}:${id}`
 /** A stored balance as a field shows it. A real 0 is written out: an empty field means "calculated". */
 const asText = (v: Money | null, currency: string, locale: string): string => (v == null ? '' : v === 0 ? '0' : amountToInput(v, currency, locale))
-
-/** Where a closed month's balances are corrected: the month after starts with what this one ended on. */
-export function closedBalanceNote(month: MonthKey, locale: string): string {
-  return `${formatMonth(month, locale, 'long')} is closed. Correct what it ended on from the starting amount of ${formatMonth(addMonths(month, 1), locale, 'long')}, or reopen the month.`
-}
 
 /**
  * The fields of a month's balances (DESIGN.md §8): a start and an end per account. A field holds a real number or is

@@ -175,8 +175,7 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
   it and of them comes out of them again. A message at the foot of the window says what came back and what stayed
   (`Restored "Rent": its schedule "Rent" runs again.`), with "Undo".
   - Whatever was changed between the archive and the restore stays: a schedule goes back only if it still ends
-    where the archive ended it, a source only where it still shows what the archive set, and a month closed since
-    keeps what it was closed with. The message counts those ("1 thing you changed since stays as it is.").
+    where the archive ended it, and a source only where it still shows what the archive set. The message counts those ("1 thing you changed since stays as it is.").
   - A virtual account whose savings account is still archived is not restored by itself, and neither is the "To …"
     row of an archived virtual account: the app says which one to restore.
   - The note travels with the record, so a restore works on a second device and years later. This is a new stored
@@ -241,7 +240,6 @@ with the place it fails today.
 
 | Step | Rule | Scenarios |
 | --- | --- | --- |
-| 2. Closing replaced by the calendar | T2 (T3 is built) | `06-the-past.feature`: 1 |
 | 3. "This and following months" | A3 | `01-amounts-over-months.feature`: 2 |
 | 4. The currency model | X10 to X15 | `05-rates.feature`: 12 |
 | 5. The question before a change alters the past | T4 | `06-the-past.feature`: 7, `14-people-goals-data.feature`: 1 |

@@ -156,7 +156,6 @@ export interface StatementBand {
 export interface Statement {
   month: MonthKey
   currency: string
-  closed: boolean
   rule: 'savings-plug' | 'leftover-plug'
   flow: StatementBand
   position: StatementBand
@@ -667,7 +666,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   }
 
   return {
-    month, currency: base, closed: t.closed, rule: household.closingRule,
+    month, currency: base, rule: household.closingRule,
     flow: { left: moneyIn, right: moneyOut, difference: moneyIn.total - moneyOut.total },
     position: { left: assetsSide, right: claimsSide, difference: assetsSide.total - claimsSide.total },
     warnings,

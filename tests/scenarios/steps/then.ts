@@ -7,6 +7,7 @@ import { BRIDGE_TERMS, bridgeOf, type BridgeTerm } from '../checks/bridge'
 import { diffFigures } from '../figures'
 import { moneyText, monthName, step } from '../registry'
 import { ScenarioError, type World } from '../world'
+import * as app from '@/store'
 import { itemsFromCurrent, planRowMonthSave } from '@/store'
 import { monthProgress } from '@/features/statement/progress'
 
@@ -143,6 +144,13 @@ step('{string} can still be changed in {month}', async (world: World, rowName: s
   const items = now.length ? now.map((i, n) => (n === 0 ? { ...i, kind: 'normal' as const, amount: (engine.cells[cellKey(row.id, month)]?.value ?? 0) + 100 } : i)) : []
   const written = planRowMonthSave(tables, engine, row.id, month, { items, scope: 'this-month' }, 1)
   expect(written.length, `what a new amount for "${rowName}" in ${monthName(month)} would write`).toBeGreaterThan(0)
+})
+
+// nothing in the data says "closed", and the app has nothing left that would say it
+step('no month can be closed or reopened', async (world: World) => {
+  const { tables } = await world.view()
+  expect(tables.monthStates.filter((s) => s.closed).map((s) => monthName(s.month)), 'the months that are closed').toEqual([])
+  expect(Object.keys(app).filter((name) => /^(close|reopen)Month/.test(name)), 'what the app has to close or reopen a month').toEqual([])
 })
 
 // ---------- what the app said ----------

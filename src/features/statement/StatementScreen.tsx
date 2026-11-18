@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
-import { Lock, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { InfoTip } from '@/components/InfoTip'
@@ -14,8 +14,8 @@ import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useE
 import { useUndoNotice } from '@/app/useUndoNotice'
 import { UndoNotice } from '@/components/UndoNotice'
 import { buildStatement, cellKey, currentAccountsIn, notSetAside, type GoalProgress, type Statement, type StatementLine, type StatementSide } from '@/engine'
-import { accountGroup, isOutsideNetWorth, isPocketRow, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type Money, type MonthKey, type Row, type Section } from '@/model'
-import { accountSuggestions, addPayOffRow, addPlanYear, closeMonth, moveAccount, movePool, removeIfFree, reopenMonth, ruleRowOf, setCellDone, setDerivedDone, setItemStatus, setupFocus, setupSteps, shownRowSuggestions, stepSuggestions, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupSide, type SetupStepKey } from '@/store'
+import { accountGroup, isOutsideNetWorth, isPastMonth, isPocketRow, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type Money, type MonthKey, type Row, type Section } from '@/model'
+import { accountSuggestions, addPayOffRow, addPlanYear, moveAccount, movePool, removeIfFree, ruleRowOf, setCellDone, setDerivedDone, setItemStatus, setupFocus, setupSteps, shownRowSuggestions, stepSuggestions, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupSide, type SetupStepKey } from '@/store'
 import { GoalDialog } from '@/features/goals/GoalDialog'
 import { goalStatusLine } from '@/features/goals/goalText'
 import { AddRowInline } from '@/features/grid/AddRowInline'
@@ -109,7 +109,8 @@ const ADD = 'text-muted-foreground'
  * and under it where things stand at the end of it, assets beside debts and net worth. Each half balances; the figures
  * come from `buildStatement`, which reads them off the engine. The month is worked here too: a tick marks a row or an
  * item done, a click on a line opens the cell editor to overwrite the amount or say how sure it is, the progress line
- * counts what is still open, and "Close month" locks it. With two or more adults, "Per person" closes the page.
+ * counts what is still open, and "Balances…" asks what the accounts really held. No month is locked: one that is
+ * over carries the chip "past" and can be changed like any other. With two or more adults, "Per person" closes the page.
  * While a household is new the guided setup leads through it: one part of the page is lit, the rest locked.
  */
 export function StatementScreen() {
@@ -178,19 +179,18 @@ export function StatementScreen() {
     if (engine && m) for (const [id, s] of Object.entries(engine.pools)) out[id] = s.months[m]?.short ?? 0
     return out
   }, [engine, m])
-  const closedNow = statement?.closed ?? true
   // A virtual account that becomes short while this month is on screen (an expense was just typed, a set-aside lowered)
   // gets its top-up offered straight away. One that was short already when the month came into view only shows its tag.
   const seenShort = useRef<{ month: MonthKey | undefined; short: Record<string, number> }>({ month: undefined, short: {} })
   useEffect(() => {
     const seen = seenShort.current
     seenShort.current = { month: m, short: shortNow }
-    if (seen.month !== m || closedNow) return
+    if (seen.month !== m) return
     const grown = Object.keys(shortNow).find((id) => shortNow[id] > (seen.short[id] ?? 0))
     if (grown) setTopUpFor(grown)
-  }, [m, shortNow, closedNow])
+  }, [m, shortNow])
   // Suggested rows sit where they will appear: under a group, or inside the category they belong to
-  const showing = (suggest ?? household?.setupOpen ?? false) && !closedNow
+  const showing = suggest ?? household?.setupOpen ?? false
   // During the guided setup only the step's own are offered, so the lit part is all there is to read. A virtual
   // account is not offered among the expenses: it waits for its step and is offered under Assets, where it will sit.
   const offers = useMemo(() => {
@@ -300,14 +300,14 @@ export function StatementScreen() {
   }
 
   /**
-   * A new row opens its category and, in an open month, its dialog for the first amount (and, where it can carry one,
+   * A new row opens its category and its dialog for the first amount (and, where it can carry one,
    * its rule). Once the dialog is closed the page shows where the row is, also when that is another group than the
    * one it was added from.
    */
   function onAdded(row: Row) {
     setOpenLines((s) => ({ ...s, [`cat:${row.section}:${row.categoryId ?? 'none'}`]: true }))
     landing.current = { id: row.id }
-    if (!statement!.closed) setEditor({ rowId: row.id })
+    setEditor({ rowId: row.id })
   }
   /** How much goes to an account: the dialog of the row that fills it, or the short one while nothing does. */
   function askRule(target: RuleTarget, start?: RuleChoice['kind']) {
@@ -354,13 +354,13 @@ export function StatementScreen() {
    */
   function onSuggested(row: Row, amount: number | null) {
     setOpenLines((s) => ({ ...s, [`cat:${row.section}:${row.categoryId ?? 'none'}`]: true }))
-    if (isPocketRow(row) && !(amount != null && amount > 0) && !statement!.closed) setEditor({ rowId: row.id })
+    if (isPocketRow(row) && !(amount != null && amount > 0)) setEditor({ rowId: row.id })
   }
   /**
-   * Whether the lines an add control stands under carry ticks: the rows of an open month do. Under a group whose
-   * lines are categories nothing is ticked, so its controls stand on the categories' columns instead.
+   * Whether the lines an add control stands under carry ticks: rows do. Under a group whose lines are categories
+   * nothing is ticked, so its controls stand on the categories' columns instead.
    */
-  const tickedUnder = (line: StatementLine) => !statement!.closed && !line.children.some((c) => c.kind === 'category')
+  const tickedUnder = (line: StatementLine) => !line.children.some((c) => c.kind === 'category')
   const suggested = (line: StatementLine) => (showing && m
     ? (
       <SuggestionLines
@@ -379,7 +379,7 @@ export function StatementScreen() {
   function onAccountSaved(account: Account, row?: Row) {
     if (row) return onAdded(row)
     // an account left out of net worth is a person's own: it is not offered the household's rest, nor asked for a rule
-    if (statement!.closed || isOutsideNetWorth(account) || (account.type !== 'savings' && account.type !== 'investment')) return
+    if (isOutsideNetWorth(account) || (account.type !== 'savings' && account.type !== 'investment')) return
     const restTaken = resolveRules(engine!.rows, household!.closingRule).restRowId !== null
     askRule({ accountId: account.id }, account.type === 'savings' && !restTaken ? 'rest' : undefined)
   }
@@ -409,7 +409,7 @@ export function StatementScreen() {
   const addRow = (line: StatementLine, section: Section, over: Pick<ComponentProps<typeof AddRowInline>, 'label' | 'defaultCategoryId' | 'only' | 'place'> = {}) => (
     <AddRowInline
       section={section} categories={categoriesOf(section)} tables={tables!} household={household!} onError={setError} onAdded={onAdded}
-      month={statement!.closed ? undefined : m} payOffNote={PAY_OFF_NOTE} freeOf={freeOf}
+      month={m} payOffNote={PAY_OFF_NOTE} freeOf={freeOf}
       // on the columns of the lines above it: the "+" where their tick is (or their arrow), the words where their names are
       lead={<AddLead ticks={tickedUnder(line)} />} leadClassName={LEAD_BUTTON} formClassName={cn('min-w-0 basis-full', LEAD_PAD[tickedUnder(line) ? 'ticks' : 'plain'])} {...over}
     />
@@ -417,7 +417,7 @@ export function StatementScreen() {
   /** Things are added where they will appear: at the foot of a group, and inside a category for a row of that category. */
   function footer(line: StatementLine): ReactNode {
     if (line.id === 'income') return <>{suggested(line)}{addRow(line, 'income')}<AddCategoryInline section="income" onError={setError} /></>
-    if (line.id === 'expenses') return <>{suggested(line)}{addRow(line, 'expense')}<AddCategoryInline section="expense" onError={setError} estimate={statement!.closed ? undefined : { month: m, currency: ccy, locale }} /></>
+    if (line.id === 'expenses') return <>{suggested(line)}{addRow(line, 'expense')}<AddCategoryInline section="expense" onError={setError} estimate={{ month: m, currency: ccy, locale }} /></>
     // what the row is for is asked first; money taken out of an account has a section of its own on the left
     if (line.id === 'set-aside') return <>{suggested(line)}{addRow(line, 'transfer', { place: 'set-aside' })}</>
     if (line.id === 'from-accounts') return addRow(line, 'transfer', { only: ['from-savings', 'from-investment'] })
@@ -484,10 +484,9 @@ export function StatementScreen() {
   }
   /**
    * What pressing a line of the lower half opens: the dialog of the account or virtual account it stands for, the one
-   * its "…" calls "Edit…". A closed month opens none, as it shows no "…".
+   * its "…" calls "Edit…".
    */
   function lineOpen(line: StatementLine): (() => void) | null {
-    if (statement!.closed) return null
     if (line.kind === 'pool' && line.poolId) {
       const id = line.poolId
       return () => setPoolEdit(id)
@@ -503,10 +502,9 @@ export function StatementScreen() {
     return null
   }
   function lineMenu(line: StatementLine): ReactNode {
-    if (statement!.closed) return null
     if (line.kind === 'category' && line.id.startsWith('cat:')) {
       const category = tables!.categories.find((c) => c.id === line.id.split(':')[2] && !c.deletedAt)
-      // an expense category's estimate for the month is set from here (a closed month has no menu at all)
+      // an expense category's estimate for the month is set from here
       return category ? (
         <CategoryMenu
           category={category} tables={tables!} household={household!} onError={setError} onDeleted={onDeleted} triggerClassName={LINE_MENU}
@@ -552,9 +550,8 @@ export function StatementScreen() {
   const accountEditing = accountEdit ? tables.accounts.find((a) => a.id === accountEdit && !a.deletedAt) : undefined
   const poolEditing = poolEdit ? tables.pools.find((p) => p.id === poolEdit && !p.deletedAt) : undefined
 
-  // a closed month shows its rules and changes none
-  const base = { locale, ccy, isOpen, onToggle, goalText, onRule: statement.closed ? undefined : onRule, onTopUp: statement.closed ? undefined : setTopUpFor, onLink: goToLink, onLinkOpen: statement.closed ? undefined : addPayOff, marked, locked: focus ? (line: StatementLine) => lockedLines.has(line.id) : undefined }
-  const flowCtx: LineContext = { ...base, withChange: false, closed: statement.closed, doneOf, onTick, onEdit: (rowId) => setEditor({ rowId }), busy, footer, onEstimate: setEstimateFor, rowMenu, menu: lineMenu }
+  const base = { locale, ccy, isOpen, onToggle, goalText, onRule, onTopUp: setTopUpFor, onLink: goToLink, onLinkOpen: addPayOff, marked, locked: focus ? (line: StatementLine) => lockedLines.has(line.id) : undefined }
+  const flowCtx: LineContext = { ...base, withChange: false, doneOf, onTick, onEdit: (rowId) => setEditor({ rowId }), busy, footer, onEstimate: setEstimateFor, rowMenu, menu: lineMenu }
   // the estimate dialog reads the category's line: what the month shows now, and what its rows explain
   const estimateCategory = estimateFor ? tables.categories.find((c) => c.id === estimateFor && !c.deletedAt) : undefined
   const estimateLine = estimateFor ? walk(statement.flow.right.lines).find((l) => l.id === `cat:expense:${estimateFor}`) : undefined
@@ -571,7 +568,7 @@ export function StatementScreen() {
   // Accounts are added where they will show: what the household has under Assets, what it owes under Debts
   const savingsAccounts = tables.accounts.filter((a) => a.type === 'savings' && !a.deletedAt && !a.archivedMonth)
   // step 3 once there is a savings account and nothing takes the rest of the month yet: one press asks the first of them
-  const stepAction = step === 'savings' && !statement.closed && savingsAccounts.length > 0 && !steps.find((s) => s.key === 'savings')?.done
+  const stepAction = step === 'savings' && savingsAccounts.length > 0 && !steps.find((s) => s.key === 'savings')?.done
     ? { label: 'Choose where the rest goes', run: () => askRule({ accountId: savingsAccounts[0].id }, 'rest') }
     : undefined
   const assetsFoot = (
@@ -596,12 +593,12 @@ export function StatementScreen() {
       {/* The month and its controls stay in view while the page scrolls, with the line that counts the month under
           them. While a household is being set up the guide holds the top of the window instead. */}
       <PageHeader
-        title="Statement" subline={<>{household.name}{statement.closed && <> · <Chip tone="zinc"><Lock aria-hidden /> closed</Chip></>}</>}
+        title="Statement" subline={<>{household.name}{isPastMonth(m) && <> · <Chip tone="zinc" title="This month is over. It can still be changed.">past</Chip></>}</>}
         sticky={!settingUp}
-        below={(statement.closed || progress.total > 0) && (
+        below={progress.total > 0 && (
           // How much of the month is ticked and what is still open; a month with nothing in it has nothing to count
           <p role="status" className="flex items-center gap-1 text-xs text-muted-foreground" data-testid="progress">
-            <span>{progressText(progress, statement.closed, ccy, locale)}</span>
+            <span>{progressText(progress, ccy, locale)}</span>
             <InfoTip help="statement.progress" />
           </p>
         )}
@@ -610,25 +607,19 @@ export function StatementScreen() {
         <Button size="xs" variant="outline" onClick={() => setAll(true)}>Expand all</Button>
         <Button size="xs" variant="outline" onClick={() => setAll(false)}>Collapse all</Button>
         <span className="flex items-center gap-1">
-          <Button size="xs" variant={showing ? 'default' : 'outline'} aria-pressed={showing} disabled={statement.closed} title={statement.closed ? 'A closed month takes no new rows.' : undefined} onClick={() => setSuggest(!showing)}>Suggestions</Button>
+          <Button size="xs" variant={showing ? 'default' : 'outline'} aria-pressed={showing} onClick={() => setSuggest(!showing)}>Suggestions</Button>
           <InfoTip help="statement.suggestions" />
         </span>
         <MarksLegend neg={neg} />
         {/* What another currency is worth this month: a chip to read, and to press for a rate of one's own */}
         {currencies.length > 0 && (
           <span className="inline-flex flex-wrap items-center gap-1.5" data-testid="month-rates">
-            {currencies.map((c) => <RateChip key={`${c}:${m}`} tables={tables} household={household} month={m} currency={c} locked={statement.closed} />)}
+            {currencies.map((c) => <RateChip key={`${c}:${m}`} tables={tables} household={household} month={m} currency={c} />)}
           </span>
         )}
-        {/* a household that is still being set up has no month to look back on yet; a closed month can always be reopened */}
-        {statement.closed ? (
-          <Button size="sm" variant="outline" onClick={() => act(() => reopenMonth(store, m))}>Reopen month</Button>
-        ) : !settingUp && (
-          <>
-            <Button size="sm" variant="outline" onClick={() => setBalances(true)}>Balances…</Button>
-            <Button size="sm" onClick={() => act(() => closeMonth(store, m))}>Close month</Button>
-          </>
-        )}
+        {/* what every account really held, and the tick that counts the month as done; a household that is still
+            being set up has no month to look back on yet */}
+        {!settingUp && <Button size="sm" variant="outline" onClick={() => setBalances(true)}>Balances…</Button>}
         {error && <p role="alert" className="basis-full text-destructive">{error}</p>}
         {statement.warnings.map((w) => <p key={w} className="basis-full text-amber-700">{w}</p>)}
       </PageHeader>
@@ -657,17 +648,17 @@ export function StatementScreen() {
         />
       )}
       {balanceAccount && balanceResult && (
-        <BalanceDialog key={`${balanceAccount.id}:${m}`} account={balanceAccount} month={m} tables={tables} household={household} closed={statement.closed} onClose={() => setBalanceFor(null)} />
+        <BalanceDialog key={`${balanceAccount.id}:${m}`} account={balanceAccount} month={m} tables={tables} household={household} onClose={() => setBalanceFor(null)} />
       )}
       {currentBalance && mainLine && engine.main?.months[m] && (
         <CurrentBalanceDialog
-          key={m} title={mainLine.label} month={m} tables={tables} household={household} closed={statement.closed} onClose={() => setCurrentBalance(false)}
+          key={m} title={mainLine.label} month={m} tables={tables} household={household} onClose={() => setCurrentBalance(false)}
         />
       )}
-      {balances && !statement.closed && <MonthBalancesDialog key={m} month={m} tables={tables} engine={engine} household={household} onClose={() => setBalances(false)} />}
+      {balances && <MonthBalancesDialog key={m} month={m} tables={tables} engine={engine} household={household} onClose={() => setBalances(false)} />}
       {estimateCategory && (
         <EstimateDialog
-          key={`${estimateCategory.id}:${m}`} category={estimateCategory} month={m} household={household} closed={statement.closed}
+          key={`${estimateCategory.id}:${m}`} category={estimateCategory} month={m} household={household}
           current={estimateLine?.budget ?? 0} rows={(estimateLine?.amount ?? 0) - estimateRest} onClose={() => setEstimateFor(null)}
         />
       )}
@@ -678,7 +669,7 @@ export function StatementScreen() {
           onClose={() => setAccountNew(null)} onSaved={onAccountSaved}
         />
       )}
-      {poolNew && <PoolDialog pool={null} savings={savingsAccounts} baseCurrency={ccy} locale={locale} fromMonth={statement.closed ? undefined : m} freeOf={freeOf} onClose={() => setPoolNew(false)} />}
+      {poolNew && <PoolDialog pool={null} savings={savingsAccounts} baseCurrency={ccy} locale={locale} fromMonth={m} freeOf={freeOf} onClose={() => setPoolNew(false)} />}
       {topUpFor && <TopUpDialog key={`${topUpFor}:${m}`} tables={tables} engine={engine} household={household} poolId={topUpFor} month={m} onClose={() => setTopUpFor(null)} />}
       {accountEditing && (
         <HouseholdAccountDialog

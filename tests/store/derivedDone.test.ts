@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { cellKey, computeEngine } from '@/engine'
 import { monthRange, newId } from '@/model'
-import { CasaDb, Store, closeMonth, loadTables, quickCreateHousehold, reopenMonth, setCellDone, setCellValue, setDerivedDone } from '@/store'
+import { CasaDb, Store, keepHouse, loadTables, quickCreateHousehold, setCellDone, setCellValue, setDerivedDone } from '@/store'
+import { legacyClose } from '../legacyClose'
 
 const months = monthRange('2026-01', '2026-03')
 
@@ -47,14 +48,14 @@ describe('automatic rows ticked as moved', () => {
     expect(after.accounts).toEqual(before.accounts)
   })
 
-  it('survives closing and reopening the month, and is refused while the month is closed', async () => {
+  it('is set for a month an older version had closed, where the amount only read as done, and can be taken off', async () => {
     const { store, toSavings } = await fresh()
-    await setDerivedDone(store, toSavings.id, '2026-02', true)
-    await closeMonth(store, '2026-02')
-    expect((await plug(store, toSavings.id, '2026-02')).status).toBe('done')
-    await expect(setDerivedDone(store, toSavings.id, '2026-02', false)).rejects.toThrow(/closed/)
-    await reopenMonth(store, '2026-02')
-    expect((await plug(store, toSavings.id, '2026-02')).status).toBe('done')
+    await legacyClose(store, '2026-02')
+    // the old mark is not read any more: until the app's own pass has met the month, the amount is not done
+    expect((await plug(store, toSavings.id, '2026-02')).status).toBe('derived')
+    await keepHouse(store, '2026-06')
+    expect(await plug(store, toSavings.id, '2026-02')).toMatchObject({ source: 'derived', status: 'done', value: 300000 })
+    expect((await plug(store, toSavings.id, '2026-03')).status).toBe('derived')
     await setDerivedDone(store, toSavings.id, '2026-02', false)
     expect((await plug(store, toSavings.id, '2026-02')).status).toBe('derived')
   })

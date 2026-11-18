@@ -235,6 +235,8 @@ rule T4 will ask first.
 
 ## T. The past
 
+The past is every month before the current calendar month.
+
 **T1. A change in an earlier month carries through every balance after it.** That follows from B1: nothing is frozen
 unless a real balance stands in between (B5).
 
@@ -243,11 +245,12 @@ puts the done mark on every line of the month that has an amount, and changes no
 opens for a month that is over, and not for the current month or a later one. The balances and the ticks are saved
 as one step.
 
-> **Decided, not built (steps 2 and 5).**
->
-> The past is every month before the current calendar month.
->
-> **T2. Closing and reopening a month go away.** A month that is over can still be corrected.
+**T2. No month is closed.** A month that is over can be corrected like any other, and what is in it can be deleted.
+It counts as done only where it is ticked (T3). By itself the app fills only the current month and later (H5), so
+the past changes only by your own hand. A month that an older version of the app had closed becomes, once, a month
+with every line ticked: it keeps every amount, and a schedule that had no item of its own there stays left out.
+
+> **Decided, not built (step 5).**
 >
 > **T4. A change that alters a past month asks first.** It lists the months and what changes in them, and offers
 > "Cancel" and "Save anyway". Where a setting can have a date (the growth of an investment), it also offers "only
@@ -395,7 +398,10 @@ takes back both (finding F8, closed).
 
 **H4. A schedule that is stopped lands for the last time in that month.**
 
-**H5. A new year of the plan gets the schedule's amounts**, whether the calendar or "Add a year" brought it.
+**H5. A new year of the plan gets the schedule's amounts**, whether the calendar or "Add a year" brought it. By
+itself the app fills the current month and the months after it. A month that is over is left as it is, with one
+exception: a month the schedules never reached, because the app was not opened from before the plan grew to it
+until after it ended, gets their amounts when the app is opened again.
 
 **H7. A schedule changed in the list of schedules counts from the current month.** The list names no month, so a
 new amount, source or rhythm starts in the current month, and the months before keep what they had; what was ticked
@@ -420,8 +426,8 @@ archive changed, and "Restore" puts that back in one step:
 - an account: the virtual accounts archived with it are back, with their rows, and what came out of the account and
   of them comes out of them again.
 
-Only what still shows what the archive left is put back. A schedule that was given another end since, a row that was
-given another source since, and a month that was closed since stay as they are; the app says how many. A virtual
+Only what still shows what the archive left is put back. A schedule that was given another end since and a row that
+was given another source since stay as they are; the app says how many. A virtual
 account is not restored while its savings account is archived, nor a "To …" row while its virtual account is.
 Something archived before the app kept this note comes back by itself (finding F7, closed).
 

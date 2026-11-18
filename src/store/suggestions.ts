@@ -190,7 +190,6 @@ export function suggestionMutations(tables: Tables, id: string, opts: { amount?:
   const month = opts.month ?? household.startMonth
   if (amount != null && amount > 0) {
     if (compareMonths(month, household.startMonth) < 0) throw new Error(`The household starts in ${household.startMonth}.`)
-    if (tables.monthStates.find((m) => m.month === month)?.closed) throw new Error(`${month} is closed. Reopen it to edit.`)
   }
   const entity = s.entityId ? tables.entities.find((e) => e.id === s.entityId && !e.deletedAt) : undefined
   const accounts = live(tables.accounts).sort(byOrder)
