@@ -8,6 +8,7 @@
  * are over, the impact says which (`over`).
  */
 import { computeEngine, cellKey, type CellResult, type EngineOutput } from '@/engine'
+import { assertMainAccount } from './mainAccount'
 import {
   AccountSchema, CategorySchema, CellSchema, EntitySchema, GoalSchema, PoolSchema, RecurringItemSchema, RowSchema,
   ENTITY_KIND_LABEL, accountIdOf, accountRef, addMonths, compareMonths, monthOfDate, monthRange, ownBalance, parseMonth, paysExpenses, poolIdOf, poolRef,
@@ -886,6 +887,8 @@ export function planRestore(tables: Tables, target: RemovalTarget, ts: number, o
       const acc = find(tables.accounts.filter((a) => !a.deletedAt), target.id, 'account')
       subject = acc.name
       const memo = acc.archiveMemo ?? null
+      // an old main account comes back only while no other is open (rule B9)
+      assertMainAccount(work, { ...acc, archivedMonth: null }, acc)
       add([put('accounts', AccountSchema, acc, { archivedMonth: null, archiveMemo: null }, ts)])
       if (!memo) { noMemo(acc.name); break }
       reach(memo.month)

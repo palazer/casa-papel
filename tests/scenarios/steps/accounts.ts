@@ -1,5 +1,6 @@
-import { addAccount, setMonthBalances, updateAccount } from '@/store'
-import type { Account, MonthKey } from '@/model'
+import { generateKeyBetween } from 'fractional-indexing'
+import { addAccount, setMainAccount, setMonthBalances, updateAccount } from '@/store'
+import { AccountSchema, HouseholdSchema, newId, type Account, type MonthKey } from '@/model'
 import { monthAtEnd, step } from '../registry'
 import { ScenarioError, type World } from '../world'
 
@@ -16,6 +17,46 @@ step('a current account {string} in {ccy} holding {money}', (world: World, name:
 // "Other current account" in the form: a joint account, a partner's own, one in another currency, with a balance of its own
 step('another current account {string} holding {money}', (world: World, name: string, holding: number) => account(world, 'joint', name, holding))
 step('another current account {string} in {ccy} holding {money}', (world: World, name: string, currency: string, holding: number) => account(world, 'joint', name, holding, { currency }))
+
+// ---------- data from before rule B9 ----------
+
+// A current account the way the app before rule B9 kept it, simply there when the app opens the data: from an old
+// file, or from a device that was not updated. Every current account was counted together then, in any currency, and
+// the household had not been looked at yet. The app's own pass (the runner's `settle`) meets it.
+async function older(world: World, name: string, holding: number, currency?: string): Promise<void> {
+  const { household, tables } = await world.view()
+  const ts = Date.now()
+  const last = tables.accounts.filter((a) => !a.deletedAt).map((a) => a.order).sort().at(-1) ?? null
+  const acc = AccountSchema.parse({
+    id: newId(), createdAt: ts, updatedAt: ts, name, type: 'checking', currency: currency ?? household.baseCurrency, openingMonth: household.startMonth,
+    openingBalance: holding, tracked: false, order: generateKeyBetween(last, null),
+  })
+  await world.store.commitSystem([
+    { op: 'put', table: 'accounts', record: acc },
+    { op: 'put', table: 'household', record: HouseholdSchema.parse({ ...household, askMainAccount: undefined, updatedAt: ts }) },
+  ])
+}
+step('the app opens data from before rule B9 with a current account {string} holding {money}', (world: World, name: string, holding: number) => older(world, name, holding))
+step('the app opens data from before rule B9 with a current account {string} in {ccy} holding {money}', (world: World, name: string, currency: string, holding: number) => older(world, name, holding, currency))
+
+step('{string} is the main account', async (world: World, name: string) => {
+  const acc = await world.account(name)
+  if (acc.type !== 'checking' || acc.archivedMonth) throw new ScenarioError(`"${name}" is not the main account: it is ${acc.type === 'joint' ? 'an other current account' : `of type ${acc.type}`}${acc.archivedMonth ? ', archived' : ''}.`)
+})
+step('{string} is an other current account', async (world: World, name: string) => {
+  const acc = await world.account(name)
+  if (acc.type !== 'joint') throw new ScenarioError(`"${name}" is ${acc.type === 'checking' ? 'a main account' : `of type ${acc.type}`}, not an other current account.`)
+})
+// "Which is your main account?", once, after the upgrade of a household with several current accounts
+step('I am asked which is the main account', async (world: World) => {
+  if ((await world.view()).household.askMainAccount !== true) throw new ScenarioError('The app does not ask which is the main account.')
+})
+step('I am not asked which is the main account', async (world: World) => {
+  if ((await world.view()).household.askMainAccount === true) throw new ScenarioError('The app asks which is the main account.')
+})
+step('I choose {string} as the main account', async (world: World, name: string) => {
+  await setMainAccount(world.store, (await world.account(name)).id)
+})
 
 step('a savings account {string} holding {money}', (world: World, name: string, holding: number) => account(world, 'savings', name, holding))
 step('a savings account {string} holding {money}, opened in {month}', (world: World, name: string, holding: number, month: string) => account(world, 'savings', name, holding, { openingMonth: month }))

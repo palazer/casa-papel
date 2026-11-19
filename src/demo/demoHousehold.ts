@@ -121,7 +121,7 @@ export function buildDemoTables(): Tables {
   const tables = {
     household: [{
       ...base(ID.household, 'a0'), name: 'Demo household', baseCurrency: 'EUR', locale: 'en-IE', startMonth: '2026-09',
-      closingRule: 'savings-plug', cashBuffer: 0, displayExpensesNegative: true, fxDriftDefault: 0, fxMonthRate: 'first',
+      closingRule: 'savings-plug', cashBuffer: 0, displayExpensesNegative: true, fxDriftDefault: 0, fxMonthRate: 'first', askMainAccount: false,
     }],
     entities: [
       { ...base(ID.sam, 'a0'), kind: 'adult', name: 'Sam', attributes: {} },

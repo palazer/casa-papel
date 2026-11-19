@@ -82,6 +82,12 @@ export const HouseholdSchema = BaseRecord.extend({
   setupOpen: z.boolean().default(false),
   /** Suggestions the household said no to (`<entity id or "household">:<template key>`); they sit behind "More suggestions". */
   dismissedSuggestions: z.array(z.string()).default([]),
+  /**
+   * Rule B9 (one main account): unset in data from before it, which the app puts right when it opens it
+   * (`planMainAccount`); true while the household is to be asked which of its current accounts is the main account;
+   * false once that is settled. A household made since is made with false. Read it with `== null`, never `=== undefined`.
+   */
+  askMainAccount: z.boolean().optional(),
 })
 
 // ---------- entities ----------

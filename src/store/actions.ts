@@ -681,7 +681,8 @@ export interface QuickHousehold {
 /** Minimal household: settings, one savings account, a handful of starter rows. */
 export async function quickCreateHousehold(store: Store, input: QuickHousehold): Promise<Household> {
   const ts = now()
-  const household = HouseholdSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, ...input })
+  // made since rule B9: there is nothing from before it to put right
+  const household = HouseholdSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, askMainAccount: false, ...input })
   const savings: Account = AccountSchema.parse({
     id: newId(), createdAt: ts, updatedAt: ts, name: 'Savings', type: 'savings', currency: input.baseCurrency,
     openingBalance: 0, openingMonth: input.startMonth, tracked: true,

@@ -16,7 +16,7 @@ import { HouseholdScreen } from '@/features/household/HouseholdScreen'
 import { PastQuestionHost } from '@/features/past/PastQuestion'
 import { StatementScreen } from '@/features/statement/StatementScreen'
 import { AccountDialog, type AccountStep } from '@/features/sync/AccountDialog'
-import { planHousekeeping } from '@/store'
+import { planHousekeeping, planMainAccount } from '@/store'
 import { SyncContext, createSyncEngine, useSyncEngine } from '@/sync/useSync'
 
 export default function App() {
@@ -83,6 +83,13 @@ function Shell() {
     const mutations = planHousekeeping(tables)
     if (mutations.length) void store.commitSystem(mutations)
   }, [tables, household, months, store])
+  // one main account (rule B9): a household from before the rule is put right, after the first sync, so it is the
+  // household as the other devices left it; the question which is the main account follows from its mark
+  useEffect(() => {
+    if (!tables || !household || !synced) return
+    const mutations = planMainAccount(tables)
+    if (mutations.length) void store.commitSystem(mutations)
+  }, [tables, household, synced, store])
   // the official rates of the currencies in use are kept up to date, once a day, after the first sync
   useAutoRates(store, tables, synced)
 

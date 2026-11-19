@@ -7,6 +7,7 @@ import {
 } from '@/model'
 import { NO_QUESTION, type Mutation, type Store } from './store'
 import { refuseThirdCurrency } from './currencies'
+import { assertMainAccount } from './mainAccount'
 import { loadTables, payOffKind, rowOfKindMutations } from './actions'
 
 const now = () => Date.now()
@@ -33,12 +34,14 @@ export async function updateEntity(store: Store, id: string, patch: Partial<Omit
 
 export type AccountInput = Pick<Account, 'name' | 'type' | 'currency' | 'openingMonth'> & Partial<Account>
 
-/** A new account at the end of the list; the caller commits it. */
+/** A new account at the end of the list; the caller commits it. A second main account, or one in another currency, is refused (rule B9). */
 function newAccount(tables: Tables, input: AccountInput): Account {
   const last = tables.accounts.filter((a) => !a.deletedAt).map((a) => a.order).sort().at(-1) ?? null
   const ts = now()
   const tracked = input.tracked ?? ['savings', 'investment', 'credit-card', 'loan', 'other-asset'].includes(input.type)
-  return AccountSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, order: generateKeyBetween(last, null), openingBalance: 0, ...input, tracked })
+  const account = AccountSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, order: generateKeyBetween(last, null), openingBalance: 0, ...input, tracked })
+  assertMainAccount(tables, account)
+  return account
 }
 
 export async function addAccount(store: Store, input: AccountInput): Promise<Account> {
@@ -155,6 +158,8 @@ export async function updateAccount(store: Store, id: string, patch: Partial<Omi
       throw new Error(`${landing.map((r) => `"${r.name}"`).join(', ')} ${landing.length === 1 ? 'lands' : 'land'} in "${a.name}", and pocket money can only land in an account that is left out of net worth. Change "Lands in…" in the row's menu first.`)
     }
   }
+  // one main account open at a time, in the household's currency, and nothing moving money into it (rule B9)
+  assertMainAccount(tables, next, a)
   const mutations: Mutation[] = [{ op: 'put', table: 'accounts', record: next }]
   refuseThirdCurrency(tables, mutations)
   await store.commit(mutations, { fromNow })
@@ -276,7 +281,8 @@ export interface SetupInput {
 /** Everything a new household needs, as one commit. Pure apart from id/time generation. */
 export function buildSetupMutations(input: SetupInput): { mutations: Mutation[]; household: Household } {
   const ts = now()
-  const household = HouseholdSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, ...input.household })
+  // made since rule B9: there is nothing from before it to put right
+  const household = HouseholdSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, askMainAccount: false, ...input.household })
   const mutations: Mutation[] = [{ op: 'put', table: 'household', record: household }]
 
   const entityOrders = generateNKeysBetween(null, null, input.adults.length + input.dependents.length)
@@ -299,6 +305,8 @@ export function buildSetupMutations(input: SetupInput): { mutations: Mutation[];
       ownerEntityId: ownerIndex != null ? entities[ownerIndex]?.id ?? null : null, ...a,
     }),
   )
+  // one main account at most, in the household's currency (rule B9)
+  accounts.forEach((a, i) => assertMainAccount({ household: [household], accounts: accounts.slice(0, i), rows: [], cells: [], recurringItems: [] } as unknown as Tables, a))
   for (const a of accounts) mutations.push({ op: 'put', table: 'accounts', record: a })
 
   // the usual expense categories come with every new household, so the suggested rows land in their groups
