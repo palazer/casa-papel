@@ -18,7 +18,7 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
 | F6 | The Statement's change for a virtual account that ran short | one figure on the Statement | show the change of the balance | closed |
 | F7 | Restoring does not bring back what archiving changed with it | amounts stay changed | restore puts it back | closed |
 | F8 | Undo of a schedule added from the list empties the row's months | amounts are lost | save the schedule and its months as one step | closed |
-| F9 | Merging an older copy (a file, or the other device's) brings back what was taken back | an undone change returns | the merge respects what this device removed | closed; the file comparison comes with step 5 |
+| F9 | Merging an older copy (a file, or the other device's) brings back what was taken back | an undone change returns | the merge respects what this device removed | closed; the file comparison built with step 5 |
 | F10 | A row that followed another shows amounts it never had once that row is archived | months that are over change | write the 0.00 down | closed |
 | F11 | A schedule deleted after a payment: the paid amount runs on into every later month | amounts appear that nobody planned | what was paid is that month's alone | closed |
 | F12 | A schedule made in the list of schedules is read in the household's currency | an amount 100 times too large, for a currency without cents | the form reads the amount in the row's currency | closed |
@@ -249,8 +249,13 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
   device's own history: if it was removed here and the copy was not changed after that, it stays removed. A copy that
   was changed after the removal comes in, because the newest still wins. Two things make the comparison hold: a
   removal is never dated before the record it removes, and whatever a device writes after a removal is dated after
-  it (so an amount taken back and put back again reaches the other device). Still to come, with step 5: a file shows
-  what it would change before it is merged (scenario "A file shows what it would change before it is merged").
+  it (so an amount taken back and put back again reaches the other device).
+- **The file comparison, built with step 5** (19 November 2026). A file picked to bring in shows what "Merge into this
+  device" and what "Replace everything here" would each change on this device before either is done; the merge's
+  list comes from the merge's own rules, run and rolled back. Scenarios: "A file made before a change: merging it
+  changes nothing, replacing everything turns the change back", "A file from the other device: merging it brings
+  what is newer there". The planned scenario was reworded: as written, it expected a merge to turn a newer amount
+  back, which a merge never does (it keeps the newer copy); only "Replace everything here" does.
 
 ### F10. A row that followed another shows amounts it never had once that row is archived
 
@@ -356,11 +361,7 @@ with the place it fails today.
 
 | Step | Rule | Scenarios |
 | --- | --- | --- |
-| 5. The question before a change alters the past | T4 | `06-the-past.feature`: 7, `14-people-goals-data.feature`: 1 |
 | One main account (its own step) | B9 | `15-main-account.feature`: 2 |
-
-One of them already shows what the app does today: a changed growth rate of an investment changes every past month
-without a question ("A changed growth rate does not change the past without asking").
 
 ## What was open, and what you decided
 

@@ -233,9 +233,9 @@ Money moved into it arrives at the month's rate. A real balance is typed in the 
 **X7. Without any rate, an amount counts one to one, and the app warns that no rate is set.** With the currencies of
 X13 that should not happen: each of them has a rate.
 
-**X8. A changed rate of an earlier month changes that month and every balance after it.** Today without a question;
-rule T4 will ask first. The app itself changes the rate of a month that is over in one case only: to settle it
-(X11), once, after the month has ended.
+**X8. A changed rate of an earlier month changes that month and every balance after it.** A rate typed for a month
+that is over, or set back to the official one, asks first (T4). The app itself changes the rate of a month that is
+over in one case only: to settle it (X11), once, after the month has ended.
 
 **X9. Two other currencies are converted through the household's.** GBP to USD is GBP to EUR, then EUR to USD.
 
@@ -334,15 +334,25 @@ as one step.
 
 **T2. No month is closed.** A month that is over can be corrected like any other, and what is in it can be deleted.
 It counts as done only where it is ticked (T3). By itself the app fills only the current month and later (H5), so
-the past changes only by your own hand. A month that an older version of the app had closed becomes, once, a month
-with every line ticked: it keeps every amount, and a schedule that had no item of its own there stays left out.
+the past changes only by your own hand, and asks first (T4). A month that an older version of the app had closed
+becomes, once, a month with every line ticked: it keeps every amount, and a schedule that had no item of its own
+there stays left out.
 
-> **Decided, not built (step 5).**
->
-> **T4. A change that alters a past month asks first.** It lists the months and what changes in them, and offers
-> "Cancel" and "Save anyway". Where a setting can have a date (the growth of an investment), it also offers "only
-> from the current month on". A change in the current month or later is saved without a question. The app never
-> changes the past by itself. A file that is merged shows the same list first: what it would change on this device.
+**T4. A change that alters a month that is over asks first.** A save that changes a figure of a month before the
+current one waits: each line's amount, an account's start, end or real balance, a virtual account, the current
+accounts, the month's sums or net worth. The question lists the months and what changes in them (an amount as runs of
+months with the same before and after, a balance at the end of the last month that differs) and offers "Cancel" and
+"Save anyway". Where the save has a version that leaves the past alone, it also offers "Only from <the current
+month> on": an investment's growth can change from a month on, and the months before keep the rate they had. A
+change in the current month or later asks nothing, and so does one that moves no figure of the past (a name, a
+category, a goal, who a row belongs to). A tick, a real balance, something new, a deletion (its own dialog names the
+months that are over) and a restore never ask; nor do undo and redo, nor a change that arrives from another device
+(it asked there). Something written while the question is open (a sync, the day's rates) stops the save: it is not
+written, and saving again asks with the figures as they are then. A file picked to bring in shows first what
+merging it and what replacing everything with it would change here, over every month of the plan.
+
+> "Rent" 1,300.00 from March, on 15 June: the question names March, April and May. "Cancel" leaves everything as
+> it was; "Save anyway" changes those months, and February keeps 1,200.00.
 
 ## M. The sums of a month
 
