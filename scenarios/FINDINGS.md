@@ -361,12 +361,13 @@ with the place it fails today.
 
 | Step | Rule | Scenarios |
 | --- | --- | --- |
-| One main account (its own step) | B9 | `15-main-account.feature`: 2 |
+
+None: the last of them, one main account (B9), was built on 19 November 2026.
 
 ## What was open, and what you decided
 
 Decided on 17 November 2026. D1, D2 and D3 are rules now (X14, B9 and X15 in `docs/calculations.md`). D1 and D3
-are built since 18 November 2026 (step 4, part 2); D2 is not built yet, and its scenarios are tagged `@planned`.
+are built since 18 November 2026 (step 4, part 2), D2 since 19 November 2026 (the main-account step).
 
 - **D1. A virtual account inside a savings account in another currency.** Decided: allowed, and kept in that
   currency. A virtual account takes the currency of the savings account that holds it: in a dollar savings account
@@ -378,8 +379,11 @@ are built since 18 November 2026 (step 4, part 2); D2 is not built yet, and its 
 - **D2. A current account in another currency, and several current accounts.** Decided: one main account, always in
   the household's currency. The month's money runs through it, and its real balance is one number. Any other
   everyday account is an account with a balance of its own that money is moved to. It is a step of its own, with a
-  question for households that have several current accounts today. Until it is built, `05-rates.feature` keeps the
-  scenario of today's behaviour: "A current account in another currency is converted when it opens, and not again".
+  question for households that have several current accounts today. Built on 19 November 2026 (your choices: such an
+  account has its own line, real balance and currency, "Joint account" in the type list became "Other current
+  account", a household from before is asked once which is the main account, the demo's joint account went).
+  `05-rates.feature` now has "Another current account in another currency keeps its balance in that currency, worth
+  what each month's rate makes of it", and `15-main-account.feature` the rest.
 - **D3. An expense in a third currency paid from an account in another currency.** Decided: not allowed for now. An
   expense comes out of an account in the expense's own currency or in the household's; anything else is refused and
   says so. Payments across three currencies stay parked. Built on 18 November 2026 for every amount that moves an

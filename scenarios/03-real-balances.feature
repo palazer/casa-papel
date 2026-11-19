@@ -1,6 +1,6 @@
 Feature: Real balances
   What an account really held, typed under "Balances for <Month>…", against what the plan worked out.
-  Rules B5 to B8 of docs/calculations.md.
+  Rules B5, B7 and B8 of docs/calculations.md, and B9 for the main account.
 
   Background:
     Given today is 15 March 2026

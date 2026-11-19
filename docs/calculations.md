@@ -109,15 +109,13 @@ What is paid in joins at the start of the month and grows with it.
 > 10,000.00 at 6 % a year: 0.4868 % a month. January ends with 10,048.68, February with 10,097.59, December with
 > 10,600.00. With 200.00 paid in every month, January ends with 10,249.65.
 
-**B4. The current accounts end a month with: start + what the month left.** What the month left is everything that
-came in minus everything that went out. A month that costs more than comes in takes the difference from the current
-accounts ("From the account"). When an account takes the rest of the month, the rest goes there and the current
-accounts keep nothing; in a month that overruns, the difference comes back out of that account.
+**B4. The main account ends a month with: start + what the month left.** What the month left is everything that came
+in minus everything that went out. A month that costs more than comes in takes the difference from the main account
+("From the account"). When an account takes the rest of the month, the rest goes there and the main account keeps
+nothing; in a month that overruns, the difference comes back out of that account.
 
-The plan knows the current accounts only together: one figure for all of them.
-
-> Income 3,000.00, rent 1,200.00, current account 1,000.00: January leaves 1,800.00 and ends with 2,800.00.
-> With "Savings" taking the rest: January ends with 1,000.00 in the current account and 6,800.00 in savings.
+> Income 3,000.00, rent 1,200.00, main account 1,000.00: January leaves 1,800.00 and ends with 2,800.00.
+> With "Savings" taking the rest: January ends with 1,000.00 in the main account and 6,800.00 in savings.
 
 **B5. A real balance replaces the calculated one.** Typed under "Balances for <Month>…", it is the end of that month.
 The next month starts from it (B1). The months before it do not change, and a later change in a month before it does
@@ -126,27 +124,39 @@ not reach past it.
 > "Savings" is calculated at 5,500.00 for the end of January and really held 5,620.00: January ends with 5,620.00,
 > February with 6,120.00. The 120.00 is the part "real balances" of that month's change in net worth (N2).
 
-**B6. The current accounts take real balances only together.** Every current account that is open in the month
-needs one. One alone is refused: the plan could not tell what the others held.
-
 **B7. The start of a month is the end of the month before.** A real start typed for March is saved as the real end
 of February. In an account's first month, the start is its opening amount.
 
 **B8. Clearing a real balance brings the calculated one back.** The months after it follow.
 
-> **Decided, not built (its own step).**
->
-> **B9. A household has one main account, in the household's currency.** The month's money runs through it, and its
-> real balance is one number. Any other everyday account is an account with a balance of its own that money is moved
-> to. B6 goes away with it.
+**B9. A household has one main account, in the household's currency.** The month's money runs through it, and its
+real balance is one number. A second one, or one in another currency, is refused. Any other everyday account (a joint
+account, a partner's own, one in another currency) is an other current account: it has a balance of its own, money
+goes into it with a transfer row, an expense can come out of it, and in another currency it is worth what each
+month's rate makes of it (X6). An income row that names it is for the overview: the money runs through the main
+account. A main account that is archived stays part of the line, as its history; in a month where it and the one that
+replaced it were both open, the line is the two together, and a real balance needs both. (Rule B6, "the current
+accounts take real balances only together", went with it.)
+
+A household from before this rule had every current account counted together, in any currency. When the app opens
+its data, the first current account in the household's currency is the main account and every other open one keeps a
+balance of its own, with what it held at the start and the real balances typed for it; an archived one stays in the
+line. Net worth stays what it was in every month, but for an account in another currency, which was converted once
+when it opened and now moves with the rate. A household that had two or more is asked once which is the main account.
+
+> Main account 1,000.00, joint account 400.00, income 3,000.00, rent 1,200.00: before the rule, one line of 1,400.00
+> that January took to 3,200.00. Now the main account ends January with 2,800.00 and the joint account with 400.00:
+> net worth is 3,200.00 either way.
+
+Built on 19 November 2026 (finding D2).
 
 ## N. Net worth
 
 **N1. Net worth is what the household has, less what it owes.**
 
-    net worth = current accounts + savings + investments + other assets − debts
+    net worth = main account + savings + investments + other assets − debts
 
-Each at the end of the month, in the household's currency. An account marked "Leave out of net worth" is not counted.
+Each at the end of the month, in the household's currency; the other current accounts and cash are other assets. An account marked "Leave out of net worth" is not counted.
 
 **N2. A change in net worth is explained by named parts.** From the end of one month to the end of the next:
 
@@ -164,7 +174,7 @@ Each at the end of the month, in the household's currency. An account marked "Le
 | money without an account | a transfer that names no account with a balance: the money is counted as gone | − |
 
 A transfer between two accounts that are both counted is in none of these parts: one falls, the other rises.
-Paying a loan down is in none of them either: the current account and the debt fall by the same amount.
+Paying a loan down is in none of them either: the main account and the debt fall by the same amount.
 
 > Income 3,000.00, rent 1,200.00, 500.00 a month to savings: net worth rises by 1,800.00 a month. Income 3,000.00,
 > spending −1,200.00; the 500.00 only moved.
@@ -175,10 +185,10 @@ The app shows these parts nowhere yet. The scenario runner works them out by its
 settings, compares them with every balance the app calculated, and fails when a cent is left over.
 
 A row that "moves money between your accounts" names the account that receives it: one with a balance of its own
-(a savings account, an investment account, cash, an other asset). The amount leaves the current accounts and arrives
-there, so it is in none of the parts above and net worth stays as it is. Only a row of that kind that names no such
-account is "moved elsewhere": no account of the household receives the money, and net worth falls by it (finding F2,
-closed).
+(a savings account, an investment account, an other current account, cash, an other asset). The amount leaves the
+main account and arrives there, so it is in none of the parts above and net worth stays as it is. Only a row of that
+kind that names no such account is "moved elsewhere": no account of the household receives the money, and net worth
+falls by it (finding F2, closed).
 
 ## P. The months of the plan
 
@@ -296,8 +306,8 @@ list of the field that holds it.
 **X15. No amount across three currencies.** An amount is in its row's currency (a row that follows another is in
 that row's), the plan counts it in the household's, and it moves money out of or into accounts that each keep their
 own. Together that is two currencies at most. A pound expense comes out of an account in pounds or in the
-household's currency; a euro amount in a euro household moves money between the current accounts and an account in
-one other currency. An expense paid from several sources is one amount per source. A choice that would bring in a third currency is refused where it is made, with the two currencies the
+household's currency; a euro amount in a euro household moves money between the main account and an account in
+one other currency. The main account is in the household's currency (B9), so it is never a third. An expense paid from several sources is one amount per source. A choice that would bring in a third currency is refused where it is made, with the two currencies the
 amount accepts; this holds for a row's currency, its source, the account it names, the row it follows, a schedule's
 source, an account's currency and the savings account a virtual account sits in.
 
@@ -361,7 +371,7 @@ merging it and what replacing everything with it would change here, over every m
     what is left = income − expenses paid from the month − what goes to savings, investments, virtual accounts,
                    pocket money and loans − what a row moves to another account, or out of the plan
 
-Both sides of the Statement's upper half show the same total. "Leftover" is what stays in the current accounts.
+Both sides of the Statement's upper half show the same total. "Leftover" is what stays in the main account.
 
 > Income 3,000.00, rent 1,200.00, groceries 450.00: 1,350.00 is left. With 500.00 to savings: 1,300.00 is left, and
 > "From what is left" shows 1,800.00.
@@ -402,7 +412,7 @@ amount (A3).
 > 10 % of 3,333.33 is 333.33.
 
 **R3. A percentage of what is left.** What is left for these percentages is the income minus the expenses, the typed
-amounts and the percentages of income (and minus what is kept in the current account, R5); never below zero.
+amounts and the percentages of income (and minus what is kept in the main account, R5); never below zero.
 
 > Income 3,000.00, rent 1,200.00, 10 % of the income to the index fund (300.00): 1,500.00 is left, and 50 % of it is
 > 750.00. In a month that overruns, nothing is left to take a percentage of.
@@ -410,7 +420,7 @@ amounts and the percentages of income (and minus what is kept in the current acc
 **R4. The rest.** One account takes whatever is left after everything else. In a month that overruns, the
 difference comes back out of it. Giving the rest to another account takes it from the first.
 
-**R5. What the household keeps in the current account every month comes off the rest.** It counts only while an
+**R5. What the household keeps in the main account every month comes off the rest.** It counts only while an
 account takes the rest.
 
 **R6. An amount typed into a month counts instead of the rule, for that month.** A rule starts in a month: the months
@@ -424,11 +434,11 @@ The order within a month: percentages of the income, what is kept, percentages o
 
     owed at the end = owed at the start − paid
 
-Net worth does not change: the current accounts and the debt fall by the same amount. The plan works out no
+Net worth does not change: the main account and the debt fall by the same amount. The plan works out no
 interest: a real balance says what is really owed (B5).
 
 A payment stops at what is owed. The last one is what is still owed, and after it the payment counts as nothing: not
-in the month's expenses, not in what is left, not in the current accounts. What was planned stays stored, so the
+in the month's expenses, not in what is left, not in the main account. What was planned stays stored, so the
 payments count again when a real balance says more is owed (finding F4, closed).
 
     owes 600.00, 250.00 planned a month: 250.00, 250.00, 100.00 count, then nothing
@@ -439,7 +449,7 @@ Not cut: a loan whose balance is not tracked, a payment row that names no loan, 
 and an amount below zero, which is money drawn again and raises what is owed.
 
 **C2. A card whose purchases are expense rows.** A purchase is an expense of its month and raises what is owed. The
-cash stays in the current accounts until the card is paid. The payment moves money and is no expense: the current
+cash stays in the main account until the card is paid. The payment moves money and is no expense: the current
 accounts and what is owed fall by it.
 
 **C3. A card that records only its payments.** The payment is the month's expense, and nothing else: no row says
