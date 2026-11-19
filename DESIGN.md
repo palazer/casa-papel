@@ -906,11 +906,16 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   card?" as a `Segmented` (`Everything I buy with it` / `Only what I pay to it`) with the chosen answer's sentence.
   Everything that has a usual default sits behind a `More options` disclosure (a chevron button that names what it
   holds while closed): currency (a `NativeSelect`), opening month, owner, tracking, net worth, and for investments growth, projection and when
-  deposits count. `Growth per year (%)` shows the current month's rate; where it changed from a month on ("Only from
+  deposits count. **One main account** (rule B9): `Main account` is in the type list only while the household has
+  no open one, or on the main account itself, and the list then starts on `Other current account`; the main account
+  has no currency select, a muted line in its place says it is always in the household's currency
+  (`acc-main-currency`), and the type's sentence of an other current account names the main account
+  (`acc-type-help`). A second main account, one in another currency, and making the main account of an account
+  that rows move money into or out of are refused in the dialog's error line, with the reason. `Growth per year (%)` shows the current month's rate; where it changed from a month on ("Only from
   <Month> on" at the question about the past, §8), a muted line under it names both: `5% a year until October 2026, 8%
   from November 2026.` (`growthText`). It is closed for a new account and open when editing. **`Leave out of net worth`** is a `Check`
-  there, for an account that holds money and has a balance (savings, investment, other asset, cash; not a current
-  account, a card or a loan), with a muted sentence under it that says what it does, another one once it is ticked
+  there, for an account that holds money and has a balance (savings, investment, other asset, cash, an other current
+  account; not the main account, a card or a loan), with a muted sentence under it that says what it does, another one once it is ticked
   (`acc-outside`). It cannot be unticked while a pocket money row lands in the account: the dialog's error names the
   row. Such an account is not asked "How much goes to …?" after it is made on the Statement. Opened from a place that says what the
   account is (Assets, Debts, a suggestion), the type list holds only the types that belong there. Errors show in the
@@ -957,6 +962,17 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   save has a version that leaves the past alone: an investment's growth), `Save anyway`. Cancel goes back to the dialog
   with what was typed and no message (`saveError` in `src/app/saveError.ts` says nothing for it); a field without a
   dialog shows what is stored again. Ticks, real balances, something new, deleting and restoring never ask.
+- **Which is your main account?** (rule B9; `src/features/main/MainAccountQuestion.tsx`, `setMainAccount` and
+  `mainAccountChoice` in `src/store/mainAccount.ts`): once, at the app's root, after the app has put a household from
+  before the rule right and marked it to be asked (`Household.askMainAccount`). A small dialog (`sm:max-w-md`,
+  `data-testid="main-account-question"`): the title with an (i) (`statement.mainAccountQuestion`), a sentence that
+  the month's money now runs through one account in the household's currency and the others keep a balance of their
+  own, a `Segmented` "Main account" of the open current accounts in that currency on the upgrade's pick, then a muted
+  line per account in another currency (`"Dollar account" is in USD: it keeps its own balance, and its worth moves
+  with the rate.`) and `Net worth stays as it was` (`, but for what the rate does` where there is one). Footer: `Save`.
+  With one account in the household's currency the title is `One main account`, the choice is a line naming it and
+  the button `OK`; with none, a line says the month's money stays on the line "Main account" until one is added.
+  Closing it keeps the upgrade's pick. The figures are right before it is answered, so it never blocks a screen.
 - Removing anything goes through one `RemoveDialog` (`src/features/remove/RemoveDialog.tsx`), reached from a row's
   menu ("Archive or delete…"), the People & things list, the account, virtual account and goal dialogs' footers
   ("Archive or delete…", "Delete…"), the schedules list, the cell editor's "All occurrences" and the Categories card.

@@ -210,7 +210,7 @@ export const GUIDE: GuideTopic[] = [
     ],
     factsTitle: 'The rules',
     facts: rules,
-    tips: ['section.transfer', 'derived.keptInAccount', 'derived.leftover', 'row.toSavingsPlug', 'household.buffer', 'household.bufferScope', 'row.automatic', 'row.rule', 'row.ruleFrom', 'statement.mainAccount', 'balance.currentAccount'],
+    tips: ['section.transfer', 'derived.keptInAccount', 'derived.leftover', 'row.toSavingsPlug', 'household.buffer', 'household.bufferScope', 'row.automatic', 'row.rule', 'row.ruleFrom', 'statement.mainAccount', 'balance.currentAccount', 'statement.mainAccountQuestion'],
     open: 'household',
   },
   {

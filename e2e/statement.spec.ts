@@ -670,9 +670,11 @@ test.describe('working the month in the Statement', () => {
     await expect(dlg.getByTestId('acc-outside')).toHaveText('It keeps its balance and can still pay into the month, but no total counts it, and net worth does not either. Pocket money can land in it.')
     await settled(dlg)
     await dlg.screenshot({ path: 'e2e/output/account-outside-net-worth.png' })
-    // the main account is the month's own money: it has no such box
-    await dlg.getByLabel('Type').selectOption('checking')
-    await expect(box).toHaveCount(0)
+    // an other current account holds money with a balance of its own too; the main account, the month's own money,
+    // is not offered here at all, as the household has one
+    await dlg.getByLabel('Type').selectOption('joint')
+    await expect(box).toBeChecked()
+    await expect(dlg.getByLabel('Type').locator('option', { hasText: /^Main account$/ })).toHaveCount(0)
     await dlg.getByLabel('Type').selectOption('savings')
     await expect(box).toBeChecked()
     await dlg.getByRole('button', { name: 'Save' }).click()
@@ -1171,7 +1173,8 @@ test.describe('working the month in the Statement', () => {
     // under Assets: what the household has. The short form asks the name, the type and what it holds
     await assets.getByRole('button', { name: 'Add account' }).click()
     await expect(dlg.getByRole('heading', { name: 'New account' })).toBeVisible()
-    await expect(dlg.getByLabel('Type').locator('option')).toHaveText(['Main account', 'Other current account', 'Savings', 'Investments', 'Other asset', 'Cash'])
+    // the household has its main account: a second one is not offered (rule B9)
+    await expect(dlg.getByLabel('Type').locator('option')).toHaveText(['Other current account', 'Savings', 'Investments', 'Other asset', 'Cash'])
     await dlg.getByLabel('Name', { exact: true }).fill('Rainy day')
     await dlg.getByLabel('Type').selectOption('savings')
     await dlg.getByLabel('Holds at the start of September 2026 (EUR)').fill('1000')

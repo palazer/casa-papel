@@ -13,6 +13,7 @@ import { GridScreen } from '@/features/grid/GridScreen'
 import { GuideScreen } from '@/features/guide/GuideScreen'
 import { HomeScreen } from '@/features/home/HomeScreen'
 import { HouseholdScreen } from '@/features/household/HouseholdScreen'
+import { MainAccountQuestion } from '@/features/main/MainAccountQuestion'
 import { PastQuestionHost } from '@/features/past/PastQuestion'
 import { StatementScreen } from '@/features/statement/StatementScreen'
 import { AccountDialog, type AccountStep } from '@/features/sync/AccountDialog'
@@ -126,6 +127,8 @@ function Shell() {
           </div>
         </main>
         <BottomTabs />
+        {/* once, after a household from before rule B9 was put right: which of its current accounts is the main one */}
+        {household?.askMainAccount === true && tables && <MainAccountQuestion key={household.id} tables={tables} household={household} />}
         {account && sync && <AccountDialog initial={account} inviteCode={inviteCode ?? undefined} hasLocalData={!!household} onClose={(message) => { setAccount(null); setNotice(message ?? null) }} />}
       </div>
     </ScreenContext.Provider>

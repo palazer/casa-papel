@@ -13,6 +13,7 @@ import { Segmented } from '@/components/Segmented'
 import { currencyChoices, currencyLabel } from '@/app/currencies'
 import { amountToInput, formatMonth, parseAmount, unreadableAmount } from '@/app/format'
 import { useStore } from '@/app/store'
+import { useTables } from '@/app/useEngine'
 import { ACCOUNT_TYPE_INFO, growthIn, monthOfDate, paysExpenses, type Account, type AccountType, type Entity, type Row } from '@/model'
 import { addAccount, addAccountWithRow, addPayOffRow, payOffRowsOf, rowNameFor, updateAccount, type AccountRowInput } from '@/store'
 import { cn } from '@/lib/utils'
@@ -64,9 +65,14 @@ const balanceWord = (type: AccountType) => (type === 'credit-card' || type === '
  */
 export function HouseholdAccountDialog({ account, entities, baseCurrency, locale, startMonth, preset, rows, withRow, onClose, onSaved, onRowAdded, onRemove, removeLabel = 'Archive or delete…' }: Props) {
   const store = useStore()
-  const types = ACCOUNT_TYPE_INFO.filter((t) => account || !preset?.types || preset.types.includes(t.value))
+  const tables = useTables()
+  // one main account open at a time (rule B9): while there is one, "Main account" is offered only on that account itself
+  const main = tables?.accounts.find((a) => !a.deletedAt && !a.archivedMonth && a.type === 'checking' && a.id !== account?.id)
+  const types = ACCOUNT_TYPE_INFO.filter((t) => (account || !preset?.types || preset.types.includes(t.value)) && !(t.value === 'checking' && main && account?.type !== 'checking'))
   const [name, setName] = useState(account?.name ?? preset?.name ?? '')
-  const [type, setType] = useState<AccountType>(account?.type ?? preset?.type ?? types[0]?.value ?? 'checking')
+  const [picked, setType] = useState<AccountType>(account?.type ?? (preset?.type && types.some((t) => t.value === preset.type) ? preset.type : types[0]?.value) ?? 'joint')
+  // the household's accounts can arrive after the form opened: a type that is no longer offered gives way to the first
+  const type: AccountType = types.some((t) => t.value === picked) ? picked : types[0]?.value ?? picked
   const [currency, setCurrency] = useState(account?.currency ?? baseCurrency)
   const [opening, setOpening] = useState(account ? amountToInput(account.openingBalance, account.currency, locale) : '')
   const [openingMonth, setOpeningMonth] = useState(account?.openingMonth ?? startMonth)
@@ -92,7 +98,8 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
   const trackable = TRACKABLE.includes(type)
   // an account that holds money, and has a balance to leave out, can be kept out of net worth
   const canLeaveOut = paysExpenses({ type }) && (!trackable || tracked)
-  const ccy = currency.toUpperCase()
+  // the main account is in the household's currency (rule B9): it has no currency to choose
+  const ccy = type === 'checking' ? baseCurrency : currency.toUpperCase()
   const foreign = ccy !== baseCurrency && ccy.length === 3
   const info = ACCOUNT_TYPE_INFO.find((t) => t.value === type)
   const debt = type === 'loan' || type === 'credit-card'
@@ -166,7 +173,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5"><Label htmlFor="acc-name">Name</Label><Input id="acc-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} /></div>
           <div className="space-y-1.5"><Label htmlFor="acc-type">Type</Label><NativeSelect id="acc-type" className="w-full" value={type} onChange={(e) => setType(e.target.value as AccountType)}>{types.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</NativeSelect></div>
-          <p className="-mt-1 text-xs text-muted-foreground sm:col-span-2">{info?.help}{foreign ? ` Amounts are typed in ${ccy} and shown in ${baseCurrency} beneath. The rates come from the European Central Bank by themselves (only currency codes and dates are sent); change them under Household, "Currency rates".` : ''}</p>
+          <p className="-mt-1 text-xs text-muted-foreground sm:col-span-2" data-testid="acc-type-help">{info?.help}{type === 'joint' && main ? ` The main account is "${main.name}".` : ''}{foreign ? ` Amounts are typed in ${ccy} and shown in ${baseCurrency} beneath. The rates come from the European Central Bank by themselves (only currency codes and dates are sent); change them under Household, "Currency rates".` : ''}</p>
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="acc-open">{balanceWord(type)} at the start of {formatMonth(openingMonth, locale, 'long')} ({ccy})</Label>
             <Input id="acc-open" className="sm:w-1/2" inputMode="decimal" value={opening} onChange={(e) => setOpening(e.target.value)} placeholder="0" />
@@ -224,12 +231,19 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
           </div>
           {more && (
             <div id="acc-more" className="grid gap-3 sm:col-span-2 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="acc-ccy">Currency</Label>
-                <NativeSelect id="acc-ccy" className="w-full" value={currency} onChange={(e) => setCurrency(e.target.value)}>
-                  {currencyChoices(baseCurrency, account?.currency).map((c) => <option key={c} value={c}>{currencyLabel(c, baseCurrency)}</option>)}
-                </NativeSelect>
-              </div>
+              {type === 'checking' ? (
+                <div className="space-y-1.5">
+                  <span className="text-sm font-medium">Currency</span>
+                  <p className="text-xs text-muted-foreground" data-testid="acc-main-currency">{currencyLabel(baseCurrency, baseCurrency)}{`: the main account is always in the household's currency. An account in another one is an "Other current account".`}</p>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <Label htmlFor="acc-ccy">Currency</Label>
+                  <NativeSelect id="acc-ccy" className="w-full" value={currency} onChange={(e) => setCurrency(e.target.value)}>
+                    {currencyChoices(baseCurrency, account?.currency).map((c) => <option key={c} value={c}>{currencyLabel(c, baseCurrency)}</option>)}
+                  </NativeSelect>
+                </div>
+              )}
               <div className="space-y-1.5"><Label htmlFor="acc-month">Opening month</Label><MonthField id="acc-month" label="Opening month" value={openingMonth} onChange={setOpeningMonth} locale={locale} /></div>
               <div className="space-y-1.5 sm:col-span-2">
                 <TipLabel htmlFor="acc-owner" help="setup.owner">Owner</TipLabel>
@@ -300,7 +314,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
           <div>{account && onRemove && <Button variant="ghost" size="sm" onClick={onRemove} disabled={busy}>{removeLabel}</Button>}</div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-            <Button disabled={busy || !name.trim() || currency.length !== 3} onClick={() => void save()}>Save</Button>
+            <Button disabled={busy || !name.trim() || ccy.length !== 3} onClick={() => void save()}>Save</Button>
           </div>
         </DialogFooter>
       </DialogContent>
