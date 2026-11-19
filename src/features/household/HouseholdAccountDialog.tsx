@@ -98,8 +98,9 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
   const trackable = TRACKABLE.includes(type)
   // an account that holds money, and has a balance to leave out, can be kept out of net worth
   const canLeaveOut = paysExpenses({ type }) && (!trackable || tracked)
-  // the main account is in the household's currency (rule B9): it has no currency to choose
-  const ccy = type === 'checking' ? baseCurrency : currency.toUpperCase()
+  // the main account is in the household's currency (rule B9): it has no currency to choose. An existing account in
+  // another one keeps it, so the save is refused with the reason instead of reading its amounts in another currency
+  const ccy = type === 'checking' ? account?.currency ?? baseCurrency : currency.toUpperCase()
   const foreign = ccy !== baseCurrency && ccy.length === 3
   const info = ACCOUNT_TYPE_INFO.find((t) => t.value === type)
   const debt = type === 'loan' || type === 'credit-card'

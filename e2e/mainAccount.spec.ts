@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from 'node:fs'
-import { expect, test, type Page } from './test'
+import { expect, saveAnyway, test, type Page } from './test'
 
 /**
  * Rule B9: one main account. A file from before the rule, with the demo's main account, a joint account and a
@@ -125,6 +125,42 @@ test.describe('one main account', () => {
     const assets = page.getByRole('region', { name: 'Assets' })
     await expect(assets.locator('[data-line="main"]')).toContainText('Main account')
     await expect(assets.locator('[data-line^="acc:"]').filter({ hasText: 'Joint account' })).toContainText('current account')
+  })
+})
+
+test.describe('the main account in the account form', () => {
+  test.use({ viewport: { width: 1400, height: 900 } })
+
+  test('an account in dollars made the main account is refused with the reason, and keeps its dollars', async ({ page }) => {
+    await page.goto('?demo=1&screen=grid')
+    await page.getByRole('button', { name: 'Load the demo household' }).click()
+    await expect(page.getByRole('button', { name: /^Main account Nov 2026:/ })).toBeVisible()
+    await page.getByRole('link', { name: 'Statement' }).click()
+    const assets = page.getByRole('region', { name: 'Assets' })
+    const dlg = page.getByRole('dialog')
+    // the demo's main account becomes an other current account: the household has no main account any more
+    await assets.locator('[data-line="main"]').getByRole('button', { name: 'Edit Main account' }).click()
+    await dlg.getByLabel('Type').selectOption('joint')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    // it has a balance of its own in the months that are over too: the question about the past asks first (rule T4)
+    await saveAnyway(page)
+    await expect(dlg).toBeHidden()
+    // an account in dollars
+    await assets.getByRole('button', { name: 'Add account' }).click()
+    await expect(dlg.getByLabel('Type').locator('option', { hasText: /^Main account$/ })).toHaveCount(1)
+    await dlg.getByLabel('Type').selectOption('joint')
+    await dlg.getByLabel('Name', { exact: true }).fill('Dollar account')
+    await dlg.getByRole('button', { name: /^More options/ }).click()
+    await dlg.getByLabel('Currency').selectOption('USD')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    // made the main account: refused where it is asked, and nothing is saved
+    await assets.getByRole('button', { name: 'Edit Dollar account' }).click()
+    await dlg.getByLabel('Type').selectOption('checking')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg.getByRole('alert')).toHaveText('The main account is in the household\'s currency, EUR. An account in USD is an "Other current account".')
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+    await expect(assets.locator('[data-line^="acc:"]').filter({ hasText: 'Dollar account' })).toContainText('USD')
   })
 })
 
