@@ -81,11 +81,15 @@ Feature: Real balances
     And net worth changes by 7,650.00 in January 2026
     And of that, -150.00 is "real balances"
 
-  @B6
-  Scenario: With two current accounts the plan needs the real balance of both
-    Given a current account "Joint account" holding 400.00
+  @B9 @B5
+  Scenario: The main account takes its own real balance, and another current account takes its own
+    Given another current account "Joint account" holding 400.00
     When "Current account" really held 2,150.00 at the end of January 2026
-    Then it is refused with "Fill in every current account, or leave them all empty to use the calculated amount."
+    Then "Current account" ends January 2026 with 2,150.00
+    And "Joint account" ends January 2026 with 400.00
+    When "Joint account" really held 350.00 at the end of February 2026
+    Then "Joint account" ends March 2026 with 350.00
+    And "Current account" ends February 2026 with 3,450.00
 
   @B5
   Scenario: A real balance in a later month leaves the earlier months alone

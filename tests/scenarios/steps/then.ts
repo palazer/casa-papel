@@ -1,5 +1,5 @@
 import { expect } from 'vitest'
-import { cellKey, computeGoals, householdFx, notSetAside, rateFor, rateInfo } from '@/engine'
+import { cellKey, computeGoals, householdFx, mainAccountsIn, notSetAside, rateFor, rateInfo } from '@/engine'
 import type { MonthKey } from '@/model'
 import { monthRange } from '@/model'
 import { all } from '../../engine/sound'
@@ -51,9 +51,10 @@ async function accountMonth(world: World, name: string, month: MonthKey): Promis
     if (!r) throw new ScenarioError(`"${name}" has no balance in ${monthName(month)}.`)
     return { start: r.start, end: r.balance, worth: r.balanceBase }
   }
-  // the plan knows the current accounts only together; one alone is that figure
+  // the main account's line is its figure; where an archived one and the one that replaced it were both open, the plan
+  // knows them only together
   if (engine.main?.accountIds.includes(acc.id)) {
-    if (engine.main.accountIds.length !== 1) throw new ScenarioError('There are several current accounts, and the plan knows them only together: use "the current accounts end … with …".')
+    if (mainAccountsIn((await world.view()).tables.accounts, month).length > 1) throw new ScenarioError(`Two main accounts were open in ${monthName(month)}, and the plan knows them only together: use "the main account ends … with …".`)
     const r = engine.main.months[month]
     if (!r) throw new ScenarioError(`${monthName(month)} is not in the plan.`)
     return { start: r.start, end: r.balance, worth: r.balance }
@@ -73,11 +74,12 @@ step('{string} is worth {money} at the end of {month}', async (world: World, nam
   same((await accountMonth(world, name, month)).worth, amount, `"${name}" at the end of ${monthName(month)}, in the household's currency`)
 })
 
-step('the current accounts start {month} with {money}', async (world: World, month: string, amount: number) => {
-  same((await world.view()).engine.main?.months[month]?.start ?? NaN, amount, `the current accounts at the start of ${monthName(month)}`)
+// the main account's line, whatever it is called
+step('the main account starts {month} with {money}', async (world: World, month: string, amount: number) => {
+  same((await world.view()).engine.main?.months[month]?.start ?? NaN, amount, `the main account at the start of ${monthName(month)}`)
 })
-step('the current accounts end {month} with {money}', async (world: World, month: string, amount: number) => {
-  same((await world.view()).engine.main?.months[month]?.balance ?? NaN, amount, `the current accounts at the end of ${monthName(month)}`)
+step('the main account ends {month} with {money}', async (world: World, month: string, amount: number) => {
+  same((await world.view()).engine.main?.months[month]?.balance ?? NaN, amount, `the main account at the end of ${monthName(month)}`)
 })
 
 // ---------- the Statement and net worth ----------

@@ -9,9 +9,13 @@ async function account(world: World, type: Account['type'], name: string, holdin
   await addAccount(world.store, { name, type, currency: household.baseCurrency, openingMonth: household.startMonth, openingBalance: holding, ...over })
 }
 
+// "a current account" is the main account (rule B9): the month's money runs through it
 step('a current account {string} holding {money}', (world: World, name: string, holding: number) => account(world, 'checking', name, holding))
 step('a current account {string} holding {money}, opened in {month}', (world: World, name: string, holding: number, month: string) => account(world, 'checking', name, holding, { openingMonth: month }))
 step('a current account {string} in {ccy} holding {money}', (world: World, name: string, currency: string, holding: number) => account(world, 'checking', name, holding, { currency }))
+// "Other current account" in the form: a joint account, a partner's own, one in another currency, with a balance of its own
+step('another current account {string} holding {money}', (world: World, name: string, holding: number) => account(world, 'joint', name, holding))
+step('another current account {string} in {ccy} holding {money}', (world: World, name: string, currency: string, holding: number) => account(world, 'joint', name, holding, { currency }))
 
 step('a savings account {string} holding {money}', (world: World, name: string, holding: number) => account(world, 'savings', name, holding))
 step('a savings account {string} holding {money}, opened in {month}', (world: World, name: string, holding: number, month: string) => account(world, 'savings', name, holding, { openingMonth: month }))

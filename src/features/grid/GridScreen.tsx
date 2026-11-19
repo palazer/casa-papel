@@ -15,7 +15,7 @@ import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { useUndoNotice } from '@/app/useUndoNotice'
 import { UndoNotice } from '@/components/UndoNotice'
-import { cellKey, currentAccountsIn, groupRowsByCategory, mainAccountLabel, type EngineOutput } from '@/engine'
+import { cellKey, mainAccountsIn, groupRowsByCategory, mainAccountLabel, type EngineOutput } from '@/engine'
 import { isOldPocketShare, isPastMonth, isShareRule, monthOfDate, parseMonth, repeatsText, resolveRules, runningSchedules, type Household, type Money, type MonthKey, type Row, type RuleState, type Section, type Tables } from '@/model'
 import { addPlanYear, derivedRowReason } from '@/store'
 import { AddRowInline } from './AddRowInline'
@@ -251,8 +251,8 @@ export function GridScreen() {
             )}
             {main && mainShown && derivedRow(mainAccountLabel(main, tables.accounts), 'in', (m) => main.months[m]?.balance ?? null, {
               strong: true, hue: HUES.worth, help: 'statement.mainAccount', mark: (m) => main.months[m]?.entered ?? false,
-              // a month takes real balances once a current account exists in it
-              onClick: (m) => { if (currentAccountsIn(tables.accounts, m).length > 0) setCurrentSel(m) },
+              // a month takes a real balance once the main account exists in it
+              onClick: (m) => { if (mainAccountsIn(tables.accounts, m).length > 0) setCurrentSel(m) },
             })}
             {accountSeries.flatMap((s) => {
               const acc = tables.accounts.find((a) => a.id === s.accountId)

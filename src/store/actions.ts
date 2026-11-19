@@ -1,7 +1,7 @@
 import { generateKeyBetween } from 'fractional-indexing'
 import { computeEngine, cellKey, sortRows, typedAmount, type EngineOutput } from '@/engine'
 import {
-  ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RecurringItemSchema, RowSchema, accountIdOf, addMonths, canCarryRule, canTakeRest, cardIsItemized, compareMonths, currencyExponent, fromMinor, holdsBalance, isOldPocketShare, isOutsideNetWorth, isShareRule, monthKey, monthOfDate, monthRange, newId, parseMonth, paysExpenses, poolIdOf, resolveRules, sharePercent, toMinor,
+  ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RecurringItemSchema, RowSchema, accountIdOf, addMonths, canCarryRule, canTakeRest, cardIsItemized, compareMonths, currencyExponent, fromMinor, holdsBalance, isOldPocketShare, isOutsideNetWorth, isShareRule, monthKey, monthOfDate, monthRange, newId, ownBalance, parseMonth, paysExpenses, poolIdOf, resolveRules, sharePercent, toMinor,
   type Account, type Category, type Cell, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Pool, type Row, type RowKind, type Tables,
 } from '@/model'
 import { NO_QUESTION, type Mutation, type Store } from './store'
@@ -990,12 +990,12 @@ function checkAccountForRow(tables: Tables, row: Pick<Row, 'kind' | 'name'> & { 
   if (need && acc.type !== need) throw new Error(`"${row.name}" needs an account of type ${label(need)}, and "${acc.name}" is of type ${label(acc.type)}.`)
   // a row that moves money sends it into the account it names, so only an account with a balance of its own can be named
   if (row.kind === 'plain' && row.section === 'transfer' && !holdsBalance(acc)) {
-    throw new Error(`"${acc.name}" has no balance of its own for the money to go into. Pick a savings account, an investment account, cash or another asset, or no account: the money then leaves the plan.`)
+    throw new Error(`"${acc.name}" has no balance of its own for the money to go into. Pick a savings account, an investment account, an other current account, cash or another asset, or no account: the money then leaves the plan.`)
   }
   // pocket money is the adult's own: it lands only in an account that net worth leaves out, and one with a balance
   if (row.kind === 'pocket-money') {
     if (!isOutsideNetWorth(acc)) throw new Error(`Pocket money can only land in an account that is left out of net worth. Tick "Leave out of net worth" in the form of "${acc.name}" first.`)
-    if (!acc.tracked && acc.type !== 'cash') throw new Error(`"${acc.name}" has no balance of its own for the pocket money to land in. Tick "Track the balance" in its form first.`)
+    if (!ownBalance(acc)) throw new Error(`"${acc.name}" has no balance of its own for the pocket money to land in. Tick "Track the balance" in its form first.`)
   }
   return acc
 }

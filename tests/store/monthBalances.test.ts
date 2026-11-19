@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { cellKey, computeEngine } from '@/engine'
 import { monthRange, newId } from '@/model'
 import {
-  CasaDb, FILL_EVERY_CURRENT, Store, addAccount, archiveAccount, loadTables, monthBalances, previewMonthBalances, quickCreateHousehold,
+  CasaDb, FILL_EVERY_MAIN, Store, addAccount, archiveAccount, loadTables, monthBalances, previewMonthBalances, quickCreateHousehold,
   setManualRate, setMonthBalances, unrecordedRowName,
 } from '@/store'
 import { DEMO_IDS } from '@/demo/demoHousehold'
@@ -22,11 +22,11 @@ async function demo() {
   return { store, read }
 }
 
-/** A new household that begins in January 2026, with one current account holding 1,200 and a savings account holding 1,000. */
+/** A new household that begins in January 2026, with its main account holding 1,200 and a savings account holding 1,000. */
 async function fresh() {
   const store = new Store(new CasaDb(`test-${newId()}`))
   await quickCreateHousehold(store, { name: 'T', baseCurrency: 'EUR', locale: 'en-IE', startMonth: '2026-01', closingRule: 'leftover-plug' })
-  const current = (await loadTables(store)).accounts.filter((a) => !a.deletedAt && (a.type === 'checking' || a.type === 'joint' || a.type === 'cash'))
+  const current = (await loadTables(store)).accounts.filter((a) => !a.deletedAt && a.type === 'checking')
   const main = current[0] ?? await addAccount(store, { name: 'Main', type: 'checking', currency: 'EUR', openingMonth: '2026-01', openingBalance: 1200_00 })
   const savings = await addAccount(store, { name: 'Rainy day', type: 'savings', currency: 'EUR', openingMonth: '2026-01', openingBalance: 1000_00 })
   const read = async () => {
@@ -151,20 +151,20 @@ describe('a month\'s balances: the list', () => {
     const { tables, out } = await read()
     const { lines, main } = monthBalances(tables, out, '2026-10')
     expect(lines.map((l) => [l.account.name, l.group])).toEqual([
-      ['Main account', 'current'], ['Joint account', 'current'], ['Savings', 'savings'], ['Index fund', 'investment'], ['Credit card', 'debt'],
+      ['Main account', 'current'], ['Savings', 'savings'], ['Index fund', 'investment'], ['Credit card', 'debt'],
     ])
     expect(main).toEqual(out.main!.months['2026-10'])
     const fund = lines.find((l) => l.account.id === DEMO_IDS.invest)!
     // the fund's real balance of September is October's start; its end is still calculated
     expect(fund).toMatchObject({ opening: false, startStored: 12_620_00, endStored: null, endCalculated: out.accounts[DEMO_IDS.invest].months['2026-10'].computed, itemized: false })
     expect(lines.find((l) => l.account.id === DEMO_IDS.card)).toMatchObject({ itemized: true, startStored: null, startCalculated: out.accounts[DEMO_IDS.card].months['2026-09'].balance })
-    // two current accounts: the plan knows them together only
-    expect(lines.find((l) => l.account.id === DEMO_IDS.main)).toMatchObject({ opening: false, startStored: null, startCalculated: null, endCalculated: null })
+    // the main account: the plan's own figures are its own
+    expect(lines.find((l) => l.account.id === DEMO_IDS.main)).toMatchObject({ opening: false, startStored: null, startCalculated: main!.start, endCalculated: main!.computed })
     // in the household's first month every start is an opening amount
     expect(monthBalances(tables, out, '2026-09').lines.every((l) => l.opening && l.startStored === l.account.openingBalance)).toBe(true)
   })
 
-  it('knows the one current account\'s amounts, as it is all of them', async () => {
+  it('knows the main account\'s amounts', async () => {
     const { store, read } = await fresh()
     const { tables, out } = await read()
     const current = monthBalances(tables, out, '2026-02').lines.filter((l) => l.group === 'current')
@@ -177,26 +177,31 @@ describe('a month\'s balances: the list', () => {
   })
 })
 
-describe('a month\'s balances: the current accounts', () => {
+describe('a month\'s balances: the main account and an other current account (rule B9)', () => {
   async function two() {
     const w = await fresh()
     const joint = await addAccount(w.store, { name: 'Joint', type: 'joint', currency: 'EUR', openingMonth: '2026-01', openingBalance: 300_00 })
     return { ...w, joint }
   }
+  /** The main account archived from `from`, and "New main" open from January: in the months before `from` both were open. */
+  async function replaced(from: string) {
+    const w = await fresh()
+    await archiveAccount(w.store, w.main.id, from)
+    const next = await addAccount(w.store, { name: 'New main', type: 'checking', currency: 'EUR', openingMonth: '2026-01', openingBalance: 0 })
+    return { ...w, next }
+  }
 
-  it('take all or none, for the end and for the start', async () => {
+  it('each takes its own real balance, alone, at the end and at the start', async () => {
     const { store, main, joint, read } = await two()
-    await expect(setMonthBalances(store, '2026-02', { ends: { [main.id]: 100_00 } })).rejects.toThrow(FILL_EVERY_CURRENT)
-    await expect(setMonthBalances(store, '2026-02', { starts: { [main.id]: 100_00 } })).rejects.toThrow(FILL_EVERY_CURRENT)
-    expect((await loadTables(store)).accountMonths.filter((a) => a.actualBalance != null)).toEqual([])
-    await setMonthBalances(store, '2026-02', { starts: { [main.id]: 100_00, [joint.id]: 20_00 }, ends: { [main.id]: 150_00, [joint.id]: 30_00 } })
-    const { out } = await read()
-    expect(out.main!.months['2026-01']).toMatchObject({ entered: true, balance: 120_00 })
-    expect(out.main!.months['2026-02']).toMatchObject({ start: 120_00, entered: true, balance: 180_00 })
-    // one of two emptied leaves the month half filled
-    await expect(setMonthBalances(store, '2026-02', { ends: { [joint.id]: null } })).rejects.toThrow(FILL_EVERY_CURRENT)
-    await setMonthBalances(store, '2026-02', { ends: { [main.id]: null, [joint.id]: null } })
-    expect((await read()).out.main!.months['2026-02']).toMatchObject({ entered: false })
+    await setMonthBalances(store, '2026-02', { starts: { [main.id]: 100_00 }, ends: { [main.id]: 150_00 } })
+    let { out } = await read()
+    expect(out.main!.months['2026-01']).toMatchObject({ entered: true, balance: 100_00 })
+    expect(out.main!.months['2026-02']).toMatchObject({ start: 100_00, entered: true, balance: 150_00 })
+    expect(out.accounts[joint.id].months['2026-02']).toMatchObject({ entered: false, balance: 300_00 })
+    await setMonthBalances(store, '2026-02', { ends: { [joint.id]: 30_00 } })
+    out = (await read()).out
+    expect(out.accounts[joint.id].months['2026-02']).toMatchObject({ entered: true, balance: 30_00 })
+    expect(out.main!.months['2026-02']).toMatchObject({ entered: true, balance: 150_00 })
   })
 
   it('start on their opening amounts in the first month, each for itself', async () => {
@@ -205,14 +210,25 @@ describe('a month\'s balances: the current accounts', () => {
     const { tables, out } = await read()
     expect(tables.accounts.find((a) => a.id === joint.id)?.openingBalance).toBe(450_00)
     expect(tables.accountMonths.filter((a) => a.actualBalance != null)).toEqual([])
-    expect(out.main!.months['2026-01'].start).toBe((tables.accounts.find((a) => a.id === main.id)?.openingBalance ?? 0) + 450_00)
+    expect(out.main!.months['2026-01'].start).toBe(tables.accounts.find((a) => a.id === main.id)?.openingBalance ?? 0)
+    expect(out.accounts[joint.id].months['2026-01'].start).toBe(450_00)
   })
 
-  it('name an account that was still open the month before and cannot be filled in from here', async () => {
-    const { store, main, joint } = await two()
-    await archiveAccount(store, joint.id, '2026-02')
-    await expect(setMonthBalances(store, '2026-02', { starts: { [main.id]: 100_00 } }))
-      .rejects.toThrow('"Joint" was still open in 2026-01 and has no real balance there. Enter it in 2026-01 first, or leave the current accounts empty.')
+  it('where an archived main account and the one that replaced it were both open, a month takes both or neither', async () => {
+    const { store, main, next, read } = await replaced('2026-03')
+    await expect(setMonthBalances(store, '2026-02', { ends: { [main.id]: 100_00 } })).rejects.toThrow(FILL_EVERY_MAIN)
+    expect((await loadTables(store)).accountMonths.filter((a) => a.actualBalance != null)).toEqual([])
+    await setMonthBalances(store, '2026-02', { ends: { [main.id]: 100_00, [next.id]: 20_00 } })
+    expect((await read()).out.main!.months['2026-02']).toMatchObject({ entered: true, balance: 120_00 })
+    // in March only the new one is open: it alone is the line
+    await setMonthBalances(store, '2026-03', { ends: { [next.id]: 500_00 } })
+    expect((await read()).out.main!.months['2026-03']).toMatchObject({ entered: true, balance: 500_00 })
+  })
+
+  it('name a main account that was still open the month before and cannot be filled in from here', async () => {
+    const { store, next } = await replaced('2026-02')
+    await expect(setMonthBalances(store, '2026-02', { starts: { [next.id]: 100_00 } }))
+      .rejects.toThrow('"Main" was still open in 2026-01 and has no real balance there. Enter it in 2026-01 first, or leave the main account empty.')
   })
 })
 

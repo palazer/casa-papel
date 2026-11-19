@@ -13,7 +13,7 @@ import { clearHandedMonth, handedOverMonth } from '@/app/screens'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { useUndoNotice } from '@/app/useUndoNotice'
 import { UndoNotice } from '@/components/UndoNotice'
-import { buildStatement, cellKey, currentAccountsIn, notSetAside, type GoalProgress, type Statement, type StatementLine, type StatementSide } from '@/engine'
+import { buildStatement, cellKey, mainAccountsIn, notSetAside, type GoalProgress, type Statement, type StatementLine, type StatementSide } from '@/engine'
 import { accountGroup, isOutsideNetWorth, isPastMonth, isPocketRow, lastDayOfMonth, monthDiff, monthOfDate, resolveRules, type Account, type AccountType, type Goal, type GoalKind, type Money, type MonthKey, type Row, type Section } from '@/model'
 import { accountSuggestions, addPayOffRow, addPlanYear, moveAccount, movePool, removeIfFree, ruleRowOf, setCellDone, setDerivedDone, setItemStatus, setupFocus, setupSteps, shownRowSuggestions, stepSuggestions, updateHousehold, type RemovalTarget, type RowSuggestion, type RuleChoice, type RuleTarget, type SetupSide, type SetupStepKey } from '@/store'
 import { GoalDialog } from '@/features/goals/GoalDialog'
@@ -136,7 +136,7 @@ export function StatementScreen() {
   const [goalEdit, setGoalEdit] = useState<{ goal: Goal | null; preset?: { kind: GoalKind; accountId?: string | null; poolId?: string | null } } | null>(null)
   const [removingGoal, setRemovingGoal] = useState<Goal | null>(null)
   const [balanceFor, setBalanceFor] = useState<string | null>(null)
-  /** The real balances of the current accounts are being typed. */
+  /** The real balance of the main account is being typed. */
   const [currentBalance, setCurrentBalance] = useState(false)
   /** "Balances…" was pressed: every account of the month, with the tick that counts the month as done. */
   const [balances, setBalances] = useState(false)
@@ -260,17 +260,17 @@ export function StatementScreen() {
     }
   }
   const progress = monthProgress(engine.rows, engine.cells, m)
-  // The other currencies this month's page counts in: those of its rows and accounts, and of the current accounts
-  // behind the first line of the lower half. Each shows its rate for the month as a chip in the toolbar.
+  // The other currencies this month's page counts in: those of its rows and accounts, and of a main account from before
+  // rule B9 behind the first line of the lower half. Each shows its rate for the month as a chip in the toolbar.
   const currencies = [...new Set([
     ...walk(linesOf(statement)).flatMap((l) => (l.native ? [l.native.currency] : [])),
-    ...currentAccountsIn(tables.accounts, m).map((a) => a.currency),
+    ...mainAccountsIn(tables.accounts, m).map((a) => a.currency),
   ])].filter((c) => c !== ccy).sort()
   const horizon = engine.months.length ? monthDiff(m, engine.months[engine.months.length - 1]) : 0
   const goalText = (g: GoalProgress) => goalStatusLine(g, locale, horizon)
   const editing = editor ? engine.rows.find((r) => r.id === editor.rowId) : undefined
   const balanceAccount = balanceFor ? tables.accounts.find((a) => a.id === balanceFor) : undefined
-  /** An account's amount was pressed. The current accounts are entered together, so one of them opens the dialog of all. */
+  /** An account's amount was pressed. The main account's line opens its own dialog, which covers an old one it replaced. */
   const openBalance = (accountId: string) => {
     const account = tables.accounts.find((a) => a.id === accountId)
     if (account && accountGroup(account) === 'current') setCurrentBalance(true)
@@ -482,9 +482,14 @@ export function StatementScreen() {
   }
   noteBeside([...statement.position.left.lines, ...statement.position.right.lines])
   /** The "…" after any other line's name: a category's menu, an account's or a virtual account's, each with the way into its dialog. */
-  /** The household's current account while it has exactly one: the calculated line is then that account. */
+  /**
+   * The household's main account: the calculated line is that account. One that was archived and replaced stays in the
+   * line as its history, so the open one is meant; null where two are open, which only data from before rule B9 has.
+   */
   const onlyCurrent = (): Account | null => {
-    const current = (engine!.main?.accountIds ?? []).map((id) => tables!.accounts.find((a) => a.id === id && !a.deletedAt)).filter((a): a is Account => !!a)
+    const counted = (engine!.main?.accountIds ?? []).map((id) => tables!.accounts.find((a) => a.id === id && !a.deletedAt)).filter((a): a is Account => !!a)
+    const open = counted.filter((a) => !a.archivedMonth)
+    const current = open.length ? open : counted
     return current.length === 1 ? current[0] : null
   }
   /**
@@ -538,8 +543,8 @@ export function StatementScreen() {
         />
       )
     }
-    // the calculated line stands for the current accounts. One account: the line is that account and carries its
-    // menu. Several: each stands under the line with a menu of its own, so the line has none
+    // the calculated line is the main account and carries its menu. Where two are open (data from before rule B9, or
+    // the month an old one was replaced), each stands under the line with a menu of its own, so the line has none
     if (line.id === 'main') {
       const only = onlyCurrent()
       if (!only) return null

@@ -74,6 +74,12 @@ const STEPS: Record<number, Step> = {
   // so nothing is rewritten. The version keeps an older app from syncing: it would count the old rate in every month
   // and drop the field when it writes the account.
   18: (raw) => raw,
+  // 19 → 20: one main account (rule B9). An account of type 'checking' is the main account; one of type 'joint' (an
+  // other current account) has a balance of its own, as another asset, and no longer counts with it. Nothing to
+  // rewrite here: a sync pull reads every older snapshot through these steps. The app puts a household with several
+  // current accounts right when it opens the data (`planMainAccount`). The version keeps an older app, which would
+  // count an other current account in the main account again, from syncing.
+  19: (raw) => raw,
 }
 
 export function migrateExport(raw: unknown): unknown {

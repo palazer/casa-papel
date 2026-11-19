@@ -9,7 +9,7 @@ import { PastChangeCancelled, type CommitGuard, type Mutation, type Store } from
  * as they are and as the change would leave them; where any figure differs, the question lists the months and what
  * changes in them, and the save waits for the answer. The figures compared are the ones the plan shows for a month:
  * each line's amount (in its currency and in the household's), each account's start, end and real balance, each
- * virtual account's balance and shortfall, the current accounts, the month's sums and net worth. A name, a category,
+ * virtual account's balance and shortfall, the main account, the month's sums and net worth. A name, a category,
  * a goal or who a row belongs to changes none of them, and asks nothing.
  */
 
@@ -95,8 +95,8 @@ const ORDER: Record<ChangeKind, number> = { amount: 0, balance: 1, 'net-worth': 
 
 /**
  * What differs between two states over `months`, as lines; null when no figure differs. At most `cap` lines: the
- * amounts first, in the order of the plan's rows, then the balances; an account's line is left out where the current
- * accounts' line already says it.
+ * amounts first, in the order of the plan's rows, then the balances; an account's line is left out where the main
+ * account's line already says it.
  */
 export function changesBetween(before: Worked, after: Worked, months: MonthKey[], home: string, cap = 8): Changes | null {
   interface Diff { m: MonthKey; b?: Figure; a?: Figure }
@@ -123,7 +123,7 @@ export function changesBetween(before: Worked, after: Worked, months: MonthKey[]
   for (const [key, diffs] of byKey) if (key !== 'net-worth' && key !== 'sums') for (const d of diffs) covered.add(d.m)
   const mainIds = new Set([...(before.engine.main?.accountIds ?? []), ...(after.engine.main?.accountIds ?? [])])
 
-  // where a line stands: the rows as the plan lists them, then the accounts, the virtual accounts, the current accounts
+  // where a line stands: the rows as the plan lists them, then the accounts, the virtual accounts, the main account
   const place = new Map<string, number>()
   for (const r of [...after.engine.rows, ...before.engine.rows]) if (!place.has(`row:${r.id}`)) place.set(`row:${r.id}`, place.size)
   for (const a of [...after.tables.accounts, ...before.tables.accounts]) if (!place.has(`account:${a.id}`)) place.set(`account:${a.id}`, place.size)

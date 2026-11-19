@@ -101,15 +101,16 @@ Feature: Amounts and accounts in another currency
     And of that, 220.00 is "real balances"
     And of that, -120.00 is "rates"
 
-  # Decided (D2 in scenarios/FINDINGS.md, rule B9): there will be one main account, in the household's currency, and
-  # this will be refused. Until that is built, this is what the app does: the opening amount is converted once, and a
-  # later rate does not move it.
-  @X6 @parked @D2
-  Scenario: A current account in another currency is converted when it opens, and not again
-    Given a current account "Dollar account" in USD holding 1,100.00
-    Then the current accounts start January 2026 with 1,000.00
-    And the current accounts end January 2026 with 1,000.00
-    And the current accounts end February 2026 with 1,000.00
+  # The main account is in the household's currency (rule B9, finding D2); another one has a balance of its own.
+  @X6 @B9
+  Scenario: Another current account in another currency keeps its balance in that currency, worth what each month's rate makes of it
+    Given another current account "Dollar account" in USD holding 1,100.00
+    Then "Dollar account" ends February 2026 with 1,100.00
+    And "Dollar account" is worth 1,000.00 at the end of January 2026
+    And "Dollar account" is worth 880.00 at the end of February 2026
+    And net worth changes by -120.00 in February 2026
+    And of that, -120.00 is "rates"
+    And the main account ends February 2026 with 0.00
 
   @X7
   Scenario: An amount in a currency without any rate is counted one to one, and the app says so

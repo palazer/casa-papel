@@ -105,7 +105,7 @@ test.describe('row sources, accounts and followers', () => {
     // an ordinary expense names the card it is bought on; the account it names today stays listed until it is changed
     await page.getByRole('menuitem', { name: 'Paid by card…' }).click()
     await expect(dlg.getByLabel('Card', { exact: true })).toHaveValue(/./)
-    await expect(dlg.getByLabel('Card', { exact: true }).locator('option')).toHaveText(['Not by card', 'Joint account (not a card)', 'Credit card'])
+    await expect(dlg.getByLabel('Card', { exact: true }).locator('option')).toHaveText(['Not by card', 'Main account (not a card)', 'Credit card'])
     await dlg.getByRole('button', { name: 'Cancel' }).click()
   })
 })

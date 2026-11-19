@@ -6,7 +6,7 @@
  * Every balance dialog writes through here. "Balances…" can tick every line of the month in the same step
  * (`opts.done`).
  */
-import { currentAccountsIn, type AccountMonthResult, type EngineOutput, type MainAccountMonth } from '@/engine'
+import { mainAccountsIn, type AccountMonthResult, type EngineOutput, type MainAccountMonth } from '@/engine'
 import {
   AccountMonthSchema, AccountSchema, accountGroup, addMonths, cardIsItemized, compareMonths,
   type Account, type AccountGroup, type Household, type Money, type MonthKey, type Tables,
@@ -45,18 +45,19 @@ export interface BalanceLine {
   endCalculated: Money | null
   /** A card whose purchases are expense rows: what it owes beyond the plan can be counted as spending. */
   itemized: boolean
-  /** The engine's month for the account. The current accounts have none of their own: see `MonthBalances.main`. */
+  /** The engine's month for the account. The main account has none of its own: see `MonthBalances.main`. */
   result?: AccountMonthResult
 }
 
 export interface MonthBalances {
-  /** Every account with a balance in the month: the current accounts, then savings, investments, other assets and debts. */
+  /** Every account with a balance in the month: the main account, then savings, investments, other assets and debts. */
   lines: BalanceLine[]
-  /** The current accounts together, in the household currency: all the plan knows about them. */
+  /** The main account's month, in the household currency (the main accounts together, where an old one was replaced in it). */
   main?: MainAccountMonth
 }
 
-export const FILL_EVERY_CURRENT = 'Fill in every current account, or leave them all empty to use the calculated amount.'
+/** In a month where an archived main account and the one that replaced it were both open, the line is the two together (rule B9). */
+export const FILL_EVERY_MAIN = 'Both main accounts were open in this month, the one archived and the one that replaced it: fill in both, or leave both empty to use the calculated amount.'
 
 const GROUP_ORDER: AccountGroup[] = ['current', 'savings', 'investment', 'other', 'debt']
 const byOrder = (a: Account, b: Account) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0)
@@ -75,10 +76,10 @@ export function monthBalances(tables: Tables, engine: EngineOutput, month: Month
   const base = tables.household.find((h) => !h.deletedAt)?.baseCurrency
   const main = engine.main?.months[month]
   const lines: BalanceLine[] = []
-  const current = currentAccountsIn(tables.accounts, month)
+  const current = mainAccountsIn(tables.accounts, month)
   for (const acc of current) {
     const opening = startsOnOpening(engine, acc, prev)
-    // the plan knows the current accounts together and in the household currency: one account alone is all of them
+    // the plan knows the main account in the household currency, and two that were open together only together
     const alone = current.length === 1 && acc.currency === base ? main : undefined
     lines.push({
       account: acc, group: 'current', opening, itemized: false,
@@ -132,18 +133,19 @@ function startMutations(tables: Tables, engine: EngineOutput, month: MonthKey, s
 }
 
 /**
- * The current accounts of a month count as entered only when every one of them has a real balance, because the plan
- * knows them together. `listed` are the accounts the month being edited shows: one that is missing from it (still
- * open in the month before, archived since) is named, as it cannot be filled in from there.
+ * The main account of a month counts as entered when it has a real balance. In a month where an archived one and the
+ * one that replaced it were both open, both need one, because the plan knows them together. `listed` are the
+ * accounts the month being edited shows: one that is missing from it (still open in the month before, archived since)
+ * is named, as it cannot be filled in from there.
  */
 function assertAllOrNone(tables: Tables, month: MonthKey, listed: ReadonlySet<string>): void {
-  const open = currentAccountsIn(tables.accounts, month)
+  const open = mainAccountsIn(tables.accounts, month)
   const missing = open.filter((a) => storedActual(tables, a.id, month) == null)
   if (missing.length === 0 || missing.length === open.length) return
   const elsewhere = missing.find((a) => !listed.has(a.id))
   throw new Error(elsewhere
-    ? `"${elsewhere.name}" was still open in ${month} and has no real balance there. Enter it in ${month} first, or leave the current accounts empty.`
-    : FILL_EVERY_CURRENT)
+    ? `"${elsewhere.name}" was still open in ${month} and has no real balance there. Enter it in ${month} first, or leave the main account empty.`
+    : FILL_EVERY_MAIN)
 }
 
 /**

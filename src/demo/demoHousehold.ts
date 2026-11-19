@@ -14,7 +14,7 @@ function id(n: number): string {
 const ID = {
   household: id(1),
   sam: id(10), alex: id(11), robin: id(12), biscuit: id(13), car: id(14), flat: id(15),
-  main: id(20), joint: id(21), savings: id(22), invest: id(23), card: id(24),
+  main: id(20), savings: id(22), invest: id(23), card: id(24),
   catHousing: id(30), catLiving: id(31), catTransport: id(32), catFamily: id(33), catFun: id(34), catPersonal: id(35), catTransfers: id(36),
   rowSamSalary: id(40), rowAlexSalary: id(41), rowChildBenefit: id(42), rowOtherIncome: id(43),
   rowRent: id(50), rowUtilities: id(51), rowGroceries: id(52), rowTransport: id(53), rowCarInsurance: id(54),
@@ -74,7 +74,7 @@ export function buildDemoTables(): Tables {
     // expenses
     { ...base(ID.rowRent, 'b0'), name: 'The flat – Rent', section: 'expense', categoryId: ID.catHousing, entityTags: [ID.flat], accountId: ID.main, defaultStatus: 'committed' },
     { ...base(ID.rowUtilities, 'b1'), name: 'The flat – Utilities', section: 'expense', categoryId: ID.catHousing, entityTags: [ID.flat], accountId: ID.main },
-    { ...base(ID.rowGroceries, 'b2'), name: 'Groceries', section: 'expense', categoryId: ID.catLiving, accountId: ID.joint },
+    { ...base(ID.rowGroceries, 'b2'), name: 'Groceries', section: 'expense', categoryId: ID.catLiving, accountId: ID.main },
     { ...base(ID.rowTransport, 'b3'), name: 'Public transport', section: 'expense', categoryId: ID.catTransport, accountId: ID.main },
     { ...base(ID.rowCarInsurance, 'b4'), name: 'The car – Insurance', section: 'expense', categoryId: ID.catTransport, entityTags: [ID.car], accountId: ID.main, defaultStatus: 'committed' },
     { ...base(ID.rowDog, 'b5'), name: 'Biscuit – Costs', section: 'expense', categoryId: ID.catFamily, entityTags: [ID.biscuit], accountId: ID.main },
@@ -133,7 +133,6 @@ export function buildDemoTables(): Tables {
     ],
     accounts: [
       { ...base(ID.main, 'a0'), name: 'Main account', type: 'checking', currency: 'EUR', ownerEntityId: null, openingBalance: 0, openingMonth: '2026-09', tracked: false },
-      { ...base(ID.joint, 'a1'), name: 'Joint account', type: 'joint', currency: 'EUR', ownerEntityId: null, openingBalance: 0, openingMonth: '2026-09', tracked: false },
       { ...base(ID.savings, 'a2'), name: 'Savings', type: 'savings', currency: 'EUR', ownerEntityId: null, openingBalance: 800000, openingMonth: '2026-09', tracked: true },
       {
         ...base(ID.invest, 'a3'), name: 'Index fund', type: 'investment', currency: 'EUR', ownerEntityId: null, openingBalance: 1200000, openingMonth: '2026-09', tracked: true,

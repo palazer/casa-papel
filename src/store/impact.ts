@@ -10,7 +10,7 @@
 import { computeEngine, cellKey, type CellResult, type EngineOutput } from '@/engine'
 import {
   AccountSchema, CategorySchema, CellSchema, EntitySchema, GoalSchema, PoolSchema, RecurringItemSchema, RowSchema,
-  ENTITY_KIND_LABEL, accountIdOf, accountRef, addMonths, compareMonths, monthOfDate, monthRange, parseMonth, paysExpenses, poolIdOf, poolRef,
+  ENTITY_KIND_LABEL, accountIdOf, accountRef, addMonths, compareMonths, monthOfDate, monthRange, ownBalance, parseMonth, paysExpenses, poolIdOf, poolRef,
   type Account, type ArchiveMemo, type Category, type Cell, type CellInput, type Entity, type FundedBy, type Goal, type Household, type Money, type MonthKey, type Pool, type RecurringItem, type Row,
   type TableName, type Tables,
 } from '@/model'
@@ -209,7 +209,7 @@ function describeAccount(ctx: Ctx, acc: Account): Described {
    * A tracked balance is part of every month from its opening: history. An untracked account is only a name, until
    * an expense comes out of it: that month's leftover depends on it.
    */
-  const tracked = acc.tracked ? ctx.months.filter((m) => compareMonths(m, acc.openingMonth) >= 0 && !(acc.archivedMonth && compareMonths(m, acc.archivedMonth) >= 0)) : []
+  const tracked = ownBalance(acc) ? ctx.months.filter((m) => compareMonths(m, acc.openingMonth) >= 0 && !(acc.archivedMonth && compareMonths(m, acc.archivedMonth) >= 0)) : []
   const activity = ctx.months.filter((m) => tracked.includes(m) || paid.includes(m))
   const goalWords = `The ${pick(goals.length, 'goal', 'goals')} ${quoteNames(goals.map((g) => g.name))}`
   const loses: string[] = []
@@ -230,7 +230,7 @@ function describeAccount(ctx: Ctx, acc: Account): Described {
     kindLabel: 'Account', subject: acc.name, loses, changes, blockers, note: null, activity, canArchive: true,
     archive: (from) => {
       const at = monthLabel(from, locale)
-      const out = [acc.tracked ? `Its balance stops at ${monthLabel(addMonths(from, -1), locale)}; from ${at} it is hidden and no longer counts towards net worth` : `Hidden from ${at} on; rows that name it keep working`]
+      const out = [ownBalance(acc) ? `Its balance stops at ${monthLabel(addMonths(from, -1), locale)}; from ${at} it is hidden and no longer counts towards net worth` : `Hidden from ${at} on; rows that name it keep working`]
       if (typed.length) out.push(`${quoteNames(typed.map((r) => r.name))} ${pick(typed.length, 'keeps', 'keep')} moving money, but the balance is no longer tracked from ${at}`)
       if (pools.length) out.push(`Its virtual ${pick(pools.length, 'account', 'accounts')} ${quoteNames(pools.map((p) => p.name))} ${pick(pools.length, 'is', 'are')} archived with it from ${at}`)
       // what its virtual accounts paid goes the same way: they are archived with it

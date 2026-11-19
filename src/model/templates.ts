@@ -138,8 +138,8 @@ export const RULE_KIND_INFO: Array<{ value: RowRule; label: string; help: string
 ]
 
 export const ACCOUNT_TYPE_INFO: Array<{ value: AccountType; label: string; help: string }> = [
-  { value: 'checking', label: 'Current account', help: 'Where salary lands and bills leave. All current accounts are counted together as one worked-out figure, so one is enough; you can type what the bank says for each.' },
-  { value: 'joint', label: 'Joint account', help: 'A shared account partners pay into for shared bills. It is counted together with the current accounts, not on its own.' },
+  { value: 'checking', label: 'Main account', help: 'Where salary lands and bills leave: the month\'s money runs through it. A household has one, in its own currency. Its balance is worked out from the months, and you can type what the bank says.' },
+  { value: 'joint', label: 'Other current account', help: 'Another everyday account: a joint account, a partner\'s own, or one in another currency. It has a balance of its own under Other assets: a transfer row moves money into it, and an expense can come out of it.' },
   { value: 'savings', label: 'Savings', help: 'Where the month\'s leftover goes. The balance is tracked month by month, and virtual accounts live inside it.' },
   { value: 'investment', label: 'Investments', help: 'Broker, fund or pension account. Deposits and value are tracked.' },
   { value: 'credit-card', label: 'Credit card', help: 'Spend now, pay later. The open balance is tracked.' },

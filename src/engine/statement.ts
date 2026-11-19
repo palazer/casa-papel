@@ -20,7 +20,7 @@
  */
 import { accountGroup, addMonths, canCarryRule, cardIsItemized, describeCadence, isTakenFromAccount, movesInto, nextDue, paysAsExpense, pocketLandsIn, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
 import { computeGoals, type GoalProgress } from './goals'
-import { currentAccountsIn, mainAccountLabel } from './mainAccount'
+import { mainAccountsIn, mainAccountLabel } from './mainAccount'
 import { cellKey, fundingTotal, type AccountSeries, type CellResult, type CellStatus, type EngineOutput } from './types'
 
 export type StatementHue = 'income' | 'expense' | 'transfer' | 'worth' | 'pool'
@@ -75,7 +75,7 @@ export interface StatementLine {
   balancing?: boolean
   /** Derived from other figures, not a balance anyone entered. */
   calculated?: boolean
-  /** The line for what stays in the current accounts: the accounts open this month, whose real balances it takes. */
+  /** The line for what stays in the main account: the main accounts open this month (one), whose real balance it takes. */
   currentAccountIds?: string[]
   /** A real balance was entered for this month. */
   entered?: boolean
@@ -95,8 +95,9 @@ export interface StatementLine {
   paidFor?: string[]
   /**
    * What kind of account a line stands for, said after its name where the name alone does not tell: a virtual
-   * account under "From accounts", and the current accounts (`From the account`, the main line under its one
-   * account's name). An account named by its own name carries none.
+   * account under "From accounts", the main line under its account's name ("main account"), and an other current
+   * account under Other assets ("current account"). An account named by its own name carries none otherwise, and a
+   * name that says the kind already ("Main account") none at all.
    */
   accountKind?: string
   /** A row shown under the name of the account it takes from: the row's own name, when that says something else. */
@@ -199,6 +200,10 @@ function bucketOf(row: Row, accountsById: Map<string, Account>): Bucket {
 }
 
 const sum = (lines: StatementLine[]): Money => lines.reduce((s, l) => (l.memo ? s : s + l.amount), 0)
+/** Says the kind of account after a line's name, unless the name says it already ("Main account"). */
+function withKind(line: StatementLine, kind: string): void {
+  if (line.label.trim().toLowerCase() !== kind) line.accountKind = kind
+}
 const anyEstimate = (lines: StatementLine[]): boolean => lines.some((l) => l.estimate)
 const byOrder = <T extends { order: string }>(a: T, b: T) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0)
 
@@ -433,7 +438,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   if (t.rest != null) {
     if (t.leftover !== 0) setAside.push({ id: 'kept', kind: 'figure', label: 'Kept in account', amount: t.leftover, children: [], automatic: true })
   } else if (t.leftover < 0) {
-    cover.push({ id: 'leftover', kind: 'figure', label: 'From the account', amount: -t.leftover, children: [], balancing: true, automatic: true, accountKind: 'current account' })
+    cover.push({ id: 'leftover', kind: 'figure', label: 'From the account', amount: -t.leftover, children: [], balancing: true, automatic: true, accountKind: 'main account' })
   } else {
     setAside.push({ id: 'leftover', kind: 'figure', label: 'Leftover', amount: t.leftover, children: [], balancing: true, automatic: true })
   }
@@ -504,12 +509,13 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
     if (mm.cardPaid !== 0) parts.push({ id: 'main:paid', kind: 'note', label: 'Paid to the card', amount: -mm.cardPaid, children: [] })
     // what the bank says beyond what the plan explains, so the parts still add up to the balance
     if (mm.adjustment !== 0) parts.push({ id: 'main:adjustment', kind: 'note', label: 'Not in the plan', amount: mm.adjustment, children: [] })
-    const openAccounts = currentAccountsIn(accounts, month)
+    const openAccounts = mainAccountsIn(accounts, month)
     const open = openAccounts.map((a) => a.id)
-    // Several current accounts each stand under the line that counts them together, so they can be seen and edited.
-    // They are listed, not added up: the lines after them explain the figure. The plan knows what one of them holds
-    // only in a month whose real balances were typed; until then the line says it is counted together.
-    const listed: StatementLine[] = main.accountIds.length > 1 ? openAccounts.map((a): StatementLine => {
+    // In the month an archived main account and the one that replaced it were both open (or in data from before rule
+    // B9), each stands under the line that counts them together, so they can be seen and edited. They are listed, not
+    // added up: the lines after them explain the figure. The plan knows what one of them holds only in a month whose
+    // real balances were typed; until then the line says it is counted together.
+    const listed: StatementLine[] = openAccounts.length > 1 ? openAccounts.map((a): StatementLine => {
       const real = mm.real?.[a.id]
       const own: StatementLine = { id: `cur:${a.id}`, kind: 'account', label: a.name, amount: real?.base ?? 0, children: [], accountId: a.id, memo: true }
       if (!real) return { ...own, empty: true, chip: 'counted together' }
@@ -519,8 +525,8 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
       id: 'main', kind: 'account', label: mainAccountLabel(main, accounts), amount: mm.balance, change: mm.balance - mm.start,
       children: [...listed, ...parts], missingRate: main.missingRate || undefined,
     }
-    // named after its one account, the line says what kind of account that is, as the headings under it do for theirs
-    if (main.accountIds.length === 1) line.accountKind = 'current account'
+    // named after its account, the line says what kind of account that is, as the headings under it do for theirs
+    withKind(line, 'main account')
     // worked out until the real balances are typed; then it reads like any other entered balance
     if (mm.entered) Object.assign(line, { entered: true, adjustment: mm.adjustment !== 0 ? mm.adjustment : undefined })
     else Object.assign(line, { calculated: true, chip: 'calculated' })
@@ -540,6 +546,8 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
       if (!s.outside || feeding.length) line.rule = ruleOfRows(feeding)
     }
     if (acc.archivedMonth) line.archived = true
+    // an other current account stands among the other assets, and says what it is: its name alone may not
+    if (acc.type === 'joint') withKind(line, 'current account')
     if (r.entered) line.entered = true
     // a card that records only its payments: no row says what was bought on it, so no row moves what is owed
     if (recordsOnlyPayments(acc)) line.note = 'changes with real balances only'

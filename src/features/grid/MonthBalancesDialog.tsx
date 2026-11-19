@@ -37,10 +37,11 @@ export function MonthBalancesDialog({ month, tables, engine, household, onClose 
   const open = progress.total - progress.done
   const [countDone, setCountDone] = useState(() => isPastMonth(month))
   const current = lines.filter((l) => l.group === 'current')
-  // one current account in the household currency carries the plan's figure in its own fields
+  // the main account carries the plan's figure in its own fields; two that were open together (an archived one and
+  // the one that replaced it) share it
   const together = current.length > 0 && !(current.length === 1 && current[0].endCalculated != null)
   const groups: BalanceGroup[] = [
-    { heading: current.length > 1 ? 'Current accounts' : undefined, note: together ? <span data-testid="current-together"><CurrentTogether form={form} base={base} /> Fill in every one of them or none.</span> : undefined, lines: current },
+    { heading: current.length > 1 ? 'Main accounts' : undefined, note: together ? <span data-testid="current-together"><CurrentTogether form={form} base={base} /> Fill in both or neither.</span> : undefined, lines: current },
     ...HEADINGS.map(([group, heading]) => ({ heading, lines: lines.filter((l) => l.group === group) })),
   ]
 

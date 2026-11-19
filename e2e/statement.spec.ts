@@ -63,8 +63,8 @@ test.describe('the Statement', () => {
     const assetsSide = page.getByRole('region', { name: 'Assets' })
     await expect(assetsSide.getByText('Travel', { exact: true })).toBeVisible()
     await expect(assetsSide.getByText('Not set aside')).toBeVisible()
-    // the demo has a main and a joint account: one line for what stays in them
-    await expect(assetsSide.getByText('Current accounts')).toBeVisible()
+    // the demo has one main account: its line is named after it
+    await expect(assetsSide.locator('[data-line="main"]')).toContainText('Main account')
 
     // a category opens to its rows, an itemized row to its items
     await expect(moneyOut.getByText('Sam – Personal')).toHaveCount(0)
@@ -522,15 +522,15 @@ test.describe('working the month in the Statement', () => {
     await dlg.getByRole('button', { name: 'Cancel' }).click()
   })
 
-  test('cash is an asset with a balance of its own: it stands under "Other assets" and never joins the current accounts', async ({ page }) => {
+  test('cash is an asset with a balance of its own: it stands under "Other assets" and never joins the main account', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'November 2026')
     const assets = page.getByRole('region', { name: 'Assets' })
     const moneyOut = page.getByRole('region', { name: 'Money out' })
     const dlg = page.getByRole('dialog')
     await expect(assets.locator('[data-line="other-assets"]')).toHaveCount(0)
-    const current = assets.getByRole('button', { name: /^Current accounts balance:/ })
-    await expect(current).toHaveAccessibleName('Current accounts balance: €78.00')
+    const current = assets.getByRole('button', { name: /^Main account balance:/ })
+    await expect(current).toHaveAccessibleName('Main account balance: €78.00')
 
     await assets.getByRole('button', { name: 'Add account' }).click()
     await dlg.getByLabel('Type').selectOption('cash')
@@ -544,11 +544,9 @@ test.describe('working the month in the Statement', () => {
     // its own line, under the heading for what the household owns beside its accounts
     await expect(assets.locator('[data-line="other-assets"]')).toContainText('€300.00')
     await expect(assets.getByRole('button', { name: 'Wallet balance: €300.00' })).toBeVisible()
-    // the current accounts are what they were: the same name, the same figure, and the wallet is not one of them
-    await expect(current).toHaveAccessibleName('Current accounts balance: €78.00')
-    await assets.getByRole('button', { name: 'Current accounts', exact: true }).click()
-    await expect(assets.locator('[data-line^="cur:"]')).toHaveCount(2)
-    await expect(assets.locator('[data-line^="cur:"]').filter({ hasText: 'Wallet' })).toHaveCount(0)
+    // the main account is what it was: the same name, the same figure, and nothing stands under it
+    await expect(current).toHaveAccessibleName('Main account balance: €78.00')
+    await expect(assets.locator('[data-line^="cur:"]')).toHaveCount(0)
 
     // an expense can come straight out of it
     await moneyOut.getByRole('button', { name: 'Living', exact: true }).click()
@@ -626,21 +624,18 @@ test.describe('working the month in the Statement', () => {
     await cancel()
     await page.screenshot({ path: 'e2e/output/statement-account-press.png', fullPage: true })
 
-    // several current accounts: their heading is no account, so it only folds; each account under it opens its own dialog
-    await expect(page.getByRole('button', { name: 'Edit Current accounts' })).toHaveCount(0)
-    await assets.getByRole('button', { name: 'Current accounts', exact: true }).click()
-    await assets.getByRole('button', { name: 'Edit Joint account' }).click()
-    await expect(name).toHaveValue('Joint account')
-    // one current account: the calculated line is that account, and opens it
-    await dlg.getByLabel('Type').selectOption('savings')
-    await dlg.getByRole('button', { name: 'Save' }).click()
-    await expect(dlg).toBeHidden()
+    // the main account: the calculated line is that account, and opens it
     const main = assets.locator('[data-line="main"]')
     await expect(main).toContainText('Main account')
     await main.getByRole('button', { name: 'Edit Main account' }).click()
     await expect(name).toHaveValue('Main account')
     await cancel()
+    // what explains its figure opens from the arrow alone
     const details = main.getByRole('button', { name: 'What is under Main account' })
+    await expect(details).toHaveAttribute('aria-expanded', 'false')
+    await details.click()
+    await expect(details).toHaveAttribute('aria-expanded', 'true')
+    await expect(assets.getByText('At the start of the month')).toBeVisible()
     await details.click()
     await expect(details).toHaveAttribute('aria-expanded', 'false')
     await expect(assets.getByText('At the start of the month')).toHaveCount(0)
@@ -675,7 +670,7 @@ test.describe('working the month in the Statement', () => {
     await expect(dlg.getByTestId('acc-outside')).toHaveText('It keeps its balance and can still pay into the month, but no total counts it, and net worth does not either. Pocket money can land in it.')
     await settled(dlg)
     await dlg.screenshot({ path: 'e2e/output/account-outside-net-worth.png' })
-    // a current account is the month's own money: it has no such box
+    // the main account is the month's own money: it has no such box
     await dlg.getByLabel('Type').selectOption('checking')
     await expect(box).toHaveCount(0)
     await dlg.getByLabel('Type').selectOption('savings')
@@ -773,7 +768,7 @@ test.describe('working the month in the Statement', () => {
     await expect(free).toContainText('-€6,274.00')
   })
 
-  test('the current accounts take their real balances: the difference shows, the next month continues, and it can be taken back', async ({ page }) => {
+  test('the main account takes its real balance: the difference shows, the next month continues, and it can be taken back', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'November 2026')
     const assets = page.getByRole('region', { name: 'Assets' })
@@ -781,44 +776,32 @@ test.describe('working the month in the Statement', () => {
     const dlg = page.getByRole('dialog')
     const sameTotals = async () => expect((await total(page, 'assets').innerText()).replace(/^Total\s*/, '')).toBe((await total(page, 'claims').innerText()).replace(/^Total\s*/, ''))
 
-    // worked out until someone says what the bank says: the demo's main and joint account together
+    // worked out until someone says what the bank says
     await expect(line).toContainText('calculated')
-    await assets.getByRole('button', { name: 'Current accounts balance: €78.00' }).click()
-    await expect(dlg.getByRole('heading', { name: 'Current accounts · November 2026' })).toBeVisible()
-    // the plan knows the two together only: no account has a calculated amount of its own
-    await expect(dlg.getByTestId('current-together')).toContainText('at the start, €78.00 at the end.')
-    const mainEnd = dlg.getByLabel('Main account: at the end of November 2026 (EUR)')
-    const jointEnd = dlg.getByLabel('Joint account: at the end of November 2026 (EUR)')
-    await expect(mainEnd).not.toHaveAttribute('placeholder', /./)
-    // every account or none
+    await assets.getByRole('button', { name: 'Main account balance: €78.00' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Main account · November 2026' })).toBeVisible()
+    // one account, one number: the plan's own figure stands in its field, in grey
+    await expect(dlg.getByTestId('current-together')).toHaveCount(0)
+    const mainEnd = dlg.getByLabel('At the end of November 2026 (EUR)')
+    await expect(mainEnd).toHaveAttribute('placeholder', '€78.00')
+    await mainEnd.fill('abc')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg.getByRole('alert')).toHaveText('That is not a number I can read.')
     await mainEnd.fill('1150')
-    await expect(dlg.getByTestId('current-balance-sum')).toHaveCount(0)
-    await dlg.getByRole('button', { name: 'Save' }).click()
-    await expect(dlg.getByRole('alert')).toHaveText('Fill in every current account, or leave them all empty to use the calculated amount.')
-    await jointEnd.fill('abc')
-    await dlg.getByRole('button', { name: 'Save' }).click()
-    await expect(dlg.getByRole('alert')).toHaveText('Joint account: that is not a number I can read.')
-    await jointEnd.fill('300')
-    await expect(dlg.getByTestId('current-balance-sum')).toHaveText('Together at the end€1,450.00Difference+€1,372.00')
     await expect(dlg).toHaveCSS('opacity', '1')
     await page.screenshot({ path: 'e2e/output/statement-current-balance-dialog.png' })
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
 
     // the line reads like any other entered balance, its parts add up, and both sides still agree
-    await expect(assets.getByRole('button', { name: 'Current accounts balance: €1,450.00, entered' })).toBeVisible()
-    await expect(line).toContainText('entered, +€1,372.00 against the plan')
+    const entered = assets.getByRole('button', { name: 'Main account balance: €1,150.00, entered' })
+    await expect(entered).toBeVisible()
+    await expect(line).toContainText('entered, +€1,072.00 against the plan')
     await expect(line).not.toContainText('calculated')
-    await assets.getByRole('button', { name: 'Current accounts', exact: true }).click()
-    await expect(assets.locator('[data-line="main:adjustment"]')).toHaveText('Not in the plan€1,372.00')
-    // each account stands under the line with what it really held; its amount opens the dialog of them all
-    await expect(assets.locator('[data-line^="cur:"]')).toHaveCount(2)
-    await expect(assets.getByRole('button', { name: 'Main account balance: €1,150.00, entered' })).toBeVisible()
-    await assets.getByRole('button', { name: 'Joint account balance: €300.00, entered' }).click()
-    await expect(dlg.getByRole('heading', { name: 'Current accounts · November 2026' })).toBeVisible()
-    await expect(jointEnd).toHaveValue('300')
-    await dlg.getByRole('button', { name: 'Cancel' }).click()
-    await expect(dlg).toBeHidden()
+    await line.getByRole('button', { name: 'What is under Main account' }).click()
+    await expect(assets.locator('[data-line="main:adjustment"]')).toHaveText('Not in the plan€1,072.00')
+    // no account stands under it
+    await expect(assets.locator('[data-line^="cur:"]')).toHaveCount(0)
     await sameTotals()
     await page.screenshot({ path: 'e2e/output/statement-current-balance.png', fullPage: true })
 
@@ -826,21 +809,20 @@ test.describe('working the month in the Statement', () => {
     await page.getByRole('button', { name: 'Next month' }).click()
     await expect(page.getByRole('heading', { level: 2, name: 'December 2026' })).toBeVisible()
     await expect(line).toContainText('calculated')
-    await expect(assets.locator('[data-line="main:start"]')).toContainText('€1,450.00')
+    await expect(assets.locator('[data-line="main:start"]')).toContainText('€1,150.00')
     await sameTotals()
     await page.getByRole('button', { name: 'Previous month' }).click()
 
     // back to the calculated amount, in one step that Undo takes back
-    await assets.getByRole('button', { name: 'Current accounts balance: €1,450.00, entered' }).click()
+    await entered.click()
     await expect(mainEnd).toHaveValue('1150')
     await mainEnd.fill('')
-    await jointEnd.fill('')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-    await expect(assets.getByRole('button', { name: 'Current accounts balance: €78.00' })).toBeVisible()
+    await expect(assets.getByRole('button', { name: 'Main account balance: €78.00' })).toBeVisible()
     await expect(line).toContainText('calculated')
     await page.getByRole('button', { name: 'Undo' }).click()
-    await expect(assets.getByRole('button', { name: 'Current accounts balance: €1,450.00, entered' })).toBeVisible()
+    await expect(entered).toBeVisible()
   })
 
   test('"Balances…" asks what every account held at the start and at the end, counts a month that is over as done, and the next month starts with it', async ({ page }) => {
@@ -857,8 +839,10 @@ test.describe('working the month in the Statement', () => {
     await page.getByRole('button', { name: 'Balances…' }).click()
     await expect(closing.getByRole('heading', { name: 'Balances for November 2026' })).toBeVisible()
     // every account that has a balance, under the headings of the page
-    for (const heading of ['Current accounts', 'Savings accounts', 'Investment accounts', 'Debts']) await expect(closing.getByText(heading, { exact: true })).toBeVisible()
-    await expect(closing.getByTestId('current-together')).toContainText('Calculated, together:')
+    for (const heading of ['Savings accounts', 'Investment accounts', 'Debts']) await expect(closing.getByText(heading, { exact: true })).toBeVisible()
+    // the main account comes first, with the plan's own figure in its fields
+    await expect(closing.getByTestId('current-together')).toHaveCount(0)
+    await expect(closing.getByLabel('Main account: at the end of November 2026 (EUR)')).toHaveAttribute('placeholder', '€78.00')
     const fundStart = closing.getByLabel('Index fund: at the start of November 2026 (EUR)')
     const fundEnd = closing.getByLabel('Index fund: at the end of November 2026 (EUR)')
     // nothing is typed: an empty field shows the calculated amount in grey and keeps it
@@ -1187,7 +1171,7 @@ test.describe('working the month in the Statement', () => {
     // under Assets: what the household has. The short form asks the name, the type and what it holds
     await assets.getByRole('button', { name: 'Add account' }).click()
     await expect(dlg.getByRole('heading', { name: 'New account' })).toBeVisible()
-    await expect(dlg.getByLabel('Type').locator('option')).toHaveText(['Current account', 'Joint account', 'Savings', 'Investments', 'Other asset', 'Cash'])
+    await expect(dlg.getByLabel('Type').locator('option')).toHaveText(['Main account', 'Other current account', 'Savings', 'Investments', 'Other asset', 'Cash'])
     await dlg.getByLabel('Name', { exact: true }).fill('Rainy day')
     await dlg.getByLabel('Type').selectOption('savings')
     await dlg.getByLabel('Holds at the start of September 2026 (EUR)').fill('1000')
@@ -1520,31 +1504,9 @@ test.describe('working the month in the Statement', () => {
     await editFrom(page, assets, 'Travel', 'Virtual account')
     await expect(dlg.getByRole('heading', { name: 'Edit virtual account' })).toBeVisible()
     await dlg.getByRole('button', { name: 'Cancel' }).click()
-    // the calculated line stands for the current accounts: opened, it lists them, each with the menu every account has
-    await expect(assets.getByRole('button', { name: 'Edit a current account' })).toHaveCount(0)
-    await assets.getByRole('button', { name: 'Current accounts', exact: true }).click()
-    const listed = assets.locator('[data-line^="cur:"]')
-    await expect(listed).toHaveCount(2)
-    await expect(listed.nth(0)).toContainText('Main account')
-    await expect(listed.nth(1)).toContainText('Joint account')
-    // the plan only knows them together: neither has an amount of its own until the real balances are typed
-    for (const one of await listed.all()) await expect(one).toContainText('counted together')
-    await expect(assets.getByRole('button', { name: 'Joint account balance: counted together' })).toBeVisible()
-    await assets.getByRole('button', { name: 'Account menu for Joint account' }).click()
-    await expect(menu.getByRole('menuitem')).toHaveText(['Edit…', 'Move up', 'Move down', 'Archive or delete…'])
-    await expect(menu.getByRole('menuitem', { name: 'Move down' })).toBeDisabled()
-    await menu.getByRole('menuitem', { name: 'Edit…' }).click()
-    await expect(dlg.getByLabel('Name', { exact: true })).toHaveValue('Joint account')
-    await dlg.getByRole('button', { name: 'Cancel' }).click()
-    // "Move up" changes their order under the line
-    await assets.getByRole('button', { name: 'Account menu for Joint account' }).click()
-    await menu.getByRole('menuitem', { name: 'Move up' }).click()
-    await expect(menu).toBeHidden()
-    await expect(listed.nth(0)).toContainText('Joint account')
-    await page.getByRole('button', { name: 'Undo' }).click()
-    await expect(listed.nth(0)).toContainText('Main account')
-    await expect(menu).toBeHidden()
-    await page.screenshot({ path: 'e2e/output/statement-current-accounts-listed.png', fullPage: true })
+    // the calculated line is the main account itself (rule B9): nothing stands under it as an account
+    await expect(assets.locator('[data-line="main"]')).toContainText('Main account')
+    await expect(assets.locator('[data-line^="cur:"]')).toHaveCount(0)
 
     // a month that is over is changed the same way: it offers the same menus
     await goToMonth(page, 'September 2026')
@@ -2656,13 +2618,12 @@ test.describe('the Statement on a phone', () => {
     await expect(page.getByRole('dialog')).toBeHidden()
     await page.screenshot({ path: 'e2e/output/statement-phone-working.png', fullPage: true })
 
-    // the current accounts' real balances on a phone: a field per account
-    await page.getByRole('region', { name: 'Assets' }).getByRole('button', { name: /^Current accounts balance:/ }).tap()
+    // the main account's real balance on a phone: its two fields side by side
+    await page.getByRole('region', { name: 'Assets' }).getByRole('button', { name: /^Main account balance:/ }).tap()
     const dlg = page.getByRole('dialog')
-    await expect(dlg.getByRole('heading', { name: 'Current accounts · November 2026' })).toBeVisible()
-    await dlg.getByLabel('Main account: at the end of November 2026 (EUR)').fill('1150')
-    await dlg.getByLabel('Joint account: at the end of November 2026 (EUR)').fill('300')
-    await expect(dlg.getByTestId('current-balance-sum')).toContainText('Together at the end€1,450.00')
+    await expect(dlg.getByRole('heading', { name: 'Main account · November 2026' })).toBeVisible()
+    await dlg.getByLabel('At the end of November 2026 (EUR)').fill('1150')
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
     await expect(dlg).toHaveCSS('opacity', '1')
     await page.screenshot({ path: 'e2e/output/statement-current-balance-phone.png' })
     await dlg.getByRole('button', { name: 'Cancel' }).tap()

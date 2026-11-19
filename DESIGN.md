@@ -259,10 +259,11 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   The grey of a month that is over stays a translucent overlay on the cells, so it reads over a band.
 - Total rows (`derivedRow` with `band`): the label in the hue on the hue's `tint`, `font-medium`; detail lines under an
   investment account (`Deposited`, `Return`) indented and `text-[11px]` muted.
-- Balances open with what stays in the current accounts: one row named like the Statement's line (the one account's
-  name, else `Current accounts`), shown once such an account exists or money stays in it, so the rows under Balances
-  add up to `Net worth`. It is worked out; a click on a month opens `CurrentBalanceDialog` (§8), and a month whose
-  real balances were typed is underlined like the other entered balances.
+- Balances open with what stays in the main account (rule B9): one row named like the Statement's line (the main
+  account's name, else `Main account`), shown once such an account exists or money stays in it, so the rows under
+  Balances add up to `Net worth`. It is worked out; a click on a month opens `CurrentBalanceDialog` (§8), and a month
+  whose real balance was typed is underlined like the other entered balances. An other current account has a row of
+  its own among the other balances, like cash.
 - Keyboard: arrows move between cells (`data-cell="row,col"`), Enter or Space opens the editor.
 
 ## 7. Rows, lists, tables and tiles
@@ -281,7 +282,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   Statement is one month in accounting form, two halves that each balance. "The month": Money in beside Money out,
   closed by the rest (to savings) or the leftover; a month that overruns shows a line tagged `to cover the month` under "From accounts" on the left.
   "At the end of the month": Assets beside Debts and net worth, closed by Free (net worth is one figure in the whole
-  app: tracked accounts and what stays in the current accounts, minus debts; `engine.netWorth`), with a muted `change` column before
+  app: tracked accounts and what stays in the main account, minus debts; `engine.netWorth`), with a muted `change` column before
   the balance on both sides (`+€460.00`, a `·` for none) and the day as the balance column's head. A side opens with
   its name in small caps and closes with its total in `font-semibold` over a hairline. Lines are `min-h-11 text-sm`
   on phones and `md:min-h-7 md:text-xs`, separated by `divide-border/60`, amounts in a fixed right-aligned column:
@@ -295,19 +296,20 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   target, the `…`, the balance) sit above it. **An account, a card, a loan and a virtual account open their dialog
   when their line is pressed, as a row opens its own** (`onOpen` in `LineContext`, `lineOpen` in the screen: the
   dialog the `…` calls `Edit…`). The line's button is then the name (`Edit <name>`), stretched over the line the same
-  way, and what is under such a line (its virtual accounts, a goal's bar, the lines that explain a single current
-  account) opens from the arrow alone, a button of its own above the line's button (`What is under <name>`, 26 px,
-  38 px for a finger), as an itemized row's items do. The amount stays the month's balances. The heading `Current
-  accounts` stands for several accounts and has no dialog, so it folds like a category. A group's chevron stands in the column of its categories' chevrons, so
+  way, and what is under such a line (its virtual accounts, a goal's bar, the lines that explain the main account)
+  opens from the arrow alone, a button of its own above the line's button (`What is under <name>`, 26 px, 38 px for a
+  finger), as an itemized row's items do. The amount stays the month's balances. A group's chevron stands in the column of its categories' chevrons, so
   the names stay in one column and no line moves; every group is open until it is folded, and which ones are folded
   is kept on the device, per household (`statement.folded.<household>`, a preference, never household data). What
   looks for a line inside a folded group opens it: a link symbol, a row that was just added, and the guided setup
   when it comes to the group's step. **Assets stand under a heading per kind of account** (`accountGroup` in
-  `src/model/accountGroup.ts`): the current accounts' one calculated line first, then `Savings accounts`,
+  `src/model/accountGroup.ts`): the main account's one calculated line first, then `Savings accounts`,
   `Investment accounts` and `Other assets` in the `worth` hue, each with the sum and the change of its accounts and
-  only while it has one; the accounts keep their columns under it. Cash is one of the other assets: money held, with
-  a balance of its own, never part of the current accounts. The first line carries a muted `current account`
-  after its name when it is named after its one account, so every line of the side says what kind it is. Tags follow the name and wrap under it
+  only while it has one; the accounts keep their columns under it. Cash and the other current accounts (a joint
+  account, a partner's own, one in another currency) are other assets: money held, with a balance of its own, never
+  part of the main account; an other current account carries a muted `current account` after its name. The first
+  line carries a muted `main account` after its name, unless the name says it already (`Main account`), so every
+  line of the side says what kind it is. Tags follow the name and wrap under it
   when there is no room: a zinc chip with the currency code and the original amount in muted `text-[11px]` for a
   line in another currency (the amount column is always the household currency), a rose `no rate` chip, `net €…`
   on an income with deductions, and a zinc chip for what the line is (`automatic`, `calculated`,
@@ -377,7 +379,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   leaves open where its money came from. An account's own name says enough and nothing follows it (it was followed
   by `savings account`, `investment account` or `other asset`, which only repeated what the Assets side's headings
   say). The kind is said in muted `text-[11px]` only where the name alone does not tell: `virtual account` after a
-  virtual account's name, and `current account` after `From the account`. What expenses took straight out of an
+  virtual account's name, and `main account` after `From the account`. What expenses took straight out of an
   account or a virtual account ("Comes out of") is worked out, one line per account in the accounts' own order and
   then one per virtual account: such a line carries the `calculated` chip and names the expenses it
   paid for in muted `text-[11px]` (`for Weekend trip, Flights`, cut with an ellipsis, the full list in the title),
@@ -483,20 +485,20 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   in the months before it was) has no such button: nothing new is started on it. A goal's detail carries an `xs ghost` `Edit`. An account's balance
   is a button named `<account> balance: <amount>` (`, entered` once it is) that opens the `BalanceDialog` (§8): what
   the account held at the start and at the end of that month.
-  The line for what stays in the current accounts (the one account's name, else `Current accounts`) is worked out
-  and says so with the `calculated` chip; its amount is the same kind of button and opens `CurrentBalanceDialog` (§8).
-  Once the real balances are typed for a month the chip goes, the amount is underlined like any entered balance, the
-  line says `entered, -€120.00 against the plan`, and its parts (At the start of the month, Kept this month, the card
-  lines) gain `Not in the plan`, so they still add up. The month after is `calculated` again, from the real number.
-  **Several current accounts each stand under that line**, before its parts, so they can be seen and edited where
-  the money is counted: the account's name in `font-medium`, its own `…` menu, and no amount of its own while the
+  The line for what stays in the main account (its name, else `Main account`) is worked out and says so with the
+  `calculated` chip; its amount is the same kind of button and opens `CurrentBalanceDialog` (§8). Once the real
+  balance is typed for a month the chip goes, the amount is underlined like any entered balance, the line says
+  `entered, -€120.00 against the plan`, and its parts (At the start of the month, Kept this month, the card lines)
+  gain `Not in the plan`, so they still add up. The month after is `calculated` again, from the real number. The line
+  is that account: no account stands under it. **Only where two main accounts were open in one month** (an archived
+  one and the one that replaced it, or data from before rule B9 until the upgrade has run) each stands under the
+  line, before its parts: the account's name in `font-medium`, its own `…` menu, and no amount of its own while the
   plan only knows them together (a faint `·` and the zinc chip `counted together`). In a month whose real balances
   are typed each shows what it really held, underlined like any entered balance. They are listed, not added up
-  (`memo`): the parts after them explain the line's figure, and the accounts are the same money seen another way.
-  An account's amount opens `CurrentBalanceDialog`, since they are entered together; such a line has no goal button.
-  One current account alone needs no line under its own: the line is that account.
+  (`memo`): the parts after them explain the line's figure. Such an account's amount opens `CurrentBalanceDialog`,
+  since they are entered together; such a line has no goal button.
   **Accounts are added in the lower half too**, in the same ghost `+` buttons as rows: the foot of the Assets side
-  holds `Add account` (current, joint, savings, investments, other asset, cash) and, once a savings account exists,
+  holds `Add account` (main account, other current account, savings, investments, other asset, cash) and, once a savings account exists,
   `Add virtual account`; `Add a card or loan` sits at the foot of the Debts group, and at the foot of that side while
   nothing is owed. A new savings or investment account opens the short rule dialog as soon as it is saved, on `The rest`
   for a savings account while nothing takes the rest yet; a new virtual account asks for its monthly amount in its own
@@ -513,8 +515,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   those of their savings account; disabled at the ends; `moveAccount`, `movePool`: the two that swap trade their
   `order`, which every list of accounts sorts by), and `Archive or delete…` (`Delete` while the household is being
   set up; how removing behaves is in §8). So every `…` on the page opens a menu, never a dialog directly;
-  a single current account's line carries the same menu, and several carry it on their own lines under
-  `Current accounts`, whose heading then has none. So that a line can hold these beside its own action, every row line that opens
+  the main account's line carries the same menu, and where two were open in the month each carries it on its own
+  line under it, and the line then has none. So that a line can hold these beside its own action, every row line that opens
   something is built the way a line with a rule symbol is: its button is its name, stretched over the whole line,
   and the symbol and the menu sit above it. A menu behind an icon is as wide as its longest entry (`w-max`), never
   as narrow as the icon.
@@ -628,7 +630,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   `src/features/grid/funding.ts`, the same in the cell editor, the row menu's "Comes out of…" and the schedule form)
   runs `This month's income`, then every account an expense can come straight out of, each under its kind and in the
   accounts' own order (`Savings account: <name>`, `Investment account: <name>`, `Other asset: <name>`, and
-  `Cash: <name>` for a cash account, which stands with the other assets), then `Virtual account: <name>`. Current accounts are the month's income and are not listed; a card or a loan is not a
+  `Cash: <name>` for a cash account and `Current account: <name>` for an other current account, which stand with the
+  other assets), then `Virtual account: <name>`. The main account is the month's income and is not listed; a card or a loan is not a
   source. What was set to the old `Savings balance` reads under the name of the account it has always come out of
   (the first savings account) and is rewritten only when another entry is picked; an archived account stays listed
   only while the row or an item still names it. The account that pays falls by the amount and the month's leftover does not.
@@ -649,7 +652,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   manual. The ECB day is the latest published one while the month runs and its last working day once it is over.
   **"Record the conversion…"** (`src/features/grid/ConversionPanel.tsx`, rule X10) stands under a single amount and
   under each item that is not on a schedule, wherever money is really changed into another currency on its way
-  (`conversionCurrency`): an amount in another currency that goes through the current accounts, or a household-currency
+  (`conversionCurrency`): an amount in another currency that goes through the main account, or a household-currency
   amount that moves an account in another; never for a dollar expense out of a dollar account. An outline `xs` button
   with an (i) opens an inline `rounded-md border` panel, "What the amount came to": `In <other currency>` and
   `1 EUR = [ ] USD` (read the usual way round, fixed while the panel is open), then `Official rate of [date] [Use]`
@@ -664,7 +667,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   conversion's line says what the amount counts as. A row whose month holds a recorded conversion keeps its currency: picking
   another says which month in the dialog's `role="alert"` line, and Save waits. **On the Statement the month's rate is a
   chip in the toolbar** (`RateChip`, after the legend and before the month's primary action; `data-testid="month-rates"`),
-  once for every other currency the month on screen counts in (its rows and accounts, and the current accounts): the
+  once for every other currency the month on screen counts in (its rows and accounts, and a main account from before rule B9): the
   rate alone, `1 EUR = 1.084 USD` (`No USD rate` while there is none), in the tone of where it came from (zinc ECB or
   carried, sky yours, amber forecast, rose missing), so the page carries one small tag and no line of its own. The
   chip is a button: it opens a popover with the source in words, a field to type a rate for this month (`Save rate`),
@@ -733,19 +736,21 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   - **The balance dialog** (`BalanceDialog.tsx`, `<account> · <month>`): one pair across the width, each field under
     its own label (`At the start of <Month>`, `At the end of <Month>`), under a `dl` with `Calculated for the end`
     and, for an investment account, `Deposited so far` and `Return so far`.
-  - **The current accounts' dialog** (`CurrentBalanceDialog.tsx`, the same frame): a pair per account that exists in
-    the month, each beside its name. The plan only knows these accounts together, so a muted line says `Calculated,
-    together: €60.00 at the start, €78.00 at the end.` and the fields have no placeholder; one account in the
-    household currency is all of them and carries the figures in its own fields. All or none, for the start and for
-    the end: a half-filled moment says "Fill in every current account, or leave them all empty to use the calculated
-    amount." in place and saves nothing. `Together at the end` and `Difference` show as soon as every end holds a
-    number (household currency only; another currency is converted on saving and the dialog says so). The
+  - **The main account's dialog** (`CurrentBalanceDialog.tsx`, the same frame, titled `<name> · <Month>`): one pair,
+    `At the start of <Month>` and `At the end of <Month>`, with the plan's own figures in grey in the fields, as in
+    `BalanceDialog`. **In a month where two main accounts were open** (an archived one and the one that replaced it)
+    there is a pair per account, each beside its name. The plan only knows the two together, so a muted line says
+    `Calculated, together: €60.00 at the start, €78.00 at the end.` and the fields have no placeholder. Both or
+    neither, for the start and for the end: a half-filled moment says "Both main accounts were open in this month,
+    the one archived and the one that replaced it: fill in both, or leave both empty to use the calculated amount."
+    in place and saves nothing. `Together at the end` and `Difference` show as soon as every end holds a number. The
     difference is shown, never booked as spending: where an account takes the rest, extra spending would lower that
-    transfer in the plan, not the current accounts.
+    transfer in the plan, not the main account.
   - **The month's balances dialog** (`MonthBalancesDialog.tsx`, `Balances for <Month>`, `sm:max-w-xl`): opened by
     `Balances…` on the Statement and `Balances for <Mon YYYY>…` in the Grid's month menu. Every account that has a
-    balance in the month, under the Statement's headings as `text-xs font-medium` lines (`Current accounts` when
-    there are several, `Savings accounts`, `Investment accounts`, `Other assets`, `Debts`), the column heads `At
+    balance in the month, under the Statement's headings as `text-xs font-medium` lines (the main account first and
+    without one, `Main accounts` where two were open, `Savings accounts`, `Investment accounts`, `Other assets` with
+    the other current accounts and cash, `Debts`), the column heads `At
     the start` and `At the end` once at the top; on a phone the name stands on a line of its own above its pair. A
     household without an account that has a balance reads `No account keeps a balance yet.` in their place. Under
     the fields, while something in the month is not ticked, a `Check` `Count everything in <Month> as done` with

@@ -1,5 +1,5 @@
 import {
-  accountIdOf, accountRef, cardIsItemized, compareMonths, conversionOf, fromMinor, growthIn, isOldPocketShare, isOutsideNetWorth, isShareRule, isTakenFromAccount, movesInto, monthRange, paysAsExpense, paysExpenses, pocketLandsIn, poolIdOf, poolRef, resolveRules, scaleMoney, toMinor,
+  accountIdOf, accountRef, cardIsItemized, compareMonths, conversionOf, fromMinor, growthIn, isOldPocketShare, isOutsideNetWorth, isShareRule, isTakenFromAccount, movesInto, monthRange, ownBalance, paysAsExpense, paysExpenses, pocketLandsIn, poolIdOf, poolRef, resolveRules, scaleMoney, toMinor,
   type Account, type Category, type Cell, type FundedBy, type Money, type MonthKey, type Row, type RuleState, type Section, type Tables,
 } from '@/model'
 import { convertMoney, householdFx } from './fx'
@@ -857,13 +857,13 @@ export function computeEngine(input: EngineInput): EngineOutput {
     accountSeries[acc.id] = series
   }
 
-  // ---------- cards, loans, other assets, cash ----------
+  // ---------- cards, loans, other assets, cash, other current accounts ----------
   for (const acc of accounts) {
     const liability = acc.type === 'credit-card' || acc.type === 'loan'
-    if (!liability && acc.type !== 'other-asset' && acc.type !== 'cash') continue
-    // Cash always has a balance: while it counted with the current accounts it was stored as untracked, with no say
-    // in it, so the flag of a cash account says nothing.
-    if (!acc.tracked && acc.type !== 'cash') continue
+    if (!liability && acc.type !== 'other-asset' && acc.type !== 'cash' && acc.type !== 'joint') continue
+    // Cash and an other current account always have a balance: while they counted with the current accounts they
+    // were stored as untracked, with no say in it, so their flag says nothing (`ownBalance`).
+    if (!ownBalance(acc)) continue
     // a loan's months were worked out before the month's sums, with its payments cut at what was owed
     if (acc.type === 'loan') {
       accountSeries[acc.id] = loanSeries[acc.id]
@@ -891,8 +891,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
           else if (row.section === 'expense') inflow += inAccountCurrency(acc, c, m)
         }
       }
-      // an other asset falls by what expenses took straight out of it, and rises by pocket money that lands in it
-      // and by money a row moves into it
+      // an other asset (an other current account among them) falls by what expenses took straight out of it, and
+      // rises by pocket money that lands in it and by money a row moves into it
       if (!liability) {
         outflow += paidFrom(acc, m)
         for (const row of rows) {
@@ -912,7 +912,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
   }
 
   // ---------- the main account, and net worth ----------
-  // What stays in the current accounts is money the household has, so it counts: the Statement's lower half would
+  // What stays in the main account is money the household has, so it counts: the Statement's lower half would
   // not balance without it, and every other screen shows the same figure.
   const main = mainAccountSeries({ months, rows, cells, totals, accounts, actuals, fx, base })
   const netWorth: Record<MonthKey, Money> = {}

@@ -33,7 +33,7 @@ async function household(page: Page): Promise<Screen> {
     assets: page.getByRole('region', { name: 'Assets' }),
     dlg: page.getByRole('dialog'),
   }
-  await addAccount(s, 'Current account', 'Current account', '1000')
+  await addAccount(s, 'Current account', 'Main account', '1000')
   await addRow(s, 'income', 'Sam – Salary', '3000')
   await addRow(s, 'expense', 'Rent', '1200')
   return s
@@ -271,7 +271,7 @@ test.describe('whole stories, as the scenarios tell them', () => {
     await expect(which.locator('option')).toHaveText(['No account: the money leaves the plan', 'Wallet'])
     await expect(text).toHaveText('An amount you type each month that no account of yours receives, like money sent to family. It is not counted as spending, and net worth falls by it.')
     await which.selectOption({ label: 'Wallet' })
-    await expect(text).toHaveText('An amount you type each month goes from the current accounts into the account you pick. Its balance rises by it, and net worth stays as it is. It is not spending.')
+    await expect(text).toHaveText('An amount you type each month goes from the main account into the account you pick. Its balance rises by it, and net worth stays as it is. It is not spending.')
     await expect(s.moneyOut.getByLabel('New transfer row name')).toHaveAttribute('placeholder', 'To Wallet')
     await s.moneyOut.getByRole('button', { name: 'Add', exact: true }).click()
     await expect(s.dlg.getByRole('heading', { name: 'To Wallet · November 2026' })).toBeVisible()

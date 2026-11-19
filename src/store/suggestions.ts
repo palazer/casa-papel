@@ -108,7 +108,7 @@ export function accountSuggestions(tables: Tables): AccountSuggestion[] {
   // an archived account was there once: it is not suggested again
   const accounts = tables.accounts.filter((a) => !a.deletedAt)
   const all: AccountSuggestion[] = []
-  if (!accounts.some((a) => a.type === 'checking' || a.type === 'joint')) all.push({ id: 'account:checking', name: 'Main account', type: 'checking', description: 'The current account your income lands in and your bills leave from.' })
+  if (!accounts.some((a) => a.type === 'checking')) all.push({ id: 'account:checking', name: 'Main account', type: 'checking', description: 'The account your income lands in and your bills leave from: the month\'s money runs through it.' })
   if (!accounts.some((a) => a.type === 'savings')) all.push({ id: 'account:savings', name: 'Savings', type: 'savings', description: 'Where the rest of the month can go. Virtual accounts live inside it.' })
   return all.filter((s) => !dismissed.has(s.id))
 }

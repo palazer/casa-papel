@@ -85,10 +85,13 @@ describe('addRowOfKind under Transfers', () => {
   it('a row that moves money names the account that receives it: one with a balance of its own, which may name the row', async () => {
     const { store } = await fresh()
     const wallet = await addAccount(store, { name: 'Wallet', type: 'cash', currency: 'EUR', openingMonth: '2026-01', openingBalance: 15000 })
-    const current = await addAccount(store, { name: 'Joint account', type: 'joint', currency: 'EUR', openingMonth: '2026-01' })
+    const current = await addAccount(store, { name: 'Main account', type: 'checking', currency: 'EUR', openingMonth: '2026-01' })
+    await addAccount(store, { name: 'Joint account', type: 'joint', currency: 'EUR', openingMonth: '2026-01' })
     const named = await addAccount(store, { name: 'Old savings', type: 'savings', currency: 'EUR', openingMonth: '2026-01', tracked: false })
     expect(rowTargets(await loadTables(store), undefined).balances.map((a) => a.name)).toContain('Wallet')
-    expect(rowTargets(await loadTables(store), undefined).balances.map((a) => a.name)).not.toContain('Joint account')
+    // an other current account has a balance of its own (rule B9); the main account is where the money comes from
+    expect(rowTargets(await loadTables(store), undefined).balances.map((a) => a.name)).toContain('Joint account')
+    expect(rowTargets(await loadTables(store), undefined).balances.map((a) => a.name)).not.toContain('Main account')
     expect(rowTargets(await loadTables(store), undefined).balances.map((a) => a.name)).not.toContain('Old savings')
 
     const move = await addRowOfKind(store, { section: 'transfer', name: '', categoryId: null, kind: 'plain', accountId: wallet.id })

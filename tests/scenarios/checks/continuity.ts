@@ -30,9 +30,9 @@ export function carriedProblems(view: View): string[] {
     const main = engine.main?.months[m]
     const before = engine.main?.months[addMonths(m, -1)]
     if (!main || !before) continue
-    // a current account that opens this month brings its opening amount; nothing else may come between the two
-    const opened = tables.accounts.some((a) => !a.deletedAt && (a.type === 'checking' || a.type === 'joint') && a.openingMonth === m && (a.openingBalance ?? 0) !== 0)
-    if (main.start !== before.balance && !opened) out.push(`The current accounts start ${monthName(m)} with ${moneyText(main.start)}, and ended the month before with ${moneyText(before.balance)}.`)
+    // a main account that opens this month brings its opening amount; nothing else may come between the two
+    const opened = tables.accounts.some((a) => !a.deletedAt && a.type === 'checking' && a.openingMonth === m && (a.openingBalance ?? 0) !== 0)
+    if (main.start !== before.balance && !opened) out.push(`The main account starts ${monthName(m)} with ${moneyText(main.start)}, and ended the month before with ${moneyText(before.balance)}.`)
   }
 
   // the Statement: a line's amount less its change is what the same line showed the month before

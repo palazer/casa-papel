@@ -25,8 +25,8 @@ export function fundingOptions(tables: Pick<Tables, 'accounts' | 'pools' | 'rows
     for (const a of accounts) {
       if (accountGroup(a) !== kind) continue
       const ref = accountRef(a.id)
-      // cash stands with the other assets and is named as what it is
-      const label = `${a.type === 'cash' ? 'Cash' : said}: ${a.name}`
+      // cash and an other current account stand with the other assets and are named as what they are
+      const label = `${a.type === 'cash' ? 'Cash' : a.type === 'joint' ? 'Current account' : said}: ${a.name}`
       if (a.id !== first) options.push({ value: ref, label })
       else {
         // both ways of saying the same account in one dialog: each keeps an entry, so neither choice is lost

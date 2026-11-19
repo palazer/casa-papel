@@ -10,7 +10,7 @@ import { useMonthBalances, type MonthBalancesForm } from './useMonthBalances'
 import { saveError } from '@/app/saveError'
 
 interface Props {
-  /** The line's name: the one current account's, or "Current accounts". */
+  /** The line's name: the main account's. */
   title: string
   month: MonthKey
   tables: Tables
@@ -19,8 +19,9 @@ interface Props {
 }
 
 /**
- * What the plan knows about the current accounts of a month: their amounts together, in the household currency. Said
- * wherever their fields stand, because one account alone has no calculated amount unless it is the only one.
+ * What the plan knows about the main accounts of a month where two were open (an archived one and the one that
+ * replaced it): their amounts together, in the household currency. Said wherever their fields stand, because one of
+ * them alone has no calculated amount.
  */
 export function CurrentTogether({ form, base }: { form: MonthBalancesForm; base: string }) {
   const { main, locale } = form
@@ -29,9 +30,10 @@ export function CurrentTogether({ form, base }: { form: MonthBalancesForm; base:
 }
 
 /**
- * What the current accounts really held when a month began and when it ended (DESIGN.md §8). The plan only knows what
- * they hold together, so each moment takes every one of them or none: their sum takes the place of the calculated
- * amount, the line shows the difference and later months continue from the real numbers.
+ * What the main account really held when a month began and when it ended (DESIGN.md §8): the real number takes the
+ * place of the calculated amount, the line shows the difference and later months continue from it. In a month where
+ * an archived main account and the one that replaced it were both open, the plan only knows the two together, so each
+ * moment takes both or neither.
  */
 export function CurrentBalanceDialog({ title, month, tables, household, onClose }: Props) {
   const store = useStore()
@@ -67,7 +69,7 @@ export function CurrentBalanceDialog({ title, month, tables, household, onClose 
           <DialogTitle>{title} · {formatMonth(month, locale, 'long')}</DialogTitle>
           <DialogDescription>
             {several
-              ? 'What they really held when the month began and when it ended, from your bank. The plan only knows them together, so fill in every account or none.'
+              ? 'Both were open in this month, the one archived and the one that replaced it. What they really held when the month began and when it ended, from your bank. The plan only knows them together, so fill in both or neither.'
               : 'What the account really held when the month began and when it ended, from your bank.'}
             {' '}An empty field keeps the calculated amount. The start is the end of the month before: changing it corrects that month too.
           </DialogDescription>

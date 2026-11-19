@@ -1,39 +1,53 @@
 /**
- * The main account, read as what stays behind. The month's money passes through the current and joint accounts:
- * the Statement's upper half is their month. The engine keeps no balance of their own for them, so this works one out
- * from what it already knows, for all of them together:
+ * The main account, read as what stays behind (rule B9). The month's money passes through it: the Statement's upper
+ * half is its month. The engine keeps no balance of its own for it, so this works one out from what it already knows:
  *
  *   balance = opening balances + every month's leftover + bought on an itemized card − paid to it
  *
  * The card term is there because a card purchase counts as spent in the month it is made while the cash only leaves
  * when the bill is paid; until then the money waits in the account and the card shows the same amount as a debt.
- * It is a calculated figure until someone says what the bank says: a month in which every current account open in it
- * has a real balance (`AccountMonth.actualBalance`) takes their sum instead, and later months continue from it. One
- * account alone cannot anchor the line, because the plan only knows what all of them hold together. The engine works
- * the series out over its whole range (`EngineOutput.main`) and counts it in net worth.
+ * It is a calculated figure until someone says what the bank says: a month in which the main account has a real
+ * balance (`AccountMonth.actualBalance`) takes it instead, and later months continue from it. The engine works the
+ * series out over its whole range (`EngineOutput.main`) and counts it in net worth.
+ *
+ * A household has one main account open at a time, in its own currency (the store refuses a second one). One that was
+ * archived stays part of the line, as its history: its money stays in the line, taken to have moved to the one that
+ * replaced it. In a month where both were open the line is the two together, and a real balance needs both. Data from
+ * before rule B9 can hold several main accounts until the app's upgrade has run (`planMainAccount`); they count
+ * together in the same way, and one in another currency is converted once, when it opens, as it was then.
  */
 import { cardIsItemized, compareMonths, type Account, type AccountMonth, type Money, type MonthKey, type Row } from '@/model'
 import { convertMoney, type FxIndex } from './fx'
 import { cellKey, type CellResult, type MainAccountSeries, type MonthTotals } from './types'
 
-/** A cash account is not one of them: it has a balance of its own, like any other asset (see `compute.ts`). */
-const CURRENT_TYPES: ReadonlySet<string> = new Set(['checking', 'joint'])
+/**
+ * Whether an account is a main account (type `checking`). An other current account (type `joint`) and cash have a
+ * balance of their own, like any other asset (see `compute.ts`).
+ */
+export const isMainAccount = (account: Pick<Account, 'type'>): boolean => account.type === 'checking'
 const byOrder = (a: Account, b: Account) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0)
 
 /**
- * The current and joint accounts that exist in a month, in their own order: opened by then, not archived yet.
- * These are the accounts whose real balances are asked for, and all of them are needed for the month to count as entered.
+ * The main accounts that exist in a month, in their own order: opened by then, not archived yet. One, or none; two
+ * only where an archived one and the one that replaced it were both open, or in data from before rule B9. Their real
+ * balances are asked for, and all of them are needed for the month to count as entered.
  */
-export function currentAccountsIn(accounts: Account[], month: MonthKey): Account[] {
+export function mainAccountsIn(accounts: Account[], month: MonthKey): Account[] {
   return accounts
-    .filter((a) => !a.deletedAt && CURRENT_TYPES.has(a.type) && compareMonths(a.openingMonth, month) <= 0 && !(a.archivedMonth && compareMonths(month, a.archivedMonth) >= 0))
+    .filter((a) => !a.deletedAt && isMainAccount(a) && compareMonths(a.openingMonth, month) <= 0 && !(a.archivedMonth && compareMonths(month, a.archivedMonth) >= 0))
     .sort(byOrder)
 }
 
-/** What the line is called on every screen: the one current account's name, "Current accounts" for several, "Main account" for none. */
+/**
+ * What the line is called on every screen: the main account's name, "Main account" without one. One that was
+ * archived names the line only while there is no other.
+ */
 export function mainAccountLabel(series: MainAccountSeries, accounts: Account[]): string {
-  if (series.accountIds.length === 1) return accounts.find((a) => a.id === series.accountIds[0])?.name ?? 'Main account'
-  return series.accountIds.length > 1 ? 'Current accounts' : 'Main account'
+  const counted = series.accountIds.flatMap((id) => accounts.filter((a) => a.id === id))
+  const open = counted.filter((a) => !a.archivedMonth)
+  const named = open.length ? open : counted.sort((a, b) => compareMonths(a.archivedMonth ?? '', b.archivedMonth ?? '')).slice(-1)
+  if (named.length === 1) return named[0].name
+  return named.length > 1 ? 'Main accounts' : 'Main account'
 }
 
 /**
@@ -52,7 +66,7 @@ export function mainAccountSeries(input: {
   base: string
 }): MainAccountSeries {
   const { months, rows, cells, totals, accounts, actuals, fx, base } = input
-  const current = accounts.filter((a) => CURRENT_TYPES.has(a.type)).sort(byOrder)
+  const current = accounts.filter(isMainAccount).sort(byOrder)
   const itemizedCards = new Set(accounts.filter((a) => cardIsItemized(a)).map((a) => a.id))
   const cardRows = rows.filter((r) => r.accountId != null && itemizedCards.has(r.accountId))
 
@@ -79,8 +93,8 @@ export function mainAccountSeries(input: {
       else if (row.section === 'expense') cardBought += c.valueBase
     }
     const computed = start + kept + cardBought - cardPaid
-    // the real balances, when every account open this month has one
-    const open = currentAccountsIn(current, m)
+    // the real balance, of every main account open this month (one, but for the month an old one was replaced)
+    const open = mainAccountsIn(current, m)
     let real: Money | null = open.length > 0 ? 0 : null
     const each: Record<string, { own: Money; base: Money }> = {}
     for (const acc of open) {

@@ -53,7 +53,7 @@ const NEW = {
 const K = {
   moves: {
     key: 'plain', section: 'transfer', label: 'Moves money between your accounts',
-    text: 'An amount you type each month goes from the current accounts into the account you pick. Its balance rises by it, and net worth stays as it is. It is not spending.',
+    text: 'An amount you type each month goes from the main account into the account you pick. Its balance rises by it, and net worth stays as it is. It is not spending.',
     targets: (t) => t.balances, targetLabel: 'Account', field: 'accountId', empty: () => '',
     none: { label: 'No account: the money leaves the plan', text: 'An amount you type each month that no account of yours receives, like money sent to family. It is not counted as spending, and net worth falls by it.' },
   },
