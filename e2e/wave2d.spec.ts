@@ -1,4 +1,4 @@
-import { expect, saveAnyway, test, type Page } from './test'
+import { expect, saveAnyway, stepMonth, test, type Page } from './test'
 
 // service workers are blocked so page.route can stand in for the rate service
 test.use({ viewport: { width: 1400, height: 900 }, serviceWorkers: 'block' })
@@ -63,13 +63,18 @@ test('the plan ends in a December and "Add <year>" appends a calendar year on ev
   await expect(page.getByRole('button', { name: 'Dec 2028', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Add 2029' })).toBeVisible()
 
-  // the Statement shares the range: at its last month Next gives way to the same action
+  // the Statement shares the range: after the last month of its strip stands the same action
   await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
-  const next = page.getByRole('button', { name: 'Next month' })
-  const add = page.getByRole('button', { name: 'Add 2029' })
-  for (let i = 0; i < 40 && !(await add.isVisible()); i++) await next.click()
-  await expect(add).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'December 2028' })).toBeVisible()
+  const strip = page.getByRole('navigation', { name: 'Months' })
+  await expect(strip.locator('[data-month]').last()).toHaveAttribute('data-month', '2028-12')
+  await strip.getByRole('button', { name: 'Add 2029' }).click()
+  await expect(strip.locator('[data-month]').last()).toHaveAttribute('data-month', '2029-12')
+  await expect(strip.getByRole('button', { name: 'Add 2030' })).toBeVisible()
+  // the month on screen stays, and the arrows beside its name are gone: the strip is where the month is changed
+  await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Next month' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Undo' }).click()
+  await expect(strip.locator('[data-month]').last()).toHaveAttribute('data-month', '2028-12')
 })
 
 test('a virtual account that was asked for more than it held stops at zero, in the expense hue, and says why', async ({ page }) => {
@@ -239,13 +244,14 @@ test('the Statement shows the month\'s rate as a chip in its toolbar: pressed, i
   await expect(chip).toHaveCount(1)
   await expect(chip).toHaveText('1 EUR = 1.25 USD')
   await expect(chip).toHaveAttribute('data-source', 'ECB')
-  // it stands with the toolbar's buttons, above the line that counts the month
+  // it stands in the month's line, after the count of the month and "Balances…"
   await expect(page.locator('header').getByTestId('rate-chip')).toBeVisible()
   const chipBox = (await chip.boundingBox())!
-  const legend = (await page.getByRole('button', { name: 'Colours and marks' }).boundingBox())!
+  const balances = (await page.getByRole('button', { name: 'Balances…' }).boundingBox())!
   const progress = (await page.getByTestId('progress').boundingBox())!
-  expect(chipBox.y + chipBox.height).toBeLessThanOrEqual(progress.y)
-  expect(Math.abs(chipBox.y + chipBox.height / 2 - (legend.y + legend.height / 2))).toBeLessThan(6)
+  expect(progress.x).toBeLessThan(balances.x)
+  expect(balances.x + balances.width).toBeLessThanOrEqual(chipBox.x)
+  expect(Math.abs(chipBox.y + chipBox.height / 2 - (balances.y + balances.height / 2))).toBeLessThan(6)
   await expect(page.getByTestId('rate-line')).toHaveCount(0)
   const other = page.getByRole('region', { name: 'Money in' }).locator('[data-line]').filter({ hasText: 'Other income' }).first()
   await expect(other).toContainText('€120.00')
@@ -268,10 +274,10 @@ test('the Statement shows the month\'s rate as a chip in its toolbar: pressed, i
   await page.screenshot({ path: 'e2e/output/statement-rate.png' })
 
   // the month before keeps its own rate; a month that is over takes a rate of its own like any other
-  await page.getByRole('button', { name: 'Previous month' }).click()
+  await stepMonth(page, -1)
   await expect(page.getByRole('heading', { level: 2, name: 'October 2026' })).toBeVisible()
   await expect(chip).toHaveText('1 EUR = 1.10 USD')
-  await page.getByRole('button', { name: 'Previous month' }).click()
+  await stepMonth(page, -1)
   await expect(page.getByRole('heading', { level: 2, name: 'September 2026' })).toBeVisible()
   await expect(page.getByText('past', { exact: true })).toBeVisible()
   await expect(chip).toHaveText('1 EUR = 1.10 USD')
@@ -282,8 +288,8 @@ test('the Statement shows the month\'s rate as a chip in its toolbar: pressed, i
   await expect(pop).toBeHidden()
 
   // and back to the ECB's, offered once the rate is one's own
-  await page.getByRole('button', { name: 'Next month' }).click()
-  await page.getByRole('button', { name: 'Next month' }).click()
+  await stepMonth(page, 1)
+  await stepMonth(page, 1)
   await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
   await page.route('https://api.frankfurter.dev/**', (r) => r.fulfill({ json: { rates: { '2026-11-02': { USD: 1.25 } } } }))
   await chip.click()

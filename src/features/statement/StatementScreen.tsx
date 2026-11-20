@@ -7,6 +7,7 @@ import { MarksLegend } from '@/components/MarksLegend'
 import { MonthPicker } from '@/components/MonthPicker'
 import { PageHeader } from '@/components/PageHeader'
 import { doneness, type DoneState } from '@/app/display'
+import { formatMonth } from '@/app/format'
 import { readPref, writePref } from '@/app/prefs'
 import { useStore } from '@/app/store'
 import { clearHandedMonth, handedOverMonth } from '@/app/screens'
@@ -600,19 +601,14 @@ export function StatementScreen() {
 
   return (
     <div className="space-y-4">
-      {/* The month and its controls stay in view while the page scrolls, with the line that counts the month under
-          them. While a household is being set up the guide holds the top of the window instead. */}
+      {/* The strip of months and the line of the month on screen stay in view while the page scrolls. The line reads
+          as the pressed month's caption: its name, whether it is over, how much of it is done, "Balances…" and its
+          rates. While a household is being set up the guide holds the top of the window instead, and there is no
+          strip: the month keeps its arrows there. */}
       <PageHeader
-        title="Statement" subline={<>{household.name}{isPastMonth(m) && <> · <Chip tone="zinc" title="This month is over. It can still be changed.">past</Chip></>}</>}
+        title="Statement" subline={household.name}
         sticky={!settingUp}
-        above={strip.length > 0 && <MonthStrip months={strip} month={m} today={monthOfDate()} currency={ccy} locale={locale} onChange={setMonth} />}
-        below={progress.total > 0 && (
-          // How much of the month is ticked and what is still open; a month with nothing in it has nothing to count
-          <p role="status" className="flex items-center gap-1 text-xs text-muted-foreground" data-testid="progress">
-            <span>{progressText(progress, ccy, locale)}</span>
-            <InfoTip help="statement.progress" />
-          </p>
-        )}
+        above={strip.length > 0 && <MonthStrip months={strip} month={m} today={monthOfDate()} currency={ccy} locale={locale} onChange={setMonth} onAddYear={() => act(() => addPlanYear(store))} />}
         // how the page is shown: quiet buttons at the right end, before Undo and Redo
         tools={<>
           <span className="flex items-center gap-1">
@@ -628,16 +624,26 @@ export function StatementScreen() {
           {statement.warnings.map((w) => <p key={w} className="text-amber-700">{w}</p>)}
         </>}
       >
-        <MonthPicker months={months} month={m} onChange={setMonth} locale={locale} onAddYear={() => act(() => addPlanYear(store))} />
+        {settingUp
+          ? <MonthPicker months={months} month={m} onChange={setMonth} locale={locale} onAddYear={() => act(() => addPlanYear(store))} />
+          : <h2 className="text-sm font-semibold leading-5">{formatMonth(m, locale, 'long')}</h2>}
+        {isPastMonth(m) && <Chip tone="zinc" title="This month is over. It can still be changed.">past</Chip>}
+        {progress.total > 0 && (
+          // How much of the month is ticked and what is still open; a month with nothing in it has nothing to count
+          <p role="status" className="flex items-center gap-1 text-muted-foreground" data-testid="progress">
+            <span>{progressText(progress, ccy, locale)}</span>
+            <InfoTip help="statement.progress" />
+          </p>
+        )}
+        {/* what every account really held, and the tick that counts the month as done, beside the count it changes;
+            a household that is still being set up has no month to look back on yet */}
+        {!settingUp && <Button size="xs" variant="outline" onClick={() => setBalances(true)}>Balances…</Button>}
         {/* What another currency is worth this month: a chip to read, and to press for a rate of one's own */}
         {currencies.length > 0 && (
           <span className="inline-flex flex-wrap items-center gap-1.5" data-testid="month-rates">
             {currencies.map((c) => <RateChip key={`${c}:${m}`} tables={tables} household={household} month={m} currency={c} />)}
           </span>
         )}
-        {/* what every account really held, and the tick that counts the month as done; a household that is still
-            being set up has no month to look back on yet */}
-        {!settingUp && <Button size="sm" variant="outline" onClick={() => setBalances(true)}>Balances…</Button>}
       </PageHeader>
 
       {settingUp && <SetupGuide steps={steps} current={step} action={stepAction} onStep={onStep} onDone={leaveSetup} />}

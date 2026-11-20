@@ -3,17 +3,18 @@ import { InfoTip } from '@/components/InfoTip'
 import { formatAmount, formatMonth, formatWhole } from '@/app/format'
 import { HUES } from '@/app/hues'
 import { cn } from '@/lib/utils'
-import { isPastMonth, type Money, type MonthKey } from '@/model'
+import { isPastMonth, parseMonth, type Money, type MonthKey } from '@/model'
 import { stripStart, type StripMonth } from './stripMonths'
 
 /**
- * The months of the plan as a strip of chips, first thing on the Statement (DESIGN.md §7). A chip is its month in
- * two lines: income + what came out of the accounts, and expenses + what was left, each figure in the hue its group
- * has on the page. A month that is over is grey, the current one says "now", and the month on screen is the pressed
- * chip. The strip opens with three past months at its left edge, scrolls sideways, and keeps the pressed chip in
- * view. One stop for the Tab key: the arrow keys move along it.
+ * The months of the plan as a strip of chips, first thing on the Statement (DESIGN.md §7), and the one place where
+ * its month is changed. A chip is its month in two lines: income + what came out of the accounts, and expenses + what
+ * was left, each figure in the hue its group has on the page. A month that is over is grey, the current one says
+ * "now", and the month on screen is the pressed chip. The strip opens with three past months at its left edge,
+ * scrolls sideways, and keeps the pressed chip in view. One stop for the Tab key: the arrow keys move along it.
+ * After the last month stands "Add <year>": the plan grows a calendar year at a time.
  */
-export function MonthStrip({ months, month, today, currency, locale, onChange }: {
+export function MonthStrip({ months, month, today, currency, locale, onChange, onAddYear }: {
   months: StripMonth[]
   /** The month on screen. */
   month: MonthKey
@@ -21,6 +22,8 @@ export function MonthStrip({ months, month, today, currency, locale, onChange }:
   currency: string
   locale: string
   onChange: (m: MonthKey) => void
+  /** "Add <year>" after the last chip. */
+  onAddYear?: () => void
 }) {
   const strip = useRef<HTMLDivElement>(null)
   const placed = useRef(false)
@@ -43,7 +46,9 @@ export function MonthStrip({ months, month, today, currency, locale, onChange }:
     if (!el || !chip) return
     // how far the strip has to be scrolled at least for the chip's right edge to be in
     const need = chip.offsetLeft + chip.offsetWidth - el.clientWidth
-    if (chip.offsetLeft < el.scrollLeft) el.scrollTo({ left: chip.offsetLeft })
+    // the plan's last month brings "Add <year>" after it into view as well
+    if (month === keys[keys.length - 1]) el.scrollTo({ left: el.scrollWidth })
+    else if (chip.offsetLeft < el.scrollLeft) el.scrollTo({ left: chip.offsetLeft })
     else if (need > el.scrollLeft) {
       // to the start of a chip, where the strip comes to rest by itself (it snaps): the first one that leaves the pressed chip whole
       const first = [...el.children].find((c) => (c as HTMLElement).offsetLeft >= need) as HTMLElement | undefined
@@ -92,6 +97,15 @@ export function MonthStrip({ months, month, today, currency, locale, onChange }:
             </button>
           )
         })}
+        {onAddYear && keys.length > 0 && (
+          // not a month: outside the arrow keys' walk, the next stop for the Tab key
+          <button
+            type="button" onClick={onAddYear}
+            className="shrink-0 rounded-md border border-dashed px-3 text-xs font-medium whitespace-nowrap text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Add {parseMonth(keys[keys.length - 1]).year + 1}
+          </button>
+        )}
       </div>
       <InfoTip help="statement.months" className="mt-1.5 shrink-0" />
     </nav>

@@ -7,9 +7,10 @@ import { useStoreVersion } from '@/app/useStoreVersion'
 import { SyncIndicator } from '@/features/sync/SyncIndicator'
 
 /**
- * The toolbar as a bar that stays at the top of the window (DESIGN.md §2), from `md` up: on the page ground, as wide
- * as the page with its padding, so what scrolls under it does not show beside or through it. The header itself makes
- * no box then (`contents`), so the bar sticks for the length of the page and not only of the header.
+ * The toolbar, with what stands above it, as a bar that stays at the top of the window (DESIGN.md §2), from `md` up:
+ * on the page ground, as wide as the page with its padding, so what scrolls under it does not show beside or through
+ * it. The header itself makes no box then (`contents`), so the bar sticks for the length of the page and not only of
+ * the header.
  */
 const BAR = 'md:sticky md:top-0 md:z-30 md:-mx-6 md:mb-2 md:bg-background md:px-6 md:py-2 md:data-[stuck=true]:shadow-[0_1px_0_var(--color-border)]'
 
@@ -20,22 +21,19 @@ const BAR = 'md:sticky md:top-0 md:z-30 md:-mx-6 md:mb-2 md:bg-background md:px-
  * (`tools`, quiet buttons), then the app's own: Undo, Redo and the sync cloud. `notes` are lines of their own under
  * the row (an alert, a warning).
  *
- * `sticky` keeps the toolbar, and `below` under it (the Statement's progress line), in view while a long page
- * scrolls: the name scrolls away, the month and its controls stay. `above` stands between the name and the toolbar
- * and scrolls away with the name (the Statement's strip of months).
+ * `sticky` keeps the toolbar in view while a long page scrolls, and with it what stands right above it (`above`: the
+ * Statement's strip of months): the name scrolls away, the months and the month's line stay.
  */
-export function PageHeader({ title, subline, children, tools, notes, controls = true, sticky = false, above, below }: {
+export function PageHeader({ title, subline, children, tools, notes, controls = true, sticky = false, above }: {
   title: string; subline?: ReactNode; children?: ReactNode; controls?: boolean
   /** How the page is shown (view buttons, the legend): quiet, at the right end, before Undo and Redo. */
   tools?: ReactNode
   /** Lines of their own under the toolbar's row: what failed, what the engine warns about. */
   notes?: ReactNode
-  /** Between the screen's name and the toolbar; it scrolls away with the name. */
+  /** Right above the toolbar, one bar with it: it stays in view when the toolbar does. */
   above?: ReactNode
   /** The toolbar stays at the top of the window while the page scrolls (from `md` up). */
   sticky?: boolean
-  /** A line that belongs to the toolbar and stays with it. */
-  below?: ReactNode
 }) {
   const { mark, stuck } = useStuck(sticky)
   return (
@@ -44,15 +42,15 @@ export function PageHeader({ title, subline, children, tools, notes, controls = 
         <h1 className="text-2xl font-semibold leading-8 tracking-tight">{title}</h1>
         {subline && <p className="text-xs leading-4 text-muted-foreground">{subline}</p>}
       </div>
-      {/* the header makes no box when its bar is sticky, so what stands above the bar brings its own distance to the name */}
-      {above && <div className={cn('min-w-0', sticky && 'md:mt-2')}>{above}</div>}
       {/* where the bar stands while nothing is scrolled: once this is above the window, the bar is stuck */}
       {sticky && <div ref={mark} className="-mb-px h-px max-md:hidden" aria-hidden />}
       <div className={cn(sticky && BAR)} data-stuck={sticky ? stuck : undefined} data-sticky-bar={sticky || undefined}>
+        {above && <div className="mb-2 min-w-0">{above}</div>}
         <div className="flex min-h-[28px] flex-wrap items-center gap-x-2.5 gap-y-1 text-xs">
           {children}
           {(tools || controls) && (
-            <div className="ml-auto flex flex-wrap items-center justify-end gap-x-1 gap-y-1">
+            // on a phone the group takes a line of its own: the page's tools from the left, the app's at the right
+            <div className="ml-auto flex flex-wrap items-center gap-x-1 gap-y-1 max-md:w-full">
               {tools}
               {controls && <HistoryControls />}
               {controls && <SyncIndicator />}
@@ -61,7 +59,6 @@ export function PageHeader({ title, subline, children, tools, notes, controls = 
         </div>
         {/* a line that says nothing takes no room */}
         {notes && <div className="mt-1 space-y-1 text-xs empty:hidden">{notes}</div>}
-        {below && <div className={sticky ? 'mt-3 md:mt-1.5' : 'mt-4'}>{below}</div>}
       </div>
     </header>
   )
@@ -85,7 +82,7 @@ function HistoryControls() {
   const store = useStore()
   useStoreVersion(store)
   return (
-    <span className="ml-1.5 inline-flex items-center gap-0.5">
+    <span className="ml-auto inline-flex items-center gap-0.5 pl-1.5">
       <Button variant="ghost" size="icon-xs" aria-label="Undo" disabled={!store.canUndo} onClick={() => void store.undo()}><Undo2 /></Button>
       <Button variant="ghost" size="icon-xs" aria-label="Redo" disabled={!store.canRedo} onClick={() => void store.redo()}><Redo2 /></Button>
     </span>

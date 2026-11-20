@@ -214,11 +214,12 @@
   html {
     @apply font-sans;
     }
-  /* Under a bar that stays at the top of the window (PageHeader `sticky`), what the browser scrolls to by itself
-     (a control that takes the focus) stops below the bar, not under it. */
+  /* Under a bar that stays at the top of the window (PageHeader `sticky`: the Statement's strip of months and the
+     month's line, two lines of it on a narrow window), what the browser scrolls to by itself (a control that takes
+     the focus) stops below the bar, not under it. */
   @media (min-width: 48rem) {
     html:has([data-sticky-bar]) {
-      scroll-padding-top: 5.5rem;
+      scroll-padding-top: 9.5rem;
       }
   }
 }

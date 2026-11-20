@@ -1,4 +1,4 @@
-import { expect, test } from './test'
+import { expect, stepMonth, test } from './test'
 
 /** Working the month on the Statement from the phone: ticks, the progress line, the real amount, items, automatic rows, the whole month counted as done. */
 test.describe('tracking the month on a phone', () => {
@@ -39,10 +39,10 @@ test.describe('tracking the month on a phone', () => {
     await expect(moneyOut.getByRole('button', { name: /^The flat – Utilities:/ })).toHaveAccessibleName('The flat – Utilities: €199.00')
     await expect(page.getByRole('checkbox', { name: 'The flat – Utilities done' })).toBeChecked()
     await expect(progress).toHaveText('2 of 21 done · €6,216.00 still to pay · €7,405.00 to come in')
-    await page.getByRole('button', { name: 'Next month' }).tap()
+    await stepMonth(page, 1)
     await expect(page.getByRole('heading', { name: 'December 2026' })).toBeVisible()
     await expect(moneyOut.getByRole('button', { name: /^The flat – Utilities:/ })).toHaveAccessibleName('The flat – Utilities: €210.00, an estimate')
-    await page.getByRole('button', { name: 'Previous month' }).tap()
+    await stepMonth(page, -1)
     await expect(page.getByRole('heading', { name: 'November 2026' })).toBeVisible()
 
     // two items make Groceries a row that opens, with a tick per item
@@ -109,7 +109,7 @@ test.describe('tracking the month on a phone', () => {
 
     // a month that is over says so beside the household's name; the current one does not
     await expect(page.getByText('past', { exact: true })).toHaveCount(0)
-    await page.getByRole('button', { name: 'Previous month' }).tap()
+    await stepMonth(page, -1)
     await expect(page.getByRole('heading', { level: 2, name: 'October 2026' })).toBeVisible()
     await expect(page.getByText('past', { exact: true })).toBeVisible()
   })

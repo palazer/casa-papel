@@ -1,4 +1,4 @@
-import { expect, test, type Page } from './test'
+import { expect, stepMonth, test, type Page } from './test'
 
 /** The demo household starts in September 2026; on the test's day, 15 November 2026, September and October are over. */
 async function loadDemo(page: Page) {
@@ -141,7 +141,7 @@ test.describe('the question on a phone', () => {
   test('fits the screen over the dialog', async ({ page }) => {
     await page.goto('?demo=1&screen=statement')
     await page.getByRole('button', { name: 'Load the demo household' }).click()
-    await page.getByRole('button', { name: 'Previous month' }).click()
+    await stepMonth(page, -1)
     await expect(page.getByRole('heading', { level: 2, name: 'October 2026' })).toBeVisible()
     await page.getByRole('button', { name: 'Expand all' }).click()
     await page.getByRole('button', { name: /^Groceries: / }).click()

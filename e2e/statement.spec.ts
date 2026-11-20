@@ -1,4 +1,4 @@
-import { expect, saveAnyway, test, type Locator, type Page } from './test'
+import { expect, openMonth, saveAnyway, stepMonth, test, type Locator, type Page } from './test'
 
 async function openStatement(page: Page) {
   await page.goto('?demo=1')
@@ -7,13 +7,9 @@ async function openStatement(page: Page) {
   await expect(page.getByRole('heading', { level: 1, name: 'Statement' })).toBeVisible()
 }
 
-/** The demo household starts in September 2026: walk back to it, then forward to the month wanted. */
+/** Open a month of the demo household from the strip of months. */
 async function goToMonth(page: Page, name: string) {
-  const prev = page.getByRole('button', { name: 'Previous month' })
-  while (await prev.isEnabled()) await prev.click()
-  await expect(page.getByRole('heading', { level: 2, name: 'September 2026' })).toBeVisible()
-  for (let i = 0; i < 24 && !(await page.getByRole('heading', { level: 2, name }).isVisible()); i++) await page.getByRole('button', { name: 'Next month' }).click()
-  await expect(page.getByRole('heading', { level: 2, name })).toBeVisible()
+  await openMonth(page, name)
 }
 
 const total = (page: Page, side: 'in' | 'out' | 'assets' | 'claims') => page.getByTestId(`total-${side}`)
@@ -160,13 +156,19 @@ test.describe('the Statement', () => {
     await expect(chip('2026-10')).toHaveAttribute('aria-pressed', 'true')
     await expect(chip('2026-11')).toHaveAttribute('aria-pressed', 'false')
     await expect(page.getByText('past', { exact: true })).toBeVisible()
-    // the arrows beside the month's name move the pressed chip, and a chip that was out of view comes into it
-    await page.getByRole('button', { name: 'Next month' }).click()
+    // the month has no arrows beside its name: the strip is where it is changed
+    await expect(page.getByRole('button', { name: 'Next month' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Previous month' })).toHaveCount(0)
+    await chip('2026-11').click()
     await expect(chip('2026-11')).toHaveAttribute('aria-pressed', 'true')
-    await goToMonth(page, 'December 2027')
+    // a chip that is out of view comes into it once it is the month on screen
+    await chip('2027-12').evaluate((el: HTMLElement) => el.click())
     await expect(chip('2027-12')).toHaveAttribute('aria-pressed', 'true')
-    // (the last chip ends where the strip ends, to a fraction of a pixel)
     await expect(chip('2027-12')).toBeInViewport({ ratio: 0.99 })
+    // the last month brings what stands after it into view: the plan grows a calendar year at a time
+    const add = strip.getByRole('button', { name: 'Add 2028' })
+    await expect(add).toBeInViewport({ ratio: 0.99 })
+    await page.screenshot({ path: 'e2e/output/statement-month-strip-end.png' })
 
     // one stop for the Tab key: the arrow keys move along the chips, Enter opens the month
     await chip('2027-12').focus()
@@ -183,11 +185,47 @@ test.describe('the Statement', () => {
     await expect(page.getByText('Line one is what came in: income + what came out of your accounts.', { exact: false })).toBeVisible()
     await page.keyboard.press('Escape')
 
-    // the strip scrolls away with the name of the screen; the month and its controls stay
+    // the strip stays in view with the month's line while the page scrolls; only the name of the screen scrolls away
     await page.getByRole('button', { name: 'Expand all' }).click()
     await page.evaluate(() => window.scrollTo(0, 500))
-    await expect(strip).not.toBeInViewport()
+    await expect(page.getByRole('heading', { level: 1, name: 'Statement' })).not.toBeInViewport()
+    await expect(strip).toBeInViewport({ ratio: 1 })
     await expect(page.getByRole('heading', { level: 2, name: 'October 2026' })).toBeInViewport()
+    // and the month is changed from there
+    await chip('2026-12').click()
+    await expect(page.getByRole('heading', { level: 2, name: 'December 2026' })).toBeInViewport()
+    await expect(chip('2026-12')).toHaveAttribute('aria-pressed', 'true')
+    await expect(strip).toBeInViewport({ ratio: 1 })
+  })
+
+  test('the line under the strip reads by subject: the month and what belongs to it, then the page\'s buttons, then Undo and Redo', async ({ page }) => {
+    await openStatement(page)
+    const bar = page.locator('[data-sticky-bar]')
+    const x = async (l: Locator) => (await l.boundingBox())!.x
+    const order = [
+      page.getByRole('heading', { level: 2, name: 'November 2026' }),
+      page.getByTestId('progress'),
+      bar.getByRole('button', { name: 'Balances…' }),
+      bar.getByRole('button', { name: 'Suggestions', exact: true }),
+      bar.getByRole('button', { name: 'Expand all' }),
+      bar.getByRole('button', { name: 'Collapse all' }),
+      bar.getByRole('button', { name: 'Colours and marks' }),
+      bar.getByRole('button', { name: 'Undo' }),
+      bar.getByRole('button', { name: 'Redo' }),
+    ]
+    const xs = [] as number[]
+    for (const l of order) xs.push(await x(l))
+    expect(xs).toEqual([...xs].sort((a, b) => a - b))
+    // one line on a wide window, under the strip
+    const ys = await Promise.all([order[0], order[2], order[8]].map(async (l) => { const b = (await l.boundingBox())!; return b.y + b.height / 2 }))
+    expect(Math.max(...ys) - Math.min(...ys)).toBeLessThan(6)
+    expect((await page.getByRole('navigation', { name: 'Months' }).boundingBox())!.y).toBeLessThan(ys[0])
+    // a month that is over says so beside its name, not up beside the household's
+    await page.getByRole('navigation', { name: 'Months' }).locator('[data-month="2026-10"]').click()
+    const past = bar.getByText('past', { exact: true })
+    await expect(past).toBeVisible()
+    expect(await x(past)).toBeGreaterThan(await x(page.getByRole('heading', { level: 2, name: 'October 2026' })))
+    expect(await x(past)).toBeLessThan(await x(page.getByTestId('progress')))
   })
 
   test('spending from a virtual account shows on both sides', async ({ page }) => {
@@ -412,7 +450,7 @@ test.describe('working the month in the Statement', () => {
     await sidesAgree()
 
     // it carries forward like any amount, and the Grid counts the same rest as an automatic row
-    await page.getByRole('button', { name: 'Next month' }).click()
+    await stepMonth(page, 1)
     await expect(page.getByRole('heading', { level: 2, name: 'December 2026' })).toBeVisible()
     expect(await amountOf('Housing')).toBe(2000)
     await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Grid' }).click()
@@ -808,12 +846,12 @@ test.describe('working the month in the Statement', () => {
     await page.screenshot({ path: 'e2e/output/statement-current-balance.png', fullPage: true })
 
     // December is worked out again, from the real number
-    await page.getByRole('button', { name: 'Next month' }).click()
+    await stepMonth(page, 1)
     await expect(page.getByRole('heading', { level: 2, name: 'December 2026' })).toBeVisible()
     await expect(line).toContainText('calculated')
     await expect(assets.locator('[data-line="main:start"]')).toContainText('€1,150.00')
     await sameTotals()
-    await page.getByRole('button', { name: 'Previous month' }).click()
+    await stepMonth(page, -1)
 
     // back to the calculated amount, in one step that Undo takes back
     await entered.click()
@@ -882,7 +920,7 @@ test.describe('working the month in the Statement', () => {
     await expect(fund).toHaveAccessibleName('Index fund balance: €14,000.00, entered')
 
     // December starts with what November ended on
-    await page.getByRole('button', { name: 'Next month' }).click()
+    await stepMonth(page, 1)
     await expect(page.getByRole('heading', { level: 2, name: 'December 2026' })).toBeVisible()
     await fund.click()
     const dlg = page.getByRole('dialog')
@@ -896,12 +934,12 @@ test.describe('working the month in the Statement', () => {
     await page.screenshot({ path: 'e2e/output/balance-start-end-dialog.png' })
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-    await page.getByRole('button', { name: 'Previous month' }).click()
+    await stepMonth(page, -1)
     await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
     await expect(fund).toHaveAccessibleName('Index fund balance: €14,250.00, entered')
 
     // October is over: the tick is set, and one Save keeps the balance and counts the whole month as done
-    await page.getByRole('button', { name: 'Previous month' }).click()
+    await stepMonth(page, -1)
     await expect(page.getByRole('heading', { level: 2, name: 'October 2026' })).toBeVisible()
     const october = (await progress.textContent())!
     expect(october).toMatch(/^\d+ of \d+ done/)
@@ -1157,7 +1195,7 @@ test.describe('working the month in the Statement', () => {
     await page.setViewportSize({ width: 1400, height: 900 })
 
     // the month before keeps what it showed
-    await page.getByRole('button', { name: 'Previous month' }).click()
+    await stepMonth(page, -1)
     await expect(page.getByRole('heading', { level: 2, name: 'October 2026' })).toBeVisible()
     await expect(moneyOut.getByRole('button', { name: 'Sam – Pocket: €500.00' })).toBeVisible()
   })
@@ -1374,9 +1412,9 @@ test.describe('working the month in the Statement', () => {
     await expect(moneyOut.getByRole('button', { name: /^The car – Fuel & parking: €90\.00/ })).toBeVisible()
     await expect(transport.locator('[data-suggestion]')).toHaveText([/^Transport/, /^The car – Loan or lease/, /^The car – Tax & inspection/, /^The car – Maintenance/])
     await expect(page.getByRole('dialog')).toHaveCount(0)
-    await page.getByRole('button', { name: 'Next month' }).click()
+    await stepMonth(page, 1)
     await expect(moneyOut.getByRole('button', { name: /^The car – Fuel & parking: €90\.00/ })).toBeVisible()
-    await page.getByRole('button', { name: 'Previous month' }).click()
+    await stepMonth(page, -1)
 
     // "×": not for us. The line is gone from the page; the undo arrow brings it back
     await expect(transport.getByRole('button', { name: /^Dismiss / })).toHaveCount(4)
@@ -1985,7 +2023,7 @@ test.describe('working the month in the Statement', () => {
     await moneyOut.getByRole('button', { name: 'Items of Health' }).click()
     await expect(moneyOut.getByRole('button', { name: /^Health: Sports club membership: €30\.00/ })).toBeVisible()
     await expect(moneyOut.getByRole('button', { name: /^Health: Gym:/ })).toHaveCount(0)
-    await page.getByRole('button', { name: 'Next month' }).click()
+    await stepMonth(page, 1)
     await expect(page.getByRole('heading', { level: 2, name: 'December 2026' })).toBeVisible()
     await expect(moneyOut.getByRole('button', { name: /^Health:/ }).first()).toBeVisible()
     await health.first().click()
@@ -2197,9 +2235,9 @@ test.describe('working the month in the Statement', () => {
     await expect(moneyOut.getByRole('button', { name: 'Housing', exact: true })).toBeVisible()
 
     // it stays folded: in another month, after another screen, and when the page is loaded again
-    await page.getByRole('button', { name: 'Next month' }).click()
+    await stepMonth(page, 1)
     await expect(setAside).toHaveAttribute('aria-expanded', 'false')
-    await page.getByRole('button', { name: 'Previous month' }).click()
+    await stepMonth(page, -1)
     await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Grid' }).click()
     await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
     await expect(setAside).toHaveAttribute('aria-expanded', 'false')
@@ -2556,13 +2594,15 @@ test.describe('the Statement on a phone', () => {
     await expect(chip('2027-03')).not.toBeInViewport()
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
     await page.screenshot({ path: 'e2e/output/statement-month-strip-phone.png' })
-    // a chip opens its month, and the strip follows the arrows beside the month's name
+    // a chip opens its month, and the strip keeps the pressed chip in view
     await chip('2026-12').tap()
     await expect(page.getByRole('heading', { level: 2, name: 'December 2026' })).toBeVisible()
-    await page.getByRole('button', { name: 'Next month' }).tap()
-    await page.getByRole('button', { name: 'Next month' }).tap()
+    await stepMonth(page, 1)
+    await stepMonth(page, 1)
     await expect(chip('2027-02')).toHaveAttribute('aria-pressed', 'true')
     await expect(chip('2027-02')).toBeInViewport({ ratio: 1 })
+    // the line under the strip wraps and the page still does not scroll sideways
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
   })
 
   test('the row\'s dialog with its "Repeats" lines fits the screen', async ({ page }) => {

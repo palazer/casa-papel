@@ -68,25 +68,26 @@ Statement frame  full width, space-y-4: the progress line, then dense islands, o
   screen to land on: they are utilities, so a fresh visit opens the household (or the welcome screen when there is
   none); the Guide also opens without a household.
 - **Page header** (`src/components/PageHeader.tsx`): every screen opens with it. The H1 is the screen's name (the rail's
-  label); the subline names the frame of reference (`The Demo Household · Sep 2026 – Nov 2027`, `· past` as a chip on the Statement of a month
-  that is over). **The toolbar is ordered by what a control is about.** At the left the screen's own controls
+  label); the subline names the frame of reference (`The Demo Household · Sep 2026 – Nov 2027`; on the Statement the household's name alone, the month
+  stands in the toolbar). **The toolbar is ordered by what a control is about.** At the left the screen's own controls
   (`children`: the month and what belongs to it, Balances…, Add <year>). At the right end (`ml-auto`, one group that
   wraps under the controls when the window is narrow) first how the page is shown (`tools`: Suggestions, Expand all,
   Collapse all, the legend, all `xs ghost`, so they stand back behind the screen's controls; a pressed one keeps the
   lime), then the app's own: Undo and Redo (6 px after the tools) and the sync cloud, last on every screen. Errors
   and warnings are `notes`, lines of their own under the row: destructive for an action that failed,
   `text-amber-700` for a warning the engine raises.
-  **On a long page the toolbar stays in view** (`sticky`, the Statement): from `md` up the toolbar and the line that
-  belongs to it (`below`: the Statement's progress line, 6 px under the controls) are one bar that sticks to the top
-  of the window, so the month and its controls are always there; the H1 and its subline scroll away. The bar is on
-  the page's ground from the rail to the window's edge (`bg-background`, `-mx-6 px-6 py-2`, `z-30`), and a hairline
-  under it (`shadow-[0_1px_0_var(--color-border)]`) shows only while it is stuck (`data-stuck`, from a mark just
-  above it that an `IntersectionObserver` watches). The header makes no box then (`md:contents`), so the bar sticks
-  for the length of the page. A line the page goes to stops below the bar, and so does a control that takes the
-  focus (`scroll-padding-top` in `index.css`). On a phone the toolbar takes three lines and scrolls with the page.
+  **On a long page the toolbar stays in view** (`sticky`, the Statement), and with it what the screen puts right
+  above it (`above`: the Statement's strip of months, §7, 8 px over the row): from `md` up they are one bar that
+  sticks to the top of the window, so the months, the month on screen and its controls are always there; the H1 and
+  its subline scroll away. The bar is on the page's ground from the rail to the window's edge (`bg-background`,
+  `-mx-6 px-6 py-2`, `z-30`), and a hairline under it (`shadow-[0_1px_0_var(--color-border)]`) shows only while it
+  is stuck (`data-stuck`, from a mark just above it that an `IntersectionObserver` watches). The header makes no box
+  then (`md:contents`), so the bar sticks for the length of the page. On a wide window the bar is the strip and one
+  line (about 110 px); under about 1150 px of page the right-hand group wraps onto a second line. A line the page
+  goes to stops below the bar, and so does a control that takes the focus (`scroll-padding-top: 9.5rem` in
+  `index.css`, the two-line bar). On a phone nothing sticks: the right-hand group takes a line of its own
+  (`max-md:w-full`), the page's tools from the left and Undo, Redo and the cloud at the right (`ml-auto`).
   While a household is being set up the setup guide holds the top of the window, and the bar is not sticky.
-  What a screen puts between its name and the toolbar (`above`: the Statement's strip of months, §7) scrolls away
-  with the name, 8 px under the subline.
 - **Welcome** (`src/features/home/HomeScreen.tsx`): the one screen without a toolbar (its header carries a `role="status"`
   line for the account dialog's outcome and a `role="alert"` line for an import that failed). One air island "Welcome to
   Casa Papel" lists the ways in as rows: a `sm` button (lime on the recommended path only, `outline` otherwise) and one
@@ -334,7 +335,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   shows the goal's name, its bar and the sentence that says how far the plan gets (`goalStatusLine`), with `Edit`
   beside the name; there is no list of all goals.
   **The strip of months** (`src/features/statement/MonthStrip.tsx`, its figures in `stripMonths.ts`) is the first
-  thing on the page, between the screen's name and the toolbar, and it scrolls away with the name. A `nav` "Months"
+  thing on the page, between the screen's name and the toolbar, and it stays in view with the toolbar (§2). It is
+  the one place where the Statement's month is changed: the month's name under it has no arrows. A `nav` "Months"
   with one chip per month of the plan: a `rounded-md border px-2 py-1` button, `min-w-[5.5rem]`, from `md` a twelfth
   of the strip, so that twelve are in view (on a phone about three and a half, the cut one saying there is more).
   A chip is its month in three lines: the month (`Nov 2026`, `text-xs font-medium`), then two `text-[11px]
@@ -350,15 +352,22 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   comes to rest on a chip's start (`snap-x`), and brings the pressed chip into view when the month is changed by
   other means. It is one stop for the Tab key: Left, Right, Home and End move along the chips. A chip is named in
   words (`November 2026, now: income €7,405, from accounts €660, expenses €3,896, from what is left €4,169`), carries
-  `aria-pressed`, and the current month `aria-current="date"`. An (i) (`statement.months`) ends the row. Not shown
-  while a household is being set up, and not in the Grid, whose columns are the months already.
-  The toolbar holds the `MonthPicker`, `Expand all` / `Collapse all`
-  (every group and category at once; not "Open" and "Close", which would read as the month's), the `Suggestions` toggle, the
-  `MarksLegend` and, last, `Balances…` (`sm outline`: the month's balances dialog, §8), left out
-  while the "Setting up" guide shows. The toolbar has no lime button: no action of a month is more final than
-  another. Under the header sits the
-  **progress line** (`monthProgress` and `progressText` in `src/features/statement/progress.ts`): a muted `text-xs`
-  `role="status"` line with an (i), `7 of 21 done · €… still to pay · €… to come in`, then `All 21 done`; a month with nothing in it shows no line. The month is worked in its upper half: a row and each of its items
+  `aria-pressed`, and the current month `aria-current="date"`. After the last month stands `Add <year>`, a chip
+  with a dashed border and muted `text-xs font-medium` (not a month: outside the arrow keys' walk, the next stop for
+  the Tab key); it grows the plan by a calendar year and leaves the month on screen, and it comes into view with the plan's last
+  month (the strip scrolls to its end when that month is pressed). An (i) (`statement.months`)
+  ends the row. Not shown while a household is being set up (the month keeps the `MonthPicker`'s arrows there), and
+  not in the Grid, whose columns are the months already.
+  **The line under the strip** is the toolbar (§2), and reads as the caption of the pressed month. At the left, what
+  is the month's: its name (`h2 text-sm font-semibold`), the zinc `past` chip when it is over, the **progress**
+  (`monthProgress` and `progressText` in `src/features/statement/progress.ts`: a muted `role="status"` text with an
+  (i), `7 of 21 done · €… still to pay · €… to come in`, then `All 21 done`; a month with nothing in it shows
+  none), `Balances…` (`xs outline`, the only button with a border in the bar: the month's balances dialog, §8,
+  beside the count it can change; left out while the "Setting up" guide shows) and the rate chips. At the right,
+  how the page is shown, as `xs ghost` buttons: the `Suggestions` toggle (lime while on) with its (i), `Expand all`
+  / `Collapse all` (every group and category at once; not "Open" and "Close", which would read as the month's) and
+  the `MarksLegend`; then Undo, Redo and the sync cloud. The bar has no lime action: no action of a month is more
+  final than another. The month is worked in its upper half: a row and each of its items
   carry the `Tick` before the name (44 px on phones, 24 px with a 12 px dot from 768 px), and the rest of the line is
   a button named `<line>: <amount>` (`, an estimate` when shaded) that opens the row's one dialog, the cell editor
   (§8), for that row and month. For a payment to a loan that counts for less than was planned, the dialog starts
@@ -598,8 +607,9 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   reach under a long list. Variants: `default` (lime) for the primary action or the active toggle, `outline` for the rest and inactive
   toggles, `ghost` for quiet actions (Edit, Cancel), `destructive` for the irreversible. Toggle idiom:
   `variant={active ? 'default' : 'outline'}` (the entity-kind picker under People & things).
-- `MonthPicker`: two `icon-xs outline` buttons around the month as an `h2 text-sm font-medium`; lives in the page
-  header's toolbar (the Statement) or an island's first line (Schedules). At the last planned month the Next button gives
+- `MonthPicker`: two `icon-xs outline` buttons around the month as an `h2 text-sm font-medium`; lives in an island's
+  first line (Schedules), and in the Statement's toolbar only while a household is being set up (afterwards the strip
+  of months changes the month, §7). At the last planned month the Next button gives
   way to an `xs outline` `Add <year>`, the Grid toolbar's action: the plan always ends in a December and grows a calendar
   year at a time (`planEnd` in `src/store/months.ts`; this year's December, next year's from October on).
 - One name per idea, the same in every control: a repeating amount is a **schedule** (dialog "New schedule" / "Edit

@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from './test'
+import { expect, openMonth, stepMonth, test, type Locator, type Page } from './test'
 
 /**
  * Whole stories through the screens, with the household and the numbers of the scenario catalogue
@@ -61,8 +61,7 @@ async function addRow(s: Screen, section: 'income' | 'expense', name: string, am
 }
 
 async function toMonth(page: Page, name: string): Promise<void> {
-  for (let i = 0; i < 24 && !(await page.getByRole('heading', { level: 2, name }).isVisible()); i++) await page.getByRole('button', { name: 'Next month' }).click()
-  await expect(page.getByRole('heading', { level: 2, name })).toBeVisible()
+  await openMonth(page, name)
 }
 
 const line = (side: Locator, text: string | RegExp) => side.locator('[data-line]').filter({ hasText: text }).first()
@@ -100,7 +99,7 @@ test.describe('whole stories, as the scenarios tell them', () => {
 
     await page.getByRole('button', { name: 'Undo' }).click()
     await expect(s.assets.locator('[data-line="main"]')).toContainText('€6,400.00')
-    await page.getByRole('button', { name: 'Previous month' }).click()
+    await stepMonth(page, -1)
     await expect(page.getByRole('heading', { level: 2, name: 'December 2026' })).toBeVisible()
     await expect(s.moneyOut.getByRole('button', { name: /^Rent: €1,200\.00/ })).toBeVisible()
   })
@@ -110,10 +109,7 @@ test.describe('whole stories, as the scenarios tell them', () => {
   test('a new amount for this and following months replaces a later one, says so first, leaves a ticked month, and undo takes it back', async ({ page }) => {
     const s = await household(page)
     const rent = (amount: string) => s.moneyOut.getByRole('button', { name: new RegExp(`^Rent: €${amount.replace('.', '\\.')}`) })
-    const back = async (name: string) => {
-      for (let i = 0; i < 24 && !(await page.getByRole('heading', { level: 2, name }).isVisible()); i++) await page.getByRole('button', { name: 'Previous month' }).click()
-      await expect(page.getByRole('heading', { level: 2, name })).toBeVisible()
-    }
+    const back = (name: string) => openMonth(page, name)
     // the rent rises to 1,300.00 in April 2027
     await toMonth(page, 'April 2027')
     await rent('1,200.00').click()

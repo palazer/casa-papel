@@ -1,4 +1,4 @@
-import { expect, test } from './test'
+import { expect, stepMonth, test } from './test'
 
 /** The app shell (DESIGN.md §2): the rail on desktop with its Settings group, the bottom tabs on phones, the page header's toolbar. */
 test.describe('shell', () => {
@@ -70,7 +70,7 @@ test.describe('shell', () => {
     await expect(page.getByRole('button', { name: 'Redo' })).toBeEnabled()
   })
 
-  test('on the Statement the month, its controls and the count of the month stay at the top while the page scrolls', async ({ page }) => {
+  test('on the Statement the strip of months and the line of the month on screen stay at the top while the page scrolls', async ({ page }) => {
     await page.goto('?demo=1')
     await page.getByRole('button', { name: 'Load the demo household' }).click()
     const title = page.getByRole('heading', { level: 1, name: 'Statement' })
@@ -83,10 +83,11 @@ test.describe('shell', () => {
     await expect(bar).toHaveCSS('box-shadow', 'none')
     await page.getByRole('button', { name: 'Expand all' }).click()
 
-    // scrolled down: the name of the screen is gone; the month, its buttons and the line that counts the month are still there
+    // scrolled down: the name of the screen is gone; the months, the month's name, its count and its buttons are still there
     await page.evaluate(() => window.scrollTo(0, 500))
     await expect(bar).toHaveAttribute('data-stuck', 'true')
     await expect(title).not.toBeInViewport()
+    await expect(page.getByRole('navigation', { name: 'Months' })).toBeInViewport({ ratio: 1 })
     await expect(month).toBeInViewport()
     await expect(page.getByRole('button', { name: 'Balances…' })).toBeInViewport()
     await expect(page.getByTestId('progress')).toBeInViewport()
@@ -100,9 +101,9 @@ test.describe('shell', () => {
     await page.screenshot({ path: 'e2e/output/statement-month-bar.png' })
 
     // the month is changed from there, and the page stays where it was
-    await page.getByRole('button', { name: 'Next month' }).click()
+    await stepMonth(page, 1)
     await expect(page.getByRole('heading', { level: 2, name: 'December 2026' })).toBeInViewport()
-    await page.getByRole('button', { name: 'Previous month' }).click()
+    await stepMonth(page, -1)
     await expect(month).toBeInViewport()
 
     // a line the page goes to stops below the bar, not under it

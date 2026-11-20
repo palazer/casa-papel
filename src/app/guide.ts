@@ -60,7 +60,7 @@ export const GUIDE: GuideTopic[] = [
     ],
     steps: [
       'A new household: "Start on this device" on the welcome screen, then "Household name", "Currency", "Number and date format", "First month" and the people and things, and "Open the Statement". The Statement opens on the first month with the "Setting up" guide: "Your first income", "Your first expenses", "Savings, and where the rest goes", "Your first virtual account", "Your first investment" and "Loans and cards". Each step lights its part of the page and locks the rest. Type an amount on a suggested line and press Enter; "Skip" or "Next" moves on, and "Leave setup" unlocks everything and puts the guide away.',
-      'Move between months with the arrows beside the month name; "Add <year>" at the last month grows the plan.',
+      'Press a month in the strip at the top to open it; the strip stays in view while the page scrolls. "Add <year>" at its end grows the plan.',
       'Open a category, "Housing" say, and tick "The flat – Rent" once the rent has left; a second press takes the tick back. An itemized row opens to its items, each with a tick of its own.',
       'Press a line, "The flat – Utilities" say, to record what it really was: "Amount in EUR", "Only this month", "Certain", then "Save". The lower half works the same way: press an account, "Index fund" say, to open it; press its amount for what it held at the start and at the end of the month; the arrow in front of "Savings" opens its virtual accounts.',
       'Press a heading, "From what is left" say, to fold it away with everything under it: its total stays, and it stays folded on this device. "Expand all" and "Collapse all" open and close every heading and category at once; "Colours and marks" is the legend.',
@@ -78,7 +78,7 @@ export const GUIDE: GuideTopic[] = [
     what: [
       'Every screen reads the same plan. The Grid shows it across time: one column per month from the current one on, one row per thing that comes in, goes out or moves, under the sections "Income", "Expenses" and "Transfers", with "Balances" and "Net worth" beneath. An amount carries forward until you change it, so a plan for a year is a handful of entries.',
       '"Earlier months" in the toolbar brings back the months before the current one and stays as you left it on this device; the sums count every month either way. A month name opens a menu with that month\'s totals, "Open in the Statement" and "Balances for <Month>…". The columns of the months that are over are grey; they can be changed like any other.',
-      'The plan always ends in a December. "Add <year>" in the toolbar grows it by a calendar year, and a change beyond the end grows it by itself. Every change is one undoable step: the two arrows at the right of every toolbar take it back and forward.',
+      'The plan always ends in a December. "Add <year>" (at the end of the strip of months on the Statement, and in the toolbar of the Grid) grows it by a calendar year, and a change beyond the end grows it by itself. Every change is one undoable step: the two arrows at the right of every toolbar take it back and forward.',
     ],
     steps: [
       'Click a cell, "Groceries" in this month, say; type in "Amount in EUR" and press "Save".',
