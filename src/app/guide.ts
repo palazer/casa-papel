@@ -63,7 +63,7 @@ export const GUIDE: GuideTopic[] = [
       'Move between months with the arrows beside the month name; "Add <year>" at the last month grows the plan.',
       'Open a category, "Housing" say, and tick "The flat – Rent" once the rent has left; a second press takes the tick back. An itemized row opens to its items, each with a tick of its own.',
       'Press a line, "The flat – Utilities" say, to record what it really was: "Amount in EUR", "Only this month", "Certain", then "Save". The lower half works the same way: press an account, "Index fund" say, to open it; press its amount for what it held at the start and at the end of the month; the arrow in front of "Savings" opens its virtual accounts.',
-      'Press a heading, "From what is left" say, to fold it away with everything under it: its total stays, and it stays folded on this device. "Expand all" and "Collapse all" open and close every heading and category at once; "What the colours and marks mean" is the legend.',
+      'Press a heading, "From what is left" say, to fold it away with everything under it: its total stays, and it stays folded on this device. "Expand all" and "Collapse all" open and close every heading and category at once; "Colours and marks" is the legend.',
       '"Balances…" when the month has ended: "Balances for <Month>" lists every account with "At the start" and "At the end". Type what the bank or the broker says, or leave a field empty to keep the calculated amount shown in grey. "Count everything in <Month> as done" ticks every line of the month and changes no amount; it is set for you when the month is over. Then "Save": one "Undo" takes the balances and the ticks back.',
       'To plan the months ahead, open the Grid; a month name there → "Open in the Statement" comes back to that month.',
       'Try things first: "Look at the demo first" on the welcome screen or "Open the demo sandbox" under Data; "Leave the demo" brings you back.',
@@ -78,7 +78,7 @@ export const GUIDE: GuideTopic[] = [
     what: [
       'Every screen reads the same plan. The Grid shows it across time: one column per month from the current one on, one row per thing that comes in, goes out or moves, under the sections "Income", "Expenses" and "Transfers", with "Balances" and "Net worth" beneath. An amount carries forward until you change it, so a plan for a year is a handful of entries.',
       '"Earlier months" in the toolbar brings back the months before the current one and stays as you left it on this device; the sums count every month either way. A month name opens a menu with that month\'s totals, "Open in the Statement" and "Balances for <Month>…". The columns of the months that are over are grey; they can be changed like any other.',
-      'The plan always ends in a December. "Add <year>" in the toolbar grows it by a calendar year, and a change beyond the end grows it by itself. Every change is one undoable step: the two arrows at the left of every toolbar take it back and forward.',
+      'The plan always ends in a December. "Add <year>" in the toolbar grows it by a calendar year, and a change beyond the end grows it by itself. Every change is one undoable step: the two arrows at the right of every toolbar take it back and forward.',
     ],
     steps: [
       'Click a cell, "Groceries" in this month, say; type in "Amount in EUR" and press "Save".',
@@ -359,12 +359,12 @@ export const GUIDE: GuideTopic[] = [
     title: 'Marks & keyboard',
     summary: 'Every kind of money has one colour and every mark one meaning; the keyboard moves you around the grid.',
     what: [
-      '"What the colours and marks mean" in the Statement and Grid toolbars is the legend. Kinds of money: "Income", "Expenses", "Transfers", "Balances and net worth", "Virtual accounts", "Goals". Marks: an estimate sits on a light yellow shade, certain is plain, done has a green dot; in the current month a red ring means nothing done yet and an amber half-dot partly done.',
+      '"Colours and marks" at the right of the Statement and Grid toolbars is the legend. Kinds of money: "Income", "Expenses", "Transfers", "Balances and net worth", "Virtual accounts", "Goals". Marks: an estimate sits on a light yellow shade, certain is plain, done has a green dot; in the current month a red ring means nothing done yet and an amber half-dot partly done.',
       'Spending shows as a red negative number when "Show expenses as negative red numbers" is on; an amber "+€…" is money drawn from savings this month; a dotted underline is a balance you entered yourself; a grey column in the Grid is a month that is over; a faint band is one category\'s rows. A crossed circle after an account\'s name on the Statement means it is not in net worth: its figures are grey and no total counts it. On the Statement two chain rings mark a row and the account it fills, takes from or pays off: press them to go to the other end, which is marked for a moment. Faint, open rings on a loan or card mean no row pays it off yet; pressing them adds the row. Two arrows in a loop mark a row or an item that is on a schedule; in a month where it does not land the line is grey and says when it lands next and with how much, "next Jan 2027" say.',
-      'In the grid the arrow keys move between cells, Enter or Space opens one, Escape closes the editor. Cmd/Ctrl+Z undoes and Shift redoes, like the two arrows at the left of every toolbar.',
+      'In the grid the arrow keys move between cells, Enter or Space opens one, Escape closes the editor. Cmd/Ctrl+Z undoes and Shift redoes, like the two arrows at the right of every toolbar.',
     ],
     steps: [
-      'Open "What the colours and marks mean" from the Statement or Grid toolbar.',
+      'Open "Colours and marks" from the Statement or Grid toolbar.',
       'Click a cell, then move with the arrow keys; Enter opens it, Escape closes it.',
       'Cmd/Ctrl+Z undoes, Cmd/Ctrl+Shift+Z redoes.',
       'Household → "Household settings" → "Show expenses as negative red numbers" switches the red negatives.',

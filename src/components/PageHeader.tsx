@@ -15,16 +15,21 @@ const BAR = 'md:sticky md:top-0 md:z-30 md:-mx-6 md:mb-2 md:bg-background md:px-
 
 /**
  * The top of every screen (DESIGN.md §2, after nfl-fantasy's page header): open on the page ground, no card. The
- * screen's name as the H1 over a muted subline (the household, the month), and under them the toolbar in its own
- * grammar: Undo and Redo first, the screen's controls, the sync cloud at the end. A `basis-full` child (an alert, a
- * notice) wraps onto a line of its own.
+ * screen's name as the H1 over a muted subline (the household), and under them the toolbar, ordered by what a
+ * control is about: the screen's own controls at the left (`children`), and at the right end how the page is shown
+ * (`tools`, quiet buttons), then the app's own: Undo, Redo and the sync cloud. `notes` are lines of their own under
+ * the row (an alert, a warning).
  *
  * `sticky` keeps the toolbar, and `below` under it (the Statement's progress line), in view while a long page
  * scrolls: the name scrolls away, the month and its controls stay. `above` stands between the name and the toolbar
  * and scrolls away with the name (the Statement's strip of months).
  */
-export function PageHeader({ title, subline, children, controls = true, sticky = false, above, below }: {
+export function PageHeader({ title, subline, children, tools, notes, controls = true, sticky = false, above, below }: {
   title: string; subline?: ReactNode; children?: ReactNode; controls?: boolean
+  /** How the page is shown (view buttons, the legend): quiet, at the right end, before Undo and Redo. */
+  tools?: ReactNode
+  /** Lines of their own under the toolbar's row: what failed, what the engine warns about. */
+  notes?: ReactNode
   /** Between the screen's name and the toolbar; it scrolls away with the name. */
   above?: ReactNode
   /** The toolbar stays at the top of the window while the page scrolls (from `md` up). */
@@ -45,10 +50,17 @@ export function PageHeader({ title, subline, children, controls = true, sticky =
       {sticky && <div ref={mark} className="-mb-px h-px max-md:hidden" aria-hidden />}
       <div className={cn(sticky && BAR)} data-stuck={sticky ? stuck : undefined} data-sticky-bar={sticky || undefined}>
         <div className="flex min-h-[28px] flex-wrap items-center gap-x-2.5 gap-y-1 text-xs">
-          {controls && <HistoryControls />}
           {children}
-          {controls && <SyncIndicator className="ml-auto" />}
+          {(tools || controls) && (
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-x-1 gap-y-1">
+              {tools}
+              {controls && <HistoryControls />}
+              {controls && <SyncIndicator />}
+            </div>
+          )}
         </div>
+        {/* a line that says nothing takes no room */}
+        {notes && <div className="mt-1 space-y-1 text-xs empty:hidden">{notes}</div>}
         {below && <div className={sticky ? 'mt-3 md:mt-1.5' : 'mt-4'}>{below}</div>}
       </div>
     </header>
@@ -73,7 +85,7 @@ function HistoryControls() {
   const store = useStore()
   useStoreVersion(store)
   return (
-    <span className="inline-flex items-center gap-0.5">
+    <span className="ml-1.5 inline-flex items-center gap-0.5">
       <Button variant="ghost" size="icon-xs" aria-label="Undo" disabled={!store.canUndo} onClick={() => void store.undo()}><Undo2 /></Button>
       <Button variant="ghost" size="icon-xs" aria-label="Redo" disabled={!store.canRedo} onClick={() => void store.redo()}><Redo2 /></Button>
     </span>

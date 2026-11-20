@@ -242,7 +242,7 @@ test('the Statement shows the month\'s rate as a chip in its toolbar: pressed, i
   // it stands with the toolbar's buttons, above the line that counts the month
   await expect(page.locator('header').getByTestId('rate-chip')).toBeVisible()
   const chipBox = (await chip.boundingBox())!
-  const legend = (await page.getByRole('button', { name: 'What the colours and marks mean' }).boundingBox())!
+  const legend = (await page.getByRole('button', { name: 'Colours and marks' }).boundingBox())!
   const progress = (await page.getByTestId('progress').boundingBox())!
   expect(chipBox.y + chipBox.height).toBeLessThanOrEqual(progress.y)
   expect(Math.abs(chipBox.y + chipBox.height / 2 - (legend.y + legend.height / 2))).toBeLessThan(6)

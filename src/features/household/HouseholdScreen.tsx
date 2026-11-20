@@ -53,9 +53,7 @@ export function HouseholdScreen() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 text-xs">
-      <PageHeader title="Household" subline={`${household.name} · ${people} ${people === 1 ? 'person or thing' : 'people & things'} · ${accounts} ${accounts === 1 ? 'account' : 'accounts'}`}>
-        {error && <p role="alert" className="basis-full text-destructive">{error}</p>}
-      </PageHeader>
+      <PageHeader title="Household" subline={`${household.name} · ${people} ${people === 1 ? 'person or thing' : 'people & things'} · ${accounts} ${accounts === 1 ? 'account' : 'accounts'}`} notes={error && <p role="alert" className="text-destructive">{error}</p>} />
       <GroupTabs />
       <SettingsCard household={household} tables={tables} onSave={(p) => act(() => updateHousehold(store, p))} onBuffer={(value, scope) => { const saving = setMonthlyDefault(store, value, scope, monthOfDate()); act(() => saving); return saving }} />
       <EntitiesCard household={household} tables={tables} entities={tables.entities.filter((e) => !e.deletedAt)} onError={setError} onRestored={onRestored} />

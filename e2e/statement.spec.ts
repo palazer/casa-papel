@@ -98,7 +98,7 @@ test.describe('the Statement', () => {
     await expect(progress).toHaveText(/^All \d+ done$/)
     await expect(page.getByRole('button', { name: /Close month|Reopen month/ })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Balances…' })).toBeVisible()
-    await page.getByRole('button', { name: 'What the colours and marks mean' }).click()
+    await page.getByRole('button', { name: 'Colours and marks' }).click()
     await expect(page.getByRole('dialog').getByText('An estimate: on the yellow shade', { exact: false })).toBeVisible()
     await expect(page.getByRole('dialog').getByText('A month that is over: grey in the Grid, "past" on the Statement. It can still be changed')).toBeVisible()
     await page.keyboard.press('Escape')
@@ -741,7 +741,7 @@ test.describe('working the month in the Statement', () => {
     await expect(line.getByRole('img', { name: 'Not in net worth' })).toBeVisible()
 
     // the legend names the mark
-    await page.getByRole('button', { name: 'What the colours and marks mean' }).click()
+    await page.getByRole('button', { name: 'Colours and marks' }).click()
     await expect(page.getByText('Not in net worth, on the Statement: an account that is a person\'s own. Its figures are grey, and no total counts it')).toBeVisible()
     await page.keyboard.press('Escape')
   })
@@ -1780,7 +1780,7 @@ test.describe('working the month in the Statement', () => {
     await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Grid' }).click()
     await expect(page.getByRole('rowheader', { name: /^The car – Insurance/ }).getByRole('img', { name: /^Repeats: Every 3 months/ })).toBeVisible()
     await expect(page.getByRole('rowheader', { name: /^Groceries/ }).locator('[data-repeats]')).toHaveCount(0)
-    await page.getByRole('button', { name: 'What the colours and marks mean' }).click()
+    await page.getByRole('button', { name: 'Colours and marks' }).click()
     await expect(page.getByText('On a schedule: it lands in its months by itself.')).toBeVisible()
   })
 
@@ -2146,7 +2146,7 @@ test.describe('working the month in the Statement', () => {
     await expect(card).toHaveAttribute('data-marked', 'true')
 
     // the legend says what the symbol means
-    await page.getByRole('button', { name: 'What the colours and marks mean' }).click()
+    await page.getByRole('button', { name: 'Colours and marks' }).click()
     await expect(page.getByText('Linked, on the Statement: a row and the account it fills, takes from or pays off.')).toBeVisible()
   })
 

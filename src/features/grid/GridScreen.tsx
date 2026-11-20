@@ -151,7 +151,19 @@ export function GridScreen() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Grid" subline={`${household.name} · ${formatMonth(months[0], locale)} – ${formatMonth(months[months.length - 1], locale)}`}>
+      <PageHeader
+        title="Grid" subline={`${household.name} · ${formatMonth(months[0], locale)} – ${formatMonth(months[months.length - 1], locale)}`}
+        tools={<MarksLegend neg={neg} />}
+        notes={<>
+          {engine.warnings.length > 0 && <p role="alert" className="text-amber-700 dark:text-amber-400">{engine.warnings.join(' · ')}</p>}
+          {error && (
+            <p role="alert" className="flex items-center gap-2 text-destructive">
+              <span>{error}</span>
+              <Button size="xs" variant="outline" onClick={() => setError(null)}>Dismiss</Button>
+            </p>
+          )}
+        </>}
+      >
         {earlier > 0 && (
           <Button size="xs" variant={showEarlier ? 'default' : 'outline'} aria-pressed={showEarlier} title={showEarlier ? 'Start at the current month again' : 'Show the months before the current one'} onClick={toggleEarlier}>
             Earlier months ({earlier})
@@ -159,14 +171,6 @@ export function GridScreen() {
         )}
         <Button size="xs" variant="outline" onClick={() => act(() => addPlanYear(store))}>Add {parseMonth(months[months.length - 1]).year + 1}</Button>
         <span className="text-muted-foreground">Click a cell to edit · arrows move · Enter opens · click a month name to open it in the Statement or to type its balances</span>
-        <MarksLegend neg={neg} />
-        {engine.warnings.length > 0 && <p role="alert" className="basis-full text-amber-700 dark:text-amber-400">{engine.warnings.join(' · ')}</p>}
-        {error && (
-          <p role="alert" className="flex basis-full items-center gap-2 text-destructive">
-            <span>{error}</span>
-            <Button size="xs" variant="outline" onClick={() => setError(null)}>Dismiss</Button>
-          </p>
-        )}
       </PageHeader>
 
       <div className="relative isolate max-h-[calc(100dvh-var(--page-chrome))] overflow-auto rounded-lg border bg-card">

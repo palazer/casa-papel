@@ -78,7 +78,7 @@ test.describe('guide', () => {
 
     // from the legend to the Marks & keyboard topic; leaving the Guide drops the hash again
     await loadDemo(page)
-    await page.getByRole('button', { name: 'What the colours and marks mean' }).click()
+    await page.getByRole('button', { name: 'Colours and marks' }).click()
     await page.getByRole('button', { name: 'More in the Guide' }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Guide' })).toBeVisible()
     expect(page.url()).toContain('#guide-marks')

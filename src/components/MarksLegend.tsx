@@ -29,7 +29,7 @@ function Mark({ sample, children }: { sample: ReactNode; children: ReactNode }) 
 }
 
 /**
- * "What the colours and marks mean" (DESIGN.md §5): the legend behind one button in the Statement and Grid toolbars.
+ * "Colours and marks" (DESIGN.md §5): the legend behind one quiet button at the right of the Statement and Grid toolbars.
  * Every kind of money has one hue, every mark one meaning; the samples use the same classes as the real cells.
  */
 export function MarksLegend({ neg }: { neg: boolean }) {
@@ -38,8 +38,8 @@ export function MarksLegend({ neg }: { neg: boolean }) {
   const moreInGuide = () => go('guide', '#guide-marks')
   return (
     <Popover>
-      <PopoverTrigger render={<Button size="xs" variant="outline" />}>What the colours and marks mean</PopoverTrigger>
-      <PopoverContent align="start" className="w-72 gap-3 p-3 text-xs">
+      <PopoverTrigger render={<Button size="xs" variant="ghost" />}>Colours and marks</PopoverTrigger>
+      <PopoverContent align="end" className="w-72 gap-3 p-3 text-xs">
         <section>
           <h4 className={H4}>Kinds of money</h4>
           <ul className="space-y-1">

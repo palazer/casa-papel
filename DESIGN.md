@@ -34,8 +34,8 @@ App shell        flex min-h-dvh: AppRail (md+) w-[72px] sticky h-dvh dark | main
                  phones (< 768 px): no rail; BottomTabs fixed at the bottom, dark, main pb-24
 Page header      header flex flex-col gap-y-2 > h1 text-2xl font-semibold leading-8 tracking-tight + p text-xs text-muted-foreground
                  toolbar  flex min-h-[28px] flex-wrap items-center gap-x-2.5 gap-y-1 text-xs:
-                          Undo Redo (icon-xs ghost) · the screen's controls · the sync cloud at ml-auto
-                          a basis-full child (an alert, a notice) wraps onto its own line under the controls
+                          the screen's controls · at ml-auto: the page's quiet tools (xs ghost) · Undo Redo (icon-xs ghost) · the sync cloud
+                          notes (an alert, a warning) are lines of their own under the row, mt-1 space-y-1
 Grid frame       the table in its own scroll box: relative isolate max-h-[calc(100dvh-var(--page-chrome))] overflow-auto rounded-lg border bg-card
 Reading page     mx-auto max-w-3xl space-y-4 text-xs of air islands (Household, Data, Guide)
 Statement frame  full width, space-y-4: the progress line, then dense islands, one per half and "Per person" last; a
@@ -69,9 +69,13 @@ Statement frame  full width, space-y-4: the progress line, then dense islands, o
   none); the Guide also opens without a household.
 - **Page header** (`src/components/PageHeader.tsx`): every screen opens with it. The H1 is the screen's name (the rail's
   label); the subline names the frame of reference (`The Demo Household · Sep 2026 – Nov 2027`, `· past` as a chip on the Statement of a month
-  that is over). The toolbar holds Undo and Redo first, then the controls (`MonthPicker`, Balances…, Add <year>), then the
-  sync cloud. Errors and warnings are `basis-full` lines: destructive for an action that failed, `text-amber-700` for a
-  warning the engine raises.
+  that is over). **The toolbar is ordered by what a control is about.** At the left the screen's own controls
+  (`children`: the month and what belongs to it, Balances…, Add <year>). At the right end (`ml-auto`, one group that
+  wraps under the controls when the window is narrow) first how the page is shown (`tools`: Suggestions, Expand all,
+  Collapse all, the legend, all `xs ghost`, so they stand back behind the screen's controls; a pressed one keeps the
+  lime), then the app's own: Undo and Redo (6 px after the tools) and the sync cloud, last on every screen. Errors
+  and warnings are `notes`, lines of their own under the row: destructive for an action that failed,
+  `text-amber-700` for a warning the engine raises.
   **On a long page the toolbar stays in view** (`sticky`, the Statement): from `md` up the toolbar and the line that
   belongs to it (`below`: the Statement's progress line, 6 px under the controls) are one bar that sticks to the top
   of the window, so the month and its controls are always there; the H1 and its subline scroll away. The bar is on
@@ -1018,7 +1022,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   texts two or three plain sentences up to 360 characters in the app's own words (virtual accounts, people & things,
   schedules, automatic). `balanceHelp(type)` picks the balance text for an account. Texts that belong to a model enum
   (section blurbs, account types, entity kinds, goal kinds, the rules) stay in `src/model/templates.ts`.
-- `MarksLegend` ("What the colours and marks mean", an `xs outline` button in the Statement and Grid toolbars) is the legend:
+- `MarksLegend` ("Colours and marks", an `xs ghost` button among the quiet tools at the right of the Statement and Grid
+  toolbars; its popover opens from its right edge) is the legend:
   the six hue dots with their kinds of money, then the marks with a sample each: estimate, certain, done, this month's
   red and amber dots, the negative spending number when that setting is on, the amber draw, the dotted entered balance,
   the grey month that is over, the category band. It ends with a ghost `xs` "More in the Guide" that opens the Guide's

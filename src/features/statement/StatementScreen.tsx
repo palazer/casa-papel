@@ -613,15 +613,22 @@ export function StatementScreen() {
             <InfoTip help="statement.progress" />
           </p>
         )}
+        // how the page is shown: quiet buttons at the right end, before Undo and Redo
+        tools={<>
+          <span className="flex items-center gap-1">
+            <Button size="xs" variant={showing ? 'default' : 'ghost'} aria-pressed={showing} onClick={() => setSuggest(!showing)}>Suggestions</Button>
+            <InfoTip help="statement.suggestions" />
+          </span>
+          <Button size="xs" variant="ghost" onClick={() => setAll(true)}>Expand all</Button>
+          <Button size="xs" variant="ghost" onClick={() => setAll(false)}>Collapse all</Button>
+          <MarksLegend neg={neg} />
+        </>}
+        notes={<>
+          {error && <p role="alert" className="text-destructive">{error}</p>}
+          {statement.warnings.map((w) => <p key={w} className="text-amber-700">{w}</p>)}
+        </>}
       >
         <MonthPicker months={months} month={m} onChange={setMonth} locale={locale} onAddYear={() => act(() => addPlanYear(store))} />
-        <Button size="xs" variant="outline" onClick={() => setAll(true)}>Expand all</Button>
-        <Button size="xs" variant="outline" onClick={() => setAll(false)}>Collapse all</Button>
-        <span className="flex items-center gap-1">
-          <Button size="xs" variant={showing ? 'default' : 'outline'} aria-pressed={showing} onClick={() => setSuggest(!showing)}>Suggestions</Button>
-          <InfoTip help="statement.suggestions" />
-        </span>
-        <MarksLegend neg={neg} />
         {/* What another currency is worth this month: a chip to read, and to press for a rate of one's own */}
         {currencies.length > 0 && (
           <span className="inline-flex flex-wrap items-center gap-1.5" data-testid="month-rates">
@@ -631,8 +638,6 @@ export function StatementScreen() {
         {/* what every account really held, and the tick that counts the month as done; a household that is still
             being set up has no month to look back on yet */}
         {!settingUp && <Button size="sm" variant="outline" onClick={() => setBalances(true)}>Balances…</Button>}
-        {error && <p role="alert" className="basis-full text-destructive">{error}</p>}
-        {statement.warnings.map((w) => <p key={w} className="basis-full text-amber-700">{w}</p>)}
       </PageHeader>
 
       {settingUp && <SetupGuide steps={steps} current={step} action={stepAction} onStep={onStep} onDone={leaveSetup} />}

@@ -20,7 +20,7 @@ test.describe('help', () => {
     await expect(page.getByRole('button', { name: 'About Expenses', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'About To savings', exact: true })).toBeVisible()
 
-    await page.getByRole('button', { name: 'What the colours and marks mean' }).click()
+    await page.getByRole('button', { name: 'Colours and marks' }).click()
     const legend = page.getByRole('dialog')
     await expect(legend.getByText('Kinds of money')).toBeVisible()
     await expect(legend.getByText('Virtual accounts', { exact: true })).toBeVisible()
@@ -49,7 +49,7 @@ test.describe('help on a phone', () => {
     await expect(page.getByRole('dialog').getByText(/Money in on the left, money out on the right/)).toBeVisible()
     await page.keyboard.press('Escape')
 
-    await page.getByRole('button', { name: 'What the colours and marks mean' }).tap()
+    await page.getByRole('button', { name: 'Colours and marks' }).tap()
     await expect(page.getByRole('dialog').getByText('Kinds of money')).toBeVisible()
   })
 })
