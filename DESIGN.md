@@ -1277,6 +1277,11 @@ feature switch; a second one follows the same form.
   the whole list is back. Its accessible name says what it is and what it comes to (`Standing order on Main account:
   €4,019.00, 2 payments`).
 - **No methods yet:** the list opens with one muted line and an outline `xs` button to Household, where they are added.
+- **The keyboard.** The list comes before the totals in the page's own order, which is the order they are read in
+  from 1024 px (below that the totals are moved above it with `max-lg:order-first`). A line is two stops, its tick
+  and its name (three with `Set…`); a total is one. A ticked line moves under another heading: the focus then goes
+  to the tick of the line that stood after it (before it, at the end of the list), so Space, Tab, Space works down
+  the list.
 - **From the Statement.** A line's day there (§7) opens this page on the Statement's month, scrolled to the payment
   (for a row with several items: all of them), which is marked for two and a half seconds the way the Statement
   marks a line it jumped to: `bg-muted ring-2 ring-inset ring-ring`, never the lime. A marked payment that is done

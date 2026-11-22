@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { InfoTip } from '@/components/InfoTip'
 import { PageHeader } from '@/components/PageHeader'
@@ -61,6 +61,20 @@ export function PaymentsScreen() {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  /**
+   * A ticked line moves under another heading, and takes the keyboard's place with it: the line that stood after it
+   * (before it, at the end of the list) gets the focus once the tick is saved, if nothing else has it by then.
+   */
+  const focusAfter = useRef<string | null>(null)
+  useEffect(() => {
+    const id = focusAfter.current
+    if (!id || busy) return
+    focusAfter.current = null
+    const at = document.activeElement
+    if (at && at !== document.body && !(at as HTMLButtonElement).disabled && document.contains(at)) return
+    document.querySelector<HTMLElement>(`[data-payment="${CSS.escape(id)}"] [role="checkbox"]`)?.focus()
+  })
+
   const today = isoDateOfToday()
   const m = months.length ? nearestMonth(months, picked ?? monthOfDate()) : null
   const data = useMemo(() => (tables && engine && m ? buildPayments(tables, engine, m, today) : null), [tables, engine, m, today])
@@ -90,6 +104,10 @@ export function PaymentsScreen() {
     const cell = row ? engine!.cells[cellKey(row.id, m!)] : undefined
     if (!row || !cell) return
     const done = !p.done
+    // the lines in view, top to bottom: what is done only while it is unfolded
+    const inView = groups.filter((g) => g.key !== 'done' || doneOpen || g.payments.some(isMarked)).flatMap((g) => g.payments.map((x) => x.id))
+    const at = inView.indexOf(p.id)
+    focusAfter.current = inView[at + 1] ?? inView[at - 1] ?? null
     setBusy(p.id)
     setError(null)
     const run = p.itemId
@@ -181,7 +199,6 @@ export function PaymentsScreen() {
         </Island>
       ) : (
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
-          <PaymentTotals data={data} filter={filter} onFilter={setFilter} locale={locale} className="lg:order-2" />
           <Island
             air title="By day" help="payments.byDay" data-testid="payments-list"
             right={filter && (
@@ -201,6 +218,8 @@ export function PaymentsScreen() {
               {groups.length === 0 ? <p className="text-muted-foreground">Nothing of it in this month.</p> : groups.map(group)}
             </div>
           </Island>
+          {/* after the list in the page's order, as it is read from 1024 px; above it below that, where it folds away */}
+          <PaymentTotals data={data} filter={filter} onFilter={setFilter} locale={locale} className="max-lg:order-first" />
         </div>
       )}
 

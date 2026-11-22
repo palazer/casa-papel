@@ -499,6 +499,42 @@ test.describe('Payments: the page', () => {
   })
 })
 
+test.describe('Payments: with the keyboard', () => {
+  test.use({ viewport: { width: 1440, height: 900 } })
+
+  test('the list comes before the totals, and after a tick the keyboard is on the next line', async ({ page }) => {
+    await withMethods(page)
+    await openPayments(page)
+    const utilities = page.getByRole('checkbox', { name: 'The flat – Utilities done' })
+    const rent = page.getByRole('checkbox', { name: 'The flat – Rent done' })
+    // from the list's (i): the first line's tick, its name, the next line's tick
+    await page.getByRole('button', { name: 'About By day' }).focus()
+    await page.keyboard.press('Tab')
+    await expect(rent).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(page.getByRole('button', { name: /^The flat – Rent: €1,650\.00, on the 1st, Standing order$/ })).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(utilities).toBeFocused()
+    // the totals follow the whole list
+    const firstTotal = page.getByTestId('payment-totals').getByRole('button', { name: 'By account and method', exact: true })
+    const lastOfList = page.getByTestId('payments-list').getByRole('checkbox').last()
+    expect(await firstTotal.evaluate((el, other) => !!(other!.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING), await lastOfList.elementHandle())).toBe(true)
+
+    // Space ticks the rent: it leaves for "Done", and the utilities, the line after it, have the focus
+    await rent.focus()
+    await page.keyboard.press('Space')
+    await expect(group(page, 'done').getByRole('heading')).toContainText('1 · €1,650.00')
+    await expect(utilities).toBeFocused()
+    await page.keyboard.press('Space')
+    await expect(group(page, 'overdue')).toHaveCount(0)
+    await expect(page.getByRole('checkbox', { name: 'Robin – Childcare done' })).toBeFocused()
+    // Enter on a total is the press
+    await page.getByTestId('payment-totals').getByRole('button', { name: /^Transfer by hand on Main account/ }).focus()
+    await page.keyboard.press('Enter')
+    await expect(lines(page)).toHaveText([/Robin – Childcare/])
+  })
+})
+
 test.describe('Payments on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true })
 
