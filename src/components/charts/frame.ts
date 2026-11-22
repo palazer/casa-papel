@@ -35,3 +35,6 @@ export function tickText(t: { month: MonthKey; year: boolean; only: boolean }, l
 /** Text in a chart is ink, never a line's colour (the mark beside it carries that). */
 export const AXIS_TEXT = 'fill-muted-foreground text-[10px] tabular-nums'
 export const GRID_LINE = 'stroke-border'
+
+/** A name cut to `n` characters, with "…" where it was cut: SVG text does not shorten itself. */
+export const cut = (s: string, n: number): string => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s)

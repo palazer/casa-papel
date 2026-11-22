@@ -156,6 +156,93 @@ test.describe('Trends', () => {
   })
 })
 
+test.describe('Trends: the change from the month before', () => {
+  test.use({ viewport: { width: 1440, height: 900 } })
+  const changes = (page: Page) => page.locator('[data-chart="changes"]')
+
+  test('a row of bars per subject on the charts, on the same months, and one pointer through both charts', async ({ page }) => {
+    await loadDemo(page)
+    await page.getByRole('button', { name: 'Expand all' }).click()
+    // the Statement's own change column for net worth in November, and the amount beside it
+    const line = (await page.locator('[data-line="net-worth"]').first().innerText()).match(/[+-]?€[\d,]+\.\d\d/g)!
+    const [change, amount] = [line[0], line[line.length - 1]]
+    expect(change).toMatch(/^\+€/)
+
+    await openTrends(page)
+    await expect(page.getByTestId('trend-changes').getByRole('heading', { name: 'Change from the month before' })).toBeVisible()
+    await expect(changes(page).locator('[data-row]')).toHaveCount(1)
+    // sixteen months: fifteen have a month before them
+    const bars = changes(page).locator('[data-row="netWorth"] [data-bar]')
+    await expect(bars).toHaveCount(15)
+    // October is over; November and later are the plan, paler
+    await expect(changes(page).locator('[data-row="netWorth"] [data-bar]:not([data-plan])')).toHaveCount(1)
+    await tile(page, 'Expenses').click()
+    await expect(changes(page).locator('[data-row]')).toHaveCount(2)
+    await expect(changes(page).locator('[data-row]').locator('text').first()).toContainText('Net worth')
+
+    // a month stands at the same place in both charts
+    const upper = (await chart(page).locator('[data-now] line').boundingBox())!
+    const lower = (await changes(page).locator('[data-now]').boundingBox())!
+    expect(Math.abs(upper.x - lower.x)).toBeLessThan(1)
+
+    // the bars say the change the Statement says
+    await changes(page).focus()
+    await page.keyboard.press('Home')
+    const tip = page.getByTestId('chart-tip')
+    await expect(tip).toContainText('September 2026')
+    await expect(tip).toContainText('nothing before it to compare with')
+    await page.keyboard.press('ArrowRight')
+    await page.keyboard.press('ArrowRight')
+    await expect(tip).toContainText('November 2026 · now')
+    await expect(tip).toContainText(`${change} Net worth`)
+    await expect(tip).toContainText(`${amount} at its end`)
+    await expect(tip).toContainText('in the month')
+    // one pointer, in both charts; only the chart that has the focus speaks
+    await expect(tip).toHaveCount(1)
+    await expect(chart(page).locator('[data-pointer]')).toHaveCount(1)
+    await expect(changes(page).locator('[data-pointer]')).toHaveCount(1)
+    const a = (await chart(page).locator('[data-pointer] line').boundingBox())!
+    const b = (await changes(page).locator('[data-pointer]').boundingBox())!
+    expect(Math.abs(a.x - b.x)).toBeLessThan(1)
+    await page.screenshot({ path: 'e2e/output/trends-changes.png', fullPage: true })
+
+    // no subject on: no bars
+    await page.keyboard.press('Escape')
+    await tile(page, 'Net worth').click()
+    await tile(page, 'Expenses').click()
+    await expect(page.getByTestId('trend-changes')).toHaveCount(0)
+  })
+
+  test('on a long range the bars are per year, and a first year that is only partly in view is not compared', async ({ page }) => {
+    await loadDemo(page)
+    await openTrends(page)
+    await tile(page, 'Income').click()
+    await page.getByRole('radio', { name: '10 years' }).click()
+    await expect(page.getByTestId('trend-changes').getByRole('heading', { name: 'Change from the year before' })).toBeVisible()
+    // 2026 has nothing before it; 2027 to 2036 each have a bar for net worth
+    await expect(changes(page).locator('[data-row="netWorth"] [data-bar]')).toHaveCount(10)
+    await changes(page).focus()
+    await page.keyboard.press('Home')
+    const tip = page.getByTestId('chart-tip')
+    await expect(tip).toContainText('2026 · 4 months')
+    // the income of 2027 is a whole year's, that of 2026 four months': not compared
+    for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowRight')
+    await expect(tip).toContainText('2027 · plan')
+    await expect(tip).toContainText('a year that is only partly in view is not compared')
+    await expect(tip).toContainText('at the end of the year')
+    await page.keyboard.press('End')
+    await expect(tip).toContainText('2036 · plan')
+    await expect(tip).toContainText('no change Income')
+    // the income did not move from 2028 on: its row says so instead of a scale
+    await expect(changes(page).locator('[data-row="income"]')).toContainText('Income · no change')
+    await page.screenshot({ path: 'e2e/output/trends-changes-years.png', fullPage: true })
+    // back to three years: months again
+    await page.getByRole('radio', { name: '3 years' }).click()
+    await expect(page.getByTestId('trend-changes').getByRole('heading', { name: 'Change from the month before' })).toBeVisible()
+    await expect(changes(page).locator('[data-row="netWorth"] [data-bar]')).toHaveCount(39)
+  })
+})
+
 test.describe('Trends on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
 

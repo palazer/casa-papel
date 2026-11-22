@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { DeltaBars, type DeltaRow } from '@/components/charts/DeltaBars'
 import { LineChart, type ChartLine } from '@/components/charts/LineChart'
 import { PageHeader } from '@/components/PageHeader'
 import { Segmented } from '@/components/Segmented'
@@ -6,8 +7,8 @@ import { Island } from '@/components/ui/island'
 import { formatAmount, formatAxis, formatMonth } from '@/app/format'
 import { writePref } from '@/app/prefs'
 import { activeHousehold, useEngine, useTables } from '@/app/useEngine'
-import { TREND_SUBJECTS, buildTrends, trendChange, type TrendSubject } from '@/engine'
-import { addMonths, compareMonths, currencyExponent, monthOfDate } from '@/model'
+import { TREND_SUBJECTS, buildTrends, byYear, isFlow, trendChange, type TrendPoint, type TrendSubject } from '@/engine'
+import { addMonths, compareMonths, currencyExponent, monthOfDate, parseMonth } from '@/model'
 import { HORIZONS, projectTables, trendMonths, type Horizon } from '@/store'
 import { HORIZON_LABEL, SUBJECTS, rememberedHorizon, rememberedSubjects } from './subjects'
 import { TrendTile } from './TrendTile'
@@ -15,10 +16,19 @@ import { TrendTile } from './TrendTile'
 /**
  * Trends (DESIGN.md §11): how net worth, income, expenses, accounts and debts move over the months, what was and
  * what the plan says will be. Five tiles say where each stands this month and are the switches that put a subject on
- * the chart; "Amounts" draws the chosen ones as lines on one scale. The figures are the Statement's own, month by
- * month (`buildTrends`), and looking past the plan's end runs the plan's calculation for more months without making
- * the plan longer (`projectTables`). Nothing is edited here.
+ * the charts; "Amounts" draws the chosen ones as lines on one scale, and under it "Change from the month before"
+ * draws how each moved, as a row of bars per subject on the same months. The figures are the Statement's own, month
+ * by month (`buildTrends`), and looking past the plan's end runs the plan's calculation for more months without
+ * making the plan longer (`projectTables`). Nothing is edited here.
  */
+/** More months than this cannot be read as bars: they are drawn by year. */
+const MONTHLY_BARS = 48
+
+/** A bar's worth of months: one month, or the months of a year that are in view, with where they stand on the axis. */
+interface Bucket extends TrendPoint {
+  from: number
+  to: number
+}
 export function TrendsScreen() {
   const tables = useTables()
   const household = activeHousehold(tables)
@@ -58,6 +68,22 @@ export function TrendsScreen() {
   }
 
   const lines: ChartLine[] = on.map((s) => ({ id: s, label: SUBJECTS[s].label, color: SUBJECTS[s].color, values: points.map((p) => p.totals[s]) }))
+  const unit = 10 ** currencyExponent(ccy)
+  const axisText = (v: number) => formatAxis(v, ccy, locale)
+  const span = `from ${formatMonth(months[0], locale, 'long')} to ${formatMonth(months[months.length - 1], locale, 'long')}`
+
+  /** The bars: a month each, or a year each on a long range. */
+  const yearly = months.length > MONTHLY_BARS
+  const buckets = (yearly ? byYear(points) : points).reduce<Bucket[]>((list, p) => {
+    const from = list.length ? list[list.length - 1].to + 1 : 0
+    return [...list, { ...p, from, to: from + p.span - 1 }]
+  }, [])
+  const bucketAt = (i: number) => buckets.findIndex((b) => i >= b.from && i <= b.to)
+  /** A year of which only some months are in view (the household's first) moved less than a whole one: it is not compared. */
+  const partial = (b: Bucket) => yearly && b.span < 12
+  const changeOf = (k: number, s: TrendSubject) => (isFlow(s) && k > 0 && (partial(buckets[k]) || partial(buckets[k - 1])) ? null : trendChange(buckets, k, s))
+  const bucketName = (b: Bucket) => (yearly ? `${parseMonth(b.month).year}${partial(b) ? ` · ${b.span} months` : ''}` : formatMonth(b.month, locale, 'long'))
+  const rows: DeltaRow[] = on.map((s) => ({ id: s, label: SUBJECTS[s].label, color: SUBJECTS[s].color, bars: buckets.map((b, k) => ({ from: b.from, to: b.to, value: changeOf(k, s) })) }))
   const moved = (i: number, s: TrendSubject) => {
     const d = trendChange(points, i, s)
     return d == null ? null : d === 0 ? 'no change' : `${formatAmount(d, ccy, locale, { sign: 'always' })} from ${formatMonth(months[i - 1], locale)}`
@@ -91,9 +117,8 @@ export function TrendsScreen() {
           <p className="px-1 py-10 text-center text-xs text-muted-foreground">Press a tile above to put it on the chart.</p>
         ) : (
           <LineChart
-            months={months} lines={lines} planFrom={planFrom} now={now} at={at} onAt={setAt} locale={locale}
-            unit={10 ** currencyExponent(ccy)} axisText={(v) => formatAxis(v, ccy, locale)}
-            label={`${lines.map((l) => l.label).join(', ')} from ${formatMonth(months[0], locale, 'long')} to ${formatMonth(months[months.length - 1], locale, 'long')}. The arrow keys read a month.`}
+            months={months} lines={lines} planFrom={planFrom} now={now} at={at} onAt={setAt} locale={locale} unit={unit} axisText={axisText}
+            label={`${lines.map((l) => l.label).join(', ')} ${span}. The arrow keys read a month.`}
             tip={(i) => (
               <>
                 <p className="mb-1 font-medium">{formatMonth(months[i], locale, 'long')}{i >= planFrom && <span className="font-normal text-muted-foreground"> · {i === now ? 'now' : 'plan'}</span>}</p>
@@ -111,6 +136,38 @@ export function TrendsScreen() {
           />
         )}
       </Island>
+
+      {rows.length > 0 && (
+        <Island title={yearly ? 'Change from the year before' : 'Change from the month before'} help="trends.changes" data-testid="trend-changes">
+          <DeltaBars
+            months={months} rows={rows} planFrom={planFrom} now={now} at={at} onAt={setAt} locale={locale} unit={unit} axisText={axisText}
+            label={`How ${rows.map((r) => r.label).join(', ')} moved from one ${yearly ? 'year' : 'month'} to the next, ${span}. The arrow keys read a ${yearly ? 'year' : 'month'}.`}
+            tip={(i) => {
+              const k = bucketAt(i)
+              const b = buckets[k]
+              return (
+                <>
+                  <p className="mb-1 font-medium">{bucketName(b)}{b.to >= planFrom && <span className="font-normal text-muted-foreground"> · {now != null && now >= b.from && now <= b.to ? 'now' : 'plan'}</span>}</p>
+                  <ul className="space-y-1">
+                    {on.map((s) => {
+                      const d = changeOf(k, s)
+                      return (
+                        <li key={s} className="grid grid-cols-[auto_1fr] items-baseline gap-x-2">
+                          <span className="size-2 self-center rounded-[2px]" style={{ background: SUBJECTS[s].color }} aria-hidden />
+                          <span><span className="font-semibold tabular-nums">{d == null ? '–' : d === 0 ? 'no change' : formatAmount(d, ccy, locale, { sign: 'always' })}</span> <span className="text-muted-foreground">{SUBJECTS[s].label}</span></span>
+                          <span className="col-start-2 text-[11px] tabular-nums text-muted-foreground">
+                            {d == null ? (k === 0 ? 'nothing before it to compare with' : 'a year that is only partly in view is not compared') : `${money(b.totals[s])} ${isFlow(s) ? (yearly ? 'in the year' : 'in the month') : (yearly ? 'at the end of the year' : 'at its end')}`}
+                          </span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </>
+              )
+            }}
+          />
+        </Island>
+      )}
     </div>
   )
 }

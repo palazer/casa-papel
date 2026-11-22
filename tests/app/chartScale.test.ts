@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { amountScale, monthAt, monthAxis, monthTicks, spreadLabels, xOf, yOf } from '@/components/charts/scale'
+import { amountScale, barPath, barWidth, monthAt, monthAxis, monthTicks, spreadLabels, xOf, yOf } from '@/components/charts/scale'
 import { monthRange } from '@/model'
 
 describe('the amount axis of a chart', () => {
@@ -79,5 +79,22 @@ describe('the labels at the end of the lines', () => {
   })
   it('stay inside the plot', () => {
     expect(spreadLabels([195, 198, 199], 14, 0, 200)).toEqual([172, 186, 200])
+  })
+})
+
+describe('a bar', () => {
+  it('is never wider than 24 px and always leaves air beside it', () => {
+    expect(barWidth(80, 1)).toBe(24)
+    expect(barWidth(20, 1)).toBe(14)
+    expect(barWidth(6, 1)).toBeCloseTo(4.2)
+    // a bar for a year of narrow months
+    expect(barWidth(6, 12)).toBe(24)
+    expect(barWidth(0.2, 1)).toBe(1)
+  })
+  it('is rounded at the end that says its amount and square at the line it grows from, upwards and downwards', () => {
+    expect(barPath(10, 20, 100, 40)).toBe('M10 100 L10 44 Q10 40 14 40 L26 40 Q30 40 30 44 L30 100 Z')
+    expect(barPath(10, 20, 100, 160)).toBe('M10 100 L10 156 Q10 160 14 160 L26 160 Q30 160 30 156 L30 100 Z')
+    // a bar shorter than its corners is rounded no further than it is high
+    expect(barPath(10, 20, 100, 98)).toBe('M10 100 L10 100 Q10 98 12 98 L28 98 Q30 98 30 100 L30 100 Z')
   })
 })

@@ -85,3 +85,17 @@ export function spreadLabels(wanted: number[], gap: number, top: number, bottom:
   order.forEach((o, k) => { out[o.i] = Math.max(top, placed[k]) })
   return out
 }
+
+const MAX_BAR = 24
+
+/** A bar from the baseline to its amount: the end that says the amount is rounded, the baseline end square. */
+export function barPath(x: number, w: number, base: number, tip: number): string {
+  const r = Math.min(4, w / 2, Math.abs(tip - base))
+  const up = tip < base
+  const s = up ? 1 : -1
+  // from the baseline's left corner, round the two corners at the tip, back down to the baseline
+  return `M${x} ${base} L${x} ${tip + s * r} Q${x} ${tip} ${x + r} ${tip} L${x + w - r} ${tip} Q${x + w} ${tip} ${x + w} ${tip + s * r} L${x + w} ${base} Z`
+}
+
+/** How wide a bar is that stands for `span` months: never more than 24 px, and always air between neighbours. */
+export const barWidth = (slot: number, span: number): number => Math.max(1, Math.min(MAX_BAR, slot * span - Math.min(6, slot * span * 0.3)))

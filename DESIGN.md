@@ -1111,6 +1111,18 @@ Tip        a popover-ground box beside the pointer (on the side with room): the 
   for the Tab key (`role="group"` with a sentence that says what it shows; the drawing itself is `aria-hidden`): Left,
   Right, Home and End move along the months, Escape lets go, and leaving the chart lets go too. The tip is a
   `role="status"`, so a screen reader hears the month it lands on. On touch a tap points and stays.
+- **One shell for every chart** (`Plot.tsx`): the measured width, the pointer, the keyboard and the tip. The month
+  pointed at is the page's, so every chart marks it with its hairline; only the chart the pointer or the focus is in
+  shows the tip.
+- **Bars** (`barPath`, `barWidth` in `scale.ts`): at most 24 px wide, with air beside them (the slot less 30 %, at
+  most 6 px), rounded 4 px at the end that says the amount and square at the line they grow from, upwards or
+  downwards. A bar may stand for a year: it is centred over that year's months.
+- **Change bars** (`DeltaBars.tsx`): how a subject moved from the point before. One row per subject, 64 px high and
+  10 px apart, each on its own scale (a change in net worth and a change in expenses differ tenfold; on one scale the
+  smaller would be flat), in one drawing with one axis of months under the last row. A row is named at its top left
+  (an 8 px square of its colour, the name in 11 px ink); its scale shows its two ends at the left and a
+  `muted-foreground/50` line at zero; a subject that did not move says `· no change` after its name and shows no
+  scale. Bars of the past are at 0.9 opacity, bars of the plan at 0.4, the bar pointed at at 1.
 - **Sparkline** (`Sparkline.tsx`): a subject's months as a 1.5 px line in its colour with no axis, 24 px high and as
   wide as its tile, solid for the past and dotted for the plan. It says the shape only.
 - **Trends** (`src/features/trends/TrendsScreen.tsx`, the figures in `src/engine/trends.ts`, the look ahead in
@@ -1123,6 +1135,11 @@ Tip        a popover-ground box beside the pointer (on the side with room): the 
   in muted `text-[11px]` (`no change`, or `–` for the household's first month) and the sparkline. A tile that is on
   has the lime border, the one pressed colour. Its accessible name says all of it in words (`Net worth: €27,965, up
   €2,565 from October 2026`). The island "Amounts" holds the `LineChart` of the subjects that are on, 260 px high;
-  with none on it says `Press a tile above to put it on the chart.` What is on, and how far ahead the page looks,
-  are remembered on the device (`trends.subjects`, `trends.horizon`).
+  with none on it says `Press a tile above to put it on the chart.` Under it the island "Change from the month
+  before" holds the `DeltaBars` of the same subjects on the same months; its tip leads with the change and says the
+  amount beneath (`€27,965.41 at its end`, `€3,896.00 in the month`). **A range of more than 48 months is drawn by
+  year in the bars** (the island is "Change from the year before"): what the year moved for income and expenses,
+  what there was at its end for the other three (`byYear`), and a year of which only some months are in view (the
+  household's first) is not compared for income and expenses; the lines stay monthly. What is on, and how far ahead
+  the page looks, are remembered on the device (`trends.subjects`, `trends.horizon`).
 
