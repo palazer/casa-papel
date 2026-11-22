@@ -92,8 +92,8 @@ export const HouseholdSchema = BaseRecord.extend({
   askMainAccount: z.boolean().optional(),
   /**
    * "Plan payments by day and method": the Payments page, the list of payment methods and the fields "Paid on" and
-   * "Paid with" exist while this is on. Off or unset, they are hidden and nothing is lost: what was set stays, and a
-   * method that draws on a card keeps counting (rule C2). Read it by truthiness.
+   * "Paid with" exist while this is on. Off or unset, they are hidden and nothing is lost: what was set stays. None
+   * of it reaches a figure, on or off (rule W1). Read it by truthiness.
    */
   payments: z.boolean().optional(),
 })

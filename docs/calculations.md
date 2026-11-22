@@ -468,7 +468,9 @@ for the card (rule B5), and net worth falls by each payment (finding F5, closed)
 month; a day the month does not have is its last day. A method is one of the household's own list: a name, a kind,
 who pays with it, and a note. It is tied to no account. Both are said in three places, and the nearest one counts:
 the item of a month, the schedule that posted it, the row ("Usually paid…"). A schedule's day or method that changes
-from a month on leaves the months before as they were, and what was paid keeps how it was paid.
+from a month on leaves the months before as they were, and what was paid keeps how it was paid. One month is the
+exception: the month in which that change is made from the Payments page ("Payment", "This and following months")
+shows what was saved there, ticked or not, because that line is the one being set.
 
 What the sums count with stays where it was: "Comes out of" (M6) says whose money pays, and "Paid by card…" (C2)
 says what is owed on a card. The rent can be paid by standing order and be covered from savings; a personal expense
@@ -478,7 +480,9 @@ can come out of pocket money and be paid with PayPal.
     "Groceries" 400.00, "Paid by card…" on "Visa": 400.00 is owed there, whatever method it names
 
 An amount with a day or a method is tracked on the Payments page; one with neither is listed there as untracked,
-outside that page's sums. This sorts a list, and no figure of the Statement follows from it.
+outside that page's sums. "To pay" and "done" there, and the sums by method and by person, are over what is
+tracked, whatever the row is: a card's purchases and the payment of that card count both when both are tracked.
+This sorts a list, and no figure of the Statement follows from it.
 
 ## V. Virtual accounts
 

@@ -82,8 +82,8 @@ const STEPS: Record<number, Step> = {
   19: (raw) => raw,
   // 20 → 21: payments by day and method. A new table of payment methods, a household switch, and optional fields: a
   // row's usual day and method, a schedule's, an item's own method (its `date` was there, unused). Nothing to rewrite.
-  // The version keeps an older app from syncing: it would drop the fields from what it writes, and it counts a card's
-  // purchases by the row where this one counts an item paid with a method that draws on a card (rule C2).
+  // The version keeps an older app from syncing: it would drop the fields from what it writes. (Schema 21 also
+  // counted an item as bought on a card when its method drew on one; schema 22 took that back.)
   20: (raw) => raw,
   // 21 → 22: a payment method is a label and no longer tied to an account. `PaymentMethod.note` is new and optional;
   // `accountId` stays readable, and a method from schema 21 shows that account's name as its note (`methodNote`)
