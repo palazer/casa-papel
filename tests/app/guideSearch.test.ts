@@ -12,7 +12,7 @@ describe('searching the guide', () => {
     expect(keys('lisbon')).toEqual(['virtual-accounts']) // a paragraph's example
     expect(keys('how often')).toEqual(['schedules']) // a step's control
     expect(keys('honest')).toEqual(['debts']) // only in a related tip's text
-    expect(keys('wallet')).toEqual(['investments']) // only in the account-type facts
+    expect(keys('coins')).toEqual(['payments']) // only in the facts: the kinds of payment method
   })
 
   it('every word must match and case does not matter', () => {

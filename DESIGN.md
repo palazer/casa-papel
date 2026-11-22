@@ -1184,3 +1184,27 @@ Tip        a popover-ground box beside the pointer (on the side with room): the 
   a sticky head and at most 384 px of height. Every figure a pointer can show is in it, so nothing on the page is
   reachable with a pointer only.
 
+## 12. Payments by day and method
+
+Everything in this section exists only while the household's switch is on (`Household.payments`). It is the app's one
+feature switch; a second one follows the same form.
+
+- **The switch** is a `Check` in "Household settings", `Plan payments by day and method`, with its (i) beside it
+  (`payments.switch`). It is the household's, not the device's: every device shows the same. A screen asks
+  `household.payments` and renders nothing of the feature when it is off; nothing is deleted by turning it off. The
+  box shows what is stored, so it changes once the save is through.
+- **"Payment methods"** is an air `Island` under Household, after "Accounts", in the transfer hue. One line per method,
+  as the accounts have them: a zinc `Chip` with the kind in lower case (`direct debit`), the name in `font-medium`,
+  then muted `on <account>` and ` · <owner>` where a person pays with it, and a ghost `xs` `Edit` at the right.
+  Archived methods stand under the small-caps `Archived` with its (i), muted, each with an outline `xs` `Use again`.
+  `Add method` is an outline `xs` button under the list.
+- **The first list.** While the household has no method, the card offers one from its accounts (`starterMethods`): a
+  muted sentence, a `Check` per suggestion (`<name> · <kind> on <account>`, all ticked), and a `sm` default button
+  `Add n methods` that follows the ticks. They are added in one step, so one Undo takes them back. Without an account
+  to draw on, one muted sentence says so.
+- **The method's dialog** (`PaymentMethodDialog`, `sm:max-w-md`): `Kind` (a select; the kind's own sentence stands
+  under it in muted `text-xs` and changes with the choice), `Name`, `Draws on` (only the accounts the kind can draw
+  on: a credit card method a card, a direct debit never a card), `Who pays with it` (`Household`, then the adults).
+  A method that is in use has `Draws on` disabled, with the reason under it. The footer's left button says what it
+  will do: `Delete` while nothing uses the method, `Archive` once something does. A refusal is said in the dialog.
+

@@ -5,6 +5,7 @@ import { FxCard } from './FxCard'
 import { HUES } from '@/app/hues'
 import { InfoTip, TipLabel } from '@/components/InfoTip'
 import { PoolsCard } from './PoolsCard'
+import { PaymentMethodsCard } from './PaymentMethodsCard'
 import { HouseholdAccountDialog } from './HouseholdAccountDialog'
 import { CategoriesCard } from './CategoriesCard'
 import { ArchivedRowsCard } from './ArchivedRowsCard'
@@ -26,7 +27,7 @@ import {
   ENTITY_KIND_LABEL, ENTITY_TEMPLATES, monthOfDate, templateTitle,
   ACCOUNT_TYPE_INFO, ENTITY_KIND_HELP, type Account, type Entity, type EntityKind, type Household, type Tables,
 } from '@/model'
-import { addEntity, applyTemplates, restoreAccount, restoreEntity, restoredText, setAccountActual, setMonthlyDefault, updateHousehold, type MonthlyDefaultScope, type Restored } from '@/store'
+import { addEntity, applyTemplates, restoreAccount, restoreEntity, restoredText, setAccountActual, setMonthlyDefault, setPaymentsOn, updateHousehold, type MonthlyDefaultScope, type Restored } from '@/store'
 import { UndoNotice } from '@/components/UndoNotice'
 import { useUndoNotice } from '@/app/useUndoNotice'
 import { saveError, showSaveError } from '@/app/saveError'
@@ -55,9 +56,10 @@ export function HouseholdScreen() {
     <div className="mx-auto max-w-3xl space-y-4 text-xs">
       <PageHeader title="Household" subline={`${household.name} · ${people} ${people === 1 ? 'person or thing' : 'people & things'} · ${accounts} ${accounts === 1 ? 'account' : 'accounts'}`} notes={error && <p role="alert" className="text-destructive">{error}</p>} />
       <GroupTabs />
-      <SettingsCard household={household} tables={tables} onSave={(p) => act(() => updateHousehold(store, p))} onBuffer={(value, scope) => { const saving = setMonthlyDefault(store, value, scope, monthOfDate()); act(() => saving); return saving }} />
+      <SettingsCard household={household} tables={tables} onSave={(p) => act(() => updateHousehold(store, p))} onBuffer={(value, scope) => { const saving = setMonthlyDefault(store, value, scope, monthOfDate()); act(() => saving); return saving }} onPayments={(on) => act(() => setPaymentsOn(store, on))} />
       <EntitiesCard household={household} tables={tables} entities={tables.entities.filter((e) => !e.deletedAt)} onError={setError} onRestored={onRestored} />
       <AccountsCard household={household} tables={tables} accounts={tables.accounts.filter((a) => !a.deletedAt)} entities={tables.entities} engine={engine} months={months} onError={setError} onRestored={onRestored} />
+      {household.payments && <PaymentMethodsCard tables={tables} onError={setError} />}
       <PoolsCard household={household} tables={tables} engine={engine} onError={setError} onRestored={onRestored} />
       <CategoriesCard household={household} tables={tables} onError={setError} />
       <ArchivedRowsCard household={household} tables={tables} onError={setError} onRestored={onRestored} />
@@ -70,7 +72,7 @@ export function HouseholdScreen() {
   )
 }
 
-function SettingsCard({ household: h, tables, onSave, onBuffer }: { household: Household; tables: Tables; onSave: (p: Partial<Household>) => void; onBuffer: (value: number, scope: MonthlyDefaultScope) => Promise<unknown> }) {
+function SettingsCard({ household: h, tables, onSave, onBuffer, onPayments }: { household: Household; tables: Tables; onSave: (p: Partial<Household>) => void; onBuffer: (value: number, scope: MonthlyDefaultScope) => Promise<unknown>; onPayments: (on: boolean) => void }) {
   const thisMonth = monthOfDate()
   const state = tables.monthStates.find((s) => s.month === thisMonth)
   /** The cash buffer this month: its own value when the month has one, else the household's. */
@@ -115,6 +117,10 @@ function SettingsCard({ household: h, tables, onSave, onBuffer }: { household: H
         </div>
         <div className="sm:col-span-2">
           <Check label="Show expenses as negative red numbers" checked={h.displayExpensesNegative} onChange={(e) => onSave({ displayExpensesNegative: e.target.checked })} />
+        </div>
+        <div className="flex items-center gap-1 sm:col-span-2">
+          <Check label="Plan payments by day and method" checked={!!h.payments} onChange={(e) => onPayments(e.target.checked)} />
+          <InfoTip help="payments.switch" />
         </div>
         <p className="text-muted-foreground sm:col-span-2">Base currency {h.baseCurrency} · first month {formatMonth(h.startMonth, h.locale)}. These cannot be changed after setup.</p>
       </div>

@@ -19,7 +19,7 @@ test.describe('guide', () => {
     await expect(page.getByRole('button', { name: 'Try the demo' })).toHaveCount(0) // hidden in the sandbox
     await expect(page.getByRole('link', { name: 'Open on GitHub' })).toHaveAttribute('href', /github\.com/)
     const contents = page.getByRole('navigation', { name: 'Topics' })
-    await expect(contents.getByRole('link')).toHaveCount(17)
+    await expect(contents.getByRole('link')).toHaveCount(18)
     // the Guide starts where the app does: the Statement first, then the Grid as the planning view
     await expect(contents.getByRole('link').nth(0)).toContainText('Start & the Statement')
     await expect(contents.getByRole('link').nth(1)).toContainText('The grid: planning ahead')

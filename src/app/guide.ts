@@ -1,4 +1,4 @@
-import { ACCOUNT_TYPE_INFO, ENTITY_KIND_HELP, ENTITY_KIND_LABEL, GOAL_KIND_INFO, RULE_KIND_INFO, type EntityKind } from '@/model'
+import { ACCOUNT_TYPE_INFO, ENTITY_KIND_HELP, ENTITY_KIND_LABEL, GOAL_KIND_INFO, PAYMENT_KIND_INFO, RULE_KIND_INFO, type EntityKind } from '@/model'
 import type { HelpKey } from './help'
 import type { Screen } from './screens'
 
@@ -47,6 +47,7 @@ const kinds: GuideFact[] = (Object.keys(ENTITY_KIND_LABEL) as EntityKind[]).map(
 const rules: GuideFact[] = RULE_KIND_INFO.map((r) => ({ label: r.label, text: r.help }))
 const accountTypes: GuideFact[] = ACCOUNT_TYPE_INFO.map((a) => ({ label: a.label, text: a.help }))
 const goalKinds: GuideFact[] = GOAL_KIND_INFO.map((g) => ({ label: g.label, text: g.help }))
+const paymentKinds: GuideFact[] = PAYMENT_KIND_INFO.map((k) => ({ label: k.label, text: k.help }))
 
 export const GUIDE: GuideTopic[] = [
   {
@@ -251,6 +252,27 @@ export const GUIDE: GuideTopic[] = [
       'Statement → "Debts and net worth" → press the balance, or Grid → "<Name> · owed" or "<Name> · outstanding" in a month → "At the end of <Month>" to correct the balance; "At the start of <Month>" corrects what was owed when the month began.',
     ],
     tips: ['balance.cardOwed', 'balance.loanOutstanding', 'balance.otherAsset', 'derived.netWorth', 'household.tracked'],
+    open: 'household',
+  },
+  {
+    key: 'payments',
+    title: 'Payments: when and with what',
+    summary: 'Switched on, the household keeps a list of its payment methods: how money leaves, and from which account or card.',
+    what: [
+      'Planning payments is off until you turn it on: Household → "Household settings" → "Plan payments by day and method". It is one switch for the whole household, on every device. Off again, everything it added is hidden and nothing is lost.',
+      'On, "Payment methods" appears under Household: your ways of paying, each with a kind, a name, the account or card it draws on, and who pays with it. "Comes out of" keeps saying whose money pays for an expense; a method says how the amount leaves, and from where.',
+      'A method that draws on a credit card means "bought on that card": the amount is owed there until the card is paid. A method that amounts were paid with keeps its account and can only be archived.',
+    ],
+    steps: [
+      'Household → "Household settings" → tick "Plan payments by day and method".',
+      'Under "Payment methods" the app offers a first list from your accounts: a direct debit, a standing order and a transfer by hand for each current account, one method per credit card, and cash. Untick what you do not use and press "Add 5 methods" (the count follows your ticks).',
+      'For another one, "Add method": choose the "Kind", type a "Name" (your bank\'s word for it, or "PayPal"), choose what it "Draws on" and "Who pays with it", then "Save".',
+      '"Edit" beside a method changes its name, kind or owner. Its button at the bottom left says "Delete" while nothing uses the method, and "Archive" once something does.',
+      'An archived method stands under "Archived"; "Use again" brings it back.',
+    ],
+    factsTitle: 'The kinds of method',
+    facts: paymentKinds,
+    tips: ['payments.switch', 'payments.kind', 'payments.drawsOn', 'payments.owner', 'payments.archivedMethod'],
     open: 'household',
   },
   {
