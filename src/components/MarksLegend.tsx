@@ -33,7 +33,7 @@ function Mark({ sample, children }: { sample: ReactNode; children: ReactNode }) 
  * Every kind of money has one hue, every mark one meaning; the samples use the same classes as the real cells.
  */
 export function MarksLegend({ neg }: { neg: boolean }) {
-  const { go } = useScreen()
+  const { go, payments } = useScreen()
   // the hash names the Guide topic; the Guide scrolls there on arrival
   const moreInGuide = () => go('guide', '#guide-marks')
   return (
@@ -65,6 +65,7 @@ export function MarksLegend({ neg }: { neg: boolean }) {
             <Mark sample={<span className="rounded bg-muted/60 px-1.5 py-0.5 text-muted-foreground">Sept</span>}>A month that is over: grey in the Grid, "past" on the Statement. It can still be changed</Mark>
             <Mark sample={<span className={cn('block h-4 w-14 rounded-sm ring-1 ring-border', HUES.expense.band)} aria-hidden />}>A faint band: the rows of one category</Mark>
             <Mark sample={<Repeat className="size-3.5 text-muted-foreground" aria-hidden />}>On a schedule: it lands in its months by itself. In the months between, the line is grey and says when it lands next, and with how much</Mark>
+            {payments && <Mark sample={<span className="text-[11px] text-muted-foreground">15th</span>}>The day an amount goes out, on the Statement: press it for the month's payments</Mark>}
             <Mark sample={<CircleSlash className="size-3.5 text-muted-foreground" aria-hidden />}>Not in net worth, on the Statement: an account that is a person's own. Its figures are grey, and no total counts it</Mark>
             <Mark sample={<Link2 className="size-3.5 text-muted-foreground" aria-hidden />}>Linked, on the Statement: a row and the account it fills, takes from or pays off. Press it to go to the other end; faint and open, no row pays that loan or card off yet</Mark>
           </ul>

@@ -17,7 +17,7 @@ const DAY_COL = 'w-12 shrink-0 whitespace-nowrap tabular-nums text-muted-foregro
  * anywhere (its name is the button, stretched over the line, as on the Statement); a line without a day carries
  * "Set…" for the row's usual day and method.
  */
-export function PaymentLine({ payment: p, month, method, currency, locale, busy, onTick, onOpen, onSet }: {
+export function PaymentLine({ payment: p, month, method, currency, locale, busy, marked = false, onTick, onOpen, onSet }: {
   payment: Payment
   month: MonthKey
   /** The method it is paid with; null where none is named. */
@@ -26,6 +26,8 @@ export function PaymentLine({ payment: p, month, method, currency, locale, busy,
   locale: string
   /** Its tick is being saved. */
   busy: boolean
+  /** The line the Statement has just pointed at (a day was pressed there): the focus ring's colour, never the lime. */
+  marked?: boolean
   onTick: () => void
   onOpen: () => void
   /** "Set…": the row's usual day and method. Left out where the line is one item of several, which is set in the amount's dialog. */
@@ -38,7 +40,7 @@ export function PaymentLine({ payment: p, month, method, currency, locale, busy,
   const daySaid = p.day != null ? `on the ${ordinalDay(p.day)}` : 'no day yet'
   const said = `${fullLabel}: ${amountText}, ${daySaid}${method ? `, ${method.name}` : ''}${p.done ? ', done' : ''}`
   return (
-    <li className="group/line flex min-h-11 items-center gap-1.5 pr-2 text-sm md:min-h-8 md:text-xs" data-payment={p.id} data-state={p.state}>
+    <li className={cn('group/line flex min-h-11 items-center gap-1.5 pr-2 text-sm md:min-h-8 md:text-xs', marked && 'rounded bg-muted ring-2 ring-inset ring-ring')} data-payment={p.id} data-state={p.state} data-marked={marked || undefined}>
       <Tick
         done={p.done ? 1 : 0} total={1} state={p.done ? 'all' : 'none'} label={`${fullLabel} done`} disabled={busy} onToggle={onTick}
         className="md:size-7 md:rounded" dotClassName="md:size-3.5"

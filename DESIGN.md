@@ -483,6 +483,12 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   `next Jan 2027` (`nextDue`), so it is not mistaken for a row nobody set up. A row with several
   schedules says `3 items repeat`. A row whose amount simply carries on from month to month has no symbol: that is
   what every row does. The Grid draws the symbol beside the row's name, and the legend names it.
+  **The day.** While the household plans its payments by day and method (§12), a line under "Money out" says the day
+  its amount goes out on, after its name and its repeat symbol: `1st`, in the tags' muted `text-[11px]`, nothing
+  more. A row with one amount says its day; in a row that lists items each item says its own, and the row says it
+  only where they share it. A line with nothing to pay, a skipped item and anything that comes in say none. It is a
+  button (`Paid on the 1st: show in Payments`, underlined on hover, above the line's own button): pressed, it opens
+  Payments on the Statement's month with that payment marked. The Grid does not draw it.
   **Not this month.** What is on a schedule and does not land in the month on screen is still there, grey
   (`resting`, `data-resting`: the name in `text-muted-foreground`, like a note), so a row reads the same in every
   month. A row with nothing this month is one grey line; a schedule of a row that has other things this month is a
@@ -1040,7 +1046,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   toolbars; its popover opens from its right edge) is the legend:
   the six hue dots with their kinds of money, then the marks with a sample each: estimate, certain, done, this month's
   red and amber dots, the negative spending number when that setting is on, the amber draw, the dotted entered balance,
-  the grey month that is over, the category band. It ends with a ghost `xs` "More in the Guide" that opens the Guide's
+  the grey month that is over, the category band, the repeat symbol, the crossed circle, the link, and, while
+  payments are planned by day, the day after a line's name. It ends with a ghost `xs` "More in the Guide" that opens the Guide's
   Marks & keyboard topic (`#guide-marks`). The welcome screen's quiet links carry "How it works" for the same page.
 
 ## 9. Loading, errors, empty
@@ -1270,3 +1277,7 @@ feature switch; a second one follows the same form.
   the whole list is back. Its accessible name says what it is and what it comes to (`Standing order on Main account:
   €4,019.00, 2 payments`).
 - **No methods yet:** the list opens with one muted line and an outline `xs` button to Household, where they are added.
+- **From the Statement.** A line's day there (§7) opens this page on the Statement's month, scrolled to the payment
+  (for a row with several items: all of them), which is marked for two and a half seconds the way the Statement
+  marks a line it jumped to: `bg-muted ring-2 ring-inset ring-ring`, never the lime. A marked payment that is done
+  unfolds "Done". The next visit opens on the current month again.

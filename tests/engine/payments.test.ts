@@ -141,6 +141,44 @@ describe('where a payment stands, and where it leaves', () => {
     expect(pay.toPay).toBeGreaterThan(25_00)
   })
 
+  it('the Statement says a line\'s day while payments are planned by day, the same day as the list; off, no line has one', () => {
+    const every = (tb: Tables) => {
+      const { statement } = of(tb)
+      return flat([...statement.flow.left.lines, ...statement.flow.right.lines, ...statement.position.left.lines, ...statement.position.right.lines])
+    }
+    expect(every(t).some((l) => l.day != null)).toBe(false)
+
+    const on: Tables = { ...t, household: [{ ...h, payments: true }] }
+    const lines = new Map(every(on).map((l) => [l.id, l]))
+    const list = of(on).pay
+    expect(list.payments.length).toBe(pay.payments.length)
+    for (const p of list.payments) expect(lines.get(p.id)?.day ?? null, p.label).toBe(p.day)
+    expect(lines.get(phone.id)?.day).toBe(12)
+    // "Flights" is paid on the 31st, and November has thirty days
+    expect(lines.get(flights.id)?.day).toBe(30)
+    // the subscriptions go out on different days (the 3rd and the 18th): each item says its own, the row says none
+    const items = lines.get(subs.id)!.children
+    expect(items.map((l) => [l.label, l.day])).toEqual([['Films', 3], ['Music', 18], ['Paper', undefined]])
+    expect(lines.get(subs.id)?.day).toBeUndefined()
+    // money that comes in has no day yet
+    expect(lines.get(salary.id)?.day).toBeUndefined()
+    expect(flat(of(on).statement.flow.left.lines).some((l) => l.day != null)).toBe(false)
+  })
+
+  it('a row whose items all go out on one day says that day itself, and a row without an amount says none', () => {
+    const on: Tables = {
+      ...t, household: [{ ...h, payments: true }],
+      cells: [...t.cells, cellItems(gym.id, '2026-11', [{ label: 'Membership', amount: 30_00 }, { label: 'Sauna', amount: 10_00 }]), cellValue(phone.id, '2026-11', 0)],
+    }
+    const lines = new Map(flat(of(on).statement.flow.right.lines).map((l) => [l.id, l]))
+    expect(lines.get(gym.id)?.day).toBe(22)
+    expect(lines.get(gym.id)!.children.map((l) => l.day)).toEqual([22, 22])
+    // typed as zero for the month: nothing to pay, so it is not on the list and has no day
+    expect(lines.get(phone.id)?.amount).toBe(0)
+    expect(lines.get(phone.id)?.day).toBeUndefined()
+    expect(of(on).pay.payments.some((p) => p.rowId === phone.id)).toBe(false)
+  })
+
   it('the account totals: the main account first, a method at a time, the card with what is owed and what pays it', () => {
     expect(pay.accounts.map((a) => a.label)).toEqual(['Main', "Sam's account", 'Savings', 'Visa'])
     const first = pay.accounts[0]

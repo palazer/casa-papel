@@ -6,7 +6,7 @@ import { InfoTip } from '@/components/InfoTip'
 import { Tick } from '@/components/Tick'
 import { cn } from '@/lib/utils'
 import { ESTIMATE_SHADE, ruleText, type DoneState } from '@/app/display'
-import { formatAmount, formatMonth, formatPercent, formatShare } from '@/app/format'
+import { formatAmount, formatMonth, formatPercent, formatShare, ordinalDay } from '@/app/format'
 import type { HelpKey } from '@/app/help'
 import { HUES, type Hue } from '@/app/hues'
 import type { GoalProgress, StatementHue, StatementLine as Line } from '@/engine'
@@ -25,6 +25,8 @@ export interface LineContext {
   /** How much of a row or an item is done; null when there is nothing to tick. Leave out for a side without ticks. */
   doneOf?: (line: Line) => { done: number; total: number; state: DoneState } | null
   onTick?: (line: Line, done: boolean) => void
+  /** A line's day was pressed: open the month's payments at that line. Without it the day is only read. */
+  onDay?: (line: Line) => void
   /** Open a row's dialog: its amount and, where it can carry one, its rule. */
   onEdit?: (rowId: string) => void
   /** The line (or row) a tick is being saved for. */
@@ -175,6 +177,15 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
           <Repeat className="size-3 text-muted-foreground" aria-hidden />
         </span>
       )}
+      {/* the day it goes out on, while payments are planned by day: quiet, and the way to the month's payments */}
+      {line.day != null && (ctx.onDay ? (
+        <button
+          type="button" data-day aria-label={`Paid on the ${ordinalDay(line.day)}: show in Payments`} title={`Paid on the ${ordinalDay(line.day)}. Press for the month's payments.`} onClick={() => ctx.onDay!(line)}
+          className={cn(ABOVE, 'shrink-0 rounded text-[11px] tabular-nums text-muted-foreground outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:-my-2 pointer-coarse:py-2')}
+        >
+          {ordinalDay(line.day)}
+        </button>
+      ) : <span data-day className="shrink-0 text-[11px] tabular-nums text-muted-foreground" title={`Paid on the ${ordinalDay(line.day)}`}>{ordinalDay(line.day)}</span>)}
       {line.nextDue && <span className="shrink-0 text-[11px] text-muted-foreground">next {formatMonth(line.nextDue, locale)}</span>}
       {line.accountKind && <span className="shrink-0 text-[11px] text-muted-foreground">{line.accountKind}</span>}
       {line.native && (

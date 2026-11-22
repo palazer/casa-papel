@@ -10,7 +10,7 @@ import { doneness, type DoneState } from '@/app/display'
 import { formatMonth } from '@/app/format'
 import { readPref, writePref } from '@/app/prefs'
 import { useStore } from '@/app/store'
-import { clearHandedMonth, handedOverMonth } from '@/app/screens'
+import { clearHandedMonth, handPayment, handedOverMonth, useScreen } from '@/app/screens'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { useUndoNotice } from '@/app/useUndoNotice'
 import { UndoNotice } from '@/components/UndoNotice'
@@ -172,6 +172,7 @@ export function StatementScreen() {
   const [topUpFor, setTopUpFor] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const { go } = useScreen()
 
   const settingUp = household?.setupOpen ?? false
   const month = picked ?? (settingUp && household ? household.startMonth : monthOfDate())
@@ -562,7 +563,13 @@ export function StatementScreen() {
   const poolEditing = poolEdit ? tables.pools.find((p) => p.id === poolEdit && !p.deletedAt) : undefined
 
   const base = { locale, ccy, isOpen, onToggle, goalText, onRule, onTopUp: setTopUpFor, onLink: goToLink, onLinkOpen: addPayOff, marked, locked: focus ? (line: StatementLine) => lockedLines.has(line.id) : undefined }
-  const flowCtx: LineContext = { ...base, withChange: false, doneOf, onTick, onEdit: (rowId) => setEditor({ rowId }), busy, footer, onEstimate: setEstimateFor, rowMenu, menu: lineMenu }
+  /** A line's day: the month's payments, at that line. */
+  const onDay = (line: StatementLine) => {
+    if (!line.rowId) return
+    handPayment({ month: m, rowId: line.rowId, itemId: line.itemId })
+    go('payments')
+  }
+  const flowCtx: LineContext = { ...base, withChange: false, doneOf, onTick, onDay, onEdit: (rowId) => setEditor({ rowId }), busy, footer, onEstimate: setEstimateFor, rowMenu, menu: lineMenu }
   // the estimate dialog reads the category's line: what the month shows now, and what its rows explain
   const estimateCategory = estimateFor ? tables.categories.find((c) => c.id === estimateFor && !c.deletedAt) : undefined
   const estimateLine = estimateFor ? walk(statement.flow.right.lines).find((l) => l.id === `cat:expense:${estimateFor}`) : undefined

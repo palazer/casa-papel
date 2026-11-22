@@ -18,7 +18,7 @@
  * Grid): that it brings a debt down shows in the lower half. "From what is left" is how the rest is shared out:
  * pocket money, savings, investments, virtual accounts, and the figure that closes the month.
  */
-import { accountGroup, addMonths, canCarryRule, cardIsItemized, describeCadence, isTakenFromAccount, movesInto, nextDue, paysAsExpense, pocketLandsIn, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
+import { accountGroup, addMonths, canCarryRule, cardIsItemized, describeCadence, isPaymentRow, isTakenFromAccount, movesInto, nextDue, payContext, payDayOf, paysAsExpense, pocketLandsIn, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
 import { computeGoals, type GoalProgress } from './goals'
 import { mainAccountsIn, mainAccountLabel } from './mainAccount'
 import { cellKey, fundingTotal, type AccountSeries, type CellResult, type CellStatus, type EngineOutput } from './types'
@@ -123,6 +123,11 @@ export interface StatementLine {
   nextDue?: MonthKey
   /** On a schedule and not landing this month: a row with nothing in it, or one of a row's schedules, listed all the same. Shown grey. */
   resting?: boolean
+  /**
+   * The day of the month the amount goes out on ("Paid on"), while the household plans its payments by day and method:
+   * on a row with one amount, on each item of a row that lists them, and on that row itself where its items share a day.
+   */
+  day?: number
   /** With `resting`: what it brings in `nextDue`, shown grey where the amount would be. It counts in no sum: the line's amount stays zero. */
   upcoming?: { amount: Money; currency: string }
   missingRate?: boolean
@@ -248,6 +253,10 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
   }
 
   const schedulesById = new Map(tables.recurringItems.map((r) => [r.id, r]))
+  // "Plan payments by day and method": only then does a line say its day (rule W1: the item, its schedule, the row)
+  const pay = household.payments ? payContext(tables) : null
+  const dayOf = (row: Row, item: CellResult['items'][number] | null): number | undefined =>
+    (pay && isPaymentRow(row) ? payDayOf(item, row, month, pay) ?? undefined : undefined)
   const cellOf = (row: Row): CellResult | null => {
     const c = engine.cells[cellKey(row.id, month)]
     return c && c.source !== 'archived' ? c : null
@@ -274,6 +283,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
           id: `${row.id}:${it.id}`, kind: 'item' as const, label: it.label || 'Amount', amount: it.effectiveAmount, currency: c.currency, children: [],
           status: it.status, estimate: !it.skipped && it.status === 'projected', skipped: !!it.skipped, scheduled: it.recurringItemId != null,
           repeats: schedule ? describeCadence(schedule, household!.locale) : undefined,
+          day: it.skipped || it.effectiveAmount === 0 ? undefined : dayOf(row, it),
           rowId: row.id, itemId: it.id,
         }
       }),
@@ -285,6 +295,10 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
     ]
     // a transfer that feeds an account says how through its rule symbol, not through a tag
     const rule = canCarryRule(row) ? ruleOf(row) : undefined
+    // the row's own day: its one amount's, or the day its items share; items on different days each say their own.
+    // A line with nothing to pay says none: it is not on the month's list of payments either
+    const days = listed ? [...new Set(live.map((i) => dayOf(row, i)))] : [dayOf(row, live.length === 1 ? live[0] : null)]
+    const day = empty || amount === 0 || days.length !== 1 ? undefined : days[0]
     return {
       id: row.id, kind: 'row', label: row.name, amount, children, status: c.status, estimate: !empty && c.status === 'projected', empty,
       // a one-off says what it was; a scheduled item only repeats its row's name
@@ -292,6 +306,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
       automatic: c.source === 'derived', chip: c.source === 'derived' && !rule ? 'automatic' : undefined, rule, missingRate: c.missingRate || undefined,
       native: c.currency !== base ? { amount: c.value, currency: c.currency } : undefined,
       net: row.section === 'income' && c.deductionsBase > 0 ? c.netBase : undefined,
+      ...(day != null ? { day } : {}),
       ...(running.length ? { scheduled: true, repeats: repeatsText(running, household!.locale), nextDue: next, upcoming, resting: empty || undefined } : {}),
       // a payment to a loan that owed less than the payment, or nothing: the line says so, and what was planned
       ...(c.asked != null ? { chip: 'paid off', planned: { amount: c.asked, currency: c.currency } } : {}),

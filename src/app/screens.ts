@@ -113,5 +113,20 @@ export const handMonth = (month: string): void => { handedMonth = month }
 export const handedOverMonth = (): string | null => handedMonth
 export const clearHandedMonth = (): void => { handedMonth = null }
 
+/**
+ * A payment the Statement hands to the Payments page (a line's day was pressed): the page opens on its month with the
+ * line marked, and clears it once it is on screen.
+ */
+export interface HandedPayment {
+  month: string
+  rowId: string
+  /** One item of the row; left out for the row as a whole. */
+  itemId?: string
+}
+let handedPayment: HandedPayment | null = null
+export const handPayment = (p: HandedPayment): void => { handedPayment = p }
+export const handedOverPayment = (): HandedPayment | null => handedPayment
+export const clearHandedPayment = (): void => { handedPayment = null }
+
 export const ScreenContext = createContext<{ screen: Screen; go: (s: Screen, hash?: string) => void; payments: boolean }>({ screen: 'statement', go: () => undefined, payments: false })
 export const useScreen = () => useContext(ScreenContext)

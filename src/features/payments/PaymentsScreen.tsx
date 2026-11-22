@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { InfoTip } from '@/components/InfoTip'
 import { PageHeader } from '@/components/PageHeader'
@@ -7,7 +7,7 @@ import { Chip } from '@/components/ui/chip'
 import { Island } from '@/components/ui/island'
 import { formatAmount, formatMonth, weekdayOf } from '@/app/format'
 import { saveError } from '@/app/saveError'
-import { useScreen } from '@/app/screens'
+import { clearHandedPayment, handedOverPayment, useScreen } from '@/app/screens'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { buildPayments, cellKey, type Payment, type PaymentState } from '@/engine'
@@ -39,8 +39,18 @@ export function PaymentsScreen() {
   const { go } = useScreen()
   const months = useMemo(() => (household && tables ? defaultMonths(household, tables) : []), [household, tables])
   const engine = useEngine(tables, months)
-  /** The month someone picked; until then, today's. */
-  const [picked, setPicked] = useState<MonthKey | null>(null)
+  /** A line of the Statement whose day was pressed: the page opens on its month, with its payments marked. */
+  const [handed, setHanded] = useState(handedOverPayment)
+  /** The month someone picked; until then, the handed one, or today's. */
+  const [picked, setPicked] = useState<MonthKey | null>(() => (handedOverPayment()?.month as MonthKey | undefined) ?? null)
+  // handed over for this visit only; the mark goes after a moment, as on the Statement
+  useEffect(() => {
+    clearHandedPayment()
+    if (!handed) return
+    document.querySelector('[data-marked]')?.scrollIntoView({ block: 'center' })
+    const timer = window.setTimeout(() => setHanded(null), 2500)
+    return () => window.clearTimeout(timer)
+  }, [handed])
   /** The total that was pressed: only its payments are listed. */
   const [filter, setFilter] = useState<PaymentFilter | null>(null)
   /** "Done" is folded until it is pressed: what is left to do is what the page is for. */
@@ -65,11 +75,13 @@ export function PaymentsScreen() {
   const editing = editor ? engine.rows.find((r) => r.id === editor) : undefined
   const paying = paidFor ? engine.rows.find((r) => r.id === paidFor) : undefined
   const noMethods = !tables.paymentMethods.some((x) => !x.deletedAt && !x.archived)
+  const isMarked = (p: Payment) => !!handed && handed.month === m && p.rowId === handed.rowId && (!handed.itemId || p.itemId === handed.itemId)
 
   /** A month of its own has totals of its own: a pressed one does not carry over. */
   const setMonth = (next: MonthKey) => {
     setPicked(next)
     setFilter(null)
+    setHanded(null)
   }
 
   /** One tick: the Statement's own, for the same amount (an item, an amount the app works out, or a row's month). */
@@ -104,7 +116,7 @@ export function PaymentsScreen() {
       {g.payments.map((p) => (
         <PaymentLine
           key={p.id} payment={p} month={m} method={p.methodId ? methods.get(p.methodId) ?? null : null} currency={ccy} locale={locale}
-          busy={busy === p.id} onTick={() => onTick(p)} onOpen={() => setEditor(p.rowId)}
+          busy={busy === p.id} onTick={() => onTick(p)} onOpen={() => setEditor(p.rowId)} marked={isMarked(p)}
           // one item of several says its own day in the amount's dialog; anything else takes the row's usual one
           onSet={p.state === 'no-day' && !p.itemId ? () => setPaidFor(p.rowId) : undefined}
         />
@@ -114,19 +126,21 @@ export function PaymentsScreen() {
   const group = (g: PaymentGroup) => {
     const count = <span className="font-normal normal-case tracking-normal text-muted-foreground">{g.payments.length} · {money(g.total)}</span>
     if (g.key === 'done') {
+      // a payment the Statement pointed at is shown, also when it is done
+      const doneShown = doneOpen || g.payments.some(isMarked)
       return (
         <section key={g.key} data-group={g.key}>
           <h4 className={cn(EYEBROW, 'text-muted-foreground')}>
             <button
-              type="button" aria-expanded={doneOpen} aria-controls="payments-done" onClick={() => setDoneOpen(!doneOpen)}
+              type="button" aria-expanded={doneShown} aria-controls="payments-done" onClick={() => setDoneOpen(!doneShown)}
               className="flex min-h-11 w-full items-center gap-1.5 rounded uppercase outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring md:min-h-7"
             >
-              <ChevronRight className={cn('size-3.5 shrink-0 transition-transform', doneOpen && 'rotate-90')} aria-hidden />
+              <ChevronRight className={cn('size-3.5 shrink-0 transition-transform', doneShown && 'rotate-90')} aria-hidden />
               <span>{heading(g)}</span>
               {count}
             </button>
           </h4>
-          {doneOpen && <div id="payments-done">{lines(g)}</div>}
+          {doneShown && <div id="payments-done">{lines(g)}</div>}
         </section>
       )
     }
