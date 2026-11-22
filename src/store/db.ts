@@ -1,6 +1,6 @@
 import Dexie, { type Table } from 'dexie'
 import type {
-  Account, AccountMonth, Category, Cell, Entity, FxRate, Goal, Household, Meta, MonthState, Pool,
+  Account, AccountMonth, Category, Cell, Entity, FxRate, Goal, Household, Meta, MonthState, PaymentMethod, Pool,
   RecurringItem, Row, StoreEvent, TableName,
 } from '@/model'
 
@@ -24,6 +24,7 @@ export class CasaDb extends Dexie {
   fxRates!: Table<FxRate, [string, string]>
   monthStates!: Table<MonthState, string>
   goals!: Table<Goal, string>
+  paymentMethods!: Table<PaymentMethod, string>
   events!: Table<StoreEvent, string>
   meta!: Table<Meta, string>
 
@@ -61,13 +62,15 @@ export class CasaDb extends Dexie {
       events: 'id, ts, txId',
       meta: 'key',
     })
+    // v3: payment methods (a table that is new keeps the others as they are)
+    this.version(3).stores({ paymentMethods: 'id' })
   }
 
   /** The data tables (everything except events and meta). */
   get dataTables(): TableName[] {
     return [
       'household', 'entities', 'accounts', 'accountMonths', 'categories', 'rows',
-      'cells', 'recurringItems', 'pools', 'fxRates', 'monthStates', 'goals',
+      'cells', 'recurringItems', 'pools', 'fxRates', 'monthStates', 'goals', 'paymentMethods',
     ]
   }
 }

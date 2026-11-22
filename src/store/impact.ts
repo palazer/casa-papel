@@ -10,7 +10,7 @@
 import { computeEngine, cellKey, type CellResult, type EngineOutput } from '@/engine'
 import { assertMainAccount } from './mainAccount'
 import {
-  AccountSchema, CategorySchema, CellSchema, EntitySchema, GoalSchema, PoolSchema, RecurringItemSchema, RowSchema,
+  AccountSchema, CategorySchema, CellSchema, EntitySchema, GoalSchema, PaymentMethodSchema, PoolSchema, RecurringItemSchema, RowSchema,
   ENTITY_KIND_LABEL, accountIdOf, accountRef, addMonths, compareMonths, monthOfDate, monthRange, ownBalance, parseMonth, paysExpenses, poolIdOf, poolRef,
   type Account, type ArchiveMemo, type Category, type Cell, type CellInput, type Entity, type FundedBy, type Goal, type Household, type Money, type MonthKey, type Pool, type RecurringItem, type Row,
   type TableName, type Tables,
@@ -227,6 +227,9 @@ function describeAccount(ctx: Ctx, acc: Account): Described {
   if (funded.length) changes.push(`${quoteNames(funded.map((r) => r.name))} ${pick(funded.length, 'comes', 'come')} out of the month's income instead`)
   if (paid.length) changes.push(`What came out of it in ${plural(paid.length, 'month')} counts as spent from that month's income, so the leftover there falls`)
   if (paying.length) changes.push(`${plural(paying.length, 'schedule')} ${pick(paying.length, 'comes', 'come')} out of the month's income instead`)
+  // the ways of paying that draw on it go with it: what was paid with one names no method any more
+  const methods = ctx.tables.paymentMethods.filter((m) => !m.deletedAt && m.accountId === acc.id)
+  if (methods.length) changes.push(`The payment ${pick(methods.length, 'method', 'methods')} ${quoteNames(methods.map((m) => m.name))} ${pick(methods.length, 'goes', 'go')} with it`)
   return {
     kindLabel: 'Account', subject: acc.name, loses, changes, blockers, note: null, activity, canArchive: true,
     archive: (from) => {
@@ -298,6 +301,8 @@ function describeEntity(ctx: Ctx, e: Entity): Described {
   if (own.length) changes.push(`${quoteNames(own.map((r) => r.name))} ${pick(own.length, 'becomes', 'become')} shared`)
   if (tagged.length) changes.push(`${quoteNames(tagged.map((r) => r.name))} ${pick(tagged.length, 'loses its tag', 'lose their tag')}`)
   if (owned.length) changes.push(`${quoteNames(owned.map((a) => a.name))} ${pick(owned.length, 'becomes', 'become')} a household account`)
+  const pays = ctx.tables.paymentMethods.filter((m) => !m.deletedAt && m.ownerEntityId === e.id)
+  if (pays.length) changes.push(`The payment ${pick(pays.length, 'method', 'methods')} ${quoteNames(pays.map((m) => m.name))} ${pick(pays.length, 'becomes', 'become')} the household's`)
   if (schedules.length) changes.push(`${plural(schedules.length, 'schedule')} ${pick(schedules.length, 'becomes', 'become')} shared`)
   return {
     kindLabel: ENTITY_KIND_LABEL[e.kind], subject: e.name, loses: [], changes, blockers: [], note: null, activity, canArchive: true,
@@ -606,6 +611,8 @@ function accountRemoval(ctx: Ctx, acc: Account, ts: number): Mutation[] {
   // what came out of it counts as spent from the month's income, as the engine reads a source that is gone
   muts.push(...moveItemSources(ctx, ref, 'cash', ts))
   for (const g of ctx.goals) if (g.accountId === acc.id) muts.push(put('goals', GoalSchema, g, { deletedAt: ts }, ts))
+  // a method that draws on it has nothing to draw on: it goes too, and what named it reads as naming none (`payContext`)
+  for (const m of ctx.tables.paymentMethods) if (!m.deletedAt && m.accountId === acc.id) muts.push(put('paymentMethods', PaymentMethodSchema, m, { deletedAt: ts }, ts))
   return muts
 }
 
@@ -666,6 +673,7 @@ function entityRemoval(ctx: Ctx, e: Entity, ts: number): Mutation[] {
     muts.push(put('rows', RowSchema, r, { scope: r.scope === e.id ? 'shared' : r.scope, entityTags: r.entityTags.filter((t) => t !== e.id) }, ts))
   }
   for (const a of ctx.accounts) if (a.ownerEntityId === e.id) muts.push(put('accounts', AccountSchema, a, { ownerEntityId: null }, ts))
+  for (const m of ctx.tables.paymentMethods) if (!m.deletedAt && m.ownerEntityId === e.id) muts.push(put('paymentMethods', PaymentMethodSchema, m, { ownerEntityId: null }, ts))
   for (const s of ctx.schedules) if (s.scope === e.id) muts.push(put('recurringItems', RecurringItemSchema, s, { scope: 'shared' }, ts))
   return muts
 }

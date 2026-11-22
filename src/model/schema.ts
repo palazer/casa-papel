@@ -8,7 +8,7 @@ import { FUNDED_BY_PATTERN, type FundedBy } from './fundedBy'
 z.config({ jitless: true })
 
 /** Bump when the shape of stored data changes; add a migration in migrations.ts. */
-export const SCHEMA_VERSION = 20
+export const SCHEMA_VERSION = 21
 
 // ---------- primitives ----------
 export const IdSchema = z.string().regex(ID_PATTERN, 'expected ULID')
@@ -22,6 +22,8 @@ export const FundedBySchema = z.string().regex(FUNDED_BY_PATTERN) as unknown as 
 export const ItemStatusSchema = z.enum(['projected', 'committed', 'done'])
 export const DefaultStatusSchema = z.enum(['projected', 'committed'])
 export const SectionSchema = z.enum(['income', 'expense', 'transfer'])
+/** The day of the month an amount goes out on ("Paid on"). A day the month does not have is its last day. */
+export const PayDaySchema = z.number().int().min(1).max(31)
 
 /** Common fields on every durable record. Soft-deleted via `deletedAt`. */
 const BaseRecord = z.object({
@@ -88,6 +90,12 @@ export const HouseholdSchema = BaseRecord.extend({
    * false once that is settled. A household made since is made with false. Read it with `== null`, never `=== undefined`.
    */
   askMainAccount: z.boolean().optional(),
+  /**
+   * "Plan payments by day and method": the Payments page, the list of payment methods and the fields "Paid on" and
+   * "Paid with" exist while this is on. Off or unset, they are hidden and nothing is lost: what was set stays, and a
+   * method that draws on a card keeps counting (rule C2). Read it by truthiness.
+   */
+  payments: z.boolean().optional(),
 })
 
 // ---------- entities ----------
@@ -185,6 +193,31 @@ export const AccountMonthSchema = z.object({
   updatedAt: TimestampSchema,
 })
 
+// ---------- payment methods ----------
+/**
+ * How a payment goes: collected or sent by itself (a direct debit, a standing order), made by hand (a transfer,
+ * cash), or made when something is bought (a card, a wallet). `model/payments.ts` says which kind asks what.
+ */
+export const PaymentKindSchema = z.enum(['direct-debit', 'standing-order', 'transfer', 'debit-card', 'credit-card', 'wallet', 'cash', 'other'])
+
+/**
+ * A way of paying ("Paid with"): the household's own list, each tied to the account or card it draws on. It says how
+ * and from where an amount physically leaves; whose money pays for it stays "Comes out of". Only one thing about it
+ * reaches a figure: a method that draws on a card whose purchases are recorded means "bought on that card" (rule C2).
+ * So its account stays as it is once an amount uses it, and a method in use is archived, never deleted.
+ */
+export const PaymentMethodSchema = BaseRecord.extend({
+  name: z.string().min(1),
+  kind: PaymentKindSchema,
+  /** Who pays with it; null = the household. */
+  ownerEntityId: IdSchema.nullable().default(null),
+  /** The account or card it draws on. */
+  accountId: IdSchema,
+  /** No longer offered; what uses it keeps it. */
+  archived: z.boolean().default(false),
+  order: z.string().default('a0'),
+})
+
 // ---------- categories & rows ----------
 export const CategorySchema = BaseRecord.extend({
   name: z.string().min(1),
@@ -248,6 +281,13 @@ export const RowSchema = BaseRecord.extend({
   ruleRowId: IdSchema.nullable().default(null),
   /** The suggestion that made this row (`RowTemplate.key`); with the row's person or thing it keeps the Statement from suggesting it again. */
   templateKey: z.string().nullable().default(null),
+  /**
+   * "Usually paid…": the day of the month the row's amount goes out on, and the method it is paid with, in every
+   * month where an item says nothing of its own. Rows from before schema 21 have neither: read both with `?? null`.
+   * A method that draws on a card is also the row's card (`accountId`); the store keeps the two in step.
+   */
+  payDay: PayDaySchema.nullable().optional(),
+  payMethodId: IdSchema.nullable().optional(),
   archivedMonth: MonthKeySchema.nullable().default(null),
   /** While archived: what the archive changed with it. A record archived before schema 14 has none. */
   archiveMemo: ArchiveMemoSchema.nullable().default(null),
@@ -277,7 +317,10 @@ export const CellItemSchema = z.object({
   amount: MoneySchema,
   status: ItemStatusSchema.default('projected'),
   fundedBy: FundedBySchema.default('cash'),
+  /** "Paid on": the day this item goes out, in its month. null = the row's usual day. */
   date: IsoDateSchema.nullable().default(null),
+  /** "Paid with": this item's own payment method. Absent or null = the row's usual one. Read it with `?? null`. */
+  methodId: IdSchema.nullable().optional(),
   note: z.string().nullable().default(null),
   recurringItemId: IdSchema.nullable().default(null),
   /** 'carry' contributes the previous month's effective value. */
@@ -333,6 +376,12 @@ export const RecurringItemSchema = BaseRecord.extend({
   startMonth: MonthKeySchema,
   endMonth: MonthKeySchema.nullable().default(null),
   notes: z.string().default(''),
+  /**
+   * The day of the month it goes out on and the method it is paid with: what the item it posts carries (`CellItem.date`,
+   * `CellItem.methodId`). Schedules from before schema 21 have neither: read both with `?? null`.
+   */
+  payDay: PayDaySchema.nullable().optional(),
+  methodId: IdSchema.nullable().optional(),
 })
 
 // ---------- pools, fx, months ----------
@@ -396,7 +445,7 @@ export const GoalSchema = BaseRecord.extend({
 
 export const TableNameSchema = z.enum([
   'household', 'entities', 'accounts', 'accountMonths', 'categories', 'rows',
-  'cells', 'recurringItems', 'pools', 'fxRates', 'monthStates', 'goals',
+  'cells', 'recurringItems', 'pools', 'fxRates', 'monthStates', 'goals', 'paymentMethods',
 ])
 
 /** Every mutation is a put (full record) or a delete (by key). `inverse` is the previous record, null if none. */
@@ -460,6 +509,7 @@ export const TablesSchema = z.object({
   fxRates: z.array(FxRateSchema),
   monthStates: z.array(MonthStateSchema),
   goals: z.array(GoalSchema).default([]),
+  paymentMethods: z.array(PaymentMethodSchema).default([]),
 })
 
 export const ExportFileSchema = z.object({
@@ -497,6 +547,8 @@ export type Pool = z.infer<typeof PoolSchema>
 export type FxRate = z.infer<typeof FxRateSchema>
 export type Goal = z.infer<typeof GoalSchema>
 export type GoalKind = z.infer<typeof GoalKindSchema>
+export type PaymentMethod = z.infer<typeof PaymentMethodSchema>
+export type PaymentKind = z.infer<typeof PaymentKindSchema>
 export type FxMonthRate = z.infer<typeof FxMonthRateSchema>
 export type MonthState = z.infer<typeof MonthStateSchema>
 export type TableName = z.infer<typeof TableNameSchema>
@@ -520,6 +572,7 @@ export type TableRecord = {
   fxRates: FxRate
   monthStates: MonthState
   goals: Goal
+  paymentMethods: PaymentMethod
 }
 
 export const TABLE_SCHEMAS = {
@@ -535,9 +588,10 @@ export const TABLE_SCHEMAS = {
   fxRates: FxRateSchema,
   monthStates: MonthStateSchema,
   goals: GoalSchema,
+  paymentMethods: PaymentMethodSchema,
 } as const
 
 export const EMPTY_TABLES: Tables = {
   household: [], entities: [], accounts: [], accountMonths: [], categories: [], rows: [],
-  cells: [], recurringItems: [], pools: [], fxRates: [], monthStates: [], goals: [],
+  cells: [], recurringItems: [], pools: [], fxRates: [], monthStates: [], goals: [], paymentMethods: [],
 }

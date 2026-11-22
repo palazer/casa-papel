@@ -80,6 +80,11 @@ const STEPS: Record<number, Step> = {
   // current accounts right when it opens the data (`planMainAccount`). The version keeps an older app, which would
   // count an other current account in the main account again, from syncing.
   19: (raw) => raw,
+  // 20 → 21: payments by day and method. A new table of payment methods, a household switch, and optional fields: a
+  // row's usual day and method, a schedule's, an item's own method (its `date` was there, unused). Nothing to rewrite.
+  // The version keeps an older app from syncing: it would drop the fields from what it writes, and it counts a card's
+  // purchases by the row where this one counts an item paid with a method that draws on a card (rule C2).
+  20: (raw) => raw,
 }
 
 export function migrateExport(raw: unknown): unknown {

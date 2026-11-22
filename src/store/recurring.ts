@@ -1,6 +1,6 @@
 import { cellKey, computeEngine, typedAmount } from '@/engine'
 import {
-  RecurringItemSchema, addMonths, compareMonths, isDue, monthOfDate, monthRange, newId,
+  RecurringItemSchema, addMonths, compareMonths, dateOn, isDue, monthOfDate, monthRange, newId,
   type Cell, type CellItem, type MonthKey, type RecurringItem, type Row, type Tables,
 } from '@/model'
 import { NO_QUESTION, type Mutation, type Store } from './store'
@@ -21,7 +21,7 @@ export function managedItem(item: RecurringItem, row: Row): CellItem {
 }
 
 const sig = (items: CellItem[]) =>
-  JSON.stringify([...items].sort((a, b) => (a.id < b.id ? -1 : 1)).map((i) => [i.id, i.label, i.amount, i.status, i.fundedBy, i.recurringItemId, i.kind, i.skipped, i.pinned ?? false]))
+  JSON.stringify([...items].sort((a, b) => (a.id < b.id ? -1 : 1)).map((i) => [i.id, i.label, i.amount, i.status, i.fundedBy, i.recurringItemId, i.kind, i.skipped, i.pinned ?? false, i.date ?? null, i.methodId ?? null]))
 
 /**
  * Make the given months agree with the recurring register. Idempotent: running it
@@ -191,6 +191,7 @@ export function planRename(tables: Tables, rowId: string, from: string, to: stri
 /** What a schedule's months show: what it posts and how often. A change to one of these counts from a month on. */
 const sameValues = (a: RecurringItem, b: RecurringItem): boolean =>
   a.rowId === b.rowId && a.amount === b.amount && a.fundedBy === b.fundedBy && a.currency === b.currency
+  && (a.payDay ?? null) === (b.payDay ?? null) && (a.methodId ?? null) === (b.methodId ?? null)
   && JSON.stringify(a.cadence ?? null) === JSON.stringify(b.cadence ?? null)
   && JSON.stringify([...(a.dueMonths ?? [])].sort()) === JSON.stringify([...(b.dueMonths ?? [])].sort())
 
@@ -270,7 +271,7 @@ export async function updateRecurringItem(store: Store, id: string, patch: Parti
   // it runs through the current month: the months before keep what it posted, a copy with the new values starts here
   const kept: RecurringItem = { ...item, name: next.name, accountId: next.accountId, scope: next.scope, notes: next.notes, startMonth: start }
   putItem(kept)
-  const split = planChangeRecurringFrom(work, { ...kept, updatedAt: ts }, today, { amount: next.amount, fundedBy: next.fundedBy, cadence: next.cadence, dueMonths: next.dueMonths, endMonth: end }, ts)
+  const split = planChangeRecurringFrom(work, { ...kept, updatedAt: ts }, today, { amount: next.amount, fundedBy: next.fundedBy, cadence: next.cadence, dueMonths: next.dueMonths, endMonth: end, payDay: next.payDay ?? null, methodId: next.methodId ?? null }, ts)
   push(split.mutations)
   if (next.rowId !== item.rowId || next.currency !== item.currency) {
     const copy = work.recurringItems.find((r) => r.id === split.targetId)!
@@ -406,8 +407,8 @@ export async function endRecurringFrom(store: Store, id: string, month: MonthKey
   return endRecurringItem(store, id, addMonths(month, -1))
 }
 
-/** What a schedule can be given from a month on: another amount, source or name, or another rhythm. */
-export type SchedulePatch = Partial<Pick<RecurringItem, 'amount' | 'fundedBy' | 'name' | 'cadence' | 'dueMonths' | 'endMonth'>>
+/** What a schedule can be given from a month on: another amount, source or name, another rhythm, another day or method of payment. */
+export type SchedulePatch = Partial<Pick<RecurringItem, 'amount' | 'fundedBy' | 'name' | 'cadence' | 'dueMonths' | 'endMonth' | 'payDay' | 'methodId'>>
 
 /** Which of a schedule's values a change really changes: only those replace what later months hold for themselves. */
 const reallyChanges = (item: RecurringItem, patch: SchedulePatch) => ({
@@ -440,6 +441,10 @@ export function oneMonthValuesReplaced(tables: Tables, item: RecurringItem, mont
  * alone keeps what later months hold for themselves, so a new rhythm by itself undoes nothing. `keepOneMonthValues`
  * is for a change the app makes by itself (an archived account's schedules move to another source): it replaces
  * nothing a month holds for itself.
+ *
+ * The day and the method of payment are read from the schedule (`payDayOf`, `methodOf`), so the copy carries the new
+ * ones from `month` on by being the copy. What was paid keeps how it was paid: a done item that is re-pointed, and
+ * that named no day or method of its own, gets the old ones written into it. A month's own day or method stays.
  */
 export async function changeRecurringFrom(store: Store, id: string, month: MonthKey, patch: SchedulePatch): Promise<string> {
   const { tables, item } = await findLive(store, id)
@@ -462,12 +467,19 @@ export function planChangeRecurringFrom(tables: Tables, item: RecurringItem, mon
     mutations.push({ op: 'put', table: 'recurringItems', record: RecurringItemSchema.parse({ ...item, endMonth: addMonths(month, -1), updatedAt: ts }) })
     mutations.push({ op: 'put', table: 'recurringItems', record: fresh })
   }
+  const newDay = patch.payDay !== undefined && (patch.payDay ?? null) !== (item.payDay ?? null)
+  const newMethod = patch.methodId !== undefined && (patch.methodId ?? null) !== (item.methodId ?? null)
+  /** The day and the method a paid item had from the schedule, where the change would give it others. */
+  const paidAs = (i: CellItem, m: MonthKey): Partial<CellItem> => ({
+    ...(newDay && i.date == null && item.payDay != null ? { date: dateOn(m, item.payDay) } : {}),
+    ...(newMethod && i.methodId == null && item.methodId != null ? { methodId: item.methodId } : {}),
+  })
   for (const cell of tables.cells) {
     if (cell.rowId !== item.rowId || compareMonths(cell.month, month) < 0) continue
     if (!cell.items.some((i) => i.recurringItemId === item.id)) continue
     const items = cell.items.map((i): CellItem => {
       if (i.recurringItemId !== item.id) return i
-      if (i.status === 'done') return { ...i, recurringItemId: targetId }
+      if (i.status === 'done') return { ...i, recurringItemId: targetId, ...paidAs(i, cell.month) }
       if (i.pinned) {
         if (!changes.amount && !changes.source) return { ...i, recurringItemId: targetId }
         const next: CellItem = { ...i, recurringItemId: targetId, amount: changes.amount ? patch.amount! : i.amount, fundedBy: changes.source ? patch.fundedBy! : i.fundedBy }
