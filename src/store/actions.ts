@@ -8,6 +8,7 @@ import { NO_QUESTION, type Mutation, type Store } from './store'
 import { cellPut, cellRecord } from './cells'
 import { refuseThirdCurrency } from './currencies'
 import { monthSpan } from './impact'
+import { withUsualPayment, type UsualPayment } from './paymentActions'
 import { primaryKeyOf } from './keys'
 import { planEnd } from './months'
 
@@ -251,6 +252,8 @@ export interface RowChange {
   currency?: string | null
   /** The category the row sorts under, one of its section's; null is none. */
   categoryId?: string | null
+  /** "Usually paid": the row's day and method of payment, for every month (`withUsualPayment` adds what follows from it). */
+  pay?: UsualPayment
 }
 
 /** Where a row goes when it moves to a category of its section (or to none): the end of that group. Throws when it cannot go there. */
@@ -308,7 +311,7 @@ export async function setCellValue(store: Store, rowId: string, month: MonthKey,
   const existing = cellOf(tables, rowId, month)
   mutations.push(cellPut(existing, { rowId, month, mode: 'value', value, items: [], markedDone: false, once }, ts))
   mutations.push(...rowChangePut(loaded.tables, rowId, rowChange))
-  const all = [...withoutRewritten(pre, mutations), ...mutations]
+  const all = withUsualPayment(loaded.tables, [...withoutRewritten(pre, mutations), ...mutations], rowId, rowChange?.pay, ts)
   refuseThirdCurrency(loaded.tables, all)
   await store.commit(all)
 }
@@ -323,7 +326,7 @@ export async function setCellItems(store: Store, rowId: string, month: MonthKey,
   const existing = cellOf(tables, rowId, month)
   mutations.push(cellPut(existing, { rowId, month, mode: 'items', value: null, items, markedDone: false, once }, ts))
   mutations.push(...rowChangePut(loaded.tables, rowId, rowChange))
-  const all = [...withoutRewritten(pre, mutations), ...mutations]
+  const all = withUsualPayment(loaded.tables, [...withoutRewritten(pre, mutations), ...mutations], rowId, rowChange?.pay, ts)
   refuseThirdCurrency(loaded.tables, all)
   await store.commit(all)
 }

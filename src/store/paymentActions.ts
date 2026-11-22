@@ -4,7 +4,8 @@ import {
   type CellItem, type PaymentKind, type PaymentMethod, type Tables,
 } from '@/model'
 import { NO_QUESTION, type Mutation, type Store } from './store'
-import { loadTables } from './actions'
+import { loadTables, withoutRewritten } from './actions'
+import { applyMutations } from './impact'
 import { cellPut } from './cells'
 import { refuseThirdCurrency } from './currencies'
 
@@ -185,6 +186,22 @@ export function planUsualPayment(tables: Tables, rowId: string, usual: UsualPaym
   }
   mutations.push({ op: 'put', table: 'rows', record: RowSchema.parse({ ...next, updatedAt: ts }) })
   return mutations
+}
+
+/**
+ * A save that also changes its row's usual day or method ("Usually paid" in the amount's dialog): what that change
+ * writes is added to the save's own mutations, worked out on the data as the save leaves it, so the month just saved
+ * is part of what follows the row. One step, one undo. `mutations` as they are when nothing changes.
+ */
+export function withUsualPayment(tables: Tables, mutations: Mutation[], rowId: string, pay: UsualPayment | undefined, ts: number): Mutation[] {
+  if (!pay) return mutations
+  const after = applyMutations(tables, mutations)
+  const row = after.rows.find((r) => r.id === rowId && !r.deletedAt)
+  if (!row) return mutations
+  const shown = usualMethod(row, payContext(after))?.id ?? null
+  if ((row.payDay ?? null) === pay.payDay && shown === pay.payMethodId) return mutations
+  const more = planUsualPayment(after, rowId, pay, ts)
+  return [...withoutRewritten(mutations, more), ...more]
 }
 
 export async function setUsualPayment(store: Store, rowId: string, usual: UsualPayment): Promise<void> {

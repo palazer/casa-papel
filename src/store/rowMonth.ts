@@ -1,6 +1,6 @@
 import { cellKey, type EngineOutput } from '@/engine'
 import {
-  RecurringItemSchema, cadenceOf, compareMonths, isDue, monthOfDate, newId, repeatOf, sameRepeat,
+  RecurringItemSchema, cadenceOf, compareMonths, dayOfDate, isDue, monthOfDate, newId, repeatOf, sameRepeat,
   type CellItem, type Money, type MonthKey, type RecurringItem, type RepeatChoice, type Repeating, type Tables,
 } from '@/model'
 import { carriesForward, engineUpTo, itemsAmount, planFollowing, rowChangePut, rowInNewCurrency, standingMoves, withoutRewritten, type EditScope, type RowChange } from './actions'
@@ -8,6 +8,7 @@ import { cellPut } from './cells'
 import { refuseThirdCurrency } from './currencies'
 import { applyMutations } from './impact'
 import { defaultMonths } from './months'
+import { withUsualPayment } from './paymentActions'
 import { managedItem, pinCarriedMonths, planChangeRecurringFrom, planRecurringPosts, planRename } from './recurring'
 import type { Mutation, Store } from './store'
 
@@ -27,6 +28,9 @@ export interface RowMonthSave {
   row?: RowChange
 }
 
+/** An item that names no day and no method of its own: it follows its schedule, or the row. */
+const FOLLOWS = { date: null, methodId: null } as const
+
 const isCellPut = (m: Mutation, rowId: string, month: MonthKey) =>
   m.op === 'put' && m.table === 'cells' && m.record.rowId === rowId && m.record.month === month
 
@@ -38,6 +42,10 @@ const isCellPut = (m: Mutation, rowId: string, month: MonthKey) =>
  * gets its first schedule here keeps the amounts its earlier months carried (`pinCarriedMonths`). A scheduled item
  * whose name was typed over is renamed (`planRename`), in every month. A dialog that also moves the row to a currency
  * counting other decimals is saved against the row's amounts in the new unit (`rowInNewCurrency`).
+ *
+ * The day and the method of payment (rule W1): an item that becomes a schedule hands it the ones it names, and
+ * follows the schedule from then on. A scheduled item whose day or method was changed here keeps them for this
+ * month alone, or, with "this and following months" or a new rhythm, hands them to its schedule from this month on.
  */
 export function planRowMonthSave(stored: Tables, calculated: EngineOutput, rowId: string, month: MonthKey, save: RowMonthSave, ts: number): Mutation[] {
   const { tables, engine, pre } = rowInNewCurrency(stored, calculated, rowId, save.row, ts)
@@ -80,13 +88,21 @@ export function planRowMonthSave(stored: Tables, calculated: EngineOutput, rowId
       }
       // the row's first schedule takes its carry-forward away in every month: the earlier ones keep their amount first
       push(pinCarriedMonths(t, rowId, month, ts))
-      const made = RecurringItemSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, name: it.label.trim() || row.name, rowId, amount: it.amount, fundedBy: it.fundedBy, ...cadenceOf(choice), startMonth: month })
+      const made = RecurringItemSchema.parse({
+        id: newId(), createdAt: ts, updatedAt: ts, name: it.label.trim() || row.name, rowId, amount: it.amount, fundedBy: it.fundedBy, ...cadenceOf(choice), startMonth: month,
+        payDay: dayOfDate(it.date, month), methodId: it.methodId ?? null,
+      })
       push([putSchedule(made)])
-      if (isDue(made, month)) items.push({ ...it, label: made.name, recurringItemId: made.id })
+      if (isDue(made, month)) items.push({ ...it, label: made.name, recurringItemId: made.id, ...FOLLOWS })
       continue
     }
     const was = before.get(it.id)
     const edited = !!was && (was.amount !== it.amount || was.fundedBy !== it.fundedBy)
+    // the day or the method it names for itself was set here: as a change of its schedule, that is the schedule's from this month on
+    const paid = !!was && ((was.date ?? null) !== (it.date ?? null) || (was.methodId ?? null) !== (it.methodId ?? null))
+    const ownDay = dayOfDate(it.date, month)
+    const pay = paid ? { ...(ownDay != null ? { payDay: ownDay } : {}), ...(it.methodId != null ? { methodId: it.methodId } : {}) } : {}
+    const handed = paid ? FOLLOWS : {}
     // a schedule that ends with this month does not repeat any more, whatever its rhythm was
     const ended = !!schedule.endMonth && compareMonths(schedule.endMonth, month) <= 0
     if (choice && !sameRepeat(choice, ended ? { kind: 'none' } : repeatOf(schedule))) {
@@ -96,16 +112,16 @@ export function planRowMonthSave(stored: Tables, calculated: EngineOutput, rowId
         items.push(edited ? { ...it, pinned: true } : it)
       } else {
         // one that had ended runs again from here, without an end
-        const { mutations, targetId } = planChangeRecurringFrom(t, schedule, month, { ...cadenceOf(choice), amount: it.amount, fundedBy: it.fundedBy, ...(ended ? { endMonth: null } : {}) }, ts)
+        const { mutations, targetId } = planChangeRecurringFrom(t, schedule, month, { ...cadenceOf(choice), amount: it.amount, fundedBy: it.fundedBy, ...pay, ...(ended ? { endMonth: null } : {}) }, ts)
         push(mutations)
         const now = scheduleOf(targetId)
         // what is done stays where it was done, whatever the new rhythm says
-        if ((now && isDue(now, month)) || it.status === 'done') items.push({ ...it, recurringItemId: targetId, pinned: false })
+        if ((now && isDue(now, month)) || it.status === 'done') items.push({ ...it, recurringItemId: targetId, pinned: false, ...handed })
       }
-    } else if (edited && (save.applyTo?.[it.id] ?? 'this-month') === 'from-now-on') {
-      const { mutations, targetId } = planChangeRecurringFrom(t, schedule, month, { amount: it.amount, fundedBy: it.fundedBy }, ts)
+    } else if ((edited || paid) && (save.applyTo?.[it.id] ?? 'this-month') === 'from-now-on') {
+      const { mutations, targetId } = planChangeRecurringFrom(t, schedule, month, { amount: it.amount, fundedBy: it.fundedBy, ...pay }, ts)
       push(mutations)
-      items.push({ ...it, recurringItemId: targetId, pinned: false })
+      items.push({ ...it, recurringItemId: targetId, pinned: false, ...handed })
     } else {
       items.push(edited ? { ...it, pinned: true } : it)
     }
@@ -144,7 +160,7 @@ export function planRowMonthSave(stored: Tables, calculated: EngineOutput, rowId
   // a row on a schedule with nothing in the month has no cell of its own there
   else if (existing && existing.mode !== 'inherit') out.push(cellPut(existing, { rowId, month, mode: 'inherit', value: null, items: [] }, ts))
   out.push(...rowChangePut(stored, rowId, save.row))
-  return [...withoutRewritten(pre, out), ...out]
+  return withUsualPayment(stored, [...withoutRewritten(pre, out), ...out], rowId, save.row?.pay, ts)
 }
 
 /**

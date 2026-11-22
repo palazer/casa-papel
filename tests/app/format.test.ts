@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ONLY_PLUS_MINUS, parseAmount, sumResult, unreadableAmount } from '@/app/format'
+import { ONLY_PLUS_MINUS, ordinalDay, parseAmount, sumResult, unreadableAmount } from '@/app/format'
 
 const eur = (text: string, locale = 'en-IE') => parseAmount(text, 'EUR', locale)
 
@@ -72,3 +72,10 @@ describe('sumResult: what the line under a field says', () => {
     for (const text of ['7352.21', '-20', '+5', '500+', '', 'abc', '1200/12', '5+-3']) expect(sumResult(text, 'EUR', 'en-IE'), text).toBeNull()
   })
 })
+
+describe('ordinalDay: a day of the month as it is said', () => {
+  it('1st, 2nd, 3rd, 4th; the teens are all "th"', () => {
+    expect([1, 2, 3, 4, 10, 11, 12, 13, 14, 20, 21, 22, 23, 24, 30, 31].map(ordinalDay)).toEqual(['1st', '2nd', '3rd', '4th', '10th', '11th', '12th', '13th', '14th', '20th', '21st', '22nd', '23rd', '24th', '30th', '31st'])
+  })
+})
+

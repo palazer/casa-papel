@@ -7,9 +7,10 @@ import { Segmented } from '@/components/Segmented'
 import { formatMonth } from '@/app/format'
 import { useStore } from '@/app/store'
 import { sortRows } from '@/engine'
-import { ENTITY_KIND_LABEL, holdsBalance, monthOfDate, type Account, type FundedBy, type Household, type Row, type Section, type Tables } from '@/model'
-import { accountTypeForRow, derivedRowReason, followRow, setRowAccount, setRowDeductedFrom, setRowFundedBy, setRowScope, thirdCurrencyReason, updateRow } from '@/store'
+import { ENTITY_KIND_LABEL, buysOnCard, holdsBalance, monthOfDate, payContext, usualMethod, type Account, type FundedBy, type Household, type Row, type Section, type Tables } from '@/model'
+import { accountTypeForRow, derivedRowReason, followRow, setRowAccount, setRowDeductedFrom, setRowFundedBy, setRowScope, setUsualPayment, thirdCurrencyReason, updateRow } from '@/store'
 import { NativeSelect } from '@/components/NativeSelect'
+import { UsualPaidFields } from '@/features/payments/PaidFields'
 import { fundingOptions } from './funding'
 import { currencyChoices, currencyLabel } from '@/app/currencies'
 import { HELP } from '@/app/help'
@@ -160,6 +161,40 @@ export function RowAccountDialog({ row, tables, onClose }: Base) {
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
           <Button onClick={() => void save(() => setRowAccount(store, row.id, accountId || null))} disabled={busy || third != null}>Save</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/**
+ * "Usually paid…": the day and the method of a row's amounts, for every month. While the household plans its
+ * payments it stands where "Paid by card…" stood for an ordinary expense row: a method that draws on a card says the
+ * same thing, and more.
+ */
+export function RowPaidDialog({ row, tables, onClose }: Base) {
+  const store = useStore()
+  const usual = usualMethod(row, payContext(tables))?.id ?? null
+  const [day, setDay] = useState<number | null>(row.payDay ?? null)
+  const [methodId, setMethodId] = useState<string | null>(usual)
+  const { error, busy, save } = useSave(onClose)
+  const method = methodId ? tables.paymentMethods.find((m) => m.id === methodId) : undefined
+  const third = buysOnCard(row) ? thirdCurrencyOf(tables, row, { accountId: method ? method.accountId : row.accountId }) : null
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Usually paid</DialogTitle>
+          <DialogDescription>Row "{row.name}"</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <UsualPaidFields titled tables={tables} row={row} day={day} methodId={methodId} onDay={setDay} onMethod={setMethodId} idPrefix="row-usual" says="For every month of this row, past ones included. An item of a month can name a day and a method of its own." />
+          <Refusal text={third} />
+          {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button onClick={() => void save(() => setUsualPayment(store, row.id, { payDay: day, payMethodId: methodId }))} disabled={busy || third != null}>Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

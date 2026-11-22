@@ -76,6 +76,7 @@ export const HELP = {
   // The Statement
   // Payments by day and method
   'payments.switch': { title: 'Plan payments by day and method', text: 'On, an amount that leaves can say the day it goes out on and the method it is paid with, and the household keeps a list of its payment methods. Off, all of that is hidden and nothing is lost: what was set stays, and what was paid with a card keeps counting on that card.' },
+  'payments.usual': { title: 'Usually paid', text: 'The day of the month this row\'s amounts go out on, and the method they are paid with, in every month. An item can name its own. A method on a credit card counts the amount as bought on that card; a method on cash or on another account of yours makes the amount come out of that account.' },
   'payments.kind': { title: 'Kind', text: 'What paying this way asks of you. A direct debit and a standing order go by themselves, so the money has to be there on the day. A transfer and cash you do by hand. A card or a wallet pays when you buy.' },
   'payments.drawsOn': { title: 'Draws on', text: 'The account or card the money is taken from. A method on a credit card means the amount is owed on that card until the card is paid. Once an amount uses the method, its account stays as it is: add another method for another account.' },
   'payments.owner': { title: 'Who pays with it', text: 'The person whose method it is: their own card, or a debit they look after. The household for what is shared. It sorts what each of you has to pay.' },

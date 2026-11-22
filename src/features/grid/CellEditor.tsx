@@ -8,19 +8,20 @@ import { Segmented } from '@/components/Segmented'
 import { cn } from '@/lib/utils'
 import { currencyChoices } from '@/app/currencies'
 import { AmountHint } from '@/components/AmountHint'
-import { amountToInput, formatAmount, formatMonth, parseAmount, unreadableAmount } from '@/app/format'
+import { amountToInput, formatAmount, formatMonth, ordinalDay, parseAmount, unreadableAmount } from '@/app/format'
 import { readPref, writePref } from '@/app/prefs'
 import { useStore } from '@/app/store'
 import { cellKey, conversionCurrency, householdFx, rateInfo, typedAmount, type EngineOutput } from '@/engine'
 import { RepeatField } from '@/features/recurring/RepeatField'
 import {
-  addMonths, cadenceOf, canCarryRule, compareMonths, fromMinor, isDue, isTakenFromAccount, isoDateOfToday, lastDayOfMonth, newId, nextDue, parseMonth, paysAsExpense, repeatOf, runningSchedules, sameRepeat, toMinor,
+  addMonths, cadenceOf, canCarryRule, compareMonths, dateOn, dayOfDate, fromMinor, isDue, isPaymentRow, isTakenFromAccount, isoDateOfToday, lastDayOfMonth, newId, nextDue, parseMonth, payContext, paysAsExpense, repeatOf, runningSchedules, sameRepeat, sourceForMethod, toMinor, usualMethod,
   type CellItem, type Conversion, type Household, type ItemStatus, type MonthKey, type RepeatChoice, type Repeating, type Row, type Tables,
 } from '@/model'
 import {
   cellPut, clearCell, currencyHeldReason, derivedRowReason, endRecurringFrom, itemsFromCurrent, oneMonthValuesReplaced, planFollowing, refreshRates, rowInNewCurrency, saveRowMonth, setCellItems, setCellValue, skipRecurringMonth,
   thirdCurrencyReason, type EditScope, type Mutation, type RuleTarget,
 } from '@/store'
+import { DaySelect, MethodSelect, UsualPaidFields } from '@/features/payments/PaidFields'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
 import { RuleFields, RulePicker } from '@/features/rules/RuleDialog'
 import { ruleFacts, type RuleKind } from '@/features/rules/ruleFacts'
@@ -103,8 +104,18 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   const paid = row.accountId ? tables.accounts.find((a) => a.id === row.accountId && !a.deletedAt) : undefined
   const canPickCategory = categories.length > 0 && row.section !== 'transfer' && (row.kind === 'plain' || row.kind === 'salary' || paysAsExpense(row, paid))
   const newCategory = category !== rowCategory ? category || null : undefined
-  /** What changed on the row itself and goes with the save; nothing when neither did. */
-  const rowChange = newCurrency !== undefined || newCategory !== undefined ? { currency: newCurrency, categoryId: newCategory } : undefined
+  // ----- "Usually paid": the row's day and method of payment, while the household plans its payments -----
+  const payments = !!household.payments && isPaymentRow(row)
+  const payCtx = useMemo(() => payContext(tables), [tables])
+  const usualNow = usualMethod(row, payCtx)?.id ?? null
+  const [payDay, setPayDay] = useState<number | null>(row.payDay ?? null)
+  const [payMethodId, setPayMethodId] = useState<string | null>(usualNow)
+  const newPay = payments && (payDay !== (row.payDay ?? null) || payMethodId !== usualNow) ? { payDay, payMethodId } : undefined
+  /** The account an expense paid with this method comes out of, where the method says so (rule W2). */
+  const sourceOf = (methodId: string | null | undefined) => (payments && row.section === 'expense' && methodId ? sourceForMethod(payCtx.methods.get(methodId) ?? null, payCtx.accounts) : null)
+  const usualSource = sourceOf(payMethodId)
+  /** What changed on the row itself and goes with the save; nothing when nothing did. */
+  const rowChange = newCurrency !== undefined || newCategory !== undefined || newPay ? { currency: newCurrency, categoryId: newCategory, pay: newPay } : undefined
   const locale = household.locale
   /** Rows driven by a schedule: no carry-forward, no single amount; the posted items are the content. */
   const isRecurringRow = engine.recurringRowIds.includes(row.id)
@@ -282,7 +293,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
     // conversion that was recorded for it (`CellItem.conversion`): built anew field by field, it would lose it.
     // what the item held beside its amount stays; its conversion is the one the panel has now
     const { conversion: _was, ...kept } = soloItem ? storedItem(soloItem) : blankItem()
-    const single: CellItem = { ...kept, amount: minor, status: status === 'default' ? row.defaultStatus : status, fundedBy, ...(conversion && !onSchedule ? { conversion } : {}) }
+    const single: CellItem = { ...kept, amount: minor, status: status === 'default' ? row.defaultStatus : status, fundedBy: usualSource ?? fundedBy, ...(conversion && !onSchedule ? { conversion } : {}) }
     if (onSchedule && !ruleRuns) {
       if (minor === 0) return setError('Type the amount that repeats.')
       if (rhythm.kind === 'months' && rhythm.months.length === 0) return setError('Pick at least one month.')
@@ -291,15 +302,33 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
     }
     // A plain value takes the row's defaults; any other certainty or source is stored as one unlabelled item, and so
     // is an amount with a recorded conversion: set back from Done it keeps the conversion, which counts again once done.
-    if (status === 'default' && fundedBy === row.defaultFundedBy && !conversion) return void run(saving(() => setCellValue(store, row.id, month, minor, saveScope, rowChange)))
+    if (status === 'default' && fundedBy === (usualSource ?? row.defaultFundedBy) && !conversion) return void run(saving(() => setCellValue(store, row.id, month, minor, saveScope, rowChange)))
     void run(saving(() => setCellItems(store, row.id, month, [single], saveScope, rowChange)))
   }
 
-  /** A scheduled item whose amount or funding was edited here. */
+  /** A scheduled item whose amount, funding, day or method was edited here. */
   const changedScheduled = (it: CellItem) => {
     const o = original.get(it.id)
-    return !!it.recurringItemId && !!o && (o.amount !== it.amount || o.fundedBy !== it.fundedBy)
+    return !!it.recurringItemId && !!o && (o.amount !== it.amount || o.fundedBy !== it.fundedBy || (o.date ?? null) !== (it.date ?? null) || (o.methodId ?? null) !== (it.methodId ?? null))
   }
+
+  /** The row's usual method: one that pays from another account of yours makes the amount come out of it. */
+  function pickUsualMethod(methodId: string | null) {
+    setPayMethodId(methodId)
+    const source = sourceOf(methodId)
+    if (source) setFundedBy(source)
+  }
+  /** An item's own method, with the account it then comes out of. */
+  function pickItemMethod(id: string, methodId: string | null) {
+    const source = sourceOf(methodId)
+    updateItem(id, { methodId, ...(source ? { fundedBy: source } : {}) })
+  }
+  const usualFields = payments && (
+    <UsualPaidFields
+      tables={tables} row={row} day={payDay} methodId={payMethodId} onDay={setPayDay} onMethod={pickUsualMethod} idPrefix="cell-usual"
+      says={`${mode === 'value' ? 'For this row, in every month' : 'For every amount of this row that names no day or method of its own, in every month'}${newPay ? '; saved with the amount.' : '.'}`}
+    />
+  )
 
   /** The items, how each repeats and what changed on the schedules of other months, saved as one step. */
   function saveItems() {
@@ -533,11 +562,13 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                 {row.section === 'expense' && (
                   <div className="space-y-1.5">
                     <TipLabel htmlFor="cell-source" help="cell.comesOutOf">Comes out of</TipLabel>
-                    <NativeSelect id="cell-source" className="w-full" value={fundedBy} onChange={(e) => setFundedBy(e.target.value as CellItem['fundedBy'])}>
+                    <NativeSelect id="cell-source" className="w-full" value={usualSource ?? fundedBy} disabled={usualSource != null} onChange={(e) => setFundedBy(e.target.value as CellItem['fundedBy'])}>
                       {fundingOptions.map((o) => <option key={o.value} value={o.value}>{o.label}{o.value === row.defaultFundedBy ? ' (row default)' : ''}</option>)}
                     </NativeSelect>
+                    {usualSource && <p className="text-xs text-muted-foreground" data-testid="source-by-method">Set by the method it is paid with.</p>}
                   </div>
                 )}
+                {usualFields}
               </div>
             ) : (
               <div className="space-y-2">
@@ -577,6 +608,13 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                   const replaces = schedule && fromHere && Number.isFinite(it.amount) ? followingEffects({ replaced: oneMonthValuesReplaced(tables, schedule, month, { amount: it.amount, fundedBy: it.fundedBy }), kept: [] }, locale) : ''
                   /** The other currency of a conversion of this item; none for one a schedule lands, which the schedule keeps writing. */
                   const itemForeign = !schedule ? conversionIn(it.fundedBy) ?? it.conversion?.foreign ?? null : null
+                  // "Paid on" and "Paid with": the item's own, or the first choice, which says what it follows
+                  const itemName = it.label.trim() || schedule?.name || 'this item'
+                  const followsDay = schedule?.payDay != null ? `As scheduled: ${ordinalDay(schedule.payDay)}` : payDay != null ? `Usual: ${ordinalDay(payDay)}` : 'No day'
+                  const scheduleMethod = schedule?.methodId ? payCtx.methods.get(schedule.methodId) : undefined
+                  const followsMethod = scheduleMethod ? `As scheduled: ${scheduleMethod.name}` : payMethodId ? `Usual: ${payCtx.methods.get(payMethodId)?.name ?? ''}` : 'No method'
+                  /** The account the method this item is paid with makes it come out of: its own method's, its schedule's, the row's. */
+                  const itemSource = sourceOf(it.methodId ?? schedule?.methodId ?? payMethodId)
                   return (
                     <div key={it.id} className={cn('space-y-2 rounded-md border p-2', schedule && 'border-transfer/40')}>
                       {/* the name takes what the other fields leave: they are as narrow as their content allows */}
@@ -604,7 +642,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                         <NativeSelect aria-label="Item status" value={it.status} onChange={(e) => updateItem(it.id, { status: e.target.value as ItemStatus })}>
                           {(['projected', 'committed', 'done'] as ItemStatus[]).map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
                         </NativeSelect>
-                        <NativeSelect aria-label="Comes out of" value={it.fundedBy} onChange={(e) => updateItem(it.id, { fundedBy: e.target.value as CellItem['fundedBy'] })} disabled={row.section !== 'expense'}>
+                        <NativeSelect aria-label="Comes out of" value={itemSource ?? it.fundedBy} title={itemSource ? 'Set by the method it is paid with' : undefined} onChange={(e) => updateItem(it.id, { fundedBy: e.target.value as CellItem['fundedBy'] })} disabled={row.section !== 'expense' || itemSource != null}>
                           {fundingOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                         </NativeSelect>
                         <Button size="icon" variant="ghost" aria-label="Remove item" onClick={() => (schedule ? setRemoving(removing === it.id ? null : it.id) : removePlain(it.id))}><Trash2 /></Button>
@@ -623,6 +661,14 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                       )}
                       {schedule && it.label.trim() !== '' && it.label.trim() !== schedule.name && (
                         <p className="text-xs text-muted-foreground" data-testid="rename-note">Renamed from "{schedule.name}" in every month.</p>
+                      )}
+                      {payments && (
+                        <div className="flex flex-wrap items-center gap-2 text-xs" data-testid="item-paid">
+                          <span className="text-muted-foreground">Paid on</span>
+                          <DaySelect className="h-7 w-36 text-xs" label={`Paid on, ${itemName}`} none={followsDay} value={dayOfDate(it.date, month)} onChange={(d) => updateItem(it.id, { date: d == null ? null : dateOn(month, d) })} />
+                          <span className="text-muted-foreground">with</span>
+                          <MethodSelect className="h-7 w-52 text-xs" label={`Paid with, ${itemName}`} none={followsMethod} tables={tables} value={it.methodId ?? null} onChange={(m) => pickItemMethod(it.id, m)} />
+                        </div>
                       )}
                       {(schedule || canSchedule) && (
                         <RepeatField value={choice} onChange={(c) => setRepeats((r) => ({ ...r, [it.id]: c }))} month={month} locale={locale} name={it.label.trim() || schedule?.name || row.name} none="Only this month" />
@@ -724,6 +770,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                     </p>
                   </fieldset>
                 )}
+                {usualFields}
                 <p className="text-xs text-muted-foreground">Set an item to Done when it is paid or received. A done cell shows a green dot; in the current month the dot also shows red for nothing done yet and amber for partly done.</p>
                 {row.section === 'expense' && (
                   <p className="text-xs text-muted-foreground">{HELP['cell.comesOutOf'].text}</p>

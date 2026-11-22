@@ -7,15 +7,15 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { useStore } from '@/app/store'
-import { canCarryRule, type Household, type Row, type Tables } from '@/model'
+import { canCarryRule, isPaymentRow, type Household, type Row, type Tables } from '@/model'
 import { derivedRowReason, moveRow, removeIfFree, renameRow, restoreRow, restoredText, updateRow } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
-import { RowAccountDialog, RowCurrencyDialog, RowDeductionDialog, RowFollowDialog, RowScopeDialog, RowSourceDialog } from './RowDialogs'
+import { RowAccountDialog, RowCurrencyDialog, RowDeductionDialog, RowFollowDialog, RowPaidDialog, RowScopeDialog, RowSourceDialog } from './RowDialogs'
 import { RowCategoryDialog } from './RowCategoryDialog'
-import { accountVerb, hasAccountChoice } from './rowAccount'
+import { accountVerb, hasAccountChoice, paysByCard } from './rowAccount'
 import { showSaveError } from '@/app/saveError'
 
-type Open = 'rename' | 'category' | 'scope' | 'currency' | 'source' | 'deduction' | 'account' | 'follow' | 'remove' | null
+type Open = 'rename' | 'category' | 'scope' | 'currency' | 'source' | 'deduction' | 'account' | 'paid' | 'follow' | 'remove' | null
 
 /** In the Grid the "…" shows while its row is hovered; another screen says when it shows on its own lines. */
 const GRID_TRIGGER = 'size-6 opacity-0 group-hover:opacity-100 focus:opacity-100 data-popup-open:opacity-100'
@@ -39,6 +39,8 @@ export function RowMenu({ row, tables, household, onError, onDeleted, onRestored
   const [name, setName] = useState(row.name)
   const followed = row.followsRowId ? tables.rows.find((r) => r.id === row.followsRowId) : undefined
   const deductedFrom = row.deductedFromRowId ? tables.rows.find((r) => r.id === row.deductedFromRowId) : undefined
+  /** While the household plans its payments, a row whose amounts leave says how it is usually paid; for an ordinary expense that takes the place of "Paid by card…". */
+  const paid = !!household.payments && isPaymentRow(row)
   /** Rows the app works out itself have no amount of their own to follow with. */
   const canFollow = !derivedRowReason(row, household.closingRule)
 
@@ -74,7 +76,8 @@ export function RowMenu({ row, tables, household, onError, onDeleted, onRestored
           )}
           {row.section === 'expense' && <DropdownMenuItem onClick={() => setOpen('source')}>Comes out of…</DropdownMenuItem>}
           {row.section === 'expense' && <DropdownMenuItem onClick={() => setOpen('deduction')}>{deductedFrom ? `Deducted from ${deductedFrom.name}…` : 'Deducted from an income…'}</DropdownMenuItem>}
-          {row.kind !== 'pool-allocation' && hasAccountChoice(row, tables.accounts) && <DropdownMenuItem onClick={() => setOpen('account')}>{accountVerb(row)}…</DropdownMenuItem>}
+          {row.kind !== 'pool-allocation' && !(paid && paysByCard(row)) && hasAccountChoice(row, tables.accounts) && <DropdownMenuItem onClick={() => setOpen('account')}>{accountVerb(row)}…</DropdownMenuItem>}
+          {paid && <DropdownMenuItem onClick={() => setOpen('paid')}>Usually paid…</DropdownMenuItem>}
           {onRule && canCarryRule(row) && !row.archivedMonth && <DropdownMenuItem onClick={onRule}>Rule…</DropdownMenuItem>}
           {canFollow && <DropdownMenuItem onClick={() => setOpen('follow')}>{followed ? `Follows ${followed.name}…` : 'Follow another row…'}</DropdownMenuItem>}
           <DropdownMenuSeparator />
@@ -102,6 +105,7 @@ export function RowMenu({ row, tables, household, onError, onDeleted, onRestored
       {open === 'deduction' && <RowDeductionDialog row={row} tables={tables} household={household} onClose={close} />}
       {open === 'source' && <RowSourceDialog row={row} tables={tables} household={household} onClose={close} />}
       {open === 'account' && <RowAccountDialog row={row} tables={tables} household={household} onClose={close} />}
+      {open === 'paid' && <RowPaidDialog row={row} tables={tables} household={household} onClose={close} />}
       {open === 'follow' && <RowFollowDialog row={row} tables={tables} household={household} onClose={close} />}
       {open === 'remove' && <RemoveDialog target={{ kind: 'row', id: row.id }} tables={tables} household={household} onClose={close} />}
     </>

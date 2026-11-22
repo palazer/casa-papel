@@ -257,11 +257,11 @@ export const GUIDE: GuideTopic[] = [
   {
     key: 'payments',
     title: 'Payments: when and with what',
-    summary: 'Switched on, the household keeps a list of its payment methods: how money leaves, and from which account or card.',
+    summary: 'Switched on, every amount that leaves can say the day it goes out on and the method it is paid with, from the household\'s own list of methods.',
     what: [
       'Planning payments is off until you turn it on: Household → "Household settings" → "Plan payments by day and method". It is one switch for the whole household, on every device. Off again, everything it added is hidden and nothing is lost.',
-      'On, "Payment methods" appears under Household: your ways of paying, each with a kind, a name, the account or card it draws on, and who pays with it. "Comes out of" keeps saying whose money pays for an expense; a method says how the amount leaves, and from where.',
-      'A method that draws on a credit card means "bought on that card": the amount is owed there until the card is paid. A method that amounts were paid with keeps its account and can only be archived.',
+      'On, "Payment methods" appears under Household: your ways of paying, each with a kind, a name, the account or card it draws on, and who pays with it. "Comes out of" keeps saying whose money pays for an expense; a method says how the amount leaves, and from where. A method that draws on a credit card means "bought on that card": the amount is owed there until the card is paid. A method that amounts were paid with keeps its account and can only be archived.',
+      'A row says how it is "Usually paid": a day of the month and a method, for every month. An item of a month can name its own, and so can something that repeats: each subscription in one row its own day and its own card. The nearest one counts: the item, then its schedule, then the row. A method that draws on cash or on another account of yours makes the amount come out of that account, and "Comes out of" then says so by itself.',
     ],
     steps: [
       'Household → "Household settings" → tick "Plan payments by day and method".',
@@ -269,10 +269,13 @@ export const GUIDE: GuideTopic[] = [
       'For another one, "Add method": choose the "Kind", type a "Name" (your bank\'s word for it, or "PayPal"), choose what it "Draws on" and "Who pays with it", then "Save".',
       '"Edit" beside a method changes its name, kind or owner. Its button at the bottom left says "Delete" while nothing uses the method, and "Archive" once something does.',
       'An archived method stands under "Archived"; "Use again" brings it back.',
+      'For a whole row: open its amount on the Statement or in the Grid and set "Paid on" and "Paid with" under "Usually paid", or use the row menu (the … at the right of its name) → "Usually paid…", which takes the place of "Paid by card…". In a month shorter than the day you chose, the amount goes out on the last day.',
+      'For one thing in a row: open the amount, "Itemized", and set "Paid on" and "with" on the item\'s own line. If the item repeats, they are kept with its schedule; changed later, "Apply the change to" asks whether that is for "Only this month" or "This and following months".',
+      'Household → "Schedules" → "Edit" shows a schedule\'s "Paid on" and "Paid with" too.',
     ],
     factsTitle: 'The kinds of method',
     facts: paymentKinds,
-    tips: ['payments.switch', 'payments.kind', 'payments.drawsOn', 'payments.owner', 'payments.archivedMethod'],
+    tips: ['payments.switch', 'payments.usual', 'payments.kind', 'payments.drawsOn', 'payments.owner', 'payments.archivedMethod'],
     open: 'household',
   },
   {

@@ -1207,4 +1207,27 @@ feature switch; a second one follows the same form.
   on: a credit card method a card, a direct debit never a card), `Who pays with it` (`Household`, then the adults).
   A method that is in use has `Draws on` disabled, with the reason under it. The footer's left button says what it
   will do: `Delete` while nothing uses the method, `Archive` once something does. A refusal is said in the dialog.
+- **"Paid on" and "Paid with"** are two native selects (`DaySelect`, `MethodSelect` in
+  `src/features/payments/PaidFields.tsx`). The day select lists `1st` to `31st`; the method select lists the methods
+  that are in use under the account each draws on (`optgroup`), the main account first. The first option of each
+  names nothing, and says what then counts: `No day` / `No method` where nothing stands behind it, `Usual: 1st` on an
+  item that follows its row, `As scheduled: 5th` on one that follows its schedule. An archived method stays offered
+  only where it is still chosen, marked `(archived)`.
+- **"Usually paid"** (`UsualPaidFields`) is the row's own day and method, for every month. In the amount's dialog it
+  is a `fieldset` under "Comes out of" (single amount) or under the list (itemized): the legend with its (i)
+  (`payments.usual`), the two selects side by side with small muted labels (`9rem` for the day, the rest for the
+  method; stacked on a phone), then muted `text-xs` lines: where it counts (`For this row, in every month`, and `;
+  saved with the amount` once it differs from what is stored), that a day past the 28th is the last day of a shorter
+  month, and what follows from the method (`Bought on "Credit card": …`, `Paid from "Savings", so the amount comes
+  out of that account too.`). It is saved with the amount, as one step. The row menu has the same fields as
+  `Usually paid…`, in a dialog of that name (`sm:max-w-md`, the legend for a screen reader only); for an ordinary
+  expense row it takes the place of `Paid by card…` while the switch is on.
+- **A method that says where the amount comes out of** (rule W2) sets "Comes out of" and disables it, with the muted
+  line `Set by the method it is paid with.` under the field, or as the select's `title` on an item's line.
+- **An item's own day and method** stand on a line of their own inside the item's box, above "Repeats": muted `Paid
+  on`, a `h-7 w-36 text-xs` day select, muted `with`, a `h-7 w-52 text-xs` method select; the line wraps on a phone.
+  The selects are named for a screen reader after their item (`Paid on, Streaming`). On an item that repeats, a
+  change of either brings up the same `Apply the change to` choice as a changed amount.
+- **The schedule's dialog** shows `Paid on` and `Paid with` where it showed the account "for your overview" (which
+  stays for an income, and while the switch is off); their first options read `The row's usual day: 1st`.
 

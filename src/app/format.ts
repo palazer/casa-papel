@@ -132,3 +132,11 @@ export function localeExample(locale: string): string {
   const d = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(2026, 10, 1))
   return `${n} · ${d}`
 }
+
+/** A day of the month as it is said: 1st, 2nd, 3rd, 4th, 11th, 21st, 22nd, 23rd, 31st. */
+export function ordinalDay(day: number): string {
+  const teen = day % 100 >= 11 && day % 100 <= 13
+  const suffix = teen ? 'th' : day % 10 === 1 ? 'st' : day % 10 === 2 ? 'nd' : day % 10 === 3 ? 'rd' : 'th'
+  return `${day}${suffix}`
+}
+

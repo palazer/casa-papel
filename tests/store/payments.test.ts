@@ -5,7 +5,7 @@ import {
 } from '@/model'
 import {
   CasaDb, Store, addAccount, addPaymentMethod, addPaymentMethods, addRecurringItem, addRow, changeRecurringFrom, describeRemoval, loadTables, methodInUse,
-  quickCreateHousehold, removeAccount, removeEntity, removePaymentMethod, setCellItems, setItemStatus, setPaymentsOn, setRowAccount, setUsualPayment, starterMethods, updatePaymentMethod,
+  quickCreateHousehold, removeAccount, removeEntity, removePaymentMethod, saveRowMonth, setCellValue, updateRecurringItem, setCellItems, setItemStatus, setPaymentsOn, setRowAccount, setUsualPayment, starterMethods, updatePaymentMethod,
 } from '@/store'
 
 const START = '2026-01'
@@ -273,5 +273,103 @@ describe('an item\'s own day and method, and its schedule\'s', () => {
     // the months after follow the new ones
     expect([payDayOf(of(next), row, next, ctx), methodOf(of(next), row, ctx)?.name, cardOf(of(next), row, ctx)]).toEqual([20, 'Visa', card.id])
     expect(of(next).methodId ?? null).toBeNull()
+  })
+})
+
+describe('saved from the amount\'s dialog', () => {
+  it('an amount and its row\'s usual day and method are one step: one undo takes both back', async () => {
+    const { store, main, own } = await fresh()
+    const sepa = await addPaymentMethod(store, { name: 'SEPA', kind: 'direct-debit', accountId: main.id })
+    const samSepa = await addPaymentMethod(store, { name: "Sam's SEPA", kind: 'direct-debit', accountId: own.id })
+    const rent = rowNamed(await loadTables(store), 'Rent')
+    const month = monthOfDate()
+    await setCellValue(store, rent.id, month, 1200_00, 'from-now-on', { pay: { payDay: 1, payMethodId: sepa.id } })
+    let t = await loadTables(store)
+    expect(rowNamed(t, 'Rent')).toMatchObject({ payDay: 1, payMethodId: sepa.id, defaultFundedBy: 'cash' })
+    expect(t.cells.find((c) => c.rowId === rent.id && c.month === month)).toMatchObject({ mode: 'value', value: 1200_00 })
+    await store.undo()
+    t = await loadTables(store)
+    expect(rowNamed(t, 'Rent').payDay ?? null).toBeNull()
+    expect(t.cells.find((c) => c.rowId === rent.id && c.month === month)?.value ?? null).toBeNull()
+    // a method on another account: the month just saved comes out of that account with the rest of the row
+    await setCellValue(store, rent.id, month, 1200_00, 'from-now-on', { pay: { payDay: 3, payMethodId: samSepa.id } })
+    t = await loadTables(store)
+    expect(rowNamed(t, 'Rent')).toMatchObject({ payDay: 3, payMethodId: samSepa.id, defaultFundedBy: accountRef(own.id), accountId: own.id })
+    // the same day and method again write nothing more about the row
+    const before = rowNamed(t, 'Rent').updatedAt
+    await setCellValue(store, rent.id, month, 1250_00, 'from-now-on', { pay: { payDay: 3, payMethodId: samSepa.id } })
+    expect(rowNamed(await loadTables(store), 'Rent').updatedAt).toBe(before)
+  })
+
+  it('an item that is set to repeat hands its day and method to its schedule, and follows it', async () => {
+    const { store, card } = await fresh()
+    const visa = await addPaymentMethod(store, { name: 'Visa', kind: 'credit-card', accountId: card.id })
+    const subs = await addRow(store, { name: 'Subscriptions', section: 'expense' })
+    const month = monthOfDate()
+    const films = item({ label: 'Films', amount: 14_00, date: dateOn(month, 5), methodId: visa.id })
+    const once = item({ label: 'Gift', amount: 30_00, date: dateOn(month, 20), methodId: visa.id })
+    await saveRowMonth(store, subs.id, month, { items: [films, once], repeats: { [films.id]: { kind: 'every', interval: 1, anchor: 1 } }, scope: 'this-month' })
+    const t = await loadTables(store)
+    const schedule = t.recurringItems.find((r) => r.rowId === subs.id && !r.deletedAt)!
+    expect(schedule).toMatchObject({ name: 'Films', payDay: 5, methodId: visa.id })
+    const items = t.cells.find((c) => c.rowId === subs.id && c.month === month)!.items
+    expect(items.find((i) => i.label === 'Films')).toMatchObject({ recurringItemId: schedule.id, date: null, methodId: null })
+    // the one that does not repeat keeps what it names
+    expect(items.find((i) => i.label === 'Gift')).toMatchObject({ recurringItemId: null, date: dateOn(month, 20), methodId: visa.id })
+    const next = addMonths(month, 1)
+    const posted = t.cells.find((c) => c.rowId === subs.id && c.month === next)!.items[0]
+    const ctx = payContext(t)
+    expect([payDayOf(posted, rowNamed(t, 'Subscriptions'), next, ctx), cardOf(posted, rowNamed(t, 'Subscriptions'), ctx)]).toEqual([5, card.id])
+  })
+
+  it('a scheduled item\'s day or method changed in a month is that month\'s alone, or its schedule\'s from that month on', async () => {
+    const { store, main, card } = await fresh()
+    const sepa = await addPaymentMethod(store, { name: 'SEPA', kind: 'direct-debit', accountId: main.id })
+    const visa = await addPaymentMethod(store, { name: 'Visa', kind: 'credit-card', accountId: card.id })
+    const subs = await addRow(store, { name: 'Subscriptions', section: 'expense' })
+    const month = monthOfDate()
+    const next = addMonths(month, 1)
+    const films = await addRecurringItem(store, { name: 'Films', rowId: subs.id, amount: 14_00, startMonth: month, payDay: 5, methodId: sepa.id })
+    let t = await loadTables(store)
+    const now = t.cells.find((c) => c.rowId === subs.id && c.month === month)!.items
+    // only this month: the item names its own, the schedule keeps its day
+    await saveRowMonth(store, subs.id, month, { items: [{ ...now[0], date: dateOn(month, 9) }], applyTo: { [now[0].id]: 'this-month' }, scope: 'this-month' })
+    t = await loadTables(store)
+    expect(t.recurringItems.filter((r) => r.rowId === subs.id && !r.deletedAt)).toHaveLength(1)
+    expect(t.recurringItems.find((r) => r.id === films.id)).toMatchObject({ payDay: 5, methodId: sepa.id })
+    const ctx = payContext(t)
+    const row = rowNamed(t, 'Subscriptions')
+    expect(payDayOf(t.cells.find((c) => c.rowId === subs.id && c.month === month)!.items[0], row, month, ctx)).toBe(9)
+    expect(payDayOf(t.cells.find((c) => c.rowId === subs.id && c.month === next)!.items[0], row, next, ctx)).toBe(5)
+    // this and following months, from the next month: the schedule is split there and the item follows it again
+    const later = t.cells.find((c) => c.rowId === subs.id && c.month === next)!.items
+    await saveRowMonth(store, subs.id, next, { items: [{ ...later[0], date: dateOn(next, 20), methodId: visa.id }], applyTo: { [later[0].id]: 'from-now-on' }, scope: 'this-month' })
+    t = await loadTables(store)
+    const pieces = t.recurringItems.filter((r) => r.rowId === subs.id && !r.deletedAt).sort((a, b) => (a.startMonth < b.startMonth ? -1 : 1))
+    expect(pieces.map((p) => [p.startMonth, p.endMonth, p.payDay, p.methodId])).toEqual([[month, month, 5, sepa.id], [next, null, 20, visa.id]])
+    const after = addMonths(next, 1)
+    const ctx2 = payContext(t)
+    for (const m of [next, after]) {
+      const it = t.cells.find((c) => c.rowId === subs.id && c.month === m)!.items[0]
+      expect(it).toMatchObject({ date: null })
+      expect([payDayOf(it, row, m, ctx2), cardOf(it, row, ctx2)]).toEqual([20, card.id])
+    }
+  })
+
+  it('a schedule\'s day or method changed in the list of schedules counts from the current month', async () => {
+    const { store, main } = await fresh()
+    const sepa = await addPaymentMethod(store, { name: 'SEPA', kind: 'direct-debit', accountId: main.id })
+    const subs = await addRow(store, { name: 'Subscriptions', section: 'expense' })
+    const month = monthOfDate()
+    const films = await addRecurringItem(store, { name: 'Films', rowId: subs.id, amount: 14_00, startMonth: addMonths(month, -2), payDay: 5 })
+    await updateRecurringItem(store, films.id, { payDay: 12, methodId: sepa.id })
+    const t = await loadTables(store)
+    const pieces = t.recurringItems.filter((r) => r.rowId === subs.id && !r.deletedAt).sort((a, b) => (a.startMonth < b.startMonth ? -1 : 1))
+    expect(pieces.map((p) => [p.startMonth, p.endMonth, p.payDay ?? null, p.methodId ?? null])).toEqual([
+      [addMonths(month, -2), addMonths(month, -1), 5, null], [month, null, 12, sepa.id],
+    ])
+    // a new name alone is the schedule's own in every month, and splits nothing
+    await updateRecurringItem(store, pieces[1].id, { name: 'Movies' })
+    expect((await loadTables(store)).recurringItems.filter((r) => r.rowId === subs.id && !r.deletedAt)).toHaveLength(2)
   })
 })
