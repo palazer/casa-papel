@@ -73,9 +73,12 @@ test.describe('Payments: the switch and the payment methods', () => {
     await expect(starter.getByRole('checkbox', { name: /^Visa · credit card$/ })).toBeChecked()
     // before there is a method, the Payments page says where they are added
     await openPayments(page)
-    await expect(page.locator('[data-group]')).toHaveCount(1)
-    await expect(page.locator('[data-group="no-day"]').getByRole('heading')).toContainText('No day yet')
-    await expect(page.locator('[data-payment]')).toHaveText([/Rent\s*no method/])
+    // nothing has a day or a method yet: no day stands in the list, no sum beside it, and the rent is untracked
+    await expect(page.locator('[data-group]')).toHaveCount(0)
+    await expect(page.getByTestId('payments-none-tracked')).toContainText('Nothing is tracked in November 2026 yet.')
+    await expect(page.getByTestId('payment-totals')).toHaveCount(0)
+    await expect(page.getByTestId('payments-summary')).toHaveText(/€0\.00 to pay · €0\.00 done · 1 untracked/)
+    await expect(page.locator('[data-payment]')).toHaveText([/^Rent\s*Track…\s*€1,200\.00$/])
     await page.getByTestId('payments-no-methods').getByRole('button', { name: 'Add them under Household' }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Household' })).toBeVisible()
 
@@ -323,6 +326,10 @@ async function withDays(page: Page) {
 const group = (page: Page, key: string) => page.locator(`[data-group="${key}"]`)
 const lines = (scope: Page | Locator) => scope.locator('[data-payment]')
 const euros = (text: string) => Number(text.replace(/[^\d.-]/g, ''))
+const inEuros = (v: number) => `€${v.toLocaleString('en-GB', { minimumFractionDigits: 2 })}`
+const untracked = (page: Page) => page.getByTestId('payments-untracked')
+const payment = (page: Page) => page.getByRole('dialog', { name: 'Payment' })
+const countsFor = (dlg: Locator) => dlg.getByRole('radiogroup', { name: 'Counts for' })
 /** The amounts of the lines in view, in euros. */
 const amounts = async (scope: Page | Locator) => (await lines(scope).getByTestId('payment-amount').allInnerTexts()).map(euros)
 const total = (list: number[]) => Math.round(list.reduce((s, v) => s + v, 0) * 100) / 100
@@ -346,9 +353,10 @@ test.describe('Payments: the page', () => {
     await expect(page.getByTestId('payments-no-methods')).toHaveCount(0)
     await expect(lines(group(page, 'overdue'))).toHaveText([/Sun 1\s*The flat – Rent\s*Standing order/, /Thu 12\s*The flat – Utilities\s*Direct debit/])
     await expect(lines(group(page, 'coming'))).toHaveText([/Wed 25\s*Robin – Childcare\s*Transfer by hand\s*by hand/, /Sat 28\s*To savings\s*Standing order\s*calculated/])
-    await expect(group(page, 'no-day').getByRole('heading')).toContainText('No day yet')
-    await expect(page.getByTestId('payments-summary')).toContainText('to pay')
-    await expect(page.getByTestId('payments-summary')).toContainText('2 overdue')
+    // the subscriptions name a method and no day; everything else of the month is untracked, below
+    await expect(group(page, 'no-day').getByRole('heading')).toHaveText(/^No day\s*1 · €18\.00$/)
+    await expect(lines(group(page, 'no-day'))).toHaveText([/–\s*Subscriptions\s*Credit card/])
+    await expect(page.getByTestId('payments-summary')).toHaveText(/€4,627\.00 to pay · €0\.00 done · 2 overdue · 12 untracked/)
     // the address is the page's own, and a reload stays on it
     await page.reload()
     await expect(page.getByRole('heading', { level: 1, name: 'Payments' })).toBeVisible()
@@ -370,7 +378,7 @@ test.describe('Payments: the page', () => {
     await expect(group(page, 'today').getByRole('heading')).toContainText('Today, Sun 15')
     await expect(lines(group(page, 'today'))).toHaveText([/The flat – Utilities\s*Direct debit/])
     await expect(lines(group(page, 'coming'))).toHaveText([/Wed 25\s*Robin – Childcare\s*Transfer by hand\s*by hand/, /Sat 28\s*To savings\s*Standing order\s*calculated/])
-    await expect(group(page, 'no-day').getByRole('heading')).toContainText('No day yet')
+    await expect(group(page, 'no-day').getByRole('heading')).toContainText('No day')
     await expect(page.getByTestId('payments-summary')).toContainText('1 overdue')
     await page.screenshot({ path: 'e2e/output/payments.png', fullPage: true })
 
@@ -396,71 +404,194 @@ test.describe('Payments: the page', () => {
     await openPayments(page)
     await expect(lines(group(page, 'overdue'))).toHaveText([/The flat – Rent/])
 
-    // a line opens its amount's dialog, the one the Statement opens
-    await page.getByRole('button', { name: /^Robin – Childcare: €380\.00, on the 25th, Transfer by hand/ }).click()
+    // a line opens "Payment", its day and method; "Amount…" there is the amount's dialog, the one the Statement opens
+    await page.getByRole('button', { name: /^Robin – Childcare: €380\.00, on the 25th, Transfer by hand$/ }).click()
+    const dlg = payment(page)
+    await expect(dlg).toContainText('Robin – Childcare')
+    await expect(dlg.getByTestId('payment-of')).toContainText('€380.00 in November 2026')
+    expect([await shown(paidOn(dlg)), await shown(paidWith(dlg))]).toEqual(['25th', choice('Transfer by hand')])
+    await dlg.getByRole('button', { name: 'Amount…' }).click()
+    await expect(dlg).toBeHidden()
     const amount = page.getByRole('dialog', { name: 'Robin – Childcare · November 2026' })
     await expect(amount.getByTestId('usually-paid')).toBeVisible()
     await amount.getByRole('button', { name: 'Cancel' }).click()
-
-    // "Set…" on a line without a day: the row's usual day and method
-    await page.getByRole('button', { name: 'Set the day and method of Groceries' }).click()
-    const set = page.getByRole('dialog', { name: 'Usually paid' })
-    await expect(set).toContainText('Row "Groceries"')
-    await paidOn(set).selectOption('20th')
-    await set.getByRole('button', { name: 'Save' }).click()
-    await expect(set).toBeHidden()
-    await expect(lines(group(page, 'coming'))).toHaveText([/Fri 20\s*Groceries\s*no method/, /Wed 25\s*Robin – Childcare/, /Sat 28\s*To savings/])
-    await expect(page.getByRole('button', { name: 'Set the day and method of Groceries' })).toHaveCount(0)
 
     // another month has no "late" and no "today": what has a day is to pay, by day
     await openMonth(page, 'December 2026')
     await expect(page.locator('[data-group]')).toHaveCount(2)
     await expect(group(page, 'open').getByRole('heading')).toContainText('To pay')
-    await expect(lines(group(page, 'open'))).toHaveText([/Tue 1\s*The flat – Rent/, /Tue 15\s*The flat – Utilities/, /Sun 20\s*Groceries/, /Fri 25\s*Robin – Childcare/, /Mon 28\s*To savings/])
+    await expect(lines(group(page, 'open'))).toHaveText([/Tue 1\s*The flat – Rent/, /Tue 15\s*The flat – Utilities/, /Fri 25\s*Robin – Childcare/, /Mon 28\s*To savings/])
     await expect(page.getByTestId('payments-summary')).not.toContainText('overdue')
   })
 
-  test('the totals add up to the list, and a pressed total leaves only its payments', async ({ page }) => {
+  test('what has no day and no method is untracked: listed below, in no sum, until "Track…" gives it one', async ({ page }) => {
+    await withDays(page)
+    await openPayments(page)
+    const summary = page.getByTestId('payments-summary')
+    const list = page.getByTestId('payments-list')
+    const totals = page.getByTestId('payment-totals')
+    // twelve amounts of the demo's November name neither: a quiet list with no ticks
+    await expect(untracked(page).getByRole('heading')).toHaveText('Untracked')
+    await expect(untracked(page)).toContainText('12 · €3,438.00')
+    await expect(lines(untracked(page))).toHaveCount(12)
+    await expect(lines(untracked(page)).first()).toHaveText(/^Groceries\s*Track…\s*€700\.00$/)
+    await expect(untracked(page).getByRole('checkbox')).toHaveCount(0)
+    // "to pay" is what is tracked, and the two lists together are the month's "Money out" rows
+    const tracked = total(await amounts(list))
+    await expect(summary).toHaveText(new RegExp(`${inEuros(tracked).replace('.', '\\.')} to pay · €0\\.00 done · 1 overdue · 12 untracked`))
+    expect(tracked).toBe(4627)
+
+    // "Track…" with a method alone: it has no day to stand on
+    await untracked(page).getByRole('button', { name: 'Track Groceries: €700.00' }).click()
+    const dlg = payment(page)
+    await expect(dlg).toContainText('Groceries')
+    await expect(dlg.getByTestId('payment-of')).toContainText('€700.00 in November 2026')
+    await expect(dlg.getByTestId('payment-reach')).toHaveText('For this row, in every month, past ones included.')
+    await expect(countsFor(dlg)).toHaveCount(0)
+    await expect(dlg.getByTestId('payment-untracked')).toBeVisible()
+    await paidWith(dlg).selectOption({ label: choice('Direct debit') })
+    await expect(dlg.getByTestId('payment-untracked')).toHaveCount(0)
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(lines(group(page, 'no-day'))).toHaveText([/–\s*Groceries\s*Direct debit/, /–\s*Subscriptions\s*Credit card/])
+    await expect(untracked(page)).toContainText('11 · €2,738.00')
+    await expect(summary).toContainText('€5,327.00 to pay')
+    await expect(summary).toContainText('11 untracked')
+    await expect(totals.getByRole('button', { name: /^Direct debit: €910\.00, 2 payments, €910\.00 not done yet$/ })).toBeVisible()
+    // the keyboard stays in the list it was in: on the line that stood after the one that left
+    await expect(untracked(page).getByRole('button', { name: /^Track Health: / })).toBeFocused()
+    // no month that is over was asked about, though the row now says it for every month
+    await expect(page.getByTestId('past-question')).toHaveCount(0)
+
+    // a day puts it on its day, and its tick is here now
+    await page.getByRole('button', { name: /^Groceries: €700\.00, no day, Direct debit$/ }).click()
+    expect([await shown(paidOn(dlg)), await shown(paidWith(dlg))]).toEqual(['No day', choice('Direct debit')])
+    await paidOn(dlg).selectOption('31st')
+    await expect(dlg.getByTestId('payment-reach')).toContainText('In a shorter month the 31st is its last day.')
+    await paidOn(dlg).selectOption('20th')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(lines(group(page, 'coming'))).toHaveText([/Fri 20\s*Groceries\s*Direct debit/, /Wed 25\s*Robin – Childcare/, /Sat 28\s*To savings/])
+    // it moved under another heading, and the keyboard went with it
+    await expect(page.getByRole('button', { name: /^Groceries: €700\.00, on the 20th, Direct debit$/ })).toBeFocused()
+    await page.getByRole('checkbox', { name: 'Groceries done' }).click()
+    await expect(summary).toContainText('€700.00 done')
+    await page.getByRole('checkbox', { name: 'Robin – Childcare done' }).focus()
+    await group(page, 'done').getByRole('button', { name: /^Done/ }).click()
+    await page.getByRole('checkbox', { name: 'Groceries done' }).click()
+    await expect(summary).toContainText('€0.00 done')
+
+    // "No day" and "No method" take it back: untracked, and out of every sum
+    await page.getByRole('button', { name: /^Groceries: €700\.00, on the 20th, Direct debit$/ }).click()
+    await paidOn(dlg).selectOption('No day')
+    await paidWith(dlg).selectOption('No method')
+    await expect(dlg.getByTestId('payment-untracked')).toContainText('it is not tracked')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(untracked(page)).toContainText('12 · €3,438.00')
+    await expect(summary).toContainText('€4,627.00 to pay')
+    await expect(totals.getByRole('button', { name: /^Direct debit: €210\.00, 1 payment, / })).toBeVisible()
+
+    // the list folds, and the device remembers it
+    await untracked(page).getByRole('button', { name: 'Untracked', exact: true }).click()
+    await expect(lines(untracked(page))).toHaveCount(0)
+    await expect(untracked(page)).toContainText('12 · €3,438.00')
+    await page.reload()
+    await expect(untracked(page).getByRole('button', { name: 'Untracked', exact: true })).toHaveAttribute('aria-expanded', 'false')
+    await untracked(page).getByRole('button', { name: 'Untracked', exact: true }).click()
+    await expect(lines(untracked(page))).toHaveCount(12)
+  })
+
+  test('something that repeats: "This and following months" changes its schedule from here, "Only this month" the month alone', async ({ page }) => {
+    await withMethods(page)
+    await openPayments(page)
+    const rent = () => lines(page).filter({ hasText: 'The flat – Rent' })
+    const dlg = payment(page)
+    // the rent repeats, and its schedule says the 1st by standing order
+    await page.getByRole('button', { name: /^The flat – Rent: €1,650\.00, on the 1st, Standing order$/ }).click()
+    await expect(countsFor(dlg).getByRole('radio')).toHaveText(['This and following months', 'Only this month'])
+    await expect(countsFor(dlg).getByRole('radio', { name: 'This and following months' })).toBeChecked()
+    expect([await shown(paidOn(dlg)), await shown(paidWith(dlg))]).toEqual(['1st', choice('Standing order')])
+    await expect(dlg.getByTestId('payment-reach')).toHaveText('From November 2026 on, wherever it repeats. Earlier months keep how they were paid.')
+
+    // only this month: the fields show what the month says for itself, and their first choice what it follows
+    await countsFor(dlg).getByRole('radio', { name: 'Only this month' }).click()
+    expect([await shown(paidOn(dlg)), await shown(paidWith(dlg))]).toEqual(['As scheduled: 1st', 'As scheduled: Standing order'])
+    await expect(dlg.getByTestId('payment-reach')).toHaveText('For November 2026 alone. The other months keep what its schedule says.')
+    await paidOn(dlg).selectOption('3rd')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(rent()).toHaveText(/Tue 3\s*The flat – Rent\s*Standing order/)
+    await openMonth(page, 'December 2026')
+    await expect(rent()).toHaveText(/Tue 1\s*The flat – Rent/)
+    await openMonth(page, 'November 2026')
+
+    // the month says a day of its own now, so the dialog opens on it; for this and the following months it gives way
+    await page.getByRole('button', { name: /^The flat – Rent: €1,650\.00, on the 3rd, Standing order$/ }).click()
+    await expect(countsFor(dlg).getByRole('radio', { name: 'Only this month' })).toBeChecked()
+    expect(await shown(paidOn(dlg))).toBe('3rd')
+    await countsFor(dlg).getByRole('radio', { name: 'This and following months' }).click()
+    expect(await shown(paidOn(dlg))).toBe('1st')
+    await paidOn(dlg).selectOption('5th')
+    await paidWith(dlg).selectOption({ label: choice('Direct debit') })
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(page.getByTestId('past-question')).toHaveCount(0)
+    await expect(rent()).toHaveText(/Thu 5\s*The flat – Rent\s*Direct debit/)
+    await openMonth(page, 'December 2026')
+    await expect(rent()).toHaveText(/Sat 5\s*The flat – Rent\s*Direct debit/)
+    // the month before keeps how it was paid
+    await openMonth(page, 'October 2026')
+    await expect(rent()).toHaveText(/Thu 1\s*The flat – Rent\s*Standing order/)
+    // and no figure moved: the Statement's November still has the rent it had
+    await openStatement(page)
+    await expect(page.getByRole('button', { name: /^The flat – Rent:/ })).toHaveAccessibleName(/^The flat – Rent: €1,650\.00/)
+  })
+
+  test('the sums by method and by person add up to what is tracked, and a pressed sum leaves only its payments', async ({ page }) => {
     await withDays(page)
     await openPayments(page)
     const totals = page.getByTestId('payment-totals')
-    const all = await amounts(page)
-    // an account's own sum is its first line; its methods follow
-    const accountTotals = (await totals.locator('[data-account-total] > button:first-child').allInnerTexts()).map((t) => euros(t.split('\n').pop() ?? ''))
-    expect(total(accountTotals)).toBe(total(all))
-    // "to pay" is the list without what is bought on a card (the demo's subscriptions, 18)
-    await expect(page.getByTestId('payments-summary')).toContainText(`€${(total(all) - 18).toLocaleString('en-GB', { minimumFractionDigits: 2 })} to pay`)
+    const list = page.getByTestId('payments-list')
+    const all = await amounts(list)
+    await expect(totals.locator('[data-method-total]')).toHaveText([/^Direct debit\s*Main account/, /^Standing order\s*Main account/, /^Transfer by hand\s*Main account/, /^Credit card\s*Sam/])
+    const sums = (await totals.locator('[data-method-total] > button').allInnerTexts()).map((t) => euros(t.split('\n').pop() ?? ''))
+    expect(total(sums)).toBe(total(all))
+    await expect(page.getByTestId('payments-summary')).toContainText(`${inEuros(total(all))} to pay`)
+    // nothing on the page speaks of an account's balance or of what a card owes
+    await expect(totals).not.toContainText('Owed')
+    await expect(page.getByTestId('payments-list')).not.toContainText('on card')
 
-    // the main account: everything that leaves it, then one of its methods
-    const main = totals.getByRole('button', { name: /^Main account: / })
-    await main.click()
-    await expect(main).toHaveAttribute('aria-pressed', 'true')
-    await expect(page.getByTestId('payments-filter')).toContainText('Only Main account')
-    const ofMain = await amounts(page)
-    await expect(main).toHaveAccessibleName(new RegExp(`^Main account: €${total(ofMain).toLocaleString('en-GB', { minimumFractionDigits: 2 })} leaves it`))
     // the rent and what goes to savings
-    const order = totals.getByRole('button', { name: /^Standing order on Main account: €[\d,.]+, 2 payments$/ })
+    const order = totals.getByRole('button', { name: /^Standing order: €4,019\.00, 2 payments, €4,019\.00 not done yet$/ })
     await order.click()
-    await expect(main).toHaveAttribute('aria-pressed', 'false')
+    await expect(order).toHaveAttribute('aria-pressed', 'true')
     await expect(lines(page)).toHaveText([/The flat – Rent/, /To savings/])
-    await expect(page.getByTestId('payments-filter')).toContainText('Only Standing order on Main account')
+    await expect(page.getByTestId('payments-filter')).toContainText('Only Standing order')
+    // what is untracked is in no sum, so it is not there while one is picked out
+    await expect(untracked(page)).toHaveCount(0)
+    // a tick shows in the sum: what of it is still open
+    await page.getByRole('checkbox', { name: 'The flat – Rent done' }).click()
+    await expect(totals.getByRole('button', { name: /^Standing order: €4,019\.00, 2 payments, €2,369\.00 not done yet$/ })).toContainText('€2,369.00 open')
     // pressed again, or "Show all": the whole list
-    await order.click()
+    await totals.getByRole('button', { name: /^Standing order: / }).click()
     await expect(page.getByTestId('payments-filter')).toHaveCount(0)
-    await expect(lines(page)).toHaveCount(all.length)
+    await expect(untracked(page)).toBeVisible()
+    await expect(lines(list)).toHaveCount(all.length - 1)
 
-    // the card: what was bought on it, what is owed, and that nothing pays it off this month
-    const card = totals.locator('[data-account-total="Credit card"]')
-    await expect(card.getByRole('button', { name: /^Credit card: €18\.00 bought on it$/ })).toBeVisible()
-    await expect(card.getByTestId('card-owed')).toContainText('Owed at the end of November 2026')
-    await expect(card.getByTestId('card-paid-by')).toHaveText('Nothing pays it off in November 2026.')
-    await card.getByRole('button', { name: /^Credit card: / }).click()
-    await expect(lines(page)).toHaveText([/Subscriptions\s*Credit card\s*on card/])
+    // tracked by a day alone: "No method", the last sum
+    await untracked(page).getByRole('button', { name: 'Track Health: €30.00' }).click()
+    await paidOn(payment(page)).selectOption('8th')
+    await payment(page).getByRole('button', { name: 'Save' }).click()
+    await expect(payment(page)).toBeHidden()
+    await expect(totals.locator('[data-method-total]').last()).toHaveText(/^No method\s*€30\.00$/)
+    await totals.getByRole('button', { name: /^No method: €30\.00, 1 payment, / }).click()
+    await expect(lines(page)).toHaveText([/Sun 8\s*Health\s*no method/])
     await page.getByTestId('payments-filter').getByRole('button', { name: 'Show all' }).click()
 
-    // by person: the card is Sam's, so what is bought on it is Sam's to pay
+    // by person: the credit card method is Sam's, so what is paid with it is Sam's to pay
     const people = page.getByTestId('payment-people')
-    await people.getByRole('button', { name: /^Sam: €18\.00/ }).click()
+    await people.getByRole('button', { name: /^Sam: €18\.00, 1 payment, / }).click()
     await expect(lines(page)).toHaveText([/Subscriptions/])
     await expect(page.getByTestId('payments-filter')).toContainText('Only Sam')
     // another month starts with the whole list again
@@ -468,7 +599,7 @@ test.describe('Payments: the page', () => {
     await expect(page.getByTestId('payments-filter')).toHaveCount(0)
   })
 
-  test('two things in one row, each paid its own way: two lines, and the row stays on its card as a whole', async ({ page }) => {
+  test('two things in one row, each paid its own way: two lines, each with its own tick, day and method', async ({ page }) => {
     await withMethods(page)
     await openStatement(page)
     const owed = await owedOnCard(page)
@@ -487,18 +618,27 @@ test.describe('Payments: the page', () => {
     expect(await owedOnCard(page)).toBe(owed + 12)
 
     await openPayments(page)
-    await expect(page.getByRole('button', { name: /^Subscriptions: Music: €12\.00, on the 20th, Direct debit$/ })).toBeVisible()
-    await expect(page.getByRole('button', { name: /^Subscriptions: Streaming: €18\.00, no day yet, Credit card$/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^Subscriptions: Streaming: €18\.00, no day, Credit card$/ })).toBeVisible()
     const music = lines(page).filter({ hasText: 'Music' })
     await expect(music).toHaveText(/Fri 20\s*Music\s*Subscriptions\s*Direct debit/)
     await expect(lines(page).filter({ hasText: 'Streaming' })).toHaveText(/Streaming\s*Subscriptions\s*Credit card/)
-    // one item of several is set in the amount's dialog: no "Set…" on its line
-    await expect(lines(page).filter({ hasText: 'Streaming' }).getByRole('button', { name: /^Set the day/ })).toHaveCount(0)
     const totals = page.getByTestId('payment-totals')
-    await expect(totals.getByRole('button', { name: /^Credit card: €30\.00 bought on it$/ })).toBeVisible()
-    // the utilities (210.00) are the demo household's other direct debit
-    await expect(totals.getByRole('button', { name: /^Direct debit on Credit card: €12\.00, 1 payment$/ })).toBeVisible()
-    await expect(totals.getByRole('button', { name: /^Direct debit on Main account: €210\.00, 1 payment$/ })).toBeVisible()
+    await expect(totals.getByRole('button', { name: /^Credit card: €18\.00, 1 payment, / })).toBeVisible()
+    // with the utilities (210.00), which the demo household pays by direct debit
+    await expect(totals.getByRole('button', { name: /^Direct debit: €222\.00, 2 payments, / })).toBeVisible()
+
+    // one item of several is this month's alone: "Payment" offers no other place to save in
+    await page.getByRole('button', { name: /^Subscriptions: Music: €12\.00, on the 20th, Direct debit$/ }).click()
+    const pay = payment(page)
+    await expect(pay).toContainText('Subscriptions: Music')
+    await expect(countsFor(pay)).toHaveCount(0)
+    await expect(pay.getByTestId('payment-reach')).toHaveText('For this amount, in November 2026 alone.')
+    // behind it stands its row, which is usually paid with the credit card
+    await expect(paidWith(pay).getByRole('option').first()).toHaveText('Usual: Credit card')
+    await paidOn(pay).selectOption('21st')
+    await pay.getByRole('button', { name: 'Save' }).click()
+    await expect(pay).toBeHidden()
+    await expect(music).toHaveText(/Sat 21\s*Music\s*Subscriptions\s*Direct debit/)
 
     // each has a tick of its own, and it is the item's tick on the Statement
     await page.getByRole('checkbox', { name: 'Subscriptions: Music done' }).click()
@@ -506,29 +646,46 @@ test.describe('Payments: the page', () => {
     await openStatement(page)
     await expect(page.getByRole('checkbox', { name: 'Subscriptions: Music done' })).toBeChecked()
     await expect(page.getByRole('checkbox', { name: 'Subscriptions: Streaming done' })).not.toBeChecked()
+    // a day and a method changed since: what is owed on the card is what it was
+    expect(await owedOnCard(page)).toBe(owed + 12)
   })
 })
 
 test.describe('Payments: with the keyboard', () => {
   test.use({ viewport: { width: 1440, height: 900 } })
 
-  test('the list comes before the totals, and after a tick the keyboard is on the next line', async ({ page }) => {
+  test('the lists come before the sums; after a tick the keyboard is on the next line, and a closed dialog gives it back', async ({ page }) => {
     await withMethods(page)
     await openPayments(page)
     const utilities = page.getByRole('checkbox', { name: 'The flat – Utilities done' })
     const rent = page.getByRole('checkbox', { name: 'The flat – Rent done' })
+    const rentLine = page.getByRole('button', { name: /^The flat – Rent: €1,650\.00, on the 1st, Standing order$/ })
     // from the list's (i): the first line's tick, its name, the next line's tick
     await page.getByRole('button', { name: 'About By day' }).focus()
     await page.keyboard.press('Tab')
     await expect(rent).toBeFocused()
     await page.keyboard.press('Tab')
-    await expect(page.getByRole('button', { name: /^The flat – Rent: €1,650\.00, on the 1st, Standing order$/ })).toBeFocused()
+    await expect(rentLine).toBeFocused()
     await page.keyboard.press('Tab')
     await expect(utilities).toBeFocused()
-    // the totals follow the whole list
-    const firstTotal = page.getByTestId('payment-totals').getByRole('button', { name: 'By account and method', exact: true })
-    const lastOfList = page.getByTestId('payments-list').getByRole('checkbox').last()
-    expect(await firstTotal.evaluate((el, other) => !!(other!.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING), await lastOfList.elementHandle())).toBe(true)
+    // the untracked list follows the days, and the sums follow both
+    const after = async (a: Locator, b: Locator) => b.evaluate((el, other) => !!(other!.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING), await a.elementHandle())
+    const firstTotal = page.getByTestId('payment-totals').getByRole('button', { name: 'By method', exact: true })
+    const firstUntracked = untracked(page).getByRole('button', { name: /^Track / }).first()
+    expect(await after(page.getByTestId('payments-list').getByRole('checkbox').last(), firstUntracked)).toBe(true)
+    expect(await after(untracked(page).getByRole('button', { name: /^Track / }).last(), firstTotal)).toBe(true)
+    // an untracked line is one stop: Tab goes from one to the next
+    await firstUntracked.focus()
+    await page.keyboard.press('Tab')
+    await expect(untracked(page).getByRole('button', { name: /^Track Health: / })).toBeFocused()
+
+    // Enter on a line opens "Payment"; Escape closes it, and the line has the keyboard again
+    await rentLine.focus()
+    await page.keyboard.press('Enter')
+    await expect(payment(page)).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(payment(page)).toBeHidden()
+    await expect(rentLine).toBeFocused()
 
     // Space ticks the rent: it leaves for "Done", and the utilities, the line after it, have the focus
     await rent.focus()
@@ -538,8 +695,8 @@ test.describe('Payments: with the keyboard', () => {
     await page.keyboard.press('Space')
     await expect(group(page, 'overdue')).toHaveCount(0)
     await expect(page.getByRole('checkbox', { name: 'Robin – Childcare done' })).toBeFocused()
-    // Enter on a total is the press
-    await page.getByTestId('payment-totals').getByRole('button', { name: /^Transfer by hand on Main account/ }).focus()
+    // Enter on a sum is the press
+    await page.getByTestId('payment-totals').getByRole('button', { name: /^Transfer by hand: / }).focus()
     await page.keyboard.press('Enter')
     await expect(lines(page)).toHaveText([/Robin – Childcare/])
   })
@@ -548,7 +705,7 @@ test.describe('Payments: with the keyboard', () => {
 test.describe('Payments on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true })
 
-  test('a fifth tab, the totals above the list where they fold away, and nothing scrolls sideways', async ({ page }) => {
+  test('a fifth tab, the sums above the lists where they fold away, and nothing scrolls sideways', async ({ page }) => {
     await loadDemo(page)
     const tabs = rail(page)
     await tabs.getByRole('link', { name: 'Settings' }).click()
@@ -565,19 +722,25 @@ test.describe('Payments on a phone', () => {
     expect((await totals.boundingBox())!.y).toBeLessThan((await list.boundingBox())!.y)
     // folded, the list comes up; the device remembers it
     const top = (await list.boundingBox())!.y
-    await totals.getByRole('button', { name: 'By account and method', exact: true }).click()
-    await expect(totals.getByRole('button', { name: /^Main account: / })).toHaveCount(0)
+    await totals.getByRole('button', { name: 'By method', exact: true }).click()
+    await expect(totals.getByRole('button', { name: /^Direct debit: / })).toHaveCount(0)
     expect((await list.boundingBox())!.y).toBeLessThan(top)
     await page.reload()
-    await expect(page.getByTestId('payment-totals').getByRole('button', { name: 'By account and method', exact: true })).toHaveAttribute('aria-expanded', 'false')
-    await page.getByTestId('payment-totals').getByRole('button', { name: 'By account and method', exact: true }).click()
+    await expect(page.getByTestId('payment-totals').getByRole('button', { name: 'By method', exact: true })).toHaveAttribute('aria-expanded', 'false')
+    await page.getByTestId('payment-totals').getByRole('button', { name: 'By method', exact: true }).click()
 
-    // a tick and a line are finger-sized, and a total too
-    const tick = page.getByRole('checkbox', { name: 'Groceries done' })
+    // a tick, a sum and an untracked line are finger-sized
+    const tick = page.getByRole('checkbox', { name: 'Robin – Childcare done' })
     expect((await tick.boundingBox())!.height).toBeGreaterThanOrEqual(44)
-    expect((await page.getByTestId('payment-totals').getByRole('button', { name: /^Main account: / }).boundingBox())!.height).toBeGreaterThanOrEqual(44)
+    expect((await page.getByTestId('payment-totals').getByRole('button', { name: /^Direct debit: / }).boundingBox())!.height).toBeGreaterThanOrEqual(44)
+    expect((await lines(untracked(page)).first().boundingBox())!.height).toBeGreaterThanOrEqual(44)
     await tick.click()
-    await expect(page.getByTestId('payments-summary')).toContainText('€700.00 done')
+    await expect(page.getByTestId('payments-summary')).toContainText('€380.00 done')
+    // an untracked line is pressed anywhere: "Payment" fits the screen
+    await lines(untracked(page)).first().click({ position: { x: 20, y: 22 } })
+    await expect(payment(page)).toBeVisible()
+    expect(await sideways()).toBe(0)
+    await payment(page).getByRole('button', { name: 'Cancel' }).click()
     expect(await sideways()).toBe(0)
     await page.screenshot({ path: 'e2e/output/payments-phone.png', fullPage: true })
   })

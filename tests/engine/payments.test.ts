@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildPayments, buildStatement, computeEngine, type StatementLine } from '@/engine'
-import { EntitySchema, PaymentMethodSchema, PoolSchema, accountRef, monthRange, newId, poolRef, type Account, type PaymentKind, type Tables } from '@/model'
+import { EntitySchema, PaymentMethodSchema, PoolSchema, RecurringItemSchema, accountRef, monthRange, newId, poolRef, type Account, type PaymentKind, type Tables } from '@/model'
 import { applyMutations, planRecurringPosts } from '@/store'
 import { buildDemoTables } from '@/demo/demoHousehold'
 import { T0, account, cellItems, cellValue, household, row, tables } from './helpers'
@@ -49,27 +49,28 @@ describe('a month\'s payments are its Statement\'s money out', () => {
     expect(sum(pay.payments.filter((p) => !p.memo)) + sum(figures)).toBe(statement.flow.right.total)
   })
 
-  it('the totals per account and per person each add up to the list; "to pay" and "paid" leave out what is bought on a card', () => {
+  it('what is tracked and what is not add up to the list; "to pay", "done" and the sums per method and person are over what is tracked', () => {
     const { pay } = of(demo)
-    const all = sum(pay.payments)
-    expect(pay.accounts.reduce((s, a) => s + a.total, 0)).toBe(all)
-    expect(pay.people.reduce((s, a) => s + a.total, 0)).toBe(all)
-    for (const a of pay.accounts) {
-      expect(a.methods.reduce((s, m) => s + m.total, 0), a.label).toBe(a.total)
-      expect(a.methods.reduce((s, m) => s + m.left, 0), a.label).toBe(a.left)
-    }
-    const onCard = pay.payments.filter((p) => p.onCard)
-    expect(onCard.map((p) => p.label)).toContain('Subscriptions')
-    expect(pay.toPay + pay.paid).toBe(all - sum(onCard))
-    const card = pay.accounts.find((a) => a.card)!
-    expect(card.total).toBe(sum(onCard))
-    expect(card.owed?.amount).toBeGreaterThan(0)
-    // the demo has no row that pays the card
-    expect(card.paidBy).toEqual([])
+    const tracked = pay.payments.filter((p) => p.tracked)
+    const loose = pay.payments.filter((p) => !p.tracked)
+    expect(tracked.length).toBeGreaterThan(3)
+    expect(loose.length).toBeGreaterThan(3)
+    expect(pay.untracked).toEqual({ count: loose.length, total: sum(loose) })
+    expect(sum(tracked) + pay.untracked.total).toBe(sum(pay.payments))
+    for (const p of loose) expect(p, p.label).toMatchObject({ day: null, methodId: null, dayFrom: null, methodFrom: null, state: 'untracked' })
+    for (const p of tracked) expect(p.day != null || p.methodId != null, p.label).toBe(true)
+    expect(pay.toPay + pay.paid).toBe(sum(tracked))
+    expect(pay.methods.reduce((s, m) => s + m.total, 0)).toBe(sum(tracked))
+    expect(pay.methods.reduce((s, m) => s + m.count, 0)).toBe(tracked.length)
+    expect(pay.methods.reduce((s, m) => s + m.left, 0)).toBe(pay.toPay)
+    expect(pay.people.reduce((s, a) => s + a.total, 0)).toBe(sum(tracked))
+    expect(pay.people.reduce((s, a) => s + a.left, 0)).toBe(pay.toPay)
+    // a row that is "Paid by card" counts like any other once it is tracked: a method is a label
+    expect(tracked.find((p) => p.label === 'Subscriptions')).toMatchObject({ day: null, tracked: true })
   })
 })
 
-describe('where a payment stands, and where it leaves', () => {
+describe('where a payment stands, and what says its day and its method', () => {
   const h = household({ startMonth: '2026-10' })
   const sam = person('Sam')
   const main = account({ name: 'Main', type: 'checking', tracked: false, openingMonth: '2026-10' })
@@ -90,10 +91,14 @@ describe('where a payment stands, and where it leaves', () => {
   const subs = row({ name: 'Subscriptions', section: 'expense', order: 'b6', payDay: 3, accountId: visa.id })
   const cardBill = row({ name: 'Visa – Payment', section: 'transfer', kind: 'card-payment', accountId: visa.id, order: 'c0', payDay: 28, payMethodId: sepa.id })
   const toSavings = row({ name: 'To savings', section: 'transfer', kind: 'to-savings', accountId: savings.id, order: 'c1' })
+  // a method and no day; and neither, ticked on the Statement
+  const water = row({ name: 'Water', section: 'expense', order: 'b7', payMethodId: sepa.id })
+  const cleaning = row({ name: 'Cleaning', section: 'expense', order: 'b8' })
   const t = tables({
     household: [h], entities: [sam], accounts: [main, own, savings, visa], pools: [travel], paymentMethods: [sepa, byHand, visaCard],
-    rows: [salary, phone, gym, rent, groceries, insurance, flights, subs, cardBill, toSavings],
+    rows: [salary, phone, gym, rent, groceries, insurance, flights, subs, cardBill, toSavings, water, cleaning],
     cells: [
+      cellValue(water.id, '2026-10', 30_00), cellItems(cleaning.id, '2026-11', [{ amount: 60_00, status: 'done' }]),
       cellValue(salary.id, '2026-10', 3000_00), cellValue(phone.id, '2026-10', 45_00), cellValue(gym.id, '2026-10', 40_00), cellValue(rent.id, '2026-10', 1200_00),
       cellValue(groceries.id, '2026-10', 600_00), cellValue(insurance.id, '2026-10', 90_00), cellValue(flights.id, '2026-11', 300_00), cellValue(cardBill.id, '2026-11', 25_00),
       cellItems(rent.id, '2026-11', [{ amount: 1200_00, status: 'done' }]),
@@ -105,13 +110,19 @@ describe('where a payment stands, and where it leaves', () => {
   const { pay } = of(t)
   const named = (label: string) => pay.payments.find((p) => p.label === label)!
 
-  it('in the current month: overdue, today, coming, without a day, done', () => {
-    expect(named('Phone')).toMatchObject({ day: 12, state: 'overdue', done: false })
+  it('in the current month: overdue, today, coming, without a day, done; with neither a day nor a method, untracked', () => {
+    expect(named('Phone')).toMatchObject({ day: 12, state: 'overdue', done: false, tracked: true })
     expect(named('Gym')).toMatchObject({ day: 22, state: 'today' })
     expect(named('Flights')).toMatchObject({ day: 30, state: 'coming' })
-    expect(named('Groceries')).toMatchObject({ day: null, state: 'no-day' })
+    // a method tracks an amount by itself: it has no day to stand on
+    expect(named('Water')).toMatchObject({ day: null, methodId: sepa.id, state: 'no-day', tracked: true })
     expect(named('Rent')).toMatchObject({ day: 25, state: 'done', done: true })
+    expect(named('Groceries')).toMatchObject({ day: null, methodId: null, state: 'untracked', tracked: false })
+    // ticked on the Statement and still untracked: that list says nothing about done
+    expect(named('Cleaning')).toMatchObject({ done: true, state: 'untracked', tracked: false })
+    expect(named('To savings')).toMatchObject({ automatic: true, state: 'untracked' })
     expect(pay.overdue).toBe(pay.payments.filter((p) => p.state === 'overdue').length)
+    expect(pay.untracked).toEqual({ count: 3, total: 600_00 + 60_00 + named('To savings').amount })
   })
 
   it('in any other month a payment with a day is open, whenever today is', () => {
@@ -125,20 +136,49 @@ describe('where a payment stands, and where it leaves', () => {
     expect(pay.payments.filter((p) => p.rowId === subs.id).map((p) => [p.label, p.rowLabel, p.amount, p.day, p.itemId != null])).toEqual([
       ['Films', 'Subscriptions', 14_00, 3, true], ['Music', 'Subscriptions', 11_00, 18, true],
     ])
-    // the row is on the card, and so is each of its items, whatever it is paid with; Films names no method
-    expect(named('Films')).toMatchObject({ accountId: visa.id, onCard: true, methodId: null, ask: null })
-    expect(named('Music')).toMatchObject({ accountId: visa.id, onCard: true, methodId: byHand.id, ask: 'hand' })
+    // Films follows its row; Music says both for itself
+    expect(named('Films')).toMatchObject({ methodId: null, ask: null, dayFrom: 'row', methodFrom: null, tracked: true })
+    expect(named('Music')).toMatchObject({ methodId: byHand.id, ask: 'hand', dayFrom: 'item', methodFrom: 'item' })
+    expect(named('Films').soleItemId).toBeUndefined()
   })
 
-  it('without a method the account is the one the amount comes out of; a transfer leaves the main account', () => {
-    expect(named('Groceries')).toMatchObject({ accountId: main.id, methodId: null, ask: null })
-    expect(named('Insurance')).toMatchObject({ accountId: own.id })
-    expect(named('Flights')).toMatchObject({ accountId: savings.id })
-    expect(named('To savings')).toMatchObject({ accountId: main.id, automatic: true })
-    // the card's payment is real money leaving the main account, though the Statement counts it in no sum
-    expect(named('Visa – Payment')).toMatchObject({ accountId: main.id, memo: true, onCard: false, day: 28, methodId: sepa.id })
-    expect(pay.toPay).toBe(sum(pay.payments.filter((p) => !p.onCard && !p.done)))
-    expect(pay.toPay).toBeGreaterThan(25_00)
+  it('a row\'s one amount says where its day and method come from, and names the one item behind it', () => {
+    expect(named('Phone')).toMatchObject({ dayFrom: 'row', methodFrom: 'row' })
+    expect([named('Phone').itemId, named('Phone').soleItemId, named('Phone').scheduleId]).toEqual([undefined, undefined, undefined])
+    // the rent's month is a list with one item: the line is the row's, and the item can hold a day of its own
+    const rentItem = t.cells.find((c) => c.rowId === rent.id && c.month === MONTH)!.items[0]
+    expect(named('Rent')).toMatchObject({ soleItemId: rentItem.id, dayFrom: 'row', methodFrom: null })
+    expect(named('Rent').itemId).toBeUndefined()
+    // carried from October: the amount is not this month's own, so there is no item of this month to write to
+    expect(named('Gym').soleItemId).toBeUndefined()
+  })
+
+  it('an item its schedule posted follows the schedule, and names it while it runs', () => {
+    const schedule = (over: object) => RecurringItemSchema.parse({ id: newId(), createdAt: T0, updatedAt: T0, name: 'Plan', rowId: phone.id, amount: 45_00, startMonth: '2026-10', payDay: 5, methodId: byHand.id, ...over })
+    const running = schedule({})
+    const ended = schedule({ endMonth: '2026-10' })
+    const withItem = (s: { id: string }, own: object = {}): Tables => ({
+      ...t, recurringItems: [running, ended],
+      cells: [...t.cells, cellItems(phone.id, MONTH, [{ label: 'Plan', amount: 45_00, recurringItemId: s.id, ...own }])],
+    })
+    const phoneOf = (tb: Tables) => of(tb).pay.payments.find((p) => p.rowId === phone.id)!
+    // the schedule's day and method count before the row's (the 12th by direct debit)
+    expect(phoneOf(withItem(running))).toMatchObject({ day: 5, methodId: byHand.id, dayFrom: 'schedule', methodFrom: 'schedule', scheduleId: running.id })
+    expect(phoneOf(withItem(running)).soleItemId).toBeDefined()
+    // the item's own day counts before both; the method is still the schedule's
+    expect(phoneOf(withItem(running, { date: `${MONTH}-09` }))).toMatchObject({ day: 9, dayFrom: 'item', methodFrom: 'schedule', scheduleId: running.id })
+    // what an ended schedule posted still follows it, but there is no schedule left to change from this month on
+    expect(phoneOf(withItem(ended))).toMatchObject({ day: 5, dayFrom: 'schedule' })
+    expect(phoneOf(withItem(ended)).scheduleId).toBeUndefined()
+  })
+
+  it('a tracked amount counts in "to pay" whatever its row is: what is bought on a card, and the payment of that card, both', () => {
+    // the card's payment is real money, though the Statement counts it in no sum
+    expect(named('Visa – Payment')).toMatchObject({ memo: true, day: 28, methodId: sepa.id, tracked: true })
+    const open = pay.payments.filter((p) => p.tracked && !p.done)
+    expect(open.map((p) => p.label)).toEqual(expect.arrayContaining(['Films', 'Music', 'Visa – Payment']))
+    expect(pay.toPay).toBe(sum(open))
+    expect(pay.paid).toBe(1200_00)
   })
 
   it('the Statement says a line\'s day while payments are planned by day, the same day as the list; off, no line has one', () => {
@@ -179,21 +219,24 @@ describe('where a payment stands, and where it leaves', () => {
     expect(of(on).pay.payments.some((p) => p.rowId === phone.id)).toBe(false)
   })
 
-  it('the account totals: the main account first, a method at a time, the card with what is owed and what pays it', () => {
-    expect(pay.accounts.map((a) => a.label)).toEqual(['Main', "Sam's account", 'Savings', 'Visa'])
-    const first = pay.accounts[0]
-    expect(first.methods.map((m) => m.label)).toEqual(['Direct debit', 'Transfer', 'No method yet'])
-    expect(first.methods[0]).toMatchObject({ total: 45_00 + 25_00, count: 2 })
-    const card = pay.accounts[3]
-    expect(card).toMatchObject({ card: true, total: 14_00 + 11_00, owed: { amount: 14_00 + 11_00 - 25_00, currency: 'EUR' }, paidBy: [cardBill.id] })
+  it('the sums per method: in the methods\' own order, what names no method last; a method nothing is paid with has no line', () => {
+    expect(pay.methods.map((m) => m.label)).toEqual(['Direct debit', 'Transfer', 'No method'])
+    // the phone, the water and the card's payment
+    expect(pay.methods[0]).toMatchObject({ methodId: sepa.id, total: 45_00 + 30_00 + 25_00, left: 45_00 + 30_00 + 25_00, count: 3 })
+    // the gym and one of the subscriptions
+    expect(pay.methods[1]).toMatchObject({ methodId: byHand.id, total: 40_00 + 11_00, count: 2 })
+    // tracked by a day alone: the rent (done), the insurance, the flights, the other subscription
+    expect(pay.methods[2]).toMatchObject({ methodId: null, total: 1200_00 + 90_00 + 300_00 + 14_00, left: 90_00 + 300_00 + 14_00, count: 4 })
+    expect(pay.methods.some((m) => m.methodId === visaCard.id)).toBe(false)
   })
 
-  it('who pays: the method\'s owner, else the owner of the account it leaves, else the household', () => {
+  it('who pays: the method\'s owner; the household for a shared method and for what names none', () => {
     expect(named('Gym').ownerId).toBe(sam.id)
-    expect(named('Insurance').ownerId).toBe(sam.id)
+    expect(named('Music').ownerId).toBe(sam.id)
+    // it comes out of Sam's account, and that says nothing about who makes the payment
+    expect(named('Insurance').ownerId).toBeNull()
     expect(named('Phone').ownerId).toBeNull()
-    expect(pay.people.map((p) => p.label)).toEqual(['Household', 'Sam'])
-    expect(pay.people[1].total).toBe(40_00 + 90_00 + 11_00)
+    expect(pay.people.map((p) => [p.label, p.total, p.count])).toEqual([['Household', pay.toPay + pay.paid - 51_00, 7], ['Sam', 40_00 + 11_00, 2]])
   })
 
   it('a row kept in another currency: its items take their share of the row\'s amount in the household\'s currency', () => {

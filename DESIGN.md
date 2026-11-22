@@ -1247,45 +1247,72 @@ feature switch; a second one follows the same form.
   stays for an income, and while the switch is off); their first options read `The row's usual day: 1st`.
 - **The Payments page** (`src/features/payments/PaymentsScreen.tsx`) is the third tile of the rail (`CalendarCheck`)
   while the switch is on; with it off the tile is gone and the page's address opens the Statement (`shownScreen`).
-  It is the month's Statement read another way (`buildPayments`), so nothing on it is a figure of its own. Its header
-  is the Statement's: the strip of months above the toolbar, the only way to change the month, both sticky; the
-  toolbar holds the month's name, the `past` chip, and one status line with its (i) (`payments.toPay`): `€6,397.00 to
-  pay · €1,650.00 done · 1 overdue`, the overdue count in rose.
-- **"By day"** is an air `Island`. Under it the payments stand under small-caps headings (`text-[10px] font-semibold
-  uppercase tracking-wider`), each followed by its count and sum in plain muted text (`2 · €2,749.00`): in the current
-  month `Overdue` (rose, the one heading in a colour), `Today, Sun 22` (foreground), `Coming`; in any other month one
-  heading `To pay`; then `No day yet`, and last `Done`, which is a button with a chevron and is folded until pressed.
-  Under a heading the payments go by day, and those of a day keep the Statement's order. A heading with nothing under
-  it is not there. A month with nothing under "Money out" says so in one muted sentence.
+  It is the month's Statement read another way (`buildPayments`), so nothing on it is a figure of its own, and
+  nothing on it speaks of an account or of what a card owes: a day and a method are labels. Its header is the
+  Statement's: the strip of months above the toolbar, the only way to change the month, both sticky; the toolbar
+  holds the month's name, the `past` chip, and one status line with its (i) (`payments.toPay`): `€4,627.00 to pay ·
+  €0.00 done · 2 overdue · 12 untracked`, the overdue count in rose.
+- **Tracked and untracked.** An amount that leaves is tracked once it has a day or a method. Everything under "Money
+  out" is on the page: what is tracked in "By day" and in the sums, what is not in "Untracked" below, outside "to
+  pay", "done" and every sum. The page is two columns from 1024 px: the two lists at the left, the sums at the right.
+- **"By day"** is an air `Island`. Under it the tracked payments stand under small-caps headings (`text-[10px]
+  font-semibold uppercase tracking-wider`), each followed by its count and sum in plain muted text (`2 · €2,749.00`):
+  in the current month `Overdue` (rose, the one heading in a colour), `Today, Sun 22` (foreground), `Coming`; in any
+  other month one heading `To pay`; then `No day` (a method and no day), and last `Done`, which is a button with a
+  chevron and is folded until pressed. Under a heading the payments go by day, and those of a day keep the
+  Statement's order. A heading with nothing under it is not there. A month with nothing under "Money out" says so in
+  one muted sentence, and so does a month in which nothing is tracked yet (it points at "Untracked").
 - **A payment's line** (`PaymentLine.tsx`) is the Statement's row in another order: `min-h-11 text-sm`, from `md`
   `min-h-8 text-xs`. The tick first (the Statement's `Tick`, 44 px, 28 px from `md`; it is the same tick, saved by the
   same actions), then a 48 px muted day column (`Wed 25`, an en dash without a day), the name, and after it in muted
-  text the row an item stands in and the method's name (`no method` where none is named); then chips: sky `by hand`
-  on an open payment that someone has to make, zinc `on card` on what is bought on a credit card, zinc `calculated`
-  on an amount the app works out, each with a `title`. The amount stands in the Statement's amount column, shaded
-  while it is an estimate, muted once done. The name is the line's button, stretched over the line (it opens the
-  amount's dialog, the one the Statement opens), and says the whole line: `Robin – Childcare: €380.00, on the 25th,
-  Transfer by hand`. A line without a day carries an outline `xs` `Set…` above that button, which opens "Usually
-  paid" for its row; one item of several has none, its day is set in the amount's dialog. Where there is no room
-  beside the name (a phone), the method and the chips wrap onto lines of their own under it.
-- **The totals** (`PaymentTotals.tsx`) are two air islands whose titles fold them (the device remembers:
-  `casa.payments.fold.*`): "By account and method" in the transfer hue, and "By person" (left out while everything is
-  the household's). Beside the list from 1024 px; above it below that, side by side from 640 px. An account is a
-  `font-medium` line with its sum, then muted `still to leave` with what is not ticked (`all of it has left` at
-  zero), then one indented line per method (`No method yet` last). A credit card's sum is marked `bought`, and under
-  its methods stand muted `Owed at the end of <Month>` (`In credit` when the card is overpaid), and `Paid off by
-  "<row>" on the 28th` with its amount, or `Nothing pays it off in <Month>.`
-- **A total is a switch** (`button aria-pressed`, 44 px tall on a phone, 28 px from `md`): pressed, the list shows only
-  its payments, the total sits on `bg-muted` inside a 2 px lime border (the pressed colour, as on a Trends tile), and
-  the list's title row says `Only <total>` with an outline `xs` `Show all`. Pressed again, or another month chosen,
-  the whole list is back. Its accessible name says what it is and what it comes to (`Standing order on Main account:
-  €4,019.00, 2 payments`).
-- **No methods yet:** the list opens with one muted line and an outline `xs` button to Household, where they are added.
-- **The keyboard.** The list comes before the totals in the page's own order, which is the order they are read in
-  from 1024 px (below that the totals are moved above it with `max-lg:order-first`). A line is two stops, its tick
-  and its name (three with `Set…`); a total is one. A ticked line moves under another heading: the focus then goes
-  to the tick of the line that stood after it (before it, at the end of the list), so Space, Tab, Space works down
-  the list.
+  text the row an item stands in and the method's name (`no method` where a day alone tracks it); then chips: sky
+  `by hand` on an open payment that someone has to make, zinc `calculated` on an amount the app works out, each with
+  a `title`. No chip says `on card`: the page does not know cards. The amount stands in the Statement's amount
+  column, shaded while it is an estimate, muted once done. The name is the line's button, stretched over the line; it
+  opens "Payment" and says the whole line: `Robin – Childcare: €380.00, on the 25th, Transfer by hand`. Where there is
+  no room beside the name (a phone), the method and the chips wrap onto lines of their own under it.
+- **"Untracked"** is a second air `Island` under "By day": its title folds it (the device remembers,
+  `casa.payments.fold.untracked`), its (i) is `payments.untracked`, the count and sum stand at the right of the title
+  row (`12 · €3,438.00`, also while folded), and one muted sentence says what it is. A line (`UntrackedLine`) has no
+  tick and no day: the name, the row an item stands in, `calculated` where it applies, and the amount in the amount
+  column of the list above. The whole line is one button (`Track Groceries: €700.00`) that opens "Payment"; the
+  outline `xs` `Track…` before the amount is what that button looks like (`aria-hidden`, muted until the line is
+  hovered), not a second stop. The island is not there while a sum is pressed: nothing untracked is in any sum.
+- **"Payment"** (`PaymentDialog.tsx`, `sm:max-w-md`) is the day and the method of one amount. The description names
+  it (`Subscriptions: Music`); the first line is its amount and month with an outline `xs` `Amount…` at the right,
+  which opens the amount's dialog in its place. Then `Paid on` and `Paid with` side by side (`9rem`, the rest;
+  stacked on a phone), then muted `text-xs` lines: how far it counts, that a day past the 28th is the last day of a
+  shorter month, and, while neither a day nor a method would count, that the amount is then untracked.
+  Where the amount stands in more than one place, `Counts for` (a `Segmented`) stands above the fields: `This and
+  following months` / `Only this month` for an item its schedule posted, `This row, every month` / `Only this month`
+  for a month that is one item of its own. A row's one amount has only the row, one item of several only itself, and
+  then the sentence says so with no choice. The fields show what the chosen place holds; their first option is what
+  counts when it holds nothing (`No day`, `Usual: 1st`, `As scheduled: 5th`, `The row's usual day: 1st`), so
+  choosing it never promises "no day" where a schedule or the row would still say one. The dialog opens on the item
+  where the item already says something of its own, else on the widest place. `Save` writes a day and a method and
+  nothing else, and never asks about months that are over.
+- **The sums** (`PaymentTotals.tsx`) are two air islands whose titles fold them (the device remembers:
+  `casa.payments.fold.*`): "By method" in the transfer hue, and "By person" (left out while everything is the
+  household's). Beside the lists from 1024 px; above them below that, side by side from 640 px. They are over what is
+  tracked. A method is one line: its name, in muted text its note and whose it is (as on the methods card), then
+  muted `€2,369.00 open` once part of it is ticked (`all done` once all of it is; nothing while none is), then the
+  sum. `No method`, what a day alone tracks, comes last. A person's line is the same without the note. While nothing
+  is tracked there are no sums, and the lists take the whole width.
+- **A sum is a switch** (`button aria-pressed`, 44 px tall on a phone, 28 px from `md`): pressed, "By day" shows only
+  its payments, the sum sits on `bg-muted` inside a 2 px lime border (the pressed colour, as on a Trends tile), and
+  the list's title row says `Only <sum>` with an outline `xs` `Show all`. Pressed again, or another month chosen,
+  the whole list is back. Its accessible name says what it is and what it comes to (`Standing order: €4,019.00, 2
+  payments, €2,369.00 not done yet`).
+- **No methods yet:** "By day" opens with one muted line and an outline `xs` button to Household, where they are added.
+- **The keyboard.** The two lists come before the sums in the page's own order, which is the order they are read in
+  from 1024 px (below that the sums are moved above them with `max-lg:order-first`). A tracked line is two stops,
+  its tick and its name; an untracked line and a sum are one each. A ticked line moves under another heading: the
+  focus then goes to the tick of the line that stood after it (before it, at the end of the list), so Space, Tab,
+  Space works down the list. After "Payment" is saved the line may stand under another heading or in the other list:
+  the focus stays in the list it was in, on the line itself while it is still there, else on the one that stood
+  after it, so Enter, pick, Enter works down "Untracked". The page holds the focus there for a moment after the save
+  (`keepFocus`: the closing dialog would otherwise hand it to whatever had it before the line), and lets go at the
+  first key or press. A dialog closed without saving gives the focus back to its line.
 - **From the Statement.** A line's day there (§7) opens this page on the Statement's month, scrolled to the payment
   (for a row with several items: all of them), which is marked for two and a half seconds the way the Statement
   marks a line it jumped to: `bg-muted ring-2 ring-inset ring-ring`, never the lime. A marked payment that is done

@@ -102,6 +102,22 @@ export const usualMethod = (row: RowPay, ctx: PayContext): PaymentMethod | null 
 /** The method an amount is paid with: the item's own, else its schedule's, else the row's usual one. `item` is null for an amount without items. */
 export const methodOf = (item: ItemPay | null, row: RowPay, ctx: PayContext): PaymentMethod | null => ownMethod(item, ctx) ?? usualMethod(row, ctx)
 
+/** Which of the three places says an amount's day or its method: the item of the month, the schedule that posted it, the row. */
+export type PayFrom = 'item' | 'schedule' | 'row'
+
+/** Where the method of `methodOf` comes from; null where nothing names one. */
+export function methodFrom(item: ItemPay | null, row: RowPay, ctx: PayContext): PayFrom | null {
+  if (ownMethod(item, ctx)) return item?.methodId != null ? 'item' : 'schedule'
+  return usualMethod(row, ctx) ? 'row' : null
+}
+
+/** Where the day of `payDayOf` comes from; null where nothing says one. */
+export function payDayFrom(item: ItemPay | null, row: RowPay, month: MonthKey, ctx: PayContext): PayFrom | null {
+  if (dayOfDate(item?.date, month) != null) return 'item'
+  if (item?.recurringItemId && ctx.schedules.get(item.recurringItemId)?.payDay != null) return 'schedule'
+  return row.payDay != null ? 'row' : null
+}
+
 /** The day of `month` an amount goes out on: the item's own date, else its schedule's day, else the row's usual day. */
 export function payDayOf(item: ItemPay | null, row: RowPay, month: MonthKey, ctx: PayContext): number | null {
   const own = dayOfDate(item?.date, month)

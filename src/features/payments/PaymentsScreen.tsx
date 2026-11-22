@@ -7,30 +7,66 @@ import { Chip } from '@/components/ui/chip'
 import { Island } from '@/components/ui/island'
 import { formatAmount, formatMonth, weekdayOf } from '@/app/format'
 import { saveError } from '@/app/saveError'
+import { readPref, writePref } from '@/app/prefs'
 import { clearHandedPayment, handedOverPayment, useScreen } from '@/app/screens'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
-import { buildPayments, cellKey, type Payment, type PaymentState } from '@/engine'
+import { NO_METHOD, buildPayments, cellKey, type Payment } from '@/engine'
 import { CellEditor } from '@/features/grid/CellEditor'
-import { RowPaidDialog } from '@/features/grid/RowDialogs'
 import { MonthStrip } from '@/features/statement/MonthStrip'
 import { nearestMonth } from '@/features/statement/progress'
 import { stripMonths } from '@/features/statement/stripMonths'
 import { cn } from '@/lib/utils'
 import { isPastMonth, isoDateOfToday, monthOfDate, type MonthKey } from '@/model'
 import { addPlanYear, setCellDone, setDerivedDone, setItemStatus } from '@/store'
-import { GROUP_TITLE, groupPayments, inFilter, type PaymentFilter, type PaymentGroup } from './groups'
-import { PaymentLine } from './PaymentLine'
+import { GROUP_TITLE, groupPayments, inFilter, type PaymentFilter, type PaymentGroup, type PaymentGroupKey } from './groups'
+import { PaymentDialog } from './PaymentDialog'
+import { PaymentLine, UntrackedLine } from './PaymentLine'
 import { PaymentTotals } from './PaymentTotals'
 
 const EYEBROW = 'text-[10px] font-semibold uppercase tracking-wider'
 
+/** The page's two lists: what has a day or a method, and what has neither. */
+type ListKey = 'tracked' | 'untracked'
+
+let watching = 0
+
 /**
- * Payments (DESIGN.md §12): a month's amounts that leave, day by day, each with the method it is paid with, and
- * beside them what each account has to carry and who pays. It exists while the household plans its payments by day
- * and method. The list is the month's Statement read another way (`buildPayments`): a tick here is the tick there,
- * and a line opens the same dialog. In the current month what is late stands first, then today, then what is coming;
- * what has no day and what is done follow.
+ * After "Payment" was saved, the line may stand under another heading or in the other list, and the button that
+ * opened the dialog is gone with it; the closing dialog then hands the focus to whatever had it before. For a moment
+ * the keyboard is kept in the list it was in: on the line itself while it is still there, else on the one that stood
+ * after it. A key or a press of the pointer ends that: from then on the focus is where its user puts it.
+ */
+function keepFocus(list: ListKey, id: string, next: string | null) {
+  // one save at a time is followed: a later one takes over from an earlier one that is still watching
+  const mine = ++watching
+  const until = performance.now() + 1200
+  let theirs = false
+  const taken = () => { theirs = true }
+  const events = ['keydown', 'pointerdown'] as const
+  for (const e of events) window.addEventListener(e, taken, { capture: true, once: true })
+  const find = (pid: string | null) => (pid ? document.querySelector<HTMLElement>(`[data-list="${list}"] [data-payment="${CSS.escape(pid)}"] [data-line-button]`) : null)
+  const step = () => {
+    if (theirs || mine !== watching || performance.now() > until) {
+      for (const e of events) window.removeEventListener(e, taken, { capture: true })
+      return
+    }
+    const at = document.activeElement
+    const line = find(id) ?? find(next)
+    // not while the dialog is still closing: it would take the focus back
+    if (line && at !== line && !at?.closest('[role="dialog"]')) line.focus()
+    window.setTimeout(step, 50)
+  }
+  step()
+}
+
+/**
+ * Payments (DESIGN.md §12): everything that leaves in a month. What has a day or a method is tracked: it stands day
+ * by day with its tick, and beside it what is paid with each method and by whom. What has neither stands below, in a
+ * quiet list outside every sum, until "Track…" gives it one. The page exists while the household plans its payments
+ * by day and method, and is the month's Statement read another way (`buildPayments`): a tick here is the tick there.
+ * In the current month what is late stands first, then today, then what is coming; what has no day and what is done
+ * follow.
  */
 export function PaymentsScreen() {
   const store = useStore()
@@ -55,9 +91,11 @@ export function PaymentsScreen() {
   const [filter, setFilter] = useState<PaymentFilter | null>(null)
   /** "Done" is folded until it is pressed: what is left to do is what the page is for. */
   const [doneOpen, setDoneOpen] = useState(false)
-  /** The row whose amount is open, and the row whose usual day and method are. */
+  /** "Untracked" folds like the sums do, and the device remembers it. */
+  const [untrackedFolded, setUntrackedFolded] = useState(() => readPref('payments.fold.untracked', false))
+  /** The payment whose day and method are open ("Payment"), and the row whose amount is. */
+  const [paying, setPaying] = useState<string | null>(null)
   const [editor, setEditor] = useState<string | null>(null)
-  const [paidFor, setPaidFor] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -84,10 +122,12 @@ export function PaymentsScreen() {
   const { baseCurrency: ccy, locale } = household
   const money = (v: number) => formatAmount(v, ccy, locale)
   const methods = new Map(tables.paymentMethods.filter((x) => !x.deletedAt).map((x) => [x.id, x]))
-  const shown = data.payments.filter((p) => inFilter(p, filter))
-  const groups = groupPayments(shown)
+  const tracked = data.payments.filter((p) => p.tracked)
+  const untracked = data.payments.filter((p) => !p.tracked)
+  const groups = groupPayments(tracked.filter((p) => inFilter(p, filter)))
   const editing = editor ? engine.rows.find((r) => r.id === editor) : undefined
-  const paying = paidFor ? engine.rows.find((r) => r.id === paidFor) : undefined
+  const payment = paying ? data.payments.find((p) => p.id === paying) : undefined
+  const paymentRow = payment ? engine.rows.find((r) => r.id === payment.rowId) : undefined
   const noMethods = !tables.paymentMethods.some((x) => !x.deletedAt && !x.archived)
   const isMarked = (p: Payment) => !!handed && handed.month === m && p.rowId === handed.rowId && (!handed.itemId || p.itemId === handed.itemId)
 
@@ -98,16 +138,22 @@ export function PaymentsScreen() {
     setHanded(null)
   }
 
+  /** The tracked lines in view, top to bottom: what is done only while it is unfolded. */
+  const inView = () => groups.filter((g) => g.key !== 'done' || doneOpen || g.payments.some(isMarked)).flatMap((g) => g.payments.map((x) => x.id))
+  /** The line that stands after a line of a list (before it, at the list's end): where the keyboard goes when that line leaves. */
+  const neighbour = (list: ListKey, id: string): string | null => {
+    const ids = list === 'tracked' ? inView() : untracked.map((x) => x.id)
+    const at = ids.indexOf(id)
+    return ids[at + 1] ?? ids[at - 1] ?? null
+  }
+
   /** One tick: the Statement's own, for the same amount (an item, an amount the app works out, or a row's month). */
   function onTick(p: Payment) {
     const row = engine!.rows.find((r) => r.id === p.rowId)
     const cell = row ? engine!.cells[cellKey(row.id, m!)] : undefined
     if (!row || !cell) return
     const done = !p.done
-    // the lines in view, top to bottom: what is done only while it is unfolded
-    const inView = groups.filter((g) => g.key !== 'done' || doneOpen || g.payments.some(isMarked)).flatMap((g) => g.payments.map((x) => x.id))
-    const at = inView.indexOf(p.id)
-    focusAfter.current = inView[at + 1] ?? inView[at - 1] ?? null
+    focusAfter.current = neighbour('tracked', p.id)
     setBusy(p.id)
     setError(null)
     const run = p.itemId
@@ -116,27 +162,21 @@ export function PaymentsScreen() {
     run.catch((e) => setError(saveError(e, 'Action failed'))).finally(() => setBusy(null))
   }
 
-  /** What a pressed total is called above the list. */
-  const filterLabel = (f: PaymentFilter): string => {
-    if (f.kind === 'person') return data.people.find((p) => p.ownerId === f.ownerId)?.label ?? 'Household'
-    const account = data.accounts.find((a) => a.accountId === f.accountId)
-    if (f.kind === 'account') return account?.label ?? 'No account'
-    return `${account?.methods.find((x) => x.methodId === f.methodId)?.label ?? 'No method yet'} on ${account?.label ?? 'no account'}`
-  }
+  /** What a pressed sum is called above the list. */
+  const filterLabel = (f: PaymentFilter): string =>
+    f.kind === 'person' ? data.people.find((p) => p.ownerId === f.ownerId)?.label ?? 'Household' : data.methods.find((x) => x.methodId === f.methodId)?.label ?? NO_METHOD
 
   const heading = (g: PaymentGroup): string => {
     const first = g.payments[0]
     return g.key === 'today' && first.day != null ? `Today, ${weekdayOf(m, first.day, locale)} ${first.day}` : GROUP_TITLE[g.key]
   }
-  const HEAD_TONE: Partial<Record<PaymentState, string>> = { overdue: 'text-rose-700 dark:text-rose-300', today: 'text-foreground' }
+  const HEAD_TONE: Partial<Record<PaymentGroupKey, string>> = { overdue: 'text-rose-700 dark:text-rose-300', today: 'text-foreground' }
   const lines = (g: PaymentGroup) => (
     <ul className="divide-y divide-border/60">
       {g.payments.map((p) => (
         <PaymentLine
           key={p.id} payment={p} month={m} method={p.methodId ? methods.get(p.methodId) ?? null : null} currency={ccy} locale={locale}
-          busy={busy === p.id} onTick={() => onTick(p)} onOpen={() => setEditor(p.rowId)} marked={isMarked(p)}
-          // one item of several says its own day in the amount's dialog; anything else takes the row's usual one
-          onSet={p.state === 'no-day' && !p.itemId ? () => setPaidFor(p.rowId) : undefined}
+          busy={busy === p.id} onTick={() => onTick(p)} onOpen={() => setPaying(p.id)} marked={isMarked(p)}
         />
       ))}
     </ul>
@@ -187,6 +227,7 @@ export function PaymentsScreen() {
             <span>
               {money(data.toPay)} to pay · {money(data.paid)} done
               {data.overdue > 0 && <> · <span className="text-rose-700 dark:text-rose-300">{data.overdue} overdue</span></>}
+              {data.untracked.count > 0 && <> · {data.untracked.count} untracked</>}
             </span>
             <InfoTip help="payments.toPay" />
           </p>
@@ -198,33 +239,57 @@ export function PaymentsScreen() {
           <p className="text-muted-foreground" data-testid="payments-empty">Nothing leaves in {formatMonth(m, locale, 'long')}: the month's Statement has no amount under "Money out".</p>
         </Island>
       ) : (
-        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
-          <Island
-            air title="By day" help="payments.byDay" data-testid="payments-list"
-            right={filter && (
-              <span className="flex items-center gap-1.5" data-testid="payments-filter">
-                <span>Only {filterLabel(filter)}</span>
-                <Button size="xs" variant="outline" onClick={() => setFilter(null)}>Show all</Button>
-              </span>
-            )}
-          >
-            <div className="space-y-2">
-              {noMethods && (
-                <p className="text-xs text-muted-foreground" data-testid="payments-no-methods">
-                  No payment methods yet, so nothing says how an amount leaves.{' '}
-                  <Button size="xs" variant="outline" onClick={() => go('household')}>Add them under Household</Button>
-                </p>
+        <div className={cn('grid grid-cols-1 items-start gap-4', tracked.length > 0 && 'lg:grid-cols-[minmax(0,1fr)_22rem]')}>
+          <div className="min-w-0 space-y-4">
+            <Island
+              air title="By day" help="payments.byDay" data-testid="payments-list" data-list="tracked"
+              right={filter && (
+                <span className="flex items-center gap-1.5" data-testid="payments-filter">
+                  <span>Only {filterLabel(filter)}</span>
+                  <Button size="xs" variant="outline" onClick={() => setFilter(null)}>Show all</Button>
+                </span>
               )}
-              {groups.length === 0 ? <p className="text-muted-foreground">Nothing of it in this month.</p> : groups.map(group)}
-            </div>
-          </Island>
-          {/* after the list in the page's order, as it is read from 1024 px; above it below that, where it folds away */}
-          <PaymentTotals data={data} filter={filter} onFilter={setFilter} locale={locale} className="max-lg:order-first" />
+            >
+              <div className="space-y-2">
+                {noMethods && (
+                  <p className="text-xs text-muted-foreground" data-testid="payments-no-methods">
+                    No payment methods yet, so nothing can say how an amount is paid.{' '}
+                    <Button size="xs" variant="outline" onClick={() => go('household')}>Add them under Household</Button>
+                  </p>
+                )}
+                {tracked.length === 0
+                  ? <p className="text-muted-foreground" data-testid="payments-none-tracked">Nothing is tracked in {formatMonth(m, locale, 'long')} yet. An amount is tracked once it has a day or a method: press one under "Untracked".</p>
+                  : groups.length === 0 ? <p className="text-muted-foreground">Nothing of it in this month.</p> : groups.map(group)}
+              </div>
+            </Island>
+            {/* outside every sum, so not there while one sum's payments are picked out */}
+            {untracked.length > 0 && !filter && (
+              <Island
+                air title="Untracked" help="payments.untracked" data-testid="payments-untracked" data-list="untracked"
+                folded={untrackedFolded} onFold={(to) => { setUntrackedFolded(to); writePref('payments.fold.untracked', to) }}
+                right={<span>{data.untracked.count} · {money(data.untracked.total)}</span>}
+                description={`What leaves in ${formatMonth(m, locale, 'long')} with no day and no method. It counts in none of the sums here, and its tick is on the Statement.`}
+              >
+                <ul className="-ml-2 divide-y divide-border/60">
+                  {untracked.map((p) => <UntrackedLine key={p.id} payment={p} currency={ccy} locale={locale} onTrack={() => setPaying(p.id)} />)}
+                </ul>
+              </Island>
+            )}
+          </div>
+          {/* after the lists in the page's order, as it is read from 1024 px; above them below that, where it folds away */}
+          {tracked.length > 0 && <PaymentTotals data={data} tables={tables} filter={filter} onFilter={setFilter} locale={locale} className="max-lg:order-first" />}
         </div>
       )}
 
       {editing && <CellEditor key={`${editing.id}:${m}`} tables={tables} engine={engine} household={household} row={editing} month={m} onClose={() => setEditor(null)} />}
-      {paying && <RowPaidDialog key={paying.id} row={paying} tables={tables} household={household} onClose={() => setPaidFor(null)} />}
+      {payment && paymentRow && (
+        <PaymentDialog
+          key={`${payment.id}:${m}`} payment={payment} row={paymentRow} month={m} tables={tables} household={household}
+          onClose={() => setPaying(null)}
+          onSaved={() => { const list: ListKey = payment.tracked ? 'tracked' : 'untracked'; keepFocus(list, payment.id, neighbour(list, payment.id)) }}
+          onAmount={() => { setPaying(null); setEditor(payment.rowId) }}
+        />
+      )}
     </div>
   )
 }

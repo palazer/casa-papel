@@ -1,8 +1,13 @@
 import { generateKeyBetween } from 'fractional-indexing'
-import { HouseholdSchema, PaymentMethodSchema, RowSchema, isPaymentRow, methodNote, newId, payContext, type PaymentKind, type PaymentMethod, type Tables } from '@/model'
+import {
+  HouseholdSchema, PaymentMethodSchema, RowSchema, compareMonths, dateOn, isPaymentRow, methodNote, newId, payContext,
+  type Cell, type CellItem, type MonthKey, type PaymentKind, type PaymentMethod, type Tables,
+} from '@/model'
 import { NO_QUESTION, type Mutation, type Store } from './store'
 import { loadTables, withoutRewritten } from './actions'
+import { cellPut } from './cells'
 import { applyMutations } from './impact'
+import { planChangeRecurringFrom } from './recurring'
 
 const now = () => Date.now()
 
@@ -156,4 +161,82 @@ export function withUsualPayment(tables: Tables, mutations: Mutation[], rowId: s
 export async function setUsualPayment(store: Store, rowId: string, usual: UsualPayment): Promise<void> {
   const tables = await loadTables(store)
   await store.commit(planUsualPayment(tables, rowId, usual, now()), NO_QUESTION)
+}
+
+// ---------- one amount's day and method, from the Payments page ----------
+
+/**
+ * What a day and a method are saved for. The row: every month ("Usually paid"); where the month the dialog stands in
+ * is one item, `month` and `itemId` name it, and it follows its row again. One item of a month: that month alone. A
+ * schedule: from `month` on, where `itemId` is the item it posted in that month.
+ */
+export type PaymentTarget =
+  | { level: 'row'; rowId: string; month?: MonthKey; itemId?: string }
+  | { level: 'item'; rowId: string; month: MonthKey; itemId: string }
+  | { level: 'schedule'; rowId: string; month: MonthKey; itemId: string; scheduleId: string }
+
+/** A day of the month and a method; null is "none said here", so the next place counts (item → schedule → row). */
+export interface PaymentOf {
+  day: number | null
+  methodId: string | null
+}
+
+/**
+ * The "Payment" dialog's save: the day and the method of one amount, written where the dialog said they count, and
+ * nothing else. No amount, no "Comes out of" and no tick is touched, so no figure moves (rule W1) and nothing is
+ * asked about months that are over.
+ *
+ * Saved for a schedule or for the row, the month the dialog stands in shows what was saved: its own item gives up a
+ * day and a method of its own, also when it is ticked. Other months keep what they hold for themselves.
+ */
+export function planPaymentOf(tables: Tables, target: PaymentTarget, pay: PaymentOf, ts: number): Mutation[] {
+  const row = tables.rows.find((r) => r.id === target.rowId && !r.deletedAt)
+  if (!row) throw new Error('Row not found')
+  const cell = target.month ? tables.cells.find((c) => c.rowId === row.id && c.month === target.month) : undefined
+  const item = target.itemId ? cell?.items.find((i) => i.id === target.itemId) : undefined
+  if (target.itemId && (!cell || cell.mode !== 'items' || !item)) throw new Error('That item is gone.')
+  /** The month's own item as `change` leaves it, in the month's record as `from` holds it. */
+  const itemPut = (from: Cell, change: (i: CellItem) => CellItem): Mutation =>
+    cellPut(from, { rowId: from.rowId, month: from.month, items: from.items.map((i) => (i.id === target.itemId ? change(i) : i)) }, ts)
+  const follows = (i: CellItem): CellItem => ({ ...i, date: null, methodId: null })
+
+  /** The month's own item gives up what it says for itself; nothing to write where it says nothing. */
+  const itemFollows = (from: Cell | undefined): Mutation[] => (from && item && (item.date != null || item.methodId != null) ? [itemPut(from, follows)] : [])
+
+  if (target.level === 'row') {
+    const same = (row.payDay ?? null) === pay.day && (row.payMethodId ?? null) === pay.methodId
+    return [...(same ? [] : planUsualPayment(tables, row.id, { payDay: pay.day, payMethodId: pay.methodId }, ts)), ...itemFollows(cell)]
+  }
+
+  if (!isPaymentRow(row)) throw new Error(`"${row.name}" is money that comes in: it has no payment day or method.`)
+  if (pay.day != null && !(Number.isInteger(pay.day) && pay.day >= 1 && pay.day <= 31)) throw new Error('The day is a day of the month, 1 to 31.')
+  const schedule = target.level === 'schedule' ? tables.recurringItems.find((r) => r.id === target.scheduleId && !r.deletedAt) : undefined
+  const method = pay.methodId ? payContext(tables).methods.get(pay.methodId) : null
+  if (pay.methodId && !method) throw new Error('That payment method no longer exists.')
+  const had = target.level === 'schedule' ? schedule?.methodId : item?.methodId
+  if (method?.archived && method.id !== had) throw new Error(`"${method.name}" is archived: pick a method that is still in use.`)
+
+  if (target.level === 'item') {
+    const date = pay.day != null ? dateOn(target.month, pay.day) : null
+    if ((item!.date ?? null) === date && (item!.methodId ?? null) === (method?.id ?? null)) return []
+    return [itemPut(cell!, (i) => ({ ...i, date, methodId: method?.id ?? null }))]
+  }
+
+  if (!schedule || schedule.rowId !== row.id || item?.recurringItemId !== schedule.id) throw new Error('That schedule is gone.')
+  if (schedule.endMonth && compareMonths(target.month, schedule.endMonth) > 0) throw new Error('That schedule has ended.')
+  // a schedule that says this already is left as it is: changing it from a month on would cut it in two for nothing
+  if ((schedule.payDay ?? null) === pay.day && (schedule.methodId ?? null) === (method?.id ?? null)) return itemFollows(cell)
+  const { mutations } = planChangeRecurringFrom(tables, schedule, target.month, { payDay: pay.day, methodId: method?.id ?? null }, ts)
+  // the schedule's change re-points the month's item to the schedule that now covers the month; on top of that the
+  // item gives up its own day and method, and whatever the change wrote into a ticked one to keep it as it was
+  const after = applyMutations(tables, mutations).cells.find((c) => c.rowId === row.id && c.month === target.month)
+  if (!after) return mutations
+  const own = itemPut(after, follows)
+  return [...withoutRewritten(mutations, [own]), own]
+}
+
+export async function setPaymentOf(store: Store, target: PaymentTarget, pay: PaymentOf): Promise<void> {
+  const tables = await loadTables(store)
+  const mutations = planPaymentOf(tables, target, pay, now())
+  if (mutations.length) await store.commit(mutations, NO_QUESTION)
 }

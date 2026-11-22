@@ -297,7 +297,7 @@ export const GUIDE: GuideTopic[] = [
       'On a phone the sums stand above the list: press "By account and method" or "By person" to fold it away. The device remembers that.',
       'On the Statement, press the grey day after a line\'s name to see that amount among the month\'s payments.',
     ],
-    tips: ['payments.toPay', 'payments.byDay', 'payments.totals', 'payments.people'],
+    tips: ['payments.toPay', 'payments.byDay', 'payments.untracked', 'payments.totals', 'payments.people'],
     open: 'payments',
   },
   {
