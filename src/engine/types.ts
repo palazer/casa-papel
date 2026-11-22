@@ -25,6 +25,8 @@ export interface RecordedPart {
   amount: Money
   /** The conversion as it holds for `amount` (`conversionFor`): the other currency, both amounts, the rate. */
   conversion: Conversion
+  /** The item the part is, where it is an item of this month: a part counts on the card its item was bought on (rule C2). */
+  itemId?: string
 }
 
 export interface Funding {

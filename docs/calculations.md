@@ -15,9 +15,9 @@ Three kinds of rule stand here:
 Amounts are kept in cents. Nothing is rounded except where a rule says so.
 
 The rules are grouped by letter: A amounts over the months, B balances, N net worth, P the months of the plan,
-X other currencies, T the past, M the sums of a month, R rules, C loans and cards, V virtual accounts, O accounts
-left out of net worth and pocket money, H schedules, K archiving, G people and goals, E the data. F and D are not
-rules: they number the findings and the open decisions in `scenarios/FINDINGS.md`.
+X other currencies, T the past, M the sums of a month, R rules, C loans and cards, W payments by day and method,
+V virtual accounts, O accounts left out of net worth and pocket money, H schedules, K archiving, G people and goals,
+E the data. F and D are not rules: they number the findings and the open decisions in `scenarios/FINDINGS.md`.
 
 ## A. An amount over the months
 
@@ -452,12 +452,46 @@ and an amount below zero, which is money drawn again and raises what is owed.
 cash stays in the main account until the card is paid. The payment moves money and is no expense: the current
 accounts and what is owed fall by it.
 
+What counts as bought on a card is said in two places, and the nearer one counts:
+
+- **the row** ("Paid by card…", or a usual payment method that draws on the card): every amount of the row, in every
+  month;
+- **an item** that names a payment method of its own, or whose schedule names one (W1): that item alone is on the
+  card its method draws on, and an item whose method draws on something else is not on the row's card.
+
+    "Subscriptions": Films 14.00 paid with a method on the card, Music 11.00 paid with PayPal from the main account
+    spent in the month: 25.00     owed on the card: 14.00     the main account falls by 11.00 until the card is paid
+
+A month in which no item names a method is the row's amount as a whole, on the row's card. A method that draws on a
+card that records only its payments (C3) moves nothing: no purchase does there.
+
 **C3. A card that records only its payments.** The payment is the month's expense, and nothing else: no row says
 what was bought on the card, so no row moves what is owed on it. That stays as it is until a real balance is typed
 for the card (rule B5), and net worth falls by each payment (finding F5, closed).
 
     owes 500.00, 300.00 paid every month: still 500.00 owed in every month
     a real balance of 200.00 in March: 200.00 from March on, and net worth is 300.00 higher that month
+
+## W. Payments by day and method
+
+**W1. A day and a payment method say when and how an amount leaves, and move no figure**, with the two exceptions
+below. The day is a day of the month; a day the month does not have is its last day. A method is one of the
+household's own list, each tied to the account or card it draws on. Both are said in three places, and the nearest
+one counts: the item of a month, the schedule that posted it, the row ("Usually paid…"). A schedule's day or method
+that changes from a month on leaves the months before as they were, and what was paid keeps how it was paid.
+
+"Comes out of" (M6) stays what the sums count with: it says whose money pays. The rent can leave the main account by
+standing order and be covered from savings.
+
+The exceptions: a method that draws on a card whose purchases are recorded means "bought on that card" (C2), and W2.
+
+**W2. A method that draws on cash, on another current account or on a savings account pays from that account**, so
+"Comes out of" says that account too (M6): choosing such a method as a row's usual one sets it for the row, for the
+row's schedules and for the items that name no method of their own. A method that draws on the main account, or on a
+card, leaves "Comes out of" as it is.
+
+    "Insurance" 90.00, usually paid by direct debit from Sam's own account, which holds 500.00
+    Sam's account at the end of the month: 410.00     the main account: as if there were no insurance
 
 ## V. Virtual accounts
 

@@ -105,6 +105,60 @@ Feature: Loans and credit cards
     And the Statement of February 2026 shows "Expenses" at 1,600.00
     And net worth changes by 1,400.00 in February 2026
 
+  @C2
+  Scenario: A row's usual payment method that draws on the card is the same as paying the row with the card
+    Given a credit card "Visa" owing 0.00, whose purchases are expense rows
+    And a payment method "Visa card" that draws on "Visa"
+    And an expense "Groceries" of 400.00 from January 2026
+    And "Groceries" is usually paid with the method "Visa card"
+    Then "Visa" ends January 2026 with 400.00
+    And "Visa" ends March 2026 with 1,200.00
+    And "Current account" ends January 2026 with 2,800.00
+    And the Statement of January 2026 shows "Leftover" at 1,400.00
+
+  @C2
+  Scenario: Two items of one row paid in different ways: only the one paid with the card is owed on it
+    Given a credit card "Visa" owing 0.00, whose purchases are expense rows
+    And a payment method "Visa card" that draws on "Visa"
+    And a payment method "PayPal" that draws on "Current account"
+    And an expense "Subscriptions" with no amount yet
+    When I add the item "Films" of 14.00 to "Subscriptions" in January 2026, paid with "Visa card"
+    And I add the item "Music" of 11.00 to "Subscriptions" in January 2026, paid with "PayPal"
+    Then "Subscriptions" is 25.00 in January 2026
+    And "Visa" ends January 2026 with 14.00
+    And "Current account" ends January 2026 with 2,789.00
+    And the Statement of January 2026 shows "Expenses" at 1,225.00
+
+  @C2
+  Scenario: On a row that is paid with a card, an item paid another way is not owed on the card
+    Given a credit card "Visa" owing 0.00, whose purchases are expense rows
+    And a payment method "PayPal" that draws on "Current account"
+    And an expense "Subscriptions" with no amount yet
+    And "Subscriptions" is paid with "Visa"
+    When I add the item "Films" of 14.00 to "Subscriptions" in January 2026, only this month
+    And I add the item "Music" of 11.00 to "Subscriptions" in January 2026, paid with "PayPal"
+    Then "Visa" ends January 2026 with 14.00
+    And "Current account" ends January 2026 with 2,789.00
+
+  @C2 @H1
+  Scenario: Something that repeats and is paid with the card is owed on it in every month it lands
+    Given a credit card "Visa" owing 0.00, whose purchases are expense rows
+    And a payment method "Visa card" that draws on "Visa"
+    And an expense "Subscriptions" with no amount yet
+    And "Subscriptions" gets the item "Films" of 14.00 every month from January 2026, paid with "Visa card"
+    Then "Visa" ends January 2026 with 14.00
+    And "Visa" ends March 2026 with 42.00
+    And "Current account" ends March 2026 with 6,400.00
+
+  @C3
+  Scenario: A payment method that draws on a card that records only its payments moves nothing that is owed
+    Given a credit card "Amex" owing 500.00, of which only the payments are recorded
+    And a payment method "Amex card" that draws on "Amex"
+    And an expense "Groceries" of 400.00 from January 2026
+    And "Groceries" is usually paid with the method "Amex card"
+    Then "Amex" ends January 2026 with 500.00
+    And "Current account" ends January 2026 with 2,400.00
+
   @C3
   Scenario: A card that records only its payments: the payment is the month's expense
     Given a credit card "Amex" owing 500.00, of which only the payments are recorded

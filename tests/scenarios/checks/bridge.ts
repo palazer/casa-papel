@@ -1,5 +1,5 @@
 import { cellKey, convertMoney, householdFx, type CellResult, type RecordedPart } from '@/engine'
-import { accountRef, addMonths, cardIsItemized, isTakenFromAccount, movesInto, pocketLandsIn, poolRef, type Money, type MonthKey } from '@/model'
+import { accountRef, addMonths, cardIsItemized, cardOf, isTakenFromAccount, movesInto, payContext, pocketLandsIn, poolRef, type Money, type MonthKey, type Row } from '@/model'
 import { moneyText, monthName } from '../registry'
 import type { View } from '../world'
 
@@ -95,6 +95,35 @@ export function bridgeOf(view: View, m: MonthKey): Bridge {
     recordedRates.set(acc.id, (recordedRates.get(acc.id) ?? 0) + sign * diff)
   }
 
+  /**
+   * What of an expense row's month was bought on which card (rule C2), read from the row and its items: the whole
+   * amount on the row's card while no item names a payment method of its own; otherwise each item on the card its
+   * method draws on, or on the row's card where it names none.
+   */
+  const pay = payContext(tables)
+  const boughtOn = (row: Row, c: CellResult): Array<{ cardId: string; amount: Money; only: (p: RecordedPart) => boolean }> => {
+    const live = c.source === 'items' ? c.items.filter((i) => !i.skipped) : []
+    const named = live.some((i) => i.methodId != null || (i.recurringItemId != null && pay.schedules.get(i.recurringItemId)?.methodId != null))
+    if (!named) {
+      const cardId = cardOf(null, row, pay)
+      return cardId ? [{ cardId, amount: c.valueBase, only: () => true }] : []
+    }
+    const by = new Map<string, { rest: Money; home: Money; items: Set<string> }>()
+    for (const it of live) {
+      const cardId = cardOf(it, row, pay)
+      if (!cardId) continue
+      const part = by.get(cardId) ?? { rest: 0, home: 0, items: new Set<string>() }
+      const held = c.recorded?.find((p) => p.itemId === it.id)
+      if (held) part.home += held.conversion.homeAmount
+      else part.rest += it.effectiveAmount
+      part.items.add(it.id)
+      by.set(cardId, part)
+    }
+    return [...by].map(([cardId, part]) => ({
+      cardId, amount: part.home + (part.rest !== 0 ? convertMoney(fx, part.rest, c.currency, base, m).value : 0), only: (p: RecordedPart) => p.itemId != null && part.items.has(p.itemId),
+    }))
+  }
+
   let toSavingsRows: Money = 0
   /** Paid to a card that records only its payments: spending, and nothing that changes what is owed. */
   let paidToLumpCards: Money = 0
@@ -132,10 +161,10 @@ export function bridgeOf(view: View, m: MonthKey): Bridge {
       owe(row.accountId, v)
       recorded(row.accountId, c, -1)
     } else if (row.section === 'expense') {
-      // bought on a card whose purchases are expense rows: the money is still in the current account, and owed on the card
-      if (account && cardIsItemized(account)) {
-        owe(account.id, -v)
-        recorded(account.id, c, 1)
+      // bought on a card whose purchases are recorded: the money is still in the current account, and owed on the card
+      for (const part of boughtOn(row, c)) {
+        owe(part.cardId, -part.amount)
+        recorded(part.cardId, c, 1, part.only)
       }
       route(engine.primarySavingsId, -c.funding.savings)
       recorded(engine.primarySavingsId, c, -1, (p) => p.source === 'savings')

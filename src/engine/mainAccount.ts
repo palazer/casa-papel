@@ -64,11 +64,13 @@ export function mainAccountSeries(input: {
   actuals: ReadonlyMap<string, AccountMonth>
   fx: FxIndex
   base: string
+  /** Bought on the cards whose purchases are recorded, per month, in the base currency (rule C2; `compute.ts` says which amounts those are). */
+  cardBought: Record<MonthKey, Money>
 }): MainAccountSeries {
   const { months, rows, cells, totals, accounts, actuals, fx, base } = input
   const current = accounts.filter(isMainAccount).sort(byOrder)
   const itemizedCards = new Set(accounts.filter((a) => cardIsItemized(a)).map((a) => a.id))
-  const cardRows = rows.filter((r) => r.accountId != null && itemizedCards.has(r.accountId))
+  const cardPayments = rows.filter((r) => r.kind === 'card-payment' && r.accountId != null && itemizedCards.has(r.accountId))
 
   const series: MainAccountSeries = { accountIds: current.map((a) => a.id), missingRate: false, months: {} }
   const entered = new Set<string>()
@@ -84,13 +86,12 @@ export function mainAccountSeries(input: {
     }
     const start = balance
     const kept = totals[m]?.leftover ?? 0
-    let cardBought: Money = 0
+    const cardBought: Money = input.cardBought[m] ?? 0
     let cardPaid: Money = 0
-    for (const row of cardRows) {
+    for (const row of cardPayments) {
       const c = cells[cellKey(row.id, m)]
       if (!c || c.value === 0 || c.source === 'archived') continue
-      if (row.kind === 'card-payment') cardPaid += c.valueBase
-      else if (row.section === 'expense') cardBought += c.valueBase
+      cardPaid += c.valueBase
     }
     const computed = start + kept + cardBought - cardPaid
     // the real balance, of every main account open this month (one, but for the month an old one was replaced)
