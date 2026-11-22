@@ -140,3 +140,8 @@ export function ordinalDay(day: number): string {
   return `${day}${suffix}`
 }
 
+/** The weekday a day of a month falls on, short, in the household's language: `Sun`. */
+export function weekdayOf(month: MonthKey, day: number, locale: string): string {
+  const [year, m] = month.split('-').map(Number)
+  return new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(year, m - 1, day)))
+}

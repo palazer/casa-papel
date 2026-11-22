@@ -1,7 +1,7 @@
 import { memo, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { isDemoMode, leaveDemoSandbox } from '@/app/store'
-import { RAIL, groupOf, screenDef, screenHref, setSettingsOpen, settingsOpen, settingsPage, useScreen, type RailItem, type Screen, type ScreenDef } from '@/app/screens'
+import { groupOf, railFor, screenDef, screenHref, setSettingsOpen, settingsOpen, settingsPage, useScreen, type RailItem, type Screen, type ScreenDef } from '@/app/screens'
 import { Chip } from '@/components/ui/chip'
 import { cn } from '@/lib/utils'
 import { follow, labelClass, monogram, tileClass } from './railStyles'
@@ -62,12 +62,12 @@ function RailGroup({ item, screen, go }: { item: Extract<RailItem, { kind: 'grou
 
 /**
  * The app's navigation on desktop (DESIGN.md §2, after nfl-fantasy's rail): a 72 px dark rail, the household's
- * monogram on top, one icon-over-label tile per screen, the open screen's tile in lime, and the Settings group that
- * folds Household, Data and the Guide. The `dark` class makes the rail a dark scope of its own on the light pages.
+ * monogram on top, one icon-over-label tile per screen (Payments only while the household's switch is on), the open
+ * screen's tile in lime, and the Settings group that folds Household, Data and the Guide. The `dark` class makes the rail a dark scope of its own on the light pages.
  * Phones get the bottom tabs instead.
  */
 export const AppRail = memo(function AppRail({ householdName }: { householdName?: string }) {
-  const { screen, go } = useScreen()
+  const { screen, go, payments } = useScreen()
   const home: Screen = 'grid'
   return (
     <nav aria-label="Screens" className="dark sticky top-0 hidden h-dvh w-[72px] shrink-0 flex-col items-center gap-3 overflow-y-auto border-r border-sidebar-border bg-sidebar py-3 text-sidebar-foreground md:flex">
@@ -82,7 +82,7 @@ export const AppRail = memo(function AppRail({ householdName }: { householdName?
           <Chip tone="amber">demo</Chip>
         </button>
       )}
-      {RAIL.map((it) => (it.kind === 'page'
+      {railFor({ payments }).map((it) => (it.kind === 'page'
         ? <RailLink key={it.key} item={screenDef(it.key)} active={screen === it.key} go={go} />
         : <RailGroup key={it.key} item={it} screen={screen} go={go} />))}
     </nav>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ErrorBoundary } from '@/app/ErrorBoundary'
-import { ScreenContext, isUtility, readScreen, rememberScreen, type Screen } from '@/app/screens'
+import { ScreenContext, isUtility, readScreen, rememberScreen, shownScreen, type Screen } from '@/app/screens'
 import { createAppStore, isDemoMode, useStore } from '@/app/store'
 import { StoreProvider } from '@/app/StoreProvider'
 import { takeInviteFromUrl } from '@/app/url'
@@ -15,6 +15,7 @@ import { HomeScreen } from '@/features/home/HomeScreen'
 import { HouseholdScreen } from '@/features/household/HouseholdScreen'
 import { MainAccountQuestion } from '@/features/main/MainAccountQuestion'
 import { PastQuestionHost } from '@/features/past/PastQuestion'
+import { PaymentsScreen } from '@/features/payments/PaymentsScreen'
 import { StatementScreen } from '@/features/statement/StatementScreen'
 import { TrendsScreen } from '@/features/trends/TrendsScreen'
 import { AccountDialog, type AccountStep } from '@/features/sync/AccountDialog'
@@ -45,12 +46,16 @@ function Shell() {
   const store = useStore()
   const tables = useTables()
   const household = activeHousehold(tables)
-  const [screen, setScreen] = useState<Screen>(readScreen)
+  const [asked, setAsked] = useState<Screen>(readScreen)
   const go = useCallback((s: Screen, hash?: string) => {
-    setScreen(s)
+    setAsked(s)
     rememberScreen(s, hash)
   }, [])
-  const nav = useMemo(() => ({ screen, go }), [screen, go])
+  /** "Plan payments by day and method": the household's switch for the Payments page (DESIGN.md §12). */
+  const payments = household?.payments ?? false
+  // a page whose switch is off (turned off on another device, or bookmarked) gives way to the Statement
+  const screen = tables === undefined ? asked : shownScreen(asked, { payments })
+  const nav = useMemo(() => ({ screen, go, payments }), [screen, go, payments])
   const sync = useSyncEngine()
   const [inviteCode] = useState(() => takeInviteFromUrl())
   const [account, setAccount] = useState<AccountStep | null>(() => (inviteCode && sync ? 'join' : null))
@@ -123,6 +128,7 @@ function Shell() {
             ) : screen === 'data' ? <DataScreen />
               : screen === 'guide' ? <GuideScreen />
               : screen === 'grid' ? <GridScreen />
+              : screen === 'payments' ? <PaymentsScreen />
               : screen === 'trends' ? <TrendsScreen />
               : screen === 'household' ? <HouseholdScreen />
               : <StatementScreen />}

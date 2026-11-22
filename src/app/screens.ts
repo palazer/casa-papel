@@ -1,8 +1,8 @@
 import { createContext, useContext } from 'react'
-import { BookOpen, ChartLine, Database, Scale, Settings, Table2, Users, type LucideIcon } from 'lucide-react'
+import { BookOpen, CalendarCheck, ChartLine, Database, Scale, Settings, Table2, Users, type LucideIcon } from 'lucide-react'
 import { readPref, writePref } from './prefs'
 
-export type Screen = 'statement' | 'grid' | 'trends' | 'household' | 'data' | 'guide'
+export type Screen = 'statement' | 'grid' | 'payments' | 'trends' | 'household' | 'data' | 'guide'
 
 export interface ScreenDef {
   key: Screen
@@ -10,12 +10,15 @@ export interface ScreenDef {
   icon: LucideIcon
   /** A utility, not a place to land: it opens without a household and is never remembered as the screen to return to. */
   utility?: boolean
+  /** Only while the household's switch "Plan payments by day and method" is on (DESIGN.md §12). */
+  switched?: boolean
 }
 
 /** Every screen, in rail order; the last three are the Settings group's pages. */
 export const SCREENS: ScreenDef[] = [
   { key: 'statement', label: 'Statement', icon: Scale },
   { key: 'grid', label: 'Grid', icon: Table2 },
+  { key: 'payments', label: 'Payments', icon: CalendarCheck, switched: true },
   { key: 'trends', label: 'Trends', icon: ChartLine },
   { key: 'household', label: 'Household', icon: Users },
   { key: 'data', label: 'Data', icon: Database, utility: true },
@@ -32,13 +35,24 @@ export const SETTINGS_PAGES: Screen[] = ['household', 'data', 'guide']
 
 export type RailItem = { kind: 'page'; key: Screen } | { kind: 'group'; key: 'settings'; label: string; icon: LucideIcon; pages: Screen[] }
 
-/** The rail and the phone bar (DESIGN.md §2): the Statement, the Grid and Trends, then Settings, which groups Household, Data and the Guide. */
+/**
+ * The rail and the phone bar (DESIGN.md §2): the Statement, the Grid, Payments and Trends, then Settings, which groups
+ * Household, Data and the Guide. Payments is there only while the household plans its payments by day and method.
+ */
 export const RAIL: RailItem[] = [
   { kind: 'page', key: 'statement' },
   { kind: 'page', key: 'grid' },
+  { kind: 'page', key: 'payments' },
   { kind: 'page', key: 'trends' },
   { kind: 'group', key: 'settings', label: 'Settings', icon: Settings, pages: SETTINGS_PAGES },
 ]
+
+/** The rail as a household sees it: without the pages whose switch is off. */
+export const railFor = (on: { payments: boolean }): RailItem[] =>
+  RAIL.filter((it) => it.kind !== 'page' || !screenDef(it.key).switched || (it.key === 'payments' && on.payments))
+
+/** The screen that is shown for the one asked for: a page whose switch is off gives way to the Statement. */
+export const shownScreen = (s: Screen, on: { payments: boolean }): Screen => (s === 'payments' && !on.payments ? 'statement' : s)
 
 export const groupOf = (s: Screen): 'settings' | null => (SETTINGS_PAGES.includes(s) ? 'settings' : null)
 
@@ -99,5 +113,5 @@ export const handMonth = (month: string): void => { handedMonth = month }
 export const handedOverMonth = (): string | null => handedMonth
 export const clearHandedMonth = (): void => { handedMonth = null }
 
-export const ScreenContext = createContext<{ screen: Screen; go: (s: Screen, hash?: string) => void }>({ screen: 'statement', go: () => undefined })
+export const ScreenContext = createContext<{ screen: Screen; go: (s: Screen, hash?: string) => void; payments: boolean }>({ screen: 'statement', go: () => undefined, payments: false })
 export const useScreen = () => useContext(ScreenContext)

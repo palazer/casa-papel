@@ -275,7 +275,7 @@ export const GUIDE: GuideTopic[] = [
     ],
     factsTitle: 'The kinds of method',
     facts: paymentKinds,
-    tips: ['payments.switch', 'payments.usual', 'payments.kind', 'payments.drawsOn', 'payments.owner', 'payments.archivedMethod'],
+    tips: ['payments.switch', 'payments.usual', 'payments.kind', 'payments.drawsOn', 'payments.owner', 'payments.archivedMethod', 'payments.toPay', 'payments.byDay', 'payments.totals', 'payments.people'],
     open: 'household',
   },
   {

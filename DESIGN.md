@@ -42,6 +42,8 @@ Statement frame  full width, space-y-4: the progress line, then dense islands, o
                  half's body is grid grid-cols-1 lg:grid-cols-2 lg:divide-x (max-lg:divide-y): two sides, each a flex
                  column whose total sits at mt-auto, so from 1024 px both totals share a line; below it the sides stack
                  and each keeps its own total. Rows are text-sm and min-h-11 on phones, md:text-xs and md:min-h-7
+Payments frame   full width, space-y-4 under the sticky header: grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_22rem],
+                 the list at the left and the totals at the right; below 1024 px the totals stand above the list (§12)
 ```
 
 - **Rail** (`src/components/AppRail.tsx`, after FantasyPros' and nfl's): a `<nav aria-label="Screens">`, 72 px, one
@@ -50,13 +52,15 @@ Statement frame  full width, space-y-4: the progress line, then dense islands, o
   it and `getByRole('link', { name: 'Household' })` stays unambiguous), then one tile per screen: a 40 × 30 `rounded-lg` tile holding a 20 px lucide icon over a `text-[10px] font-semibold`
   label. The open screen's tile is `bg-primary text-primary-foreground` with `aria-current="page"`; the others are
   `text-white/70`, hover `bg-white/10`. Items are real links (`?screen=…`, every other parameter kept, so `?demo=1`
-  survives); a plain click opens in place, Cmd-click opens a tab. The rail's order is `RAIL`: Statement, Grid, Trends (§11), then
+  survives); a plain click opens in place, Cmd-click opens a tab. The rail's order is `RAIL`: Statement, Grid, Payments
+  (§12; only while the household's switch is on, `railFor`), Trends (§11), then
   **Settings**, a group after nfl-fantasy's Research: a `<button aria-expanded aria-controls="rail-settings">` tile with a
   caret in its label, and when unfolded a `role="group"` block on `bg-white/5` holding its pages Household, Data and Guide
   as ordinary links with smaller 32 × 26 tiles. A click on it folded unfolds it and opens the group's page open last
   (`casa.settings.page`, Household at first); a click on it unfolded only folds it (`casa.settings.open`, unfolded until
   someone folds it). Folded while one of its pages is open, the Settings tile wears the lime and `aria-current`.
-- **Bottom tabs** (`src/components/BottomTabs.tsx`): the rail's four tiles (Statement, Grid, Trends, Settings) as a bar along
+- **Bottom tabs** (`src/components/BottomTabs.tsx`): the rail's tiles (Statement, Grid, Trends, Settings, and Payments
+  as the third of five while its switch is on; five still fit 320 px) as a bar along
   the bottom edge, 56 px tall plus the safe-area inset, `md:hidden`. The Settings tab opens the group's page open last;
   on phones the group's pages switch through `GroupTabs` (`src/components/GroupTabs.tsx`), a `TabBar` named
   `Settings pages` on a hairline right under the page header of Household, Data and Guide, `md:hidden`.
@@ -1230,4 +1234,39 @@ feature switch; a second one follows the same form.
   change of either brings up the same `Apply the change to` choice as a changed amount.
 - **The schedule's dialog** shows `Paid on` and `Paid with` where it showed the account "for your overview" (which
   stays for an income, and while the switch is off); their first options read `The row's usual day: 1st`.
-
+- **The Payments page** (`src/features/payments/PaymentsScreen.tsx`) is the third tile of the rail (`CalendarCheck`)
+  while the switch is on; with it off the tile is gone and the page's address opens the Statement (`shownScreen`).
+  It is the month's Statement read another way (`buildPayments`), so nothing on it is a figure of its own. Its header
+  is the Statement's: the strip of months above the toolbar, the only way to change the month, both sticky; the
+  toolbar holds the month's name, the `past` chip, and one status line with its (i) (`payments.toPay`): `€6,397.00 to
+  pay · €1,650.00 done · 1 overdue`, the overdue count in rose.
+- **"By day"** is an air `Island`. Under it the payments stand under small-caps headings (`text-[10px] font-semibold
+  uppercase tracking-wider`), each followed by its count and sum in plain muted text (`2 · €2,749.00`): in the current
+  month `Overdue` (rose, the one heading in a colour), `Today, Sun 22` (foreground), `Coming`; in any other month one
+  heading `To pay`; then `No day yet`, and last `Done`, which is a button with a chevron and is folded until pressed.
+  Under a heading the payments go by day, and those of a day keep the Statement's order. A heading with nothing under
+  it is not there. A month with nothing under "Money out" says so in one muted sentence.
+- **A payment's line** (`PaymentLine.tsx`) is the Statement's row in another order: `min-h-11 text-sm`, from `md`
+  `min-h-8 text-xs`. The tick first (the Statement's `Tick`, 44 px, 28 px from `md`; it is the same tick, saved by the
+  same actions), then a 48 px muted day column (`Wed 25`, an en dash without a day), the name, and after it in muted
+  text the row an item stands in and the method's name (`no method` where none is named); then chips: sky `by hand`
+  on an open payment that someone has to make, zinc `on card` on what is bought on a credit card, zinc `calculated`
+  on an amount the app works out, each with a `title`. The amount stands in the Statement's amount column, shaded
+  while it is an estimate, muted once done. The name is the line's button, stretched over the line (it opens the
+  amount's dialog, the one the Statement opens), and says the whole line: `Robin – Childcare: €380.00, on the 25th,
+  Transfer by hand`. A line without a day carries an outline `xs` `Set…` above that button, which opens "Usually
+  paid" for its row; one item of several has none, its day is set in the amount's dialog. Where there is no room
+  beside the name (a phone), the method and the chips wrap onto lines of their own under it.
+- **The totals** (`PaymentTotals.tsx`) are two air islands whose titles fold them (the device remembers:
+  `casa.payments.fold.*`): "By account and method" in the transfer hue, and "By person" (left out while everything is
+  the household's). Beside the list from 1024 px; above it below that, side by side from 640 px. An account is a
+  `font-medium` line with its sum, then muted `still to leave` with what is not ticked (`all of it has left` at
+  zero), then one indented line per method (`No method yet` last). A credit card's sum is marked `bought`, and under
+  its methods stand muted `Owed at the end of <Month>` (`In credit` when the card is overpaid), and `Paid off by
+  "<row>" on the 28th` with its amount, or `Nothing pays it off in <Month>.`
+- **A total is a switch** (`button aria-pressed`, 44 px tall on a phone, 28 px from `md`): pressed, the list shows only
+  its payments, the total sits on `bg-muted` inside a 2 px lime border (the pressed colour, as on a Trends tile), and
+  the list's title row says `Only <total>` with an outline `xs` `Show all`. Pressed again, or another month chosen,
+  the whole list is back. Its accessible name says what it is and what it comes to (`Standing order on Main account:
+  €4,019.00, 2 payments`).
+- **No methods yet:** the list opens with one muted line and an outline `xs` button to Household, where they are added.

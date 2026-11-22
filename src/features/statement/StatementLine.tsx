@@ -87,9 +87,9 @@ const ROW = 'flex min-h-11 items-center gap-1.5 pr-2 text-sm md:min-h-7 md:text-
 /** The name with its tags: one line where there is room, the tags on a second line, under the name, where there is not. */
 const LABEL = 'flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5 py-1'
 /** A control on a line whose own button covers the whole line: it stays above that button. */
-const ABOVE = 'relative z-10'
+export const ABOVE = 'relative z-10'
 /** That button: its name is what is read, and it reaches over the whole line (the line is `relative`). */
-const STRETCHED = 'rounded text-left outline-none after:absolute after:inset-0 after:rounded focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring'
+export const STRETCHED = 'rounded text-left outline-none after:absolute after:inset-0 after:rounded focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring'
 /** The line the page has just moved to from a link symbol (DESIGN.md §7): the focus ring's colour, never the lime. */
 const MARKED = 'bg-muted ring-2 ring-inset ring-ring'
 

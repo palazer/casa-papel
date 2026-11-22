@@ -1,18 +1,30 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { RAIL, SCREENS, SETTINGS_PAGES, groupOf, isScreen, isUtility, readScreen, screenDef, type Screen } from '@/app/screens'
+import { RAIL, SCREENS, SETTINGS_PAGES, groupOf, isScreen, isUtility, railFor, readScreen, screenDef, shownScreen, type Screen } from '@/app/screens'
 
 describe('screens and the rail', () => {
-  it('the rail covers every screen exactly once: the Statement, the Grid and Trends, then the Settings group', () => {
+  it('the rail covers every screen exactly once: the Statement, the Grid, Payments and Trends, then the Settings group', () => {
     const keys = RAIL.flatMap((it) => (it.kind === 'page' ? [it.key] : it.pages))
     expect(keys).toEqual(SCREENS.map((s) => s.key))
-    expect(keys).toEqual(['statement', 'grid', 'trends', 'household', 'data', 'guide'])
-    expect(RAIL.map((it) => it.kind)).toEqual(['page', 'page', 'page', 'group'])
+    expect(keys).toEqual(['statement', 'grid', 'payments', 'trends', 'household', 'data', 'guide'])
+    expect(RAIL.map((it) => it.kind)).toEqual(['page', 'page', 'page', 'page', 'group'])
     expect(screenDef('statement').label).toBe('Statement')
     expect(SETTINGS_PAGES).toEqual(['household', 'data', 'guide'])
     expect(screenDef('guide').label).toBe('Guide')
   })
+  it('Payments is in the rail only while the household plans its payments by day and method', () => {
+    const pages = (payments: boolean) => railFor({ payments }).flatMap((it) => (it.kind === 'page' ? [it.key] : [it.key]))
+    expect(pages(false)).toEqual(['statement', 'grid', 'trends', 'settings'])
+    expect(pages(true)).toEqual(['statement', 'grid', 'payments', 'trends', 'settings'])
+    expect(SCREENS.filter((s) => s.switched).map((s) => s.key)).toEqual(['payments'])
+    expect(screenDef('payments').label).toBe('Payments')
+  })
+  it('with the switch off, the Payments page gives way to the Statement; every other screen stays', () => {
+    expect(shownScreen('payments', { payments: false })).toBe('statement')
+    expect(shownScreen('payments', { payments: true })).toBe('payments')
+    for (const s of SCREENS) if (s.key !== 'payments') expect(shownScreen(s.key, { payments: false })).toBe(s.key)
+  })
   it('knows which screens live under Settings', () => {
-    const grouped: Record<Screen, 'settings' | null> = { statement: null, grid: null, trends: null, household: 'settings', data: 'settings', guide: 'settings' }
+    const grouped: Record<Screen, 'settings' | null> = { statement: null, grid: null, payments: null, trends: null, household: 'settings', data: 'settings', guide: 'settings' }
     for (const [k, v] of Object.entries(grouped)) expect(groupOf(k as Screen)).toBe(v)
   })
   it('Data and the Guide are the utilities: they open without a household and are never the screen to land on', () => {

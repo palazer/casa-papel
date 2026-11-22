@@ -15,16 +15,10 @@ import {
   METHOD_ACCOUNT_TYPES, PAYMENT_KIND_INFO, methodAccountReason, paymentKindInfo,
   type Account, type Entity, type PaymentKind, type PaymentMethod, type Tables,
 } from '@/model'
+import { methodDetail } from '@/features/payments/methods'
 import { addPaymentMethod, addPaymentMethods, methodInUse, removePaymentMethod, starterMethods, updatePaymentMethod, type PaymentMethodInput } from '@/store'
 
 const byOrder = <T extends { order: string }>(a: T, b: T) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0)
-
-/** What a method says after its name: the account it draws on, and whose it is. */
-export function methodDetail(method: Pick<PaymentMethod, 'accountId' | 'ownerEntityId'>, tables: Pick<Tables, 'accounts' | 'entities'>): string {
-  const account = tables.accounts.find((a) => a.id === method.accountId)
-  const owner = method.ownerEntityId ? tables.entities.find((e) => e.id === method.ownerEntityId)?.name : null
-  return `${account && !account.deletedAt ? account.name : 'no account'}${owner ? ` · ${owner}` : ''}`
-}
 
 /**
  * The household's ways of paying: shown while "Plan payments by day and method" is on. A method that is in use is

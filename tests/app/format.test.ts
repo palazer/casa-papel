@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ONLY_PLUS_MINUS, ordinalDay, parseAmount, sumResult, unreadableAmount } from '@/app/format'
+import { ONLY_PLUS_MINUS, ordinalDay, parseAmount, sumResult, unreadableAmount, weekdayOf } from '@/app/format'
 
 const eur = (text: string, locale = 'en-IE') => parseAmount(text, 'EUR', locale)
 
@@ -79,3 +79,12 @@ describe('ordinalDay: a day of the month as it is said', () => {
   })
 })
 
+describe('weekdayOf: the weekday a day of a month falls on', () => {
+  it('is the calendar\'s, whatever the time zone of the device', () => {
+    expect(weekdayOf('2026-11', 22, 'en-GB')).toBe('Sun')
+    expect(weekdayOf('2026-11', 1, 'en-GB')).toBe('Sun')
+    expect(weekdayOf('2027-02', 28, 'en-GB')).toBe('Sun')
+    expect(weekdayOf('2026-12', 31, 'en-GB')).toBe('Thu')
+    expect(weekdayOf('2026-11', 23, 'de-DE')).toBe('Mo')
+  })
+})
