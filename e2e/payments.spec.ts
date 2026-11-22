@@ -17,11 +17,49 @@ async function turnPayments(page: Page, on: boolean) {
   await expect(planSwitch(page)).toBeChecked({ checked: on })
 }
 
+/**
+ * A household made on the first screen, with a current account, a credit card that is Sam's and one expense: it has
+ * no payment methods yet, which is where the first list of them is offered. (The demo household brings its own.)
+ */
+async function newHousehold(page: Page) {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Start on this device' }).click()
+  await page.getByLabel('Household name').fill('Sam and Alex')
+  await page.getByLabel('Adult 1 name').fill('Sam')
+  await page.getByLabel('Adult 2 name').fill('Alex')
+  await page.getByRole('button', { name: 'Open the Statement' }).click()
+  await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
+  await page.getByTestId('setup-guide').getByRole('button', { name: 'Leave setup' }).click()
+  const dlg = page.getByRole('dialog')
+  await page.getByRole('region', { name: 'Assets' }).getByRole('button', { name: 'Add account' }).click()
+  await dlg.getByLabel('Name', { exact: true }).fill('Current account')
+  await dlg.getByLabel('Type').selectOption({ label: 'Main account' })
+  await dlg.getByRole('button', { name: 'Save' }).click()
+  await expect(dlg).toBeHidden()
+  await page.getByRole('button', { name: 'Add a card or loan' }).click()
+  await dlg.getByLabel('Name', { exact: true }).fill('Visa')
+  await dlg.getByLabel('Type').selectOption({ label: 'Credit card' })
+  await dlg.getByRole('button', { name: /^More options/ }).click()
+  await dlg.getByLabel('Owner', { exact: true }).selectOption({ label: 'Sam' })
+  await dlg.getByRole('button', { name: 'Save' }).click()
+  // a card comes with the row that pays it off, which asks for its first amount: not yet
+  await expect(page.getByRole('dialog', { name: /^Visa – Payment · / })).toBeVisible()
+  await dlg.getByRole('button', { name: 'Cancel' }).click()
+  await expect(dlg).toBeHidden()
+  const out = page.getByRole('region', { name: 'Money out' })
+  await out.getByRole('button', { name: 'Add expense row' }).click()
+  await out.getByLabel('New expense row name').fill('Rent')
+  await out.getByLabel('New expense row name').press('Enter')
+  await dlg.getByLabel('Amount in EUR').fill('1200')
+  await dlg.getByRole('button', { name: 'Save' }).click()
+  await expect(dlg).toBeHidden()
+}
+
 test.describe('Payments: the switch and the payment methods', () => {
   test.use({ viewport: { width: 1440, height: 900 } })
 
   test('off, nothing of it is there; on, the list of methods starts from the accounts', async ({ page }) => {
-    await loadDemo(page)
+    await newHousehold(page)
     await openHousehold(page)
     await expect(planSwitch(page)).not.toBeChecked()
     await expect(page.getByRole('heading', { name: 'Payment methods' })).toHaveCount(0)
@@ -31,16 +69,27 @@ test.describe('Payments: the switch and the payment methods', () => {
     const starter = page.getByTestId('starter-methods')
     await expect(starter.getByRole('checkbox')).toHaveCount(4)
     await expect(starter.getByRole('checkbox', { name: /^Direct debit/ })).toBeChecked()
-    await expect(starter.getByRole('checkbox', { name: /^Credit card · credit card on Credit card/ })).toBeChecked()
+    await expect(starter.getByRole('checkbox', { name: /^Visa · credit card on Visa/ })).toBeChecked()
+    // before there is a method, the Payments page says where they are added
+    await openPayments(page)
+    await expect(page.locator('[data-group]')).toHaveCount(1)
+    await expect(page.locator('[data-group="no-day"]').getByRole('heading')).toContainText('No day yet')
+    await expect(page.locator('[data-payment]')).toHaveText([/Rent\s*no method/])
+    await page.getByTestId('payments-no-methods').getByRole('button', { name: 'Add them under Household' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Household' })).toBeVisible()
+
     await starter.getByRole('checkbox', { name: /^Transfer by hand/ }).uncheck()
     await starter.getByRole('button', { name: 'Add 3 methods' }).click()
     await expect(starter).toHaveCount(0)
     await expect(methods(page).getByRole('listitem')).toHaveCount(3)
     await expect(methods(page).getByRole('listitem').nth(0)).toContainText('direct debit')
     await expect(methods(page).getByRole('listitem').nth(0)).toContainText('Direct debit')
-    await expect(methods(page).getByRole('listitem').nth(0)).toContainText('on Main account')
-    // the card is Sam's in the demo household, and so is its method
-    await expect(methods(page).getByRole('listitem').nth(2)).toContainText('on Credit card · Sam')
+    await expect(methods(page).getByRole('listitem').nth(0)).toContainText('on Current account')
+    // the card is Sam's, and so is its method
+    await expect(methods(page).getByRole('listitem').nth(2)).toContainText('on Visa · Sam')
+    await openPayments(page)
+    await expect(page.getByTestId('payments-no-methods')).toHaveCount(0)
+    await openHousehold(page)
 
     // one undo takes the three back, and the list is offered again
     await page.getByRole('button', { name: 'Undo' }).click()
@@ -55,6 +104,16 @@ test.describe('Payments: the switch and the payment methods', () => {
     await openHousehold(page)
     await turnPayments(page, true)
     await expect(methods(page).getByRole('listitem')).toHaveCount(3)
+  })
+
+  test('the demo household brings four methods of its own, shown once it is switched on', async ({ page }) => {
+    await loadDemo(page)
+    await openHousehold(page)
+    await expect(planSwitch(page)).not.toBeChecked()
+    await expect(page.getByRole('heading', { name: 'Payment methods' })).toHaveCount(0)
+    await turnPayments(page, true)
+    await expect(page.getByTestId('starter-methods')).toHaveCount(0)
+    await expect(methods(page).getByRole('listitem')).toHaveText([/direct debit\s*Direct debit\s*on Main account/, /Standing order\s*on Main account/, /Transfer by hand\s*on Main account/, /Credit card\s*on Credit card · Sam/])
   })
 
   test('a method is added, changed and removed; a kind only offers what it can draw on', async ({ page }) => {
@@ -91,12 +150,11 @@ test.describe('Payments: the switch and the payment methods', () => {
   })
 })
 
-/** The demo household with payments planned and the first list of methods: a direct debit, a standing order and a transfer on the main account, and the credit card. */
+/** The demo household with payments planned. It has its methods: a direct debit, a standing order and a transfer on the main account, and the credit card. */
 async function withMethods(page: Page) {
   await loadDemo(page)
   await openHousehold(page)
   await turnPayments(page, true)
-  await page.getByTestId('starter-methods').getByRole('button', { name: 'Add 4 methods' }).click()
   await expect(methods(page).getByRole('listitem')).toHaveCount(4)
 }
 async function openStatement(page: Page) {
@@ -245,13 +303,14 @@ async function usuallyPaid(page: Page, row: string, day: string | null, method: 
   await dlg.getByRole('button', { name: 'Save' }).click()
   await expect(dlg).toBeHidden()
 }
-/** The demo household with its methods, and three rows with a day: the 1st (past), the 15th (the tests' today) and the 25th. */
+/**
+ * The demo household with payments planned. Its rent goes on the 1st (its schedule says so), childcare on the 25th and
+ * the savings on the 28th; the utilities are moved from the 12th to the 15th, the day the tests run on.
+ */
 async function withDays(page: Page) {
   await withMethods(page)
   await openStatement(page)
-  await usuallyPaid(page, 'The flat – Rent', '1st', 'Standing order')
-  await usuallyPaid(page, 'The flat – Utilities', '15th', 'Direct debit')
-  await usuallyPaid(page, 'Robin – Childcare', '25th', 'Transfer by hand')
+  await usuallyPaid(page, 'The flat – Utilities', '15th', null)
 }
 const group = (page: Page, key: string) => page.locator(`[data-group="${key}"]`)
 const lines = (scope: Page | Locator) => scope.locator('[data-payment]')
@@ -275,18 +334,18 @@ test.describe('Payments: the page', () => {
     await openPayments(page)
     await expect(rail(page).getByRole('link', { name: 'Payments' })).toHaveAttribute('aria-current', 'page')
     await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
-    // no methods and no days yet: everything stands under "No day yet", and the page says where the methods are added
-    await expect(page.getByTestId('payments-no-methods')).toBeVisible()
-    await expect(page.locator('[data-group]')).toHaveCount(1)
+    // the demo household's own days: the rent (the 1st) and the utilities (the 12th) are late on the 15th
+    await expect(page.getByTestId('payments-no-methods')).toHaveCount(0)
+    await expect(lines(group(page, 'overdue'))).toHaveText([/Sun 1\s*The flat – Rent\s*Standing order/, /Thu 12\s*The flat – Utilities\s*Direct debit/])
+    await expect(lines(group(page, 'coming'))).toHaveText([/Wed 25\s*Robin – Childcare\s*Transfer by hand\s*by hand/, /Sat 28\s*To savings\s*Standing order\s*calculated/])
     await expect(group(page, 'no-day').getByRole('heading')).toContainText('No day yet')
     await expect(page.getByTestId('payments-summary')).toContainText('to pay')
-    await expect(page.getByTestId('payments-summary')).not.toContainText('overdue')
+    await expect(page.getByTestId('payments-summary')).toContainText('2 overdue')
     // the address is the page's own, and a reload stays on it
     await page.reload()
     await expect(page.getByRole('heading', { level: 1, name: 'Payments' })).toBeVisible()
 
-    await page.getByTestId('payments-no-methods').getByRole('button', { name: 'Add them under Household' }).click()
-    await expect(page.getByRole('heading', { level: 1, name: 'Household' })).toBeVisible()
+    await openHousehold(page)
     await turnPayments(page, false)
     await expect(rail(page).getByRole('link', { name: 'Payments' })).toHaveCount(0)
     await page.goto('?demo=1&screen=payments')
@@ -302,7 +361,7 @@ test.describe('Payments: the page', () => {
     // the tests run on Sunday 15 November 2026
     await expect(group(page, 'today').getByRole('heading')).toContainText('Today, Sun 15')
     await expect(lines(group(page, 'today'))).toHaveText([/The flat – Utilities\s*Direct debit/])
-    await expect(lines(group(page, 'coming'))).toHaveText([/Wed 25\s*Robin – Childcare\s*Transfer by hand\s*by hand/])
+    await expect(lines(group(page, 'coming'))).toHaveText([/Wed 25\s*Robin – Childcare\s*Transfer by hand\s*by hand/, /Sat 28\s*To savings\s*Standing order\s*calculated/])
     await expect(group(page, 'no-day').getByRole('heading')).toContainText('No day yet')
     await expect(page.getByTestId('payments-summary')).toContainText('1 overdue')
     await page.screenshot({ path: 'e2e/output/payments.png', fullPage: true })
@@ -342,14 +401,14 @@ test.describe('Payments: the page', () => {
     await paidOn(set).selectOption('20th')
     await set.getByRole('button', { name: 'Save' }).click()
     await expect(set).toBeHidden()
-    await expect(lines(group(page, 'coming'))).toHaveText([/Fri 20\s*Groceries\s*no method/, /Wed 25\s*Robin – Childcare/])
+    await expect(lines(group(page, 'coming'))).toHaveText([/Fri 20\s*Groceries\s*no method/, /Wed 25\s*Robin – Childcare/, /Sat 28\s*To savings/])
     await expect(page.getByRole('button', { name: 'Set the day and method of Groceries' })).toHaveCount(0)
 
     // another month has no "late" and no "today": what has a day is to pay, by day
     await openMonth(page, 'December 2026')
     await expect(page.locator('[data-group]')).toHaveCount(2)
     await expect(group(page, 'open').getByRole('heading')).toContainText('To pay')
-    await expect(lines(group(page, 'open'))).toHaveText([/Tue 1\s*The flat – Rent/, /Tue 15\s*The flat – Utilities/, /Sun 20\s*Groceries/, /Fri 25\s*Robin – Childcare/])
+    await expect(lines(group(page, 'open'))).toHaveText([/Tue 1\s*The flat – Rent/, /Tue 15\s*The flat – Utilities/, /Sun 20\s*Groceries/, /Fri 25\s*Robin – Childcare/, /Mon 28\s*To savings/])
     await expect(page.getByTestId('payments-summary')).not.toContainText('overdue')
   })
 
@@ -371,10 +430,11 @@ test.describe('Payments: the page', () => {
     await expect(page.getByTestId('payments-filter')).toContainText('Only Main account')
     const ofMain = await amounts(page)
     await expect(main).toHaveAccessibleName(new RegExp(`^Main account: €${total(ofMain).toLocaleString('en-GB', { minimumFractionDigits: 2 })} leaves it`))
-    const order = totals.getByRole('button', { name: /^Standing order on Main account: €1,650\.00, 1 payment$/ })
+    // the rent and what goes to savings
+    const order = totals.getByRole('button', { name: /^Standing order on Main account: €[\d,.]+, 2 payments$/ })
     await order.click()
     await expect(main).toHaveAttribute('aria-pressed', 'false')
-    await expect(lines(page)).toHaveText([/The flat – Rent/])
+    await expect(lines(page)).toHaveText([/The flat – Rent/, /To savings/])
     await expect(page.getByTestId('payments-filter')).toContainText('Only Standing order on Main account')
     // pressed again, or "Show all": the whole list
     await order.click()
@@ -427,7 +487,8 @@ test.describe('Payments: the page', () => {
     await expect(lines(page).filter({ hasText: 'Streaming' }).getByRole('button', { name: /^Set the day/ })).toHaveCount(0)
     const totals = page.getByTestId('payment-totals')
     await expect(totals.getByRole('button', { name: /^Credit card: €18\.00 bought on it$/ })).toBeVisible()
-    await expect(totals.getByRole('button', { name: /^Direct debit on Main account: €12\.00, 1 payment$/ })).toBeVisible()
+    // with the utilities (210.00), which the demo household pays by direct debit
+    await expect(totals.getByRole('button', { name: /^Direct debit on Main account: €222\.00, 2 payments$/ })).toBeVisible()
 
     // each has a tick of its own, and it is the item's tick on the Statement
     await page.getByRole('checkbox', { name: 'Subscriptions: Music done' }).click()
@@ -446,7 +507,6 @@ test.describe('Payments on a phone', () => {
     const tabs = rail(page)
     await tabs.getByRole('link', { name: 'Settings' }).click()
     await turnPayments(page, true)
-    await page.getByTestId('starter-methods').getByRole('button', { name: 'Add 4 methods' }).click()
     await expect(tabs.getByRole('link')).toHaveText(['Statement', 'Grid', 'Payments', 'Trends', 'Settings'])
     await tabs.getByRole('link', { name: 'Payments' }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Payments' })).toBeVisible()
@@ -491,12 +551,9 @@ test.describe('Payments: the day on the Statement', () => {
 
     await openHousehold(page)
     await turnPayments(page, true)
-    await page.getByTestId('starter-methods').getByRole('button', { name: 'Add 4 methods' }).click()
     await openStatement(page)
-    await usuallyPaid(page, 'The flat – Rent', '1st', 'Standing order')
-    await usuallyPaid(page, 'Robin – Childcare', '25th', 'Transfer by hand')
-    // the two rows with a day say it after their name; nothing else on the page has one
-    await expect(page.locator('[data-day]')).toHaveText(['1st', '25th'])
+    // the demo household's four amounts with a day say it after their name; nothing else on the page has one
+    await expect(page.locator('[data-day]')).toHaveText(['1st', '12th', '25th', '28th'])
     await expect(dayOn(page, 'The flat – Rent')).toHaveAccessibleName('Paid on the 1st: show in Payments')
     await page.getByRole('button', { name: 'Colours and marks' }).click()
     await expect(page.getByText('The day an amount goes out')).toBeVisible()

@@ -24,6 +24,7 @@ const ID = {
   rowPocketSam: id(74), rowPocketAlex: id(75),
   poolTravel: id(80), poolClothing: id(81),
   recRent: id(90), recCarInsurance: id(91), recStreaming: id(92), recDogTax: id(93),
+  payDebit: id(100), payStanding: id(101), payTransfer: id(102), payCard: id(103),
 }
 
 type Status = 'projected' | 'committed' | 'done'
@@ -73,12 +74,12 @@ export function buildDemoTables(): Tables {
     { ...base(ID.rowOtherIncome, 'a3'), name: 'Other income', section: 'income' },
     // expenses
     { ...base(ID.rowRent, 'b0'), name: 'The flat – Rent', section: 'expense', categoryId: ID.catHousing, entityTags: [ID.flat], accountId: ID.main, defaultStatus: 'committed' },
-    { ...base(ID.rowUtilities, 'b1'), name: 'The flat – Utilities', section: 'expense', categoryId: ID.catHousing, entityTags: [ID.flat], accountId: ID.main },
+    { ...base(ID.rowUtilities, 'b1'), name: 'The flat – Utilities', section: 'expense', categoryId: ID.catHousing, entityTags: [ID.flat], accountId: ID.main, payDay: 12, payMethodId: ID.payDebit },
     { ...base(ID.rowGroceries, 'b2'), name: 'Groceries', section: 'expense', categoryId: ID.catLiving, accountId: ID.main },
     { ...base(ID.rowTransport, 'b3'), name: 'Public transport', section: 'expense', categoryId: ID.catTransport, accountId: ID.main },
     { ...base(ID.rowCarInsurance, 'b4'), name: 'The car – Insurance', section: 'expense', categoryId: ID.catTransport, entityTags: [ID.car], accountId: ID.main, defaultStatus: 'committed' },
     { ...base(ID.rowDog, 'b5'), name: 'Biscuit – Costs', section: 'expense', categoryId: ID.catFamily, entityTags: [ID.biscuit], accountId: ID.main },
-    { ...base(ID.rowChildcare, 'b6'), name: 'Robin – Childcare', section: 'expense', categoryId: ID.catFamily, entityTags: [ID.robin], scope: ID.robin, accountId: ID.main, defaultStatus: 'committed' },
+    { ...base(ID.rowChildcare, 'b6'), name: 'Robin – Childcare', section: 'expense', categoryId: ID.catFamily, entityTags: [ID.robin], scope: ID.robin, accountId: ID.main, defaultStatus: 'committed', payDay: 25, payMethodId: ID.payTransfer },
     { ...base(ID.rowSubscriptions, 'b7'), name: 'Subscriptions', section: 'expense', categoryId: ID.catFun, accountId: ID.card },
     { ...base(ID.rowHealth, 'b8'), name: 'Health', section: 'expense', categoryId: ID.catLiving, accountId: ID.main },
     { ...base(ID.rowSamPersonal, 'b9'), name: 'Sam – Personal', section: 'expense', categoryId: ID.catPersonal, scope: ID.sam, accountId: ID.main },
@@ -86,7 +87,7 @@ export function buildDemoTables(): Tables {
     { ...base(ID.rowTravel, 'bb'), name: 'Travel', section: 'expense', categoryId: ID.catFun, defaultFundedBy: poolRef(ID.poolTravel) },
     { ...base(ID.rowClothing, 'bc'), name: 'Clothing', section: 'expense', categoryId: ID.catFun, defaultFundedBy: poolRef(ID.poolClothing) },
     // transfers
-    { ...base(ID.rowToSavings, 'c0'), name: 'To savings', section: 'transfer', kind: 'to-savings', categoryId: ID.catTransfers, accountId: ID.savings, defaultStatus: 'committed' },
+    { ...base(ID.rowToSavings, 'c0'), name: 'To savings', section: 'transfer', kind: 'to-savings', categoryId: ID.catTransfers, accountId: ID.savings, defaultStatus: 'committed', payDay: 28, payMethodId: ID.payStanding },
     { ...base(ID.rowToInvestment, 'c1'), name: 'To investments', section: 'transfer', kind: 'to-investment', categoryId: ID.catTransfers, accountId: ID.invest, defaultStatus: 'committed' },
     { ...base(ID.rowTravelAlloc, 'c2'), name: 'To Travel', section: 'transfer', kind: 'pool-allocation', categoryId: ID.catTransfers, accountId: ID.savings, defaultStatus: 'committed' },
     { ...base(ID.rowClothingAlloc, 'c3'), name: 'To Clothing', section: 'transfer', kind: 'pool-allocation', categoryId: ID.catTransfers, accountId: ID.savings, defaultStatus: 'committed' },
@@ -155,14 +156,24 @@ export function buildDemoTables(): Tables {
     rows,
     cells,
     recurringItems: [
-      { ...base(ID.recRent, 'a0'), name: 'Rent', rowId: ID.rowRent, amount: 165000, cadence: { intervalMonths: 1, anchorMonth: 1 }, accountId: ID.main, startMonth: '2026-09', notes: 'Due on the 1st' },
-      { ...base(ID.recCarInsurance, 'a1'), name: 'Car insurance', rowId: ID.rowCarInsurance, amount: 21000, cadence: { intervalMonths: 3, anchorMonth: 1 }, accountId: ID.main, startMonth: '2026-09', notes: 'Quarterly: Jan, Apr, Jul, Oct' },
+      { ...base(ID.recRent, 'a0'), name: 'Rent', rowId: ID.rowRent, amount: 165000, cadence: { intervalMonths: 1, anchorMonth: 1 }, accountId: ID.main, startMonth: '2026-09', notes: '', payDay: 1, methodId: ID.payStanding },
+      { ...base(ID.recCarInsurance, 'a1'), name: 'Car insurance', rowId: ID.rowCarInsurance, amount: 21000, cadence: { intervalMonths: 3, anchorMonth: 1 }, accountId: ID.main, startMonth: '2026-09', notes: 'Quarterly: Jan, Apr, Jul, Oct', payDay: 15, methodId: ID.payDebit },
       { ...base(ID.recStreaming, 'a2'), name: 'Streaming', rowId: ID.rowSubscriptions, amount: 1800, cadence: { intervalMonths: 1, anchorMonth: 1 }, accountId: ID.card, startMonth: '2026-09', notes: '' },
-      { ...base(ID.recDogTax, 'a3'), name: 'Dog tax', rowId: ID.rowDog, amount: 12000, cadence: { intervalMonths: 12, anchorMonth: 3 }, accountId: ID.main, startMonth: '2026-09', notes: 'Yearly in March' },
+      { ...base(ID.recDogTax, 'a3'), name: 'Dog tax', rowId: ID.rowDog, amount: 12000, cadence: { intervalMonths: 12, anchorMonth: 3 }, accountId: ID.main, startMonth: '2026-09', notes: 'Yearly in March', payDay: 10, methodId: ID.payDebit },
     ],
     pools: [
       { ...base(ID.poolTravel, 'a0'), name: 'Travel', accountId: ID.savings, allocationRowId: ID.rowTravelAlloc, openingBalance: 60000 },
       { ...base(ID.poolClothing, 'a1'), name: 'Clothing', accountId: ID.savings, allocationRowId: ID.rowClothingAlloc, openingBalance: 15000 },
+    ],
+    // Payments by day and method: the household has not switched it on (`payments` is not set), so none of this shows
+    // until someone does. Then the page is not empty: the rent goes by standing order on the 1st, the utilities by
+    // direct debit on the 12th, childcare by hand on the 25th, the savings by standing order on the 28th, and the
+    // quarterly insurance and the yearly dog tax say theirs. The rest waits under "No day yet".
+    paymentMethods: [
+      { ...base(ID.payDebit, 'a0'), name: 'Direct debit', kind: 'direct-debit', accountId: ID.main, ownerEntityId: null },
+      { ...base(ID.payStanding, 'a1'), name: 'Standing order', kind: 'standing-order', accountId: ID.main, ownerEntityId: null },
+      { ...base(ID.payTransfer, 'a2'), name: 'Transfer by hand', kind: 'transfer', accountId: ID.main, ownerEntityId: null },
+      { ...base(ID.payCard, 'a3'), name: 'Credit card', kind: 'credit-card', accountId: ID.card, ownerEntityId: ID.sam },
     ],
     fxRates: [],
     monthStates: [],

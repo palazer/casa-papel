@@ -86,6 +86,8 @@ describe('describeRemoval', () => {
     expect(main.changes).toEqual([
       '"The flat – Rent", "The flat – Utilities", "Groceries", "Public transport" and 6 more no longer name it as the paying account',
       '3 schedules no longer name it',
+      // the demo household's three methods that draw on the main account
+      'The payment methods "Direct debit", "Standing order" and "Transfer by hand" go with it',
     ])
     expect(main.archiveChanges[0]).toBe('Hidden from Nov 2026 on; rows that name it keep working')
   })

@@ -64,7 +64,7 @@ export function HouseholdScreen() {
       <CategoriesCard household={household} tables={tables} onError={setError} />
       <ArchivedRowsCard household={household} tables={tables} onError={setError} onRestored={onRestored} />
       <FxCard household={household} tables={tables} months={months} onError={setError} />
-      <Island air tone={HUES.transfer} title="Schedules" description="Recurring payments and incomes: rent, salary, insurance, subscriptions, anything on a schedule. They land in the grid by themselves and show up in Moves when due.">
+      <Island air tone={HUES.transfer} title="Schedules" description="Recurring payments and incomes: rent, salary, insurance, subscriptions, anything on a schedule. They land in their months by themselves, on the Statement and in the grid.">
         <RecurringList engine={engine} />
       </Island>
       {notice.notice && <UndoNotice text={notice.notice} onUndo={() => act(() => store.undo())} onDismiss={notice.clear} />}

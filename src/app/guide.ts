@@ -275,8 +275,30 @@ export const GUIDE: GuideTopic[] = [
     ],
     factsTitle: 'The kinds of method',
     facts: paymentKinds,
-    tips: ['payments.switch', 'payments.usual', 'payments.kind', 'payments.drawsOn', 'payments.owner', 'payments.archivedMethod', 'payments.toPay', 'payments.byDay', 'payments.totals', 'payments.people'],
+    tips: ['payments.switch', 'payments.usual', 'payments.kind', 'payments.drawsOn', 'payments.owner', 'payments.archivedMethod'],
     open: 'household',
+  },
+  {
+    key: 'payments-page',
+    title: 'The Payments page',
+    summary: 'A month\'s amounts that leave, day by day, with what each account has to carry and who pays.',
+    what: [
+      'With "Plan payments by day and method" on, "Payments" is the third tile of the rail (the third tab on a phone). It shows the month chosen in the strip of months: every amount under "Money out" on the Statement, on the day it goes out, with the method it is paid with. It is the same month read another way, so a tick here is the tick on the Statement, and pressing a line opens the same dialog.',
+      'In the current month the list starts with "Overdue" (the day has passed and the amount is not ticked), then "Today" and "Coming"; in any other month what is not ticked stands under "To pay". "No day yet" lists what has no day, and "Done" at the foot unfolds when pressed. The line at the top counts it: what is still to pay, what is done, how many are overdue. What is bought on a credit card is listed and marked "on card", and is not in "to pay": the card\'s own payment is.',
+      '"By account and method" says what each account has to carry in the month and how it leaves, so the money can be made ready in time: the sum, what of it is still to leave, and a sum per method. A credit card shows what was bought on it, what is owed at the end of the month and the row that pays it off. "By person" says who pays, by the owner of the method or of the account. On the Statement a small grey day stands after a line\'s name ("1st" after "The flat – Rent"); pressing it opens Payments at that line.',
+    ],
+    steps: [
+      'Turn on Household → "Household settings" → "Plan payments by day and method", then open "Payments" in the rail.',
+      'Pick the month in the strip at the top; the current one says "now".',
+      'Tick a line once the amount has really left. It moves to "Done"; open "Done" and tick it again to take that back.',
+      'Press a line to open its amount, and change the amount, "Paid on" or "Paid with" there.',
+      'Under "No day yet", press "Set…" on a line to give its row a usual day and method.',
+      'Press a sum under "By account and method", or a name under "By person", to list only its payments. "Show all" brings the whole list back.',
+      'On a phone the sums stand above the list: press "By account and method" or "By person" to fold it away. The device remembers that.',
+      'On the Statement, press the grey day after a line\'s name to see that amount among the month\'s payments.',
+    ],
+    tips: ['payments.toPay', 'payments.byDay', 'payments.totals', 'payments.people'],
+    open: 'payments',
   },
   {
     key: 'goals',
@@ -407,7 +429,7 @@ export const GUIDE: GuideTopic[] = [
     what: [
       '"Colours and marks" at the right of the Statement and Grid toolbars is the legend. Kinds of money: "Income", "Expenses", "Transfers", "Balances and net worth", "Virtual accounts", "Goals". Marks: an estimate sits on a light yellow shade, certain is plain, done has a green dot; in the current month a red ring means nothing done yet and an amber half-dot partly done.',
       'Spending shows as a red negative number when "Show expenses as negative red numbers" is on; an amber "+€…" is money drawn from savings this month; a dotted underline is a balance you entered yourself; a grey column in the Grid is a month that is over; a faint band is one category\'s rows. A crossed circle after an account\'s name on the Statement means it is not in net worth: its figures are grey and no total counts it. On the Statement two chain rings mark a row and the account it fills, takes from or pays off: press them to go to the other end, which is marked for a moment. Faint, open rings on a loan or card mean no row pays it off yet; pressing them adds the row. Two arrows in a loop mark a row or an item that is on a schedule; in a month where it does not land the line is grey and says when it lands next and with how much, "next Jan 2027" say.',
-      'In the grid the arrow keys move between cells, Enter or Space opens one, Escape closes the editor. Cmd/Ctrl+Z undoes and Shift redoes, like the two arrows at the right of every toolbar.',
+      'In the grid the arrow keys move between cells, Enter or Space opens one, Escape closes the editor. Cmd/Ctrl+Z undoes and Shift redoes, like the two arrows at the right of every toolbar. While payments are planned by day, a small grey day after a line\'s name on the Statement ("12th") says when the amount goes out; pressing it opens the month\'s payments.',
     ],
     steps: [
       'Open "Colours and marks" from the Statement or Grid toolbar.',

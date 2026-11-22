@@ -11,8 +11,8 @@ function sentence(s: string, what: string) {
 }
 
 describe('the Guide', () => {
-  it('has eighteen topics with unique kebab keys, short titles and whole sentences', () => {
-    expect(GUIDE).toHaveLength(18)
+  it('has nineteen topics with unique kebab keys, short titles and whole sentences', () => {
+    expect(GUIDE).toHaveLength(19)
     const keys = GUIDE.map((t) => t.key)
     expect(new Set(keys).size).toBe(keys.length)
     for (const t of GUIDE) {
