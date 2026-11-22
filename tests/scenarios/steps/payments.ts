@@ -10,10 +10,13 @@ async function methodNamed(world: World, name: string) {
   return method
 }
 
-// Household → Payment methods → "Add method": a card for a credit card, a direct debit for any other account
-step('a payment method {string} that draws on {string}', async (world: World, name: string, accountName: string) => {
-  const account = await world.account(accountName)
-  await addPaymentMethod(world.store, { name, kind: account.type === 'credit-card' ? 'credit-card' : account.type === 'cash' ? 'cash' : 'direct-debit', accountId: account.id })
+// Household → Payment methods → "Add method": a label, tied to no account
+step('a payment method {string}', async (world: World, name: string) => {
+  await addPaymentMethod(world.store, { name, kind: 'other' })
+})
+// the same, with the note that names an account: a note is words, and nothing reads it
+step('a payment method {string} with the note {string}', async (world: World, name: string, note: string) => {
+  await addPaymentMethod(world.store, { name, kind: 'other', note })
 })
 
 // row menu → "Usually paid…": the method alone, and the day with it

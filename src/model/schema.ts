@@ -8,7 +8,7 @@ import { FUNDED_BY_PATTERN, type FundedBy } from './fundedBy'
 z.config({ jitless: true })
 
 /** Bump when the shape of stored data changes; add a migration in migrations.ts. */
-export const SCHEMA_VERSION = 21
+export const SCHEMA_VERSION = 22
 
 // ---------- primitives ----------
 export const IdSchema = z.string().regex(ID_PATTERN, 'expected ULID')
@@ -201,18 +201,23 @@ export const AccountMonthSchema = z.object({
 export const PaymentKindSchema = z.enum(['direct-debit', 'standing-order', 'transfer', 'debit-card', 'credit-card', 'wallet', 'cash', 'other'])
 
 /**
- * A way of paying ("Paid with"): the household's own list, each tied to the account or card it draws on. It says how
- * and from where an amount physically leaves; whose money pays for it stays "Comes out of". Only one thing about it
- * reaches a figure: a method that draws on a card whose purchases are recorded means "bought on that card" (rule C2).
- * So its account stays as it is once an amount uses it, and a method in use is archived, never deleted.
+ * A way of paying ("Paid with"): the household's own list. A method is a label: how an amount is paid, and by whom.
+ * It is tied to no account and reaches no figure (rule W1); whose money pays for an amount stays "Comes out of", and
+ * what is bought on a card stays "Paid by card…" on the row. A method that amounts were paid with is archived, never
+ * deleted, so they keep its name.
  */
 export const PaymentMethodSchema = BaseRecord.extend({
   name: z.string().min(1),
   kind: PaymentKindSchema,
   /** Who pays with it; null = the household. */
   ownerEntityId: IdSchema.nullable().default(null),
-  /** The account or card it draws on. */
-  accountId: IdSchema,
+  /**
+   * A few words of one's own after the name: "main account", "Bills pot". Read it through `methodNote`: a method
+   * from schema 21 has none, and shows the name of the account it was tied to then.
+   */
+  note: z.string().nullable().optional(),
+  /** Schema 21 only: the account a method was tied to. No figure reads it; it is cleared when the method is edited. */
+  accountId: IdSchema.nullable().optional(),
   /** No longer offered; what uses it keeps it. */
   archived: z.boolean().default(false),
   order: z.string().default('a0'),
@@ -284,7 +289,7 @@ export const RowSchema = BaseRecord.extend({
   /**
    * "Usually paid…": the day of the month the row's amount goes out on, and the method it is paid with, in every
    * month where an item says nothing of its own. Rows from before schema 21 have neither: read both with `?? null`.
-   * A method that draws on a card is also the row's card (`accountId`); the store keeps the two in step.
+   * Neither reaches a figure: the row's card stays `accountId` ("Paid by card…").
    */
   payDay: PayDaySchema.nullable().optional(),
   payMethodId: IdSchema.nullable().optional(),

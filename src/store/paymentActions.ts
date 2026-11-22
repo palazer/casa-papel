@@ -1,13 +1,8 @@
 import { generateKeyBetween } from 'fractional-indexing'
-import {
-  HouseholdSchema, PaymentMethodSchema, RecurringItemSchema, RowSchema, buysOnCard, isPaymentRow, methodAccountReason, newId, payContext, sourceForMethod, usualMethod,
-  type CellItem, type PaymentKind, type PaymentMethod, type Tables,
-} from '@/model'
+import { HouseholdSchema, PaymentMethodSchema, RowSchema, isPaymentRow, methodNote, newId, payContext, type PaymentKind, type PaymentMethod, type Tables } from '@/model'
 import { NO_QUESTION, type Mutation, type Store } from './store'
 import { loadTables, withoutRewritten } from './actions'
 import { applyMutations } from './impact'
-import { cellPut } from './cells'
-import { refuseThirdCurrency } from './currencies'
 
 const now = () => Date.now()
 
@@ -25,21 +20,17 @@ export async function setPaymentsOn(store: Store, on: boolean): Promise<void> {
 export interface PaymentMethodInput {
   name: string
   kind: PaymentKind
-  accountId: string
   ownerEntityId?: string | null
+  /** A few words after the name ("main account"); nothing reads them. */
+  note?: string
 }
 
-function checkMethod(tables: Tables, m: { name: string; kind: PaymentKind; accountId: string; ownerEntityId: string | null }): void {
+function checkMethod(tables: Tables, m: { name: string; ownerEntityId: string | null }): void {
   if (!m.name.trim()) throw new Error('Give the payment method a name.')
-  const account = tables.accounts.find((a) => a.id === m.accountId && !a.deletedAt)
-  if (!account) throw new Error('Pick the account or card the method draws on.')
-  if (account.archivedMonth) throw new Error(`"${account.name}" is archived: pick an account that is still open.`)
-  const why = methodAccountReason(m.kind, account)
-  if (why) throw new Error(why)
   if (m.ownerEntityId && !tables.entities.some((e) => e.id === m.ownerEntityId && !e.deletedAt)) throw new Error('That person no longer exists.')
 }
 
-/** Whether an amount, a schedule or a row names the method: such a method keeps its account, and is archived, not deleted. */
+/** Whether an amount, a schedule or a row names the method: such a method is archived, not deleted, so what was paid with it keeps its name. */
 export function methodInUse(tables: Pick<Tables, 'rows' | 'recurringItems' | 'cells'>, id: string): boolean {
   return tables.rows.some((r) => !r.deletedAt && r.payMethodId === id)
     || tables.recurringItems.some((r) => !r.deletedAt && r.methodId === id)
@@ -47,7 +38,7 @@ export function methodInUse(tables: Pick<Tables, 'rows' | 'recurringItems' | 'ce
 }
 
 function methodPut(tables: Tables, input: PaymentMethodInput, after: string | null, ts: number): { mutation: Mutation; method: PaymentMethod } {
-  const fields = { name: input.name.trim(), kind: input.kind, accountId: input.accountId, ownerEntityId: input.ownerEntityId ?? null }
+  const fields = { name: input.name.trim(), kind: input.kind, ownerEntityId: input.ownerEntityId ?? null, note: (input.note ?? '').trim() }
   checkMethod(tables, fields)
   const method = PaymentMethodSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, ...fields, order: generateKeyBetween(after, null) })
   return { mutation: { op: 'put', table: 'paymentMethods', record: method }, method }
@@ -77,21 +68,18 @@ export async function addPaymentMethods(store: Store, inputs: PaymentMethodInput
 }
 
 /**
- * Change a method's name, kind or owner, archive it or bring it back. The account it draws on stays once something
- * uses the method: on that account hangs whether past amounts count as bought on a card (rule C2) and which account
- * they left. A method for another account is a new method.
+ * Change a method's name, kind, owner or note, archive it or bring it back. A method from schema 21 that is edited
+ * gets its note written (what it showed until then, unless a new one is given) and lets go of its old account.
  */
 export async function updatePaymentMethod(store: Store, id: string, patch: Partial<PaymentMethodInput> & { archived?: boolean }): Promise<void> {
   const tables = await loadTables(store)
   const method = tables.paymentMethods.find((m) => m.id === id && !m.deletedAt)
   if (!method) throw new Error('Payment method not found')
-  const next = { ...method, ...patch, name: (patch.name ?? method.name).trim() }
-  if (next.accountId !== method.accountId && methodInUse(tables, id)) {
-    throw new Error(`"${method.name}" is in use, so the account it draws on stays as it is. Add a method for the other account, and archive this one when nothing new should use it.`)
-  }
+  const note = (patch.note ?? methodNote(method, tables.accounts)).trim()
+  const next = { ...method, ...patch, name: (patch.name ?? method.name).trim(), note, accountId: null }
   // an archived method only has to keep saying what it said; one that is offered has to be sound
   if (!next.archived) checkMethod(tables, next)
-  await store.commit([{ op: 'put', table: 'paymentMethods', record: PaymentMethodSchema.parse({ ...next, updatedAt: now() }) }])
+  await store.commit([{ op: 'put', table: 'paymentMethods', record: PaymentMethodSchema.parse({ ...next, updatedAt: now() }) }], NO_QUESTION)
 }
 
 /** Take a method off the list: deleted where nothing uses it, archived (no longer offered, still shown where it is used) otherwise. */
@@ -107,27 +95,23 @@ export async function removePaymentMethod(store: Store, id: string): Promise<'de
 }
 
 /**
- * The methods a household would start with, from the accounts it has: for the main account and every other current
- * account a direct debit, a standing order and a transfer by hand; one per credit card; cash. Without what is there
- * already (the same kind on the same account).
+ * The methods a household would start with: a direct debit, a standing order and a transfer by hand, noted with the
+ * main account's name where there is one; one per credit card, named after it; cash. Without what is there already
+ * (the same kind under the same name).
  */
 export function starterMethods(tables: Pick<Tables, 'accounts' | 'paymentMethods'>): PaymentMethodInput[] {
-  const have = new Set(tables.paymentMethods.filter((m) => !m.deletedAt).map((m) => `${m.kind}|${m.accountId}`))
+  const have = new Set(tables.paymentMethods.filter((m) => !m.deletedAt).map((m) => `${m.kind}|${m.name.trim().toLowerCase()}`))
   const accounts = tables.accounts.filter((a) => !a.deletedAt && !a.archivedMonth).sort((a, b) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0))
-  const current = [...accounts.filter((a) => a.type === 'checking'), ...accounts.filter((a) => a.type === 'joint')]
-  const several = current.length > 1
+  const main = accounts.find((a) => a.type === 'checking')
   const out: PaymentMethodInput[] = []
-  const offer = (kind: PaymentKind, name: string, accountId: string, ownerEntityId: string | null) => {
-    if (!have.has(`${kind}|${accountId}`)) out.push({ kind, name, accountId, ownerEntityId })
+  const offer = (kind: PaymentKind, name: string, ownerEntityId: string | null, note: string) => {
+    if (!have.has(`${kind}|${name.trim().toLowerCase()}`)) out.push({ kind, name, ownerEntityId, note })
   }
-  for (const a of current) {
-    const of = several ? ` · ${a.name}` : ''
-    offer('direct-debit', `Direct debit${of}`, a.id, a.ownerEntityId)
-    offer('standing-order', `Standing order${of}`, a.id, a.ownerEntityId)
-    offer('transfer', `Transfer by hand${of}`, a.id, a.ownerEntityId)
-  }
-  for (const a of accounts) if (a.type === 'credit-card') offer('credit-card', a.name, a.id, a.ownerEntityId)
-  for (const a of accounts) if (a.type === 'cash') offer('cash', a.name, a.id, a.ownerEntityId)
+  offer('direct-debit', 'Direct debit', null, main?.name ?? '')
+  offer('standing-order', 'Standing order', null, main?.name ?? '')
+  offer('transfer', 'Transfer by hand', null, main?.name ?? '')
+  for (const a of accounts) if (a.type === 'credit-card') offer('credit-card', a.name, a.ownerEntityId, '')
+  offer('cash', 'Cash', null, '')
   return out
 }
 
@@ -140,52 +124,18 @@ export interface UsualPayment {
 
 /**
  * "Usually paid…": the day and the method of a row's amounts, in every month where an item says nothing of its own.
- *
- * A method is how the amount leaves, and two things follow from the account it draws on, for an ordinary expense row:
- * - the row's account is that account, so a method on a card whose purchases are recorded puts the row on that card
- *   (rule C2), and any other method takes it off the card it was on;
- * - a method on cash, on an other current account or on a savings account pays from that account, so "Comes out of"
- *   says that account too: for the row's single amounts, for its schedules and for the items that name no method of
- *   their own. A method on the main account or on a card leaves "Comes out of" as it is.
- *
- * It counts for every month, the ones that are over included, so the store's question for a change to the past asks
- * where a figure of such a month moves. A day moves no figure.
+ * It writes the row and nothing else, and moves no figure (rule W1): the row's card stays "Paid by card…", and where
+ * its amounts come out of stays "Comes out of".
  */
 export function planUsualPayment(tables: Tables, rowId: string, usual: UsualPayment, ts: number): Mutation[] {
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
   if (!row) throw new Error('Row not found')
   if (!isPaymentRow(row)) throw new Error(`"${row.name}" is money that comes in: it has no payment day or method.`)
   if (usual.payDay != null && !(Number.isInteger(usual.payDay) && usual.payDay >= 1 && usual.payDay <= 31)) throw new Error('The day is a day of the month, 1 to 31.')
-  const ctx = payContext(tables)
-  const method = usual.payMethodId ? ctx.methods.get(usual.payMethodId) : null
+  const method = usual.payMethodId ? payContext(tables).methods.get(usual.payMethodId) : null
   if (usual.payMethodId && !method) throw new Error('That payment method no longer exists.')
   if (method?.archived && method.id !== row.payMethodId) throw new Error(`"${method.name}" is archived: pick a method that is still in use.`)
-
-  const mutations: Mutation[] = []
-  let next = { ...row, payDay: usual.payDay, payMethodId: method?.id ?? null }
-  if (buysOnCard(row)) {
-    // "no method" takes the row off the card its method drew on; a card it was put on before methods existed, and
-    // that no method draws on, is not something this dialog showed, so it stays
-    next = { ...next, accountId: method ? method.accountId : usualMethod(row, ctx) ? null : row.accountId }
-    const source = sourceForMethod(method ?? null, ctx.accounts)
-    if (source) {
-      next = { ...next, defaultFundedBy: source }
-      // what follows the row's method has to come out of the same account: its schedules, and the items of its months
-      const followers = new Set<string>()
-      for (const s of tables.recurringItems) {
-        if (s.deletedAt || s.rowId !== row.id || s.methodId) continue
-        followers.add(s.id)
-        if (s.fundedBy !== source) mutations.push({ op: 'put', table: 'recurringItems', record: RecurringItemSchema.parse({ ...s, fundedBy: source, updatedAt: ts }) })
-      }
-      const follows = (i: CellItem) => !i.methodId && (!i.recurringItemId || followers.has(i.recurringItemId) || !ctx.schedules.get(i.recurringItemId)?.methodId)
-      for (const c of tables.cells) {
-        if (c.rowId !== row.id || !c.items.some((i) => follows(i) && i.fundedBy !== source)) continue
-        mutations.push(cellPut(c, { rowId: c.rowId, month: c.month, items: c.items.map((i) => (follows(i) ? { ...i, fundedBy: source } : i)) }, ts))
-      }
-    }
-  }
-  mutations.push({ op: 'put', table: 'rows', record: RowSchema.parse({ ...next, updatedAt: ts }) })
-  return mutations
+  return [{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, payDay: usual.payDay, payMethodId: method?.id ?? null, updatedAt: ts }) }]
 }
 
 /**
@@ -198,15 +148,12 @@ export function withUsualPayment(tables: Tables, mutations: Mutation[], rowId: s
   const after = applyMutations(tables, mutations)
   const row = after.rows.find((r) => r.id === rowId && !r.deletedAt)
   if (!row) return mutations
-  const shown = usualMethod(row, payContext(after))?.id ?? null
-  if ((row.payDay ?? null) === pay.payDay && shown === pay.payMethodId) return mutations
+  if ((row.payDay ?? null) === pay.payDay && (row.payMethodId ?? null) === pay.payMethodId) return mutations
   const more = planUsualPayment(after, rowId, pay, ts)
   return [...withoutRewritten(mutations, more), ...more]
 }
 
 export async function setUsualPayment(store: Store, rowId: string, usual: UsualPayment): Promise<void> {
   const tables = await loadTables(store)
-  const mutations = planUsualPayment(tables, rowId, usual, now())
-  refuseThirdCurrency(tables, mutations)
-  await store.commit(mutations)
+  await store.commit(planUsualPayment(tables, rowId, usual, now()), NO_QUESTION)
 }

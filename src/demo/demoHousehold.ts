@@ -80,7 +80,7 @@ export function buildDemoTables(): Tables {
     { ...base(ID.rowCarInsurance, 'b4'), name: 'The car – Insurance', section: 'expense', categoryId: ID.catTransport, entityTags: [ID.car], accountId: ID.main, defaultStatus: 'committed' },
     { ...base(ID.rowDog, 'b5'), name: 'Biscuit – Costs', section: 'expense', categoryId: ID.catFamily, entityTags: [ID.biscuit], accountId: ID.main },
     { ...base(ID.rowChildcare, 'b6'), name: 'Robin – Childcare', section: 'expense', categoryId: ID.catFamily, entityTags: [ID.robin], scope: ID.robin, accountId: ID.main, defaultStatus: 'committed', payDay: 25, payMethodId: ID.payTransfer },
-    { ...base(ID.rowSubscriptions, 'b7'), name: 'Subscriptions', section: 'expense', categoryId: ID.catFun, accountId: ID.card },
+    { ...base(ID.rowSubscriptions, 'b7'), name: 'Subscriptions', section: 'expense', categoryId: ID.catFun, accountId: ID.card, payDay: null, payMethodId: ID.payCard },
     { ...base(ID.rowHealth, 'b8'), name: 'Health', section: 'expense', categoryId: ID.catLiving, accountId: ID.main },
     { ...base(ID.rowSamPersonal, 'b9'), name: 'Sam – Personal', section: 'expense', categoryId: ID.catPersonal, scope: ID.sam, accountId: ID.main },
     { ...base(ID.rowAlexPersonal, 'ba'), name: 'Alex – Personal', section: 'expense', categoryId: ID.catPersonal, scope: ID.alex, accountId: ID.main },
@@ -167,13 +167,14 @@ export function buildDemoTables(): Tables {
     ],
     // Payments by day and method: the household has not switched it on (`payments` is not set), so none of this shows
     // until someone does. Then the page is not empty: the rent goes by standing order on the 1st, the utilities by
-    // direct debit on the 12th, childcare by hand on the 25th, the savings by standing order on the 28th, and the
-    // quarterly insurance and the yearly dog tax say theirs. The rest waits under "No day yet".
+    // direct debit on the 12th, childcare by hand on the 25th, the savings by standing order on the 28th, the
+    // subscriptions are paid with Sam's credit card on no set day, and the quarterly insurance and the yearly dog tax
+    // say theirs. The rest is untracked. A method is a label: the row's card is "Paid by card…", as it always was.
     paymentMethods: [
-      { ...base(ID.payDebit, 'a0'), name: 'Direct debit', kind: 'direct-debit', accountId: ID.main, ownerEntityId: null },
-      { ...base(ID.payStanding, 'a1'), name: 'Standing order', kind: 'standing-order', accountId: ID.main, ownerEntityId: null },
-      { ...base(ID.payTransfer, 'a2'), name: 'Transfer by hand', kind: 'transfer', accountId: ID.main, ownerEntityId: null },
-      { ...base(ID.payCard, 'a3'), name: 'Credit card', kind: 'credit-card', accountId: ID.card, ownerEntityId: ID.sam },
+      { ...base(ID.payDebit, 'a0'), name: 'Direct debit', kind: 'direct-debit', ownerEntityId: null, note: 'Main account' },
+      { ...base(ID.payStanding, 'a1'), name: 'Standing order', kind: 'standing-order', ownerEntityId: null, note: 'Main account' },
+      { ...base(ID.payTransfer, 'a2'), name: 'Transfer by hand', kind: 'transfer', ownerEntityId: null, note: 'Main account' },
+      { ...base(ID.payCard, 'a3'), name: 'Credit card', kind: 'credit-card', ownerEntityId: ID.sam, note: '' },
     ],
     fxRates: [],
     monthStates: [],

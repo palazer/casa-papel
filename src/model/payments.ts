@@ -1,6 +1,3 @@
-import { paysExpenses } from './accountGroup'
-import { cardIsItemized } from './cards'
-import { accountRef, type FundedBy } from './fundedBy'
 import { parseMonth, type MonthKey } from './month'
 import { isTakenFromAccount } from './rules'
 import type { Account, CellItem, PaymentKind, PaymentMethod, RecurringItem, Row, Tables } from './schema'
@@ -9,12 +6,12 @@ import type { Account, CellItem, PaymentKind, PaymentMethod, RecurringItem, Row,
  * Payments by day and method ("Plan payments by day and method").
  *
  * An amount that leaves can say when it goes out ("Paid on": a day of the month) and how ("Paid with": one of the
- * household's payment methods, each tied to the account or card it draws on). Both are said in three places, and the
- * nearest one counts: the item of a month, the schedule that posted it, the row ("Usually paid…").
+ * household's payment methods). Both are said in three places, and the nearest one counts: the item of a month, the
+ * schedule that posted it, the row ("Usually paid…").
  *
- * Whose money pays for an amount stays "Comes out of" (`fundedBy`); a method says how it physically leaves. One thing
- * about a method reaches a figure: a method that draws on a card whose purchases are recorded means "bought on that
- * card" (rule C2), for the item that names it. Everything else here is for the Payments page.
+ * None of it reaches a figure (rule W1). Whose money pays for an amount is "Comes out of" (`fundedBy`), and what is
+ * bought on a card is the row's "Paid by card…" (`Row.accountId`, rule C2); a method is a label beside them, for the
+ * Payments page alone.
  */
 
 /** What a payment asks of the household: nothing (it goes by itself), an action, or it happens at the till. */
@@ -25,24 +22,21 @@ export const PAYMENT_KIND_INFO: ReadonlyArray<{ value: PaymentKind; label: strin
   { value: 'standing-order', label: 'Standing order', ask: 'itself', help: 'Sent by the bank on a fixed day. The money has to be there on the day.' },
   { value: 'transfer', label: 'Transfer by hand', ask: 'hand', help: 'A transfer you make yourself each time.' },
   { value: 'debit-card', label: 'Debit card', ask: 'buying', help: 'A card that takes the money from its account when you pay.' },
-  { value: 'credit-card', label: 'Credit card', ask: 'buying', help: 'Paying with one of your credit cards: the amount is owed on the card until the card is paid.' },
-  { value: 'wallet', label: 'Wallet', ask: 'buying', help: 'PayPal, Apple Pay and the like, drawing on an account or on a card.' },
+  { value: 'credit-card', label: 'Credit card', ask: 'buying', help: 'Paying with a credit card. For the amount to count as owed on the card, put its row on the card with "Paid by card…".' },
+  { value: 'wallet', label: 'Wallet', ask: 'buying', help: 'PayPal, Apple Pay and the like.' },
   { value: 'cash', label: 'Cash', ask: 'hand', help: 'Notes and coins.' },
   { value: 'other', label: 'Other', ask: 'hand', help: 'Any other way of paying.' },
 ]
 
 export const paymentKindInfo = (kind: PaymentKind) => PAYMENT_KIND_INFO.find((k) => k.value === kind) ?? PAYMENT_KIND_INFO[PAYMENT_KIND_INFO.length - 1]
 
-/** The types of account a payment method can draw on: money you pay from, and credit cards. */
-export const METHOD_ACCOUNT_TYPES: ReadonlyArray<Account['type']> = ['checking', 'joint', 'cash', 'savings', 'credit-card']
-
-/** Why a method of this kind cannot draw on this account, or null: a credit card method is a card, and a card is not a bank account. */
-export function methodAccountReason(kind: PaymentKind, account: Pick<Account, 'type' | 'name'>): string | null {
-  if (!METHOD_ACCOUNT_TYPES.includes(account.type)) return `A payment method cannot draw on "${account.name}": pick a current account, cash, a savings account or a credit card.`
-  const card = account.type === 'credit-card'
-  if (kind === 'credit-card' && !card) return `A credit card method draws on one of your credit cards, and "${account.name}" is not one.`
-  if (card && kind !== 'credit-card' && kind !== 'wallet' && kind !== 'other') return `"${account.name}" is a credit card: the method is a credit card, a wallet that draws on it, or "Other".`
-  return null
+/**
+ * What a method says after its name: the note someone typed, and for a method from schema 21 that has none, the name
+ * of the account it was tied to then (a deleted account included: its name is still what the method meant).
+ */
+export function methodNote(method: Pick<PaymentMethod, 'note' | 'accountId'>, accounts: ReadonlyArray<Pick<Account, 'id' | 'name'>>): string {
+  if (method.note != null) return method.note
+  return (method.accountId ? accounts.find((a) => a.id === method.accountId)?.name : undefined) ?? ''
 }
 
 // ---------- the day ----------
@@ -83,19 +77,17 @@ export interface PayContext {
   methods: ReadonlyMap<string, PaymentMethod>
   /** Every schedule, removed ones included: an item that was paid outlives the schedule that posted it. */
   schedules: ReadonlyMap<string, RecurringItem>
-  accounts: ReadonlyMap<string, Account>
 }
 
-export function payContext(tables: Pick<Tables, 'paymentMethods' | 'recurringItems' | 'accounts'>): PayContext {
+export function payContext(tables: Pick<Tables, 'paymentMethods' | 'recurringItems'>): PayContext {
   return {
     methods: new Map((tables.paymentMethods ?? []).filter((m) => !m.deletedAt).map((m) => [m.id, m])),
     schedules: new Map(tables.recurringItems.map((r) => [r.id, r])),
-    accounts: new Map(tables.accounts.filter((a) => !a.deletedAt).map((a) => [a.id, a])),
   }
 }
 
 type ItemPay = Pick<CellItem, 'date' | 'methodId' | 'recurringItemId'>
-type RowPay = Pick<Row, 'section' | 'kind' | 'accountId' | 'payDay' | 'payMethodId'>
+type RowPay = Pick<Row, 'payDay' | 'payMethodId'>
 
 /** The method an item names for itself: its own, else its schedule's. */
 function ownMethod(item: ItemPay | null, ctx: PayContext): PaymentMethod | null {
@@ -104,20 +96,8 @@ function ownMethod(item: ItemPay | null, ctx: PayContext): PaymentMethod | null 
   return id ? ctx.methods.get(id) ?? null : null
 }
 
-/**
- * A row's usual method. A row that was put on a card before methods existed ("Paid by card…") names none: it reads
- * as the first method that draws on that card, so the card it counts on and the method it shows are the same thing.
- */
-export function usualMethod(row: RowPay, ctx: PayContext): PaymentMethod | null {
-  const named = row.payMethodId ? ctx.methods.get(row.payMethodId) : undefined
-  if (named) return named
-  if (!buysOnCard(row) || !row.accountId || ctx.accounts.get(row.accountId)?.type !== 'credit-card') return null
-  let first: PaymentMethod | null = null
-  for (const m of ctx.methods.values()) {
-    if (m.accountId === row.accountId && !m.archived && (!first || m.order < first.order)) first = m
-  }
-  return first
-}
+/** A row's usual method ("Usually paid…"); null where it names none, or one that is gone. */
+export const usualMethod = (row: RowPay, ctx: PayContext): PaymentMethod | null => (row.payMethodId ? ctx.methods.get(row.payMethodId) ?? null : null)
 
 /** The method an amount is paid with: the item's own, else its schedule's, else the row's usual one. `item` is null for an amount without items. */
 export const methodOf = (item: ItemPay | null, row: RowPay, ctx: PayContext): PaymentMethod | null => ownMethod(item, ctx) ?? usualMethod(row, ctx)
@@ -128,28 +108,4 @@ export function payDayOf(item: ItemPay | null, row: RowPay, month: MonthKey, ctx
   if (own != null) return own
   const day = (item?.recurringItemId ? ctx.schedules.get(item.recurringItemId)?.payDay : null) ?? row.payDay ?? null
   return day != null ? dayIn(month, day) : null
-}
-
-/**
- * The card an amount is bought on (rule C2), where its purchases are recorded: the card the item's own method draws
- * on, and for an item that names no method, or an amount without items, the row's card (`Row.accountId`). An item
- * whose own method draws on something else is not on the row's card.
- */
-export function cardOf(item: ItemPay | null, row: RowPay, ctx: PayContext): string | null {
-  if (!buysOnCard(row)) return null
-  const own = ownMethod(item, ctx)
-  const accountId = own ? own.accountId : row.accountId
-  const account = accountId ? ctx.accounts.get(accountId) : undefined
-  return account && cardIsItemized(account) ? account.id : null
-}
-
-/**
- * What "Comes out of" has to say for an expense paid with this method, or null where the method leaves it free. A
- * method on cash, on a current account other than the main one or on a savings account pays from that account, so
- * that is where the expense comes out of. The main account is the month's income, whatever covers it (savings, a
- * virtual account), and a card is paid later: both leave "Comes out of" as it is.
- */
-export function sourceForMethod(method: Pick<PaymentMethod, 'accountId'> | null, accounts: ReadonlyMap<string, Account>): FundedBy | null {
-  const account = method ? accounts.get(method.accountId) : undefined
-  return account && paysExpenses(account) ? accountRef(account.id) : null
 }

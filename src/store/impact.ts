@@ -227,9 +227,6 @@ function describeAccount(ctx: Ctx, acc: Account): Described {
   if (funded.length) changes.push(`${quoteNames(funded.map((r) => r.name))} ${pick(funded.length, 'comes', 'come')} out of the month's income instead`)
   if (paid.length) changes.push(`What came out of it in ${plural(paid.length, 'month')} counts as spent from that month's income, so the leftover there falls`)
   if (paying.length) changes.push(`${plural(paying.length, 'schedule')} ${pick(paying.length, 'comes', 'come')} out of the month's income instead`)
-  // the ways of paying that draw on it go with it: what was paid with one names no method any more
-  const methods = ctx.tables.paymentMethods.filter((m) => !m.deletedAt && m.accountId === acc.id)
-  if (methods.length) changes.push(`The payment ${pick(methods.length, 'method', 'methods')} ${quoteNames(methods.map((m) => m.name))} ${pick(methods.length, 'goes', 'go')} with it`)
   return {
     kindLabel: 'Account', subject: acc.name, loses, changes, blockers, note: null, activity, canArchive: true,
     archive: (from) => {
@@ -611,8 +608,6 @@ function accountRemoval(ctx: Ctx, acc: Account, ts: number): Mutation[] {
   // what came out of it counts as spent from the month's income, as the engine reads a source that is gone
   muts.push(...moveItemSources(ctx, ref, 'cash', ts))
   for (const g of ctx.goals) if (g.accountId === acc.id) muts.push(put('goals', GoalSchema, g, { deletedAt: ts }, ts))
-  // a method that draws on it has nothing to draw on: it goes too, and what named it reads as naming none (`payContext`)
-  for (const m of ctx.tables.paymentMethods) if (!m.deletedAt && m.accountId === acc.id) muts.push(put('paymentMethods', PaymentMethodSchema, m, { deletedAt: ts }, ts))
   return muts
 }
 

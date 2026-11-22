@@ -1206,21 +1206,26 @@ feature switch; a second one follows the same form.
   box shows what is stored, so it changes once the save is through.
 - **"Payment methods"** is an air `Island` under Household, after "Accounts", in the transfer hue. One line per method,
   as the accounts have them: a zinc `Chip` with the kind in lower case (`direct debit`), the name in `font-medium`,
-  then muted `on <account>` and ` · <owner>` where a person pays with it, and a ghost `xs` `Edit` at the right.
+  then in muted text its note and ` · <owner>` where a person pays with it (either may be missing, and then nothing
+  stands there), and a ghost `xs` `Edit` at the right. A method is a label: nothing on the card names an account as
+  something it draws on.
   Archived methods stand under the small-caps `Archived` with its (i), muted, each with an outline `xs` `Use again`.
   `Add method` is an outline `xs` button under the list.
-- **The first list.** While the household has no method, the card offers one from its accounts (`starterMethods`): a
-  muted sentence, a `Check` per suggestion (`<name> · <kind> on <account>`, all ticked), and a `sm` default button
-  `Add n methods` that follows the ticks. They are added in one step, so one Undo takes them back. Without an account
-  to draw on, one muted sentence says so.
-- **The method's dialog** (`PaymentMethodDialog`, `sm:max-w-md`): `Kind` (a select; the kind's own sentence stands
-  under it in muted `text-xs` and changes with the choice), `Name`, `Draws on` (only the accounts the kind can draw
-  on: a credit card method a card, a direct debit never a card), `Who pays with it` (`Household`, then the adults).
-  A method that is in use has `Draws on` disabled, with the reason under it. The footer's left button says what it
-  will do: `Delete` while nothing uses the method, `Archive` once something does. A refusal is said in the dialog.
+- **The first list.** While the household has no method, the card offers one (`starterMethods`): a muted sentence, a
+  `Check` per suggestion (`<name> · <kind>`, then ` · <note>` where it has one; all ticked), and a `sm` default
+  button `Add n methods` that follows the ticks. They are added in one step, so one Undo takes them back. The list
+  is a direct debit, a standing order and a transfer by hand (noted with the main account's name), one method per
+  credit card (named after it), and cash.
+- **The method's dialog** (`PaymentMethodDialog`, `sm:max-w-md`), in the order a method is thought of: `Name` (the
+  one field it needs; `Save` is enabled once it is there), `Kind` (a select; the kind's own sentence stands under it
+  in muted `text-xs` and changes with the choice), `Who pays with it` (`Household`, then the adults), `Note
+  (optional)` with its (i) (`payments.note`; free text such as "main account", shown after the name wherever the
+  method is listed). The description says that it changes no figure. A method can be changed at any time, in use or
+  not. The footer's left button says what it will do: `Delete` while nothing uses the method, `Archive` once
+  something does. A refusal is said in the dialog.
 - **"Paid on" and "Paid with"** are two native selects (`DaySelect`, `MethodSelect` in
   `src/features/payments/PaidFields.tsx`). The day select lists `1st` to `31st`; the method select lists the methods
-  that are in use under the account each draws on (`optgroup`), the main account first. The first option of each
+  that are in use in the card's order, one flat list, each as `<name> · <note>`. The first option of each
   names nothing, and says what then counts: `No day` / `No method` where nothing stands behind it, `Usual: 1st` on an
   item that follows its row, `As scheduled: 5th` on one that follows its schedule. An archived method stays offered
   only where it is still chosen, marked `(archived)`.
@@ -1228,13 +1233,12 @@ feature switch; a second one follows the same form.
   is a `fieldset` under "Comes out of" (single amount) or under the list (itemized): the legend with its (i)
   (`payments.usual`), the two selects side by side with small muted labels (`9rem` for the day, the rest for the
   method; stacked on a phone), then muted `text-xs` lines: where it counts (`For this row, in every month`, and `;
-  saved with the amount` once it differs from what is stored), that a day past the 28th is the last day of a shorter
-  month, and what follows from the method (`Bought on "Credit card": …`, `Paid from "Savings", so the amount comes
-  out of that account too.`). It is saved with the amount, as one step. The row menu has the same fields as
-  `Usually paid…`, in a dialog of that name (`sm:max-w-md`, the legend for a screen reader only); for an ordinary
-  expense row it takes the place of `Paid by card…` while the switch is on.
-- **A method that says where the amount comes out of** (rule W2) sets "Comes out of" and disables it, with the muted
-  line `Set by the method it is paid with.` under the field, or as the select's `title` on an item's line.
+  saved with the amount` once it differs from what is stored), and that a day past the 28th is the last day of a
+  shorter month. Nothing is said about what follows from the method, because nothing does. It is saved with the
+  amount, as one step. The row menu has the same fields as `Usually paid…`, in a dialog of that name (`sm:max-w-md`,
+  the legend for a screen reader only), beside `Paid by card…`, which is the only thing that puts a row on a card.
+- **A day and a method touch no other field.** "Comes out of" and `Paid by card…` are never set, locked or explained
+  by a method; a screen that shows a method beside one of them shows two separate choices.
 - **An item's own day and method** stand on a line of their own inside the item's box, above "Repeats": muted `Paid
   on`, a `h-7 w-36 text-xs` day select, muted `with`, a `h-7 w-52 text-xs` method select; the line wraps on a phone.
   The selects are named for a screen reader after their item (`Paid on, Streaming`). On an item that repeats, a

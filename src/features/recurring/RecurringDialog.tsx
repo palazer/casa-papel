@@ -10,7 +10,7 @@ import { AmountHint } from '@/components/AmountHint'
 import { amountToInput, formatMonth, parseAmount, unreadableAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import { sortRows } from '@/engine'
-import { isPaymentRow, monthOfDate, payContext, sourceForMethod, type Household, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
+import { isPaymentRow, monthOfDate, payContext, type Household, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
 import { addRecurringItem, rowCurrencyOf, updateRecurringItem, type RecurringInput } from '@/store'
 import { fundingOptions } from '@/features/grid/funding'
 import { DaySelect, MethodSelect } from '@/features/payments/PaidFields'
@@ -64,9 +64,6 @@ export function RecurringDialog({ tables, household, item, defaultMonth, onClose
   const paid = !!household.payments && !!target && isPaymentRow(target)
   const usual = rowId === '__new__' ? undefined : rows.find((r) => r.id === rowId)
   const ctx = payContext(tables)
-  /** The account an expense paid with the schedule's own method comes out of (rule W2). */
-  const sourceOf = (id: string | null) => (paid && section === 'expense' && id ? sourceForMethod(ctx.methods.get(id) ?? null, ctx.accounts) : null)
-  const methodSource = sourceOf(methodId)
   const accountHelp = section === 'income' ? 'Which of your accounts receives it. For your overview only; the sums do not change.' : 'Which of your accounts the money leaves. For your overview only; the sums do not change.'
 
   async function save() {
@@ -85,7 +82,7 @@ export function RecurringDialog({ tables, household, item, defaultMonth, onClose
         name: name.trim(), rowId, amount: minor, currency: null,
         cadence: cadence === 'months' ? null : { intervalMonths: Number(cadence) as 1 | 2 | 3 | 6 | 12, anchorMonth: cadence === '1' ? 1 : anchor },
         dueMonths: cadence === 'months' ? [...dueMonths] : null,
-        accountId: accountId || null, scope, fundedBy: section === 'expense' ? ((methodSource ?? fundedBy) as RecurringInput['fundedBy']) : 'cash',
+        accountId: accountId || null, scope, fundedBy: section === 'expense' ? (fundedBy as RecurringInput['fundedBy']) : 'cash',
         startMonth, endMonth: endMonth || null, notes,
         ...(paid ? { payDay, methodId } : {}),
       }
@@ -146,7 +143,7 @@ export function RecurringDialog({ tables, household, item, defaultMonth, onClose
           {paid ? (
             <>
               <div className="space-y-1.5"><Label htmlFor="rc-day">Paid on</Label><DaySelect id="rc-day" className="w-full" value={payDay} onChange={setPayDay} none={usual?.payDay != null ? `The row's usual day: ${ordinalDay(usual.payDay)}` : 'No day'} /></div>
-              <div className="space-y-1.5"><Label htmlFor="rc-method">Paid with</Label><MethodSelect id="rc-method" className="w-full" tables={tables} value={methodId} onChange={(m) => { setMethodId(m); const s = sourceOf(m); if (s) setFundedBy(s) }} none={usual?.payMethodId && ctx.methods.get(usual.payMethodId) ? `The row's usual method: ${ctx.methods.get(usual.payMethodId)!.name}` : 'No method'} /></div>
+              <div className="space-y-1.5"><Label htmlFor="rc-method">Paid with</Label><MethodSelect id="rc-method" className="w-full" tables={tables} value={methodId} onChange={setMethodId} none={usual?.payMethodId && ctx.methods.get(usual.payMethodId) ? `The row's usual method: ${ctx.methods.get(usual.payMethodId)!.name}` : 'No method'} /></div>
             </>
           ) : (
             <>
@@ -155,7 +152,7 @@ export function RecurringDialog({ tables, household, item, defaultMonth, onClose
             </>
           )}
           <div className="space-y-1.5"><Label htmlFor="rc-scope">Whose</Label><NativeSelect id="rc-scope" className="w-full" value={scope} onChange={(e) => setScope(e.target.value)}><option value="shared">Shared</option>{adults.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</NativeSelect></div>
-          {section === 'expense' && <div className="space-y-1.5"><Label htmlFor="rc-funded">Comes out of</Label><NativeSelect id="rc-funded" className="w-full" value={methodSource ?? fundedBy} disabled={methodSource != null} onChange={(e) => setFundedBy(e.target.value)}>{sources.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</NativeSelect><p className="text-xs text-muted-foreground">Spending from an account or a virtual account does not reduce this month's leftover.</p></div>}
+          {section === 'expense' && <div className="space-y-1.5"><Label htmlFor="rc-funded">Comes out of</Label><NativeSelect id="rc-funded" className="w-full" value={fundedBy} onChange={(e) => setFundedBy(e.target.value)}>{sources.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</NativeSelect><p className="text-xs text-muted-foreground">Spending from an account or a virtual account does not reduce this month's leftover.</p></div>}
           <div className="space-y-1.5"><Label>From month</Label><MonthField label="From month" value={startMonth} onChange={setStartMonth} locale={locale} /></div>
           <div className="space-y-1.5"><Label>Until month (optional)</Label><MonthField label="Until month" value={endMonth} onChange={setEndMonth} locale={locale} allowEmpty /></div>
           <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="rc-notes">Notes</Label><Input id="rc-notes" value={notes} onChange={(e) => setNotes(e.target.value)} /></div>

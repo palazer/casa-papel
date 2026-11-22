@@ -1,5 +1,5 @@
 import {
-  accountIdOf, accountRef, buysOnCard, cardIsItemized, cardOf, compareMonths, conversionOf, fromMinor, growthIn, isOldPocketShare, isOutsideNetWorth, isShareRule, isTakenFromAccount, movesInto, monthRange, ownBalance, payContext, paysAsExpense, paysExpenses, pocketLandsIn, poolIdOf, poolRef, resolveRules, scaleMoney, toMinor,
+  accountIdOf, accountRef, cardIsItemized, compareMonths, conversionOf, fromMinor, growthIn, isOldPocketShare, isOutsideNetWorth, isShareRule, isTakenFromAccount, movesInto, monthRange, ownBalance, paysAsExpense, paysExpenses, pocketLandsIn, poolIdOf, poolRef, resolveRules, scaleMoney, toMinor,
   type Account, type Category, type Cell, type FundedBy, type Money, type MonthKey, type Row, type RuleState, type Section, type Tables,
 } from '@/model'
 import { convertMoney, householdFx } from './fx'
@@ -80,7 +80,7 @@ function withoutRecorded(f: Funding, parts: RecordedPart[]): Funding {
 /** A recorded part scaled by `f`: a row's share of the part in the row it follows, or a payment cut to what is owed. The rate stays. */
 function scalePart(p: RecordedPart, f: number, source: FundedBy = p.source): RecordedPart {
   const { conversion: c } = p
-  return { ...p, source, amount: scaleMoney(p.amount, f), conversion: { ...c, foreignAmount: scaleMoney(c.foreignAmount, f), homeAmount: scaleMoney(c.homeAmount, f) } }
+  return { source, amount: scaleMoney(p.amount, f), conversion: { ...c, foreignAmount: scaleMoney(c.foreignAmount, f), homeAmount: scaleMoney(c.homeAmount, f) } }
 }
 
 /**
@@ -290,7 +290,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
           value += effectiveAmount
           addFunding(funding, it.fundedBy, effectiveAmount, paying)
           const held = it.conversion ? conversionOf(it, currency, base) : null
-          if (held) (recorded ??= []).push({ source: it.fundedBy, amount: it.amount, conversion: held, itemId: it.id })
+          if (held) (recorded ??= []).push({ source: it.fundedBy, amount: it.amount, conversion: held })
           if (it.status === 'projected') anyProjected = true
           if (it.status !== 'done') allDone = false
         }
@@ -367,67 +367,6 @@ export function computeEngine(input: EngineInput): EngineOutput {
     const conv = amountIn(c, acc.currency, m)
     if (conv.missingRate) warnOnce(`${acc.id}|${c.currency}`, `No ${c.currency}→${acc.currency} rate for ${m} (${acc.name})`)
     return conv.value
-  }
-
-  // ---------- bought on a card (rule C2) ----------
-  // An amount is bought on a card where its row is on that card, or where the item names a payment method that
-  // draws on it (`cardOf`). A month in which no item names a method of its own is the row's amount as a whole, on
-  // the row's card: what the months held before items could say how they are paid, to the cent.
-  const pay = payContext(tables)
-  interface CardPart {
-    cardId: string
-    /** In the cell's currency. */
-    amount: Money
-    /** The recorded parts among it (rule X10). */
-    recorded?: RecordedPart[]
-    /** The month's whole amount: its figures are the cell's own. */
-    whole: boolean
-  }
-  const cardPartsByCell = new Map<string, CardPart[]>()
-  const cardParts = (row: Row, c: CellResult): CardPart[] => {
-    const key = cellKey(row.id, c.month)
-    const known = cardPartsByCell.get(key)
-    if (known) return known
-    let parts: CardPart[] = []
-    if (buysOnCard(row) && c.value !== 0 && c.source !== 'archived') {
-      const live = c.source === 'items' ? c.items.filter((i) => !i.skipped) : []
-      const named = live.some((i) => i.methodId != null || (i.recurringItemId != null && pay.schedules.get(i.recurringItemId)?.methodId != null))
-      if (!named) {
-        const cardId = cardOf(null, row, pay)
-        if (cardId) parts = [{ cardId, amount: c.value, recorded: c.recorded, whole: true }]
-      } else {
-        // the items give what they count for; where the month counts for another amount than they add up to (an
-        // estimate's rest), each keeps its share of it
-        const sum = live.reduce((s, i) => s + i.effectiveAmount, 0)
-        const f = sum !== 0 && sum !== c.value ? c.value / sum : 1
-        const by = new Map<string, CardPart>()
-        for (const it of live) {
-          const cardId = cardOf(it, row, pay)
-          if (!cardId) continue
-          const part = by.get(cardId) ?? { cardId, amount: 0, whole: false }
-          part.amount += f === 1 ? it.effectiveAmount : Math.round(it.effectiveAmount * f)
-          const held = f === 1 ? c.recorded?.filter((p) => p.itemId === it.id) : undefined
-          if (held?.length) (part.recorded ??= []).push(...held)
-          by.set(cardId, part)
-        }
-        parts = [...by.values()]
-      }
-    }
-    cardPartsByCell.set(key, parts)
-    return parts
-  }
-  /** Such a part in a currency: what was recorded of it as recorded, the rest at the month's rate. */
-  const partAmountIn = (c: CellResult, part: CardPart, to: string, m: MonthKey): { value: Money; missingRate: boolean } => {
-    if (part.whole) return amountIn(c, to, m)
-    let rest = part.amount
-    let value: Money = 0
-    for (const p of part.recorded ?? []) {
-      rest -= p.amount
-      value += partIn(p, c.currency, to, m)
-    }
-    if (rest === 0) return { value, missingRate: false }
-    const conv = convertMoney(fx, rest, c.currency, to, m)
-    return { value: value + conv.value, missingRate: conv.missingRate }
   }
 
   // ---------- loans: a payment stops at what is owed ----------
@@ -938,23 +877,18 @@ export function computeEngine(input: EngineInput): EngineOutput {
       const prev: Money = prevBalance ?? acc.openingBalance
       let inflow: Money = 0
       let outflow: Money = 0
-      // A card whose purchases are recorded grows with them and shrinks with its payment. On a card that records
-      // only its payments the payment is the spending itself: nothing says what was bought, so nothing here can say
-      // what is owed. It stays as it is until a real balance is entered.
-      if (cardIsItemized(acc)) {
+      if (acc.type === 'credit-card') {
+        const itemized = cardIsItemized(acc)
         for (const row of rows) {
+          if (row.accountId !== acc.id) continue
           const c = cells[cellKey(row.id, m)]
           if (!c || c.value === 0 || c.source === 'archived') continue
-          if (row.kind === 'card-payment') {
-            if (row.accountId === acc.id) outflow += inAccountCurrency(acc, c, m)
-            continue
-          }
-          for (const part of cardParts(row, c)) {
-            if (part.cardId !== acc.id) continue
-            const conv = partAmountIn(c, part, acc.currency, m)
-            if (conv.missingRate) warnOnce(`${acc.id}|${c.currency}`, `No ${c.currency}→${acc.currency} rate for ${m} (${acc.name})`)
-            inflow += conv.value
-          }
+          // A card whose purchases are expense rows grows with them and shrinks with its payment. On a card that
+          // records only its payments the payment is the spending itself: nothing says what was bought, so nothing
+          // here can say what is owed. It stays as it is until a real balance is entered.
+          if (!itemized) continue
+          if (row.kind === 'card-payment') outflow += inAccountCurrency(acc, c, m)
+          else if (row.section === 'expense') inflow += inAccountCurrency(acc, c, m)
         }
       }
       // an other asset (an other current account among them) falls by what expenses took straight out of it, and
@@ -980,19 +914,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
   // ---------- the main account, and net worth ----------
   // What stays in the main account is money the household has, so it counts: the Statement's lower half would
   // not balance without it, and every other screen shows the same figure.
-  // bought on the cards whose purchases are recorded, in the household's currency: the cash for it is still in the
-  // main account
-  const cardBought: Record<MonthKey, Money> = {}
-  for (const m of months) {
-    let bought: Money = 0
-    for (const row of rows) {
-      const c = cells[cellKey(row.id, m)]
-      if (!c) continue
-      for (const part of cardParts(row, c)) bought += part.whole ? c.valueBase : partAmountIn(c, part, base, m).value
-    }
-    cardBought[m] = bought
-  }
-  const main = mainAccountSeries({ months, rows, cells, totals, accounts, actuals, fx, base, cardBought })
+  const main = mainAccountSeries({ months, rows, cells, totals, accounts, actuals, fx, base })
   const netWorth: Record<MonthKey, Money> = {}
   for (const m of months) {
     let nw = main.months[m]?.balance ?? 0

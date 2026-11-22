@@ -85,6 +85,12 @@ const STEPS: Record<number, Step> = {
   // The version keeps an older app from syncing: it would drop the fields from what it writes, and it counts a card's
   // purchases by the row where this one counts an item paid with a method that draws on a card (rule C2).
   20: (raw) => raw,
+  // 21 → 22: a payment method is a label and no longer tied to an account. `PaymentMethod.note` is new and optional;
+  // `accountId` stays readable, and a method from schema 21 shows that account's name as its note (`methodNote`)
+  // until it is edited. Nothing to rewrite. The version keeps an older app from syncing: it requires an account on
+  // every method, and it counts an item paid with a method on a card as bought on that card, where this one counts a
+  // card's purchases by the row again (rule C2).
+  21: (raw) => raw,
 }
 
 export function migrateExport(raw: unknown): unknown {

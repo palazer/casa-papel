@@ -3,8 +3,8 @@ import { NativeSelect } from '@/components/NativeSelect'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { ordinalDay } from '@/app/format'
-import type { Row, Tables } from '@/model'
-import { methodEffects, methodGroups } from './methods'
+import type { Tables } from '@/model'
+import { methodChoices, methodOption } from './methods'
 
 const DAYS = Array.from({ length: 31 }, (_, i) => i + 1)
 
@@ -24,19 +24,14 @@ export function DaySelect({ value, onChange, none = 'No day', label = 'Paid on',
   )
 }
 
-/** "Paid with": one of the household's payment methods, grouped by the account it draws on, or the first choice, which names none (see `DaySelect`). */
+/** "Paid with": one of the household's payment methods, by name with its note, or the first choice, which names none (see `DaySelect`). */
 export function MethodSelect({ tables, value, onChange, none = 'No method', label = 'Paid with', id, className }: {
   tables: Pick<Tables, 'paymentMethods' | 'accounts'>; value: string | null; onChange: (methodId: string | null) => void; none?: string; label?: string; id?: string; className?: string
 }) {
-  const groups = methodGroups(tables, value)
   return (
     <NativeSelect id={id} aria-label={id ? undefined : label} className={cn('min-w-0', className)} value={value ?? ''} onChange={(e) => onChange(e.target.value || null)}>
       <option value="">{none}</option>
-      {groups.map((g) => (
-        <optgroup key={g.account} label={g.account}>
-          {g.methods.map((m) => <option key={m.id} value={m.id}>{m.name}{m.archived ? ' (archived)' : ''}</option>)}
-        </optgroup>
-      ))}
+      {methodChoices(tables, value).map((m) => <option key={m.id} value={m.id}>{methodOption(m, tables)}</option>)}
     </NativeSelect>
   )
 }
@@ -45,15 +40,13 @@ export function MethodSelect({ tables, value, onChange, none = 'No method', labe
  * "Usually paid": the day and the method of a row's amounts, in every month where an item says nothing of its own.
  * The amount's dialog shows it under the amount, the row menu on its own; `says` is the sentence about where it counts.
  */
-export function UsualPaidFields({ tables, row, day, methodId, onDay, onMethod, says, idPrefix = 'usual', titled = false }: {
-  tables: Pick<Tables, 'paymentMethods' | 'accounts'>; row: Pick<Row, 'section' | 'kind'>
+export function UsualPaidFields({ tables, day, methodId, onDay, onMethod, says, idPrefix = 'usual', titled = false }: {
+  tables: Pick<Tables, 'paymentMethods' | 'accounts'>
   day: number | null; methodId: string | null; onDay: (day: number | null) => void; onMethod: (methodId: string | null) => void
   says: string; idPrefix?: string
   /** The dialog's own title says "Usually paid" already: the heading is then for a screen reader alone. */
   titled?: boolean
 }) {
-  const accounts = new Map(tables.accounts.filter((a) => !a.deletedAt).map((a) => [a.id, a]))
-  const method = methodId ? tables.paymentMethods.find((m) => m.id === methodId && !m.deletedAt) ?? null : null
   const none = tables.paymentMethods.every((m) => m.deletedAt || m.archived)
   return (
     <fieldset className="space-y-1.5" data-testid="usually-paid">
@@ -64,7 +57,6 @@ export function UsualPaidFields({ tables, row, day, methodId, onDay, onMethod, s
       </div>
       <p className="text-xs text-muted-foreground">{says}{day != null && day > 28 ? ` In a shorter month the ${ordinalDay(day)} is its last day.` : ''}</p>
       {none && <p className="text-xs text-muted-foreground">No payment methods yet: add them under Household → "Payment methods".</p>}
-      {methodEffects(method, row, accounts).map((text) => <p key={text} className="text-xs text-muted-foreground" data-testid="method-effect">{text}</p>)}
     </fieldset>
   )
 }

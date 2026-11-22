@@ -1,4 +1,4 @@
-import { expect, openMonth, saveAnyway, test, type Locator, type Page } from './test'
+import { expect, openMonth, test, type Locator, type Page } from './test'
 
 async function loadDemo(page: Page) {
   await page.goto('?demo=1')
@@ -67,9 +67,10 @@ test.describe('Payments: the switch and the payment methods', () => {
     await turnPayments(page, true)
     await expect(page.getByRole('heading', { name: 'Payment methods' })).toBeVisible()
     const starter = page.getByTestId('starter-methods')
-    await expect(starter.getByRole('checkbox')).toHaveCount(4)
-    await expect(starter.getByRole('checkbox', { name: /^Direct debit/ })).toBeChecked()
-    await expect(starter.getByRole('checkbox', { name: /^Visa · credit card on Visa/ })).toBeChecked()
+    // three noted with the main account's name, one for the card, and cash
+    await expect(starter.getByRole('checkbox')).toHaveCount(5)
+    await expect(starter.getByRole('checkbox', { name: /^Direct debit · direct debit · Current account/ })).toBeChecked()
+    await expect(starter.getByRole('checkbox', { name: /^Visa · credit card$/ })).toBeChecked()
     // before there is a method, the Payments page says where they are added
     await openPayments(page)
     await expect(page.locator('[data-group]')).toHaveCount(1)
@@ -79,14 +80,15 @@ test.describe('Payments: the switch and the payment methods', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Household' })).toBeVisible()
 
     await starter.getByRole('checkbox', { name: /^Transfer by hand/ }).uncheck()
+    await starter.getByRole('checkbox', { name: /^Cash/ }).uncheck()
     await starter.getByRole('button', { name: 'Add 3 methods' }).click()
     await expect(starter).toHaveCount(0)
     await expect(methods(page).getByRole('listitem')).toHaveCount(3)
     await expect(methods(page).getByRole('listitem').nth(0)).toContainText('direct debit')
     await expect(methods(page).getByRole('listitem').nth(0)).toContainText('Direct debit')
-    await expect(methods(page).getByRole('listitem').nth(0)).toContainText('on Current account')
-    // the card is Sam's, and so is its method
-    await expect(methods(page).getByRole('listitem').nth(2)).toContainText('on Visa · Sam')
+    await expect(methods(page).getByRole('listitem').nth(0)).toContainText('Current account')
+    // the card is Sam's, and so is the method named after it
+    await expect(methods(page).getByRole('listitem').nth(2)).toHaveText(/credit card\s*Visa\s*Sam/)
     await openPayments(page)
     await expect(page.getByTestId('payments-no-methods')).toHaveCount(0)
     await openHousehold(page)
@@ -113,40 +115,52 @@ test.describe('Payments: the switch and the payment methods', () => {
     await expect(page.getByRole('heading', { name: 'Payment methods' })).toHaveCount(0)
     await turnPayments(page, true)
     await expect(page.getByTestId('starter-methods')).toHaveCount(0)
-    await expect(methods(page).getByRole('listitem')).toHaveText([/direct debit\s*Direct debit\s*on Main account/, /Standing order\s*on Main account/, /Transfer by hand\s*on Main account/, /Credit card\s*on Credit card · Sam/])
+    await expect(methods(page).getByRole('listitem')).toHaveText([/direct debit\s*Direct debit\s*Main account/, /Standing order\s*Main account/, /Transfer by hand\s*Main account/, /credit card\s*Credit card\s*Sam/])
   })
 
-  test('a method is added, changed and removed; a kind only offers what it can draw on', async ({ page }) => {
+  test('a method is a name, a kind, who pays and a note: added with a name alone, changed and removed', async ({ page }) => {
     await loadDemo(page)
     await openHousehold(page)
     await turnPayments(page, true)
     await methods(page).getByRole('button', { name: 'Add method' }).click()
     const dialog = page.getByRole('dialog', { name: 'New payment method' })
+    // nothing asks for an account
+    await expect(dialog.getByLabel('Draws on')).toHaveCount(0)
+    await expect(dialog.getByRole('button', { name: 'Save' })).toBeDisabled()
+    await dialog.getByLabel('Name', { exact: true }).fill('Bills automation')
+    await expect(dialog.getByRole('button', { name: 'Save' })).toBeEnabled()
+    await dialog.getByRole('button', { name: 'Save' }).click()
+    await expect(dialog).toBeHidden()
+    await expect(methods(page).getByRole('listitem').filter({ hasText: 'Bills automation' })).toHaveText(/direct debit\s*Bills automation\s*Edit/)
+
+    await methods(page).getByRole('button', { name: 'Add method' }).click()
     await expect(dialog.getByTestId('pm-kind-help')).toContainText('Collected from the account')
-    // a direct debit cannot draw on a credit card
-    await expect(dialog.getByLabel('Draws on', { exact: true }).getByRole('option', { name: /Credit card/ })).toHaveCount(0)
     await dialog.getByLabel('Kind', { exact: true }).selectOption('Wallet')
     await expect(dialog.getByTestId('pm-kind-help')).toContainText('PayPal')
-    await dialog.getByLabel('Draws on', { exact: true }).selectOption({ label: 'Credit card (credit card)' })
-    await expect(dialog.getByRole('button', { name: 'Save' })).toBeDisabled()
     await dialog.getByLabel('Name', { exact: true }).fill('PayPal')
     await dialog.getByLabel('Who pays with it', { exact: true }).selectOption({ label: 'Alex' })
+    await dialog.getByLabel('Note (optional)', { exact: true }).fill('main account')
     await dialog.getByRole('button', { name: 'Save' }).click()
     await expect(dialog).toBeHidden()
     const line = methods(page).getByRole('listitem').filter({ hasText: 'PayPal' })
     await expect(line).toContainText('wallet')
-    await expect(line).toContainText('on Credit card · Alex')
+    await expect(line).toContainText('main account · Alex')
 
     await line.getByRole('button', { name: 'Edit' }).click()
     const edit = page.getByRole('dialog', { name: 'Edit payment method' })
+    await expect(edit.getByLabel('Note (optional)', { exact: true })).toHaveValue('main account')
     await edit.getByLabel('Name', { exact: true }).fill('PayPal (Alex)')
+    await edit.getByLabel('Note (optional)', { exact: true }).fill('')
     await edit.getByRole('button', { name: 'Save' }).click()
-    await expect(methods(page).getByRole('listitem').filter({ hasText: 'PayPal (Alex)' })).toBeVisible()
+    await expect(methods(page).getByRole('listitem').filter({ hasText: 'PayPal (Alex)' })).toHaveText(/wallet\s*PayPal \(Alex\)\s*Alex\s*Edit/)
 
-    // nothing uses it yet, so it can be deleted
+    // nothing uses it yet, so it can be deleted; the standing order is in use (the rent), so it is archived
     await methods(page).getByRole('listitem').filter({ hasText: 'PayPal (Alex)' }).getByRole('button', { name: 'Edit' }).click()
     await page.getByRole('dialog', { name: 'Edit payment method' }).getByRole('button', { name: 'Delete' }).click()
     await expect(methods(page).getByRole('listitem').filter({ hasText: 'PayPal' })).toHaveCount(0)
+    await methods(page).getByRole('listitem').filter({ hasText: 'Standing order' }).getByRole('button', { name: 'Edit' }).click()
+    await page.getByRole('dialog', { name: 'Edit payment method' }).getByRole('button', { name: 'Archive' }).click()
+    await expect(methods(page).getByRole('listitem').filter({ hasText: 'Standing order' }).getByRole('button', { name: 'Use again' })).toBeVisible()
   })
 })
 
@@ -166,6 +180,8 @@ async function openStatement(page: Page) {
 const shown = (select: Locator) => select.evaluate((el: HTMLSelectElement) => el.selectedOptions[0]?.textContent ?? '')
 const paidOn = (dlg: Locator) => dlg.getByLabel('Paid on', { exact: true })
 const paidWith = (dlg: Locator) => dlg.getByLabel('Paid with', { exact: true })
+/** A method of the demo household as a list of choices names it: with its note. */
+const choice = (name: string) => (name === 'Credit card' ? name : `${name} · Main account`)
 /** What is owed on the demo's card at the end of the month on screen. */
 async function owedOnCard(page: Page): Promise<number> {
   const text = await page.locator('[data-line^="acc:"]').filter({ hasText: 'Credit card' }).first().innerText()
@@ -176,7 +192,7 @@ async function owedOnCard(page: Page): Promise<number> {
 test.describe('Payments: "Paid on" and "Paid with"', () => {
   test.use({ viewport: { width: 1440, height: 900 } })
 
-  test('"Usually paid…" in the row menu: a day and a method for the row, and a card the row was on reads as that card\'s method', async ({ page }) => {
+  test('"Usually paid…" in the row menu: a day and a method for the row, beside "Paid by card…", and no figure moves', async ({ page }) => {
     await withMethods(page)
     await openStatement(page)
     await page.getByRole('button', { name: 'Row menu for The flat – Rent' }).click()
@@ -187,66 +203,57 @@ test.describe('Payments: "Paid on" and "Paid with"', () => {
     await paidOn(dlg).selectOption('31st')
     await expect(dlg).toContainText('In a shorter month the 31st is its last day.')
     await paidOn(dlg).selectOption('1st')
-    await paidWith(dlg).selectOption({ label: 'Standing order' })
-    // on the main account: nothing follows for the figures
-    await expect(dlg.getByTestId('method-effect')).toHaveCount(0)
+    await paidWith(dlg).selectOption({ label: choice('Standing order') })
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
     await page.getByRole('button', { name: 'Row menu for The flat – Rent' }).click()
     await page.getByRole('menuitem', { name: 'Usually paid…' }).click()
-    expect([await shown(paidOn(dlg)), await shown(paidWith(dlg))]).toEqual(['1st', 'Standing order'])
+    expect([await shown(paidOn(dlg)), await shown(paidWith(dlg))]).toEqual(['1st', choice('Standing order')])
     await dlg.getByRole('button', { name: 'Cancel' }).click()
 
-    // "Subscriptions" was put on the card with "Paid by card…": that choice is the card's method now
+    // "Subscriptions" is on the card through "Paid by card…", which is in the menu beside "Usually paid…"
     const owed = await owedOnCard(page)
+    expect(owed).toBeGreaterThan(0)
     await page.getByRole('button', { name: 'Row menu for Subscriptions' }).click()
-    await expect(page.getByRole('menuitem', { name: 'Paid by card…' })).toHaveCount(0)
+    await expect(page.getByRole('menuitem', { name: 'Paid by card…' })).toBeVisible()
     await page.getByRole('menuitem', { name: 'Usually paid…' }).click()
     expect(await shown(paidWith(dlg))).toBe('Credit card')
-    await expect(dlg.getByTestId('method-effect')).toHaveText('Bought on "Credit card": the amount is owed there until the card is paid.')
-    // paid by direct debit instead: off the card, in every month, so the months that are over are asked about
-    await paidWith(dlg).selectOption({ label: 'Direct debit' })
-    await expect(dlg.getByTestId('method-effect')).toHaveCount(0)
+    // paid by direct debit instead: a label changes, the row stays on its card, and no month that is over is asked about
+    await paidWith(dlg).selectOption({ label: choice('Direct debit') })
+    await paidOn(dlg).selectOption('7th')
     await dlg.getByRole('button', { name: 'Save' }).click()
-    await saveAnyway(page)
     await expect(dlg).toBeHidden()
-    // waited for: the dialog closes before the page has the saved figures
-    expect(owed).toBeGreaterThan(0)
-    await expect.poll(() => owedOnCard(page)).toBe(0)
+    await expect(page.getByTestId('past-question')).toHaveCount(0)
+    // once the page has the change (the day after the row's name), what is owed on the card is what it was
+    await expect(page.locator('[data-line]').filter({ hasText: 'Subscriptions' }).first().locator('[data-day]')).toHaveText('7th')
+    expect(await owedOnCard(page)).toBe(owed)
   })
 
-  test('the amount\'s dialog: "Usually paid" is saved with the amount, and a method on another account sets "Comes out of"', async ({ page }) => {
+  test('the amount\'s dialog: "Usually paid" is saved with the amount, and leaves "Comes out of" alone', async ({ page }) => {
     await withMethods(page)
-    await methods(page).getByRole('button', { name: 'Add method' }).click()
-    const add = page.getByRole('dialog', { name: 'New payment method' })
-    await add.getByLabel('Kind', { exact: true }).selectOption('Standing order')
-    await add.getByLabel('Name', { exact: true }).fill('From savings')
-    await add.getByLabel('Draws on', { exact: true }).selectOption({ label: 'Savings' })
-    await add.getByRole('button', { name: 'Save' }).click()
-    await expect(add).toBeHidden()
     await openStatement(page)
 
     await page.getByRole('button', { name: /^Groceries:/ }).click()
     const dlg = page.getByRole('dialog', { name: /^Groceries · / })
     const usual = dlg.getByTestId('usually-paid')
+    const source = dlg.getByLabel('Comes out of', { exact: true })
+    const from = await shown(source)
     await expect(usual).toContainText('For this row, in every month.')
     await paidOn(usual).selectOption('15th')
-    await paidWith(usual).selectOption({ label: 'Direct debit' })
+    await paidWith(usual).selectOption({ label: choice('Direct debit') })
     await expect(usual).toContainText('saved with the amount')
-    await expect(dlg.getByLabel('Comes out of', { exact: true })).toBeEnabled()
     await dlg.getByLabel('Amount in EUR').fill('720')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
     await expect(page.getByRole('button', { name: /^Groceries:/ })).toHaveAccessibleName(/^Groceries: €720\.00/)
 
-    // a method that pays from the savings account: the amount comes out of it, and the field says who set it
+    // whatever the method, where the amount comes out of is its own choice: free, and as it was
     await page.getByRole('button', { name: /^Groceries:/ }).click()
-    expect([await shown(paidOn(usual)), await shown(paidWith(usual))]).toEqual(['15th', 'Direct debit'])
-    await paidWith(usual).selectOption({ label: 'From savings' })
-    await expect(usual.getByTestId('method-effect')).toHaveText('Paid from "Savings", so the amount comes out of that account too.')
-    await expect(dlg.getByLabel('Comes out of', { exact: true })).toBeDisabled()
-    expect(await shown(dlg.getByLabel('Comes out of', { exact: true }))).toContain('Savings')
-    await expect(dlg.getByTestId('source-by-method')).toBeVisible()
+    expect([await shown(paidOn(usual)), await shown(paidWith(usual))]).toEqual(['15th', choice('Direct debit')])
+    await paidWith(usual).selectOption({ label: 'Credit card' })
+    await expect(source).toBeEnabled()
+    expect(await shown(source)).toBe(from)
+    await expect(dlg.getByTestId('method-effect')).toHaveCount(0)
     await dlg.getByRole('button', { name: 'Cancel' }).click()
 
     // one undo takes the amount and the row's day and method back together
@@ -264,17 +271,14 @@ test.describe('Payments: "Paid on" and "Paid with"', () => {
     const dlg = page.getByRole('dialog', { name: /^Subscriptions · / })
     const day = dlg.getByLabel('Paid on, Streaming')
     const method = dlg.getByLabel('Paid with, Streaming')
-    // nothing of its own yet: it follows the row, which is on the card
+    // nothing of its own yet: it follows the row, which is usually paid with the credit card
     expect([await shown(day), await shown(method)]).toEqual(['No day', 'Usual: Credit card'])
     await day.selectOption('5th')
-    await method.selectOption({ label: 'Direct debit' })
+    await method.selectOption({ label: choice('Direct debit') })
     // it repeats, so the dialog asks how far the change goes
     await dlg.getByRole('radio', { name: 'This and following months' }).click()
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-    // paid by direct debit from the main account: no longer bought on the card this month
-    await expect.poll(() => owedOnCard(page)).toBe(owed - 18)
-
     await page.getByRole('button', { name: /^Subscriptions:/ }).click()
     expect([await shown(day), await shown(method)]).toEqual(['As scheduled: 5th', 'As scheduled: Direct debit'])
     // only this month, on the 9th: the item names it, the schedule keeps the 5th
@@ -285,6 +289,9 @@ test.describe('Payments: "Paid on" and "Paid with"', () => {
     await page.getByRole('button', { name: /^Subscriptions:/ }).click()
     expect(await shown(day)).toBe('9th')
     await expect(day.getByRole('option').first()).toHaveText('As scheduled: 5th')
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+    // the row is on the card ("Paid by card…"), and a method is a label: what is owed there has not moved
+    expect(await owedOnCard(page)).toBe(owed)
   })
 })
 
@@ -294,13 +301,13 @@ async function openPayments(page: Page) {
   await rail(page).getByRole('link', { name: 'Payments' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Payments' })).toBeVisible()
 }
-/** "Usually paid…" from the row's menu on the Statement: a day and a method on the main account, which asks nothing. */
+/** "Usually paid…" from the row's menu on the Statement: a day and a method. It asks nothing, in any month. */
 async function usuallyPaid(page: Page, row: string, day: string | null, method: string | null) {
   await page.getByRole('button', { name: `Row menu for ${row}`, exact: true }).click()
   await page.getByRole('menuitem', { name: 'Usually paid…' }).click()
   const dlg = page.getByRole('dialog', { name: 'Usually paid' })
   if (day) await paidOn(dlg).selectOption(day)
-  if (method) await paidWith(dlg).selectOption({ label: method })
+  if (method) await paidWith(dlg).selectOption({ label: choice(method) })
   await dlg.getByRole('button', { name: 'Save' }).click()
   await expect(dlg).toBeHidden()
 }
@@ -461,7 +468,7 @@ test.describe('Payments: the page', () => {
     await expect(page.getByTestId('payments-filter')).toHaveCount(0)
   })
 
-  test('two things in one row, each paid its own way: two lines, and only the card\'s one is bought on the card', async ({ page }) => {
+  test('two things in one row, each paid its own way: two lines, and the row stays on its card as a whole', async ({ page }) => {
     await withMethods(page)
     await openStatement(page)
     const owed = await owedOnCard(page)
@@ -471,27 +478,27 @@ test.describe('Payments: the page', () => {
     await dlg.getByLabel('Item label').last().fill('Music')
     await dlg.getByLabel('Item amount').last().fill('12')
     await dlg.getByLabel('Paid on, Music').selectOption('20th')
-    await dlg.getByLabel('Paid with, Music').selectOption({ label: 'Direct debit' })
+    await dlg.getByLabel('Paid with, Music').selectOption({ label: choice('Direct debit') })
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-    // once the page has the new item (18.00 and 12.00): the row is on the card, and the new item is not, so what is
-    // owed on the card has not moved
+    // once the page has the new item (18.00 and 12.00): the row is on the card ("Paid by card…"), and so is the new
+    // item, whatever it is paid with
     await expect(page.getByRole('button', { name: /^Subscriptions:/ })).toHaveAccessibleName(/^Subscriptions: €30\.00/)
-    expect(await owedOnCard(page)).toBe(owed)
+    expect(await owedOnCard(page)).toBe(owed + 12)
 
     await openPayments(page)
     await expect(page.getByRole('button', { name: /^Subscriptions: Music: €12\.00, on the 20th, Direct debit$/ })).toBeVisible()
     await expect(page.getByRole('button', { name: /^Subscriptions: Streaming: €18\.00, no day yet, Credit card$/ })).toBeVisible()
     const music = lines(page).filter({ hasText: 'Music' })
     await expect(music).toHaveText(/Fri 20\s*Music\s*Subscriptions\s*Direct debit/)
-    await expect(music).not.toContainText('on card')
-    await expect(lines(page).filter({ hasText: 'Streaming' })).toContainText('on card')
+    await expect(lines(page).filter({ hasText: 'Streaming' })).toHaveText(/Streaming\s*Subscriptions\s*Credit card/)
     // one item of several is set in the amount's dialog: no "Set…" on its line
     await expect(lines(page).filter({ hasText: 'Streaming' }).getByRole('button', { name: /^Set the day/ })).toHaveCount(0)
     const totals = page.getByTestId('payment-totals')
-    await expect(totals.getByRole('button', { name: /^Credit card: €18\.00 bought on it$/ })).toBeVisible()
-    // with the utilities (210.00), which the demo household pays by direct debit
-    await expect(totals.getByRole('button', { name: /^Direct debit on Main account: €222\.00, 2 payments$/ })).toBeVisible()
+    await expect(totals.getByRole('button', { name: /^Credit card: €30\.00 bought on it$/ })).toBeVisible()
+    // the utilities (210.00) are the demo household's other direct debit
+    await expect(totals.getByRole('button', { name: /^Direct debit on Credit card: €12\.00, 1 payment$/ })).toBeVisible()
+    await expect(totals.getByRole('button', { name: /^Direct debit on Main account: €210\.00, 1 payment$/ })).toBeVisible()
 
     // each has a tick of its own, and it is the item's tick on the Statement
     await page.getByRole('checkbox', { name: 'Subscriptions: Music done' }).click()

@@ -25,12 +25,12 @@ describe('demo household', () => {
     const t = buildDemoTables()
     expect(t.household[0].payments ?? false).toBe(false)
     expect(t.paymentMethods.map((m) => m.name)).toEqual(['Direct debit', 'Standing order', 'Transfer by hand', 'Credit card'])
-    const accountIds = new Set(t.accounts.map((a) => a.id))
     const methodIds = new Set(t.paymentMethods.map((m) => m.id))
-    for (const m of t.paymentMethods) expect(accountIds.has(m.accountId), m.name).toBe(true)
+    // a method is a label: none is tied to an account
+    for (const m of t.paymentMethods) expect(m.accountId ?? null, m.name).toBeNull()
     for (const r of t.recurringItems) if (r.methodId) expect(methodIds.has(r.methodId), r.name).toBe(true)
     const usual = t.rows.filter((r) => r.payMethodId)
-    expect(usual.map((r) => [r.name, r.payDay])).toEqual([['The flat – Utilities', 12], ['Robin – Childcare', 25], ['To savings', 28]])
+    expect(usual.map((r) => [r.name, r.payDay ?? null])).toEqual([['The flat – Utilities', 12], ['Robin – Childcare', 25], ['Subscriptions', null], ['To savings', 28]])
     // setting the same day and method through the store changes nothing but the time of the change
     for (const r of usual) {
       const written = planUsualPayment(t, r.id, { payDay: r.payDay ?? null, payMethodId: r.payMethodId ?? null }, 1)
@@ -38,7 +38,7 @@ describe('demo household', () => {
       expect(written[0].op === 'put' && { ...written[0].record, updatedAt: r.updatedAt }, r.name).toEqual(r)
     }
     expect(t.recurringItems.filter((r) => r.payDay != null).map((r) => [r.name, r.payDay])).toEqual([['Rent', 1], ['Car insurance', 15], ['Dog tax', 10]])
-    // with the switch off and on, the figures are the same: no method here draws on a card or on another account
+    // with the switch off and on, with the methods and without them, the figures are the same (rule W1)
     const months = monthRange('2026-09', '2027-12')
     const on: typeof t = { ...t, household: [{ ...t.household[0], payments: true }] }
     const without: typeof t = { ...t, paymentMethods: [], rows: t.rows.map((r) => ({ ...r, payDay: null, payMethodId: null })), recurringItems: t.recurringItems.map((r) => ({ ...r, payDay: null, methodId: null })) }

@@ -1,7 +1,7 @@
 import { generateKeyBetween } from 'fractional-indexing'
 import { computeEngine, cellKey, sortRows, typedAmount, type EngineOutput } from '@/engine'
 import {
-  ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RecurringItemSchema, RowSchema, accountIdOf, addMonths, buysOnCard, canCarryRule, canTakeRest, cardIsItemized, compareMonths, currencyExponent, fromMinor, holdsBalance, isOldPocketShare, isOutsideNetWorth, isShareRule, monthKey, monthOfDate, monthRange, newId, ownBalance, parseMonth, paysExpenses, poolIdOf, resolveRules, sharePercent, toMinor,
+  ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RecurringItemSchema, RowSchema, accountIdOf, addMonths, canCarryRule, canTakeRest, cardIsItemized, compareMonths, currencyExponent, fromMinor, holdsBalance, isOldPocketShare, isOutsideNetWorth, isShareRule, monthKey, monthOfDate, monthRange, newId, ownBalance, parseMonth, paysExpenses, poolIdOf, resolveRules, sharePercent, toMinor,
   type Account, type Category, type Cell, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Pool, type Row, type RowKind, type Tables,
 } from '@/model'
 import { NO_QUESTION, type Mutation, type Store } from './store'
@@ -977,11 +977,7 @@ export async function setRowAccount(store: Store, rowId: string, accountId: stri
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
   if (!row) throw new Error('Row not found')
   checkAccountForRow(tables, row, accountId)
-  // "Paid by card…" and the row's usual method say the same thing (`planUsualPayment`): a method that draws on
-  // another account than the one named here no longer holds
-  const method = row.payMethodId ? tables.paymentMethods.find((m) => m.id === row.payMethodId) : undefined
-  const stale = buysOnCard(row) && method != null && method.accountId !== accountId
-  await updateRow(store, rowId, { accountId, ...(stale ? { payMethodId: null } : {}) })
+  await updateRow(store, rowId, { accountId })
 }
 
 /** The account a row may point at: it must exist, and a typed row (deposits, payments) needs the matching type. */

@@ -8,7 +8,7 @@ import { T0, account, cellItems, cellValue, household, row, tables } from './hel
 const MONTH = '2026-11'
 const TODAY = '2026-11-22'
 const method = (name: string, acc: Account, kind: PaymentKind, ownerEntityId: string | null = null) =>
-  PaymentMethodSchema.parse({ id: newId(), createdAt: T0, updatedAt: T0, name, kind, accountId: acc.id, ownerEntityId })
+  PaymentMethodSchema.parse({ id: newId(), createdAt: T0, updatedAt: T0, name, kind, note: acc.name, ownerEntityId })
 const person = (name: string) => EntitySchema.parse({ id: newId(), createdAt: T0, updatedAt: T0, kind: 'adult', name })
 
 function of(t: Tables, month = MONTH, today = TODAY) {
@@ -125,9 +125,9 @@ describe('where a payment stands, and where it leaves', () => {
     expect(pay.payments.filter((p) => p.rowId === subs.id).map((p) => [p.label, p.rowLabel, p.amount, p.day, p.itemId != null])).toEqual([
       ['Films', 'Subscriptions', 14_00, 3, true], ['Music', 'Subscriptions', 11_00, 18, true],
     ])
-    // Films follows the row onto the card; Music is paid by hand from the main account
-    expect(named('Films')).toMatchObject({ accountId: visa.id, onCard: true, methodId: visaCard.id, ask: 'buying' })
-    expect(named('Music')).toMatchObject({ accountId: main.id, onCard: false, methodId: byHand.id, ask: 'hand' })
+    // the row is on the card, and so is each of its items, whatever it is paid with; Films names no method
+    expect(named('Films')).toMatchObject({ accountId: visa.id, onCard: true, methodId: null, ask: null })
+    expect(named('Music')).toMatchObject({ accountId: visa.id, onCard: true, methodId: byHand.id, ask: 'hand' })
   })
 
   it('without a method the account is the one the amount comes out of; a transfer leaves the main account', () => {
@@ -185,7 +185,7 @@ describe('where a payment stands, and where it leaves', () => {
     expect(first.methods.map((m) => m.label)).toEqual(['Direct debit', 'Transfer', 'No method yet'])
     expect(first.methods[0]).toMatchObject({ total: 45_00 + 25_00, count: 2 })
     const card = pay.accounts[3]
-    expect(card).toMatchObject({ card: true, total: 14_00, owed: { amount: 14_00 - 25_00, currency: 'EUR' }, paidBy: [cardBill.id] })
+    expect(card).toMatchObject({ card: true, total: 14_00 + 11_00, owed: { amount: 14_00 + 11_00 - 25_00, currency: 'EUR' }, paidBy: [cardBill.id] })
   })
 
   it('who pays: the method\'s owner, else the owner of the account it leaves, else the household', () => {
@@ -193,7 +193,7 @@ describe('where a payment stands, and where it leaves', () => {
     expect(named('Insurance').ownerId).toBe(sam.id)
     expect(named('Phone').ownerId).toBeNull()
     expect(pay.people.map((p) => p.label)).toEqual(['Household', 'Sam'])
-    expect(pay.people[1].total).toBe(40_00 + 90_00 + 14_00 + 11_00)
+    expect(pay.people[1].total).toBe(40_00 + 90_00 + 11_00)
   })
 
   it('a row kept in another currency: its items take their share of the row\'s amount in the household\'s currency', () => {

@@ -32,7 +32,7 @@ export interface Payment {
   methodId: string | null
   /** What the method asks of the household; null without a method. */
   ask: PaymentAsk | null
-  /** The account or card it leaves: the method's, else the one "Comes out of" or the row's card names; null where there is none (no main account yet). */
+  /** The account or card it leaves: the one "Comes out of" or the row's card names; null where there is none (no main account yet). */
   accountId: string | null
   /** Who pays: the method's owner, else the owner of the account it leaves; null = the household. */
   ownerId: string | null
@@ -109,6 +109,7 @@ export function buildPayments(tables: Tables, engine: EngineOutput, month: Month
   const household = tables.household.find((h) => !h.deletedAt)
   if (!statement || !household) return null
   const ctx = payContext(tables)
+  const accountsById = new Map(tables.accounts.filter((a) => !a.deletedAt).map((a) => [a.id, a]))
   const rowsById = new Map(engine.rows.map((r) => [r.id, r]))
   const poolsById = new Map(tables.pools.filter((p) => !p.deletedAt).map((p) => [p.id, p]))
   const entities = new Map(tables.entities.filter((e) => !e.deletedAt).map((e) => [e.id, e]))
@@ -123,13 +124,13 @@ export function buildPayments(tables: Tables, engine: EngineOutput, month: Month
     if (poolId) return poolsById.get(poolId)?.accountId ?? mainId
     if (f === 'savings') return engine.primarySavingsId ?? mainId
     const id = accountIdOf(f)
-    const account = id ? ctx.accounts.get(id) : undefined
+    const account = id ? accountsById.get(id) : undefined
     return account && paysExpenses(account) ? account.id : mainId
   }
   /** Where an amount leaves when no method says: the card it is bought on, the account it comes out of, else the main account. */
   const leaves = (row: Row, item: CellItem | null): string | null => {
     if (!buysOnCard(row)) return mainId
-    const card = row.accountId ? ctx.accounts.get(row.accountId) : undefined
+    const card = row.accountId ? accountsById.get(row.accountId) : undefined
     if (card?.type === 'credit-card') return card.id
     return sourceAccount(item?.fundedBy ?? row.defaultFundedBy)
   }
@@ -143,8 +144,9 @@ export function buildPayments(tables: Tables, engine: EngineOutput, month: Month
   const payments: Payment[] = []
   const add = (row: Row, line: StatementLine, item: CellItem | null, amount: Money, native: Payment['native'], over: Partial<Payment>) => {
     const method: PaymentMethod | null = methodOf(item, row, ctx)
-    const accountId = method ? method.accountId : leaves(row, item)
-    const account: Account | undefined = accountId ? ctx.accounts.get(accountId) : undefined
+    // a method is a label: where an amount leaves is what "Comes out of" and the row's card say
+    const accountId = leaves(row, item)
+    const account: Account | undefined = accountId ? accountsById.get(accountId) : undefined
     const day = payDayOf(item, row, month, ctx)
     const done = (over.status ?? line.status) === 'done'
     payments.push({
@@ -201,10 +203,10 @@ export function buildPayments(tables: Tables, engine: EngineOutput, month: Month
   }
 
   const byAccount = new Map<string, PaymentAccountTotal>()
-  const accountOrder = [...ctx.accounts.values()].sort((a, b) => (a.type === 'checking' ? 0 : 1) - (b.type === 'checking' ? 0 : 1) || (a.order < b.order ? -1 : a.order > b.order ? 1 : 0)).map((a) => a.id)
+  const accountOrder = [...accountsById.values()].sort((a, b) => (a.type === 'checking' ? 0 : 1) - (b.type === 'checking' ? 0 : 1) || (a.order < b.order ? -1 : a.order > b.order ? 1 : 0)).map((a) => a.id)
   for (const p of payments) {
     const key = p.accountId ?? ''
-    const account = p.accountId ? ctx.accounts.get(p.accountId) : undefined
+    const account = p.accountId ? accountsById.get(p.accountId) : undefined
     let total = byAccount.get(key)
     if (!total) byAccount.set(key, (total = { accountId: p.accountId, label: account?.name ?? 'No account', card: account?.type === 'credit-card', total: 0, left: 0, methods: [] }))
     total.total += p.amount
@@ -216,7 +218,7 @@ export function buildPayments(tables: Tables, engine: EngineOutput, month: Month
     if (!p.done) method.left += p.amount
   }
   // a card the plan follows stands in the list also in a month nothing was bought on it: what is owed, and what pays it
-  for (const account of ctx.accounts.values()) {
+  for (const account of accountsById.values()) {
     if (account.type !== 'credit-card' || (account.archivedMonth && compareMonths(month, account.archivedMonth) >= 0)) continue
     const series = engine.accounts[account.id]?.months[month]
     if (!series && !byAccount.has(account.id)) continue
