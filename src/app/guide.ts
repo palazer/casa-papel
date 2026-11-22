@@ -286,8 +286,9 @@ export const GUIDE: GuideTopic[] = [
       'Point at a month in "Amounts", or press Tab until the chart has the focus and use the arrow keys: a list says that month\'s amounts and how each moved from the month before.',
       'With one tile on, press "Breakdown" beside "Amounts": the line becomes columns stacked from its parts, named under the chart. "Total" brings the line back.',
       'Press "10 years" under "Looks ahead" to see where the plan leads; "Plan" goes back.',
+      'A goal is a chip under the tiles: press it to draw its amount across the chart, with a flag at the month it is due and a dot where the plan gets there. A goal is set on the Statement, on the line it watches.',
     ],
-    tips: ['trends.tiles', 'trends.amounts', 'trends.changes', 'trends.breakdown'],
+    tips: ['trends.tiles', 'trends.amounts', 'trends.changes', 'trends.breakdown', 'trends.goals'],
     open: 'trends',
   },
   {

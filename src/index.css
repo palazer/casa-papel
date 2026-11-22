@@ -87,6 +87,8 @@
        above; accounts and debts get one each. Checked as a set of five with the dataviz validator, every pair, on white. */
     --trend-accounts: oklch(58.8% 0.158 241.966);  /* sky-600 */
     --trend-debts: oklch(66.6% 0.179 58.318);      /* amber-600 */
+    /* A balance a goal watches, as a line of its own: ink, told by the name at its end, not one more hue. */
+    --trend-balance: oklch(44.6% 0.03 256.802);    /* slate-600 */
     /* The parts of a breakdown, in the order they are given out; neighbours in a stack are told apart with
        colour-blindness too. The dataviz reference palette's first six, and a grey for "Other". */
     --part-1: #2a78d6;

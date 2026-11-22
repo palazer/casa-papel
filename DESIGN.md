@@ -1136,6 +1136,11 @@ Tip        a popover-ground box beside the pointer (on the side with room): the 
   only, in the order of the stack (a 10 px square each, a 12 px stroke for the line across).
 - **The amount axis ends on a step, except just below zero:** an amount less than a quarter of a step under it (a
   small debt beneath large savings) gets that room and no step of its own.
+- **A target on a line chart** (`ChartTarget`): an amount a line is meant to reach. A 1.5 px dashed line (6 4) in the
+  goal's gold across the plot from the month the goal was set, named above its start in 10 px ink (`House: €50,000
+  by Jun 2027`; under the line where it runs along the top of the plot); a small gold flag standing on it at the
+  month it is due; and a 4.5 px gold dot, ringed in the card ground, on the line itself at the first month it gets
+  there. Dashes are the target, dots the plan: the two never read as one. Gold stays the goals' alone (§5).
 - **Sparkline** (`Sparkline.tsx`): a subject's months as a 1.5 px line in its colour with no axis, 24 px high and as
   wide as its tile, solid for the past and dotted for the plan. It says the shape only.
 - **Trends** (`src/features/trends/TrendsScreen.tsx`, the figures in `src/engine/trends.ts`, the look ahead in
@@ -1162,4 +1167,14 @@ Tip        a popover-ground box beside the pointer (on the side with room): the 
   the Statement's order, whatever range is in view (`topParts`); the rest is "Other". Its tip says the total, then
   every part from the top of the column down. What is on, how far ahead the page looks and whether the one subject
   is shown as its parts are remembered on the device (`trends.subjects`, `trends.horizon`, `trends.breakdown`).
+  **Goals** stand under the tiles when the household has any (`goalMarks.ts`): a small-caps `Goals` with an (i), then
+  a chip per goal that is a switch (`button aria-pressed`: the gold `Target` icon, the goal's name, its percentage in
+  muted tabular figures; the lime border when on), and under them one line per goal that is on, in the Statement's
+  own sentence and colour (`goalStatusLine`). On, a net worth goal is a target on the net worth line (it is off
+  while that line is, and turning it on brings the line back); a goal on an account, a virtual account, a card or a
+  loan brings that balance as a line of its own in `--trend-balance` (slate-600: ink, told by the name at its end,
+  not one more hue) with its target. Net worth goals are on until a chip is pressed; after that the device remembers
+  the choice (`trends.goals`). The goals are read over the months in view, so a longer look ahead can show a month
+  the plan itself does not reach. A goal in another currency than the household's, or one that cannot be measured,
+  keeps its chip and its sentence and is not drawn. With a goal's own line on the chart there is no `Breakdown`.
 

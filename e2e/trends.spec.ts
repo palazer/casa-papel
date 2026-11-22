@@ -331,6 +331,119 @@ test.describe('Trends: one subject as its parts', () => {
   })
 })
 
+test.describe('Trends: goals', () => {
+  test.use({ viewport: { width: 1440, height: 900 } })
+  const goals = (page: Page) => page.getByTestId('trend-goals')
+  const said = (page: Page) => page.getByRole('list', { name: 'Goals on the chart' }).getByRole('listitem')
+
+  /** A goal set on the Statement, on the line it watches. */
+  async function setGoal(page: Page, region: string, line: string, name: string, target: string, due?: { month: string; year: string }) {
+    await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
+    await page.getByRole('region', { name: region }).getByRole('button', { name: `Set a goal for ${line}` }).click()
+    const dlg = page.getByRole('dialog')
+    await dlg.getByLabel('Name').fill(name)
+    await dlg.getByLabel(/^Target \(EUR\)/).fill(target)
+    if (due) {
+      await dlg.getByLabel('Target month: month').selectOption(due.month)
+      await dlg.getByLabel('Target month: year').selectOption(due.year)
+    }
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+  }
+
+  test('a net worth goal is drawn on the net worth line: its amount across, a flag where it is due, a dot where the plan gets there', async ({ page }) => {
+    await loadDemo(page)
+    await openTrends(page)
+    // a household without goals has no row of them
+    await expect(goals(page)).toHaveCount(0)
+
+    // net worth is about 28,000 and grows by about 2,400 a month: 50,000 is reached after June 2027
+    await setGoal(page, 'Debts and net worth', 'Net worth', 'House', '50000', { month: '6', year: '2027' })
+    await openTrends(page)
+    const chip = goals(page).getByRole('button', { name: /^House/ })
+    await expect(chip).toHaveAttribute('aria-pressed', 'true')
+    await expect(chip).toContainText(/House\s*5\d%/)
+    const target = chart(page).locator('[data-target]')
+    await expect(target).toHaveCount(1)
+    await expect(target).toContainText('House: €50,000 by Jun 2027')
+    await expect(target.locator('[data-due]')).toHaveCount(1)
+    await expect(chart(page).locator('[data-reached]')).toHaveCount(1)
+    // the flag stands before the dot: the plan gets there after the month it is due
+    const due = (await target.locator('[data-due]').boundingBox())!
+    const reached = (await chart(page).locator('[data-reached]').boundingBox())!
+    expect(reached.x).toBeGreaterThan(due.x + due.width)
+    // the Statement's own sentence
+    await expect(said(page)).toHaveCount(1)
+    await expect(said(page)).toContainText(/House: €27,965\.\d\d of €50,000\.00 · reached by \w+ 2027, after the target of Jun 2027/)
+    await page.screenshot({ path: 'e2e/output/trends-goal.png', fullPage: true })
+
+    // the chip is a switch, remembered on the device
+    await chip.click()
+    await expect(chip).toHaveAttribute('aria-pressed', 'false')
+    await expect(target).toHaveCount(0)
+    await expect(said(page)).toHaveCount(0)
+    await page.reload()
+    await expect(chip).toHaveAttribute('aria-pressed', 'false')
+    await chip.click()
+    await expect(target).toHaveCount(1)
+
+    // it is drawn on the net worth line: without that line it is off, and turning it on brings the line back
+    await tile(page, 'Net worth').click()
+    await expect(chip).toHaveAttribute('aria-pressed', 'false')
+    await tile(page, 'Income').click()
+    await expect(chart(page).locator('[data-target]')).toHaveCount(0)
+    await chip.click()
+    await expect(tile(page, 'Net worth')).toHaveAttribute('aria-pressed', 'true')
+    await expect(chart(page).locator('[data-target]')).toHaveCount(1)
+    await expect(chart(page).locator('[data-line]')).toHaveCount(2)
+    // the (i) of the row
+    await goals(page).getByRole('button', { name: 'About Goals on the chart' }).click()
+    await expect(page.getByText('the dashed gold line is its amount', { exact: false })).toBeVisible()
+  })
+
+  test('a goal the plan does not reach can be reached by looking further ahead', async ({ page }) => {
+    await loadDemo(page)
+    await setGoal(page, 'Debts and net worth', 'Net worth', 'Freedom', '200000')
+    await openTrends(page)
+    await expect(said(page)).toContainText('Freedom: €27,965')
+    await expect(said(page)).toContainText('not reached in the next 13 months')
+    await expect(chart(page).locator('[data-target]')).toContainText('Freedom: €200,000')
+    await expect(chart(page).locator('[data-reached]')).toHaveCount(0)
+    await page.getByRole('radio', { name: '10 years' }).click()
+    await expect(said(page)).toContainText(/Freedom: .* · reached by \w+ 203\d/)
+    await expect(chart(page).locator('[data-reached]')).toHaveCount(1)
+    await page.screenshot({ path: 'e2e/output/trends-goal-10-years.png', fullPage: true })
+  })
+
+  test('a goal on a virtual account brings that balance as a line of its own, with its amount across', async ({ page }) => {
+    await loadDemo(page)
+    await setGoal(page, 'Assets', 'Travel', 'Travel fund', '1000', { month: '6', year: '2027' })
+    await openTrends(page)
+    const chip = goals(page).getByRole('button', { name: /^Travel fund/ })
+    // only net worth goals are on by themselves
+    await expect(chip).toHaveAttribute('aria-pressed', 'false')
+    await expect(chart(page).locator('[data-line]')).toHaveCount(1)
+    await expect(page.getByTestId('trend-amounts').getByRole('radiogroup')).toHaveCount(1)
+    await chip.click()
+    await expect(chip).toHaveAttribute('aria-pressed', 'true')
+    await expect(chart(page).locator('[data-line]')).toHaveCount(2)
+    await expect(chart(page).locator('[data-end]')).toHaveText(['Net worth', 'Travel'])
+    await expect(chart(page).locator('[data-target]')).toContainText('Travel fund: €1,000 by Jun 2027')
+    await expect(said(page)).toContainText('Travel fund:')
+    // a line of its own is on: nothing to break down
+    await expect(page.getByTestId('trend-amounts').getByRole('radiogroup')).toHaveCount(0)
+    // the pointer reads the balance too
+    await chart(page).focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(page.getByTestId('chart-tip')).toContainText(/€\d[\d,]*\.\d\d Travel/)
+    await page.keyboard.press('Escape')
+    // alone on the chart, it has the chart's scale to itself
+    await tile(page, 'Net worth').click()
+    await expect(chart(page).locator('[data-line]')).toHaveCount(1)
+    await page.screenshot({ path: 'e2e/output/trends-goal-balance.png', fullPage: true })
+  })
+})
+
 test.describe('Trends on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
 

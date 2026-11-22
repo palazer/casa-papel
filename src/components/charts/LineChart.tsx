@@ -99,7 +99,8 @@ export function LineChart({ months, lines, planFrom, now, at, onAt, unit, axisTe
                     <path d="M0 -13 L9 -10 L0 -7 Z" style={{ fill: 'var(--goal)' }} />
                   </g>
                 )}
-                <text x={x(t.from) + 2} y={y(t.value) - 5} className="fill-foreground text-[10px]">{cut(t.label, Math.max(12, Math.floor((plotRight - x(t.from)) / 6)))}</text>
+                {/* named above its line; under it where the line runs along the top of the plot */}
+                <text x={x(t.from) + 2} y={y(t.value) - TOP < 14 ? y(t.value) + 12 : y(t.value) - 5} className="fill-foreground text-[10px]">{cut(t.label, Math.max(12, Math.floor((plotRight - x(t.from)) / 6)))}</text>
               </g>
             ))}
             {lines.map((l) => (
