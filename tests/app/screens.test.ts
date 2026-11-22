@@ -2,17 +2,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RAIL, SCREENS, SETTINGS_PAGES, groupOf, isScreen, isUtility, readScreen, screenDef, type Screen } from '@/app/screens'
 
 describe('screens and the rail', () => {
-  it('the rail covers every screen exactly once: the Statement and the Grid, then the Settings group', () => {
+  it('the rail covers every screen exactly once: the Statement, the Grid and Trends, then the Settings group', () => {
     const keys = RAIL.flatMap((it) => (it.kind === 'page' ? [it.key] : it.pages))
     expect(keys).toEqual(SCREENS.map((s) => s.key))
-    expect(keys).toEqual(['statement', 'grid', 'household', 'data', 'guide'])
-    expect(RAIL.map((it) => it.kind)).toEqual(['page', 'page', 'group'])
+    expect(keys).toEqual(['statement', 'grid', 'trends', 'household', 'data', 'guide'])
+    expect(RAIL.map((it) => it.kind)).toEqual(['page', 'page', 'page', 'group'])
     expect(screenDef('statement').label).toBe('Statement')
     expect(SETTINGS_PAGES).toEqual(['household', 'data', 'guide'])
     expect(screenDef('guide').label).toBe('Guide')
   })
   it('knows which screens live under Settings', () => {
-    const grouped: Record<Screen, 'settings' | null> = { statement: null, grid: null, household: 'settings', data: 'settings', guide: 'settings' }
+    const grouped: Record<Screen, 'settings' | null> = { statement: null, grid: null, trends: null, household: 'settings', data: 'settings', guide: 'settings' }
     for (const [k, v] of Object.entries(grouped)) expect(groupOf(k as Screen)).toBe(v)
   })
   it('Data and the Guide are the utilities: they open without a household and are never the screen to land on', () => {

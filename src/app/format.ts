@@ -13,6 +13,11 @@ export function formatWhole(minor: Money, currency: string, locale: string): str
   return new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(fromMinor(minor, currency))
 }
 
+/** An amount for a chart's axis, short: "€20K", "€1.5M", "€750". The axis says the size, the pointer the exact amount. */
+export function formatAxis(minor: Money, currency: string, locale: string): string {
+  return new Intl.NumberFormat(locale, { style: 'currency', currency, notation: 'compact', maximumFractionDigits: 1 }).format(fromMinor(minor, currency))
+}
+
 export function formatPercent(fraction: number, locale: string): string {
   return new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 0 }).format(fraction)
 }

@@ -9,7 +9,8 @@ test.describe('shell', () => {
     await page.getByRole('button', { name: 'Load the demo household' }).click()
     const rail = page.getByRole('navigation', { name: 'Screens' })
     await expect(rail).toBeVisible()
-    // the Statement is the first screen; the rail holds it, the Grid and the Settings group
+    // the Statement is the first screen; the rail holds it, the Grid, Trends and the Settings group
+    await expect(rail.getByRole('link')).toHaveText(['DH', 'Statement', 'Grid', 'Trends', 'Household', 'Data', 'Guide'])
     await expect(rail.getByRole('link', { name: 'Statement' })).toHaveAttribute('aria-current', 'page')
     await expect(page.getByRole('heading', { level: 1, name: 'Statement' })).toBeVisible()
     await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
@@ -129,7 +130,7 @@ test.describe('shell on a phone', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Statement' })).toBeVisible()
     const tabs = page.getByRole('navigation', { name: 'Screens' })
     await expect(tabs).toHaveCount(1)
-    await expect(tabs.getByRole('link')).toHaveText(['Statement', 'Grid', 'Settings'])
+    await expect(tabs.getByRole('link')).toHaveText(['Statement', 'Grid', 'Trends', 'Settings'])
     await expect(tabs.getByRole('link', { name: 'Statement' })).toHaveAttribute('aria-current', 'page')
     const box = await tabs.boundingBox()
     expect(box && box.y + box.height).toBeGreaterThan(800)

@@ -50,13 +50,13 @@ Statement frame  full width, space-y-4: the progress line, then dense islands, o
   it and `getByRole('link', { name: 'Household' })` stays unambiguous), then one tile per screen: a 40 × 30 `rounded-lg` tile holding a 20 px lucide icon over a `text-[10px] font-semibold`
   label. The open screen's tile is `bg-primary text-primary-foreground` with `aria-current="page"`; the others are
   `text-white/70`, hover `bg-white/10`. Items are real links (`?screen=…`, every other parameter kept, so `?demo=1`
-  survives); a plain click opens in place, Cmd-click opens a tab. The rail's order is `RAIL`: Statement, Grid, then
+  survives); a plain click opens in place, Cmd-click opens a tab. The rail's order is `RAIL`: Statement, Grid, Trends (§11), then
   **Settings**, a group after nfl-fantasy's Research: a `<button aria-expanded aria-controls="rail-settings">` tile with a
   caret in its label, and when unfolded a `role="group"` block on `bg-white/5` holding its pages Household, Data and Guide
   as ordinary links with smaller 32 × 26 tiles. A click on it folded unfolds it and opens the group's page open last
   (`casa.settings.page`, Household at first); a click on it unfolded only folds it (`casa.settings.open`, unfolded until
   someone folds it). Folded while one of its pages is open, the Settings tile wears the lime and `aria-current`.
-- **Bottom tabs** (`src/components/BottomTabs.tsx`): the rail's three tiles (Statement, Grid, Settings) as a bar along
+- **Bottom tabs** (`src/components/BottomTabs.tsx`): the rail's four tiles (Statement, Grid, Trends, Settings) as a bar along
   the bottom edge, 56 px tall plus the safe-area inset, `md:hidden`. The Settings tab opens the group's page open last;
   on phones the group's pages switch through `GroupTabs` (`src/components/GroupTabs.tsx`), a `TabBar` named
   `Settings pages` on a hairline right under the page header of Household, Data and Guide, `md:hidden`.
@@ -1070,3 +1070,59 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 4. Explanations inline, errors in place, a `help.ts` key for each (i).
 5. `npm run typecheck && npm run lint && npx vitest run && npm run build && npm run e2e`, then screenshots at 1440 × 900
    and 390 × 844 compared against the Statement and the Grid; extend this file in the same commit.
+
+## 11. Charts
+
+Charts are drawn by the app itself as plain SVG (`src/components/charts/`): no charting library, so they wear the
+design system's own type, hairlines and hues and add nothing to an app that works offline. They stand on the light
+ground only (the rail is the one dark surface, and holds none). The rules follow the dataviz method: the form before
+the colour, one scale per chart, thin marks, text in ink.
+
+```
+Frame      a chart is drawn in real pixels at its measured width (useWidth), never stretched: text stays 10 px, a line 2 px
+           left 48 px for the amounts, right 104 px for the lines' names from 640 px of width (12 px below it); frame.ts
+Months     every month has a slot of the same width and stands in its middle (scale.ts: monthAxis, xOf, monthAt), so a
+           month is at the same x in every chart of a page
+Amounts    amountScale: round steps (1, 2, 2.5, 5 x a power of ten), about four of them, always including zero;
+           axis text short ("€20K", formatAxis) in text-[10px] tabular-nums muted ink, right-aligned 6 px left of the plot
+Grid       horizontal hairlines in the border colour at the steps, solid; no vertical grid, no axis line
+Line       2 px, round joins and caps, in its subject's colour; the past solid, the plan dotted (dash 1 5)
+Now        an upright hairline in muted-foreground/60 at the current month, "now" above it
+Pointer    an upright hairline in foreground/50 at the pointed month, a 4 px dot ringed 2 px in the card ground on every line
+Tip        a popover-ground box beside the pointer (on the side with room): the month, then per line a 12 px stroke of
+           its colour, the amount in semibold tabular figures, its name in muted ink, and the change beneath in text-[11px]
+```
+
+- **Colour is identity, and is never alone.** A subject has one colour in every chart: net worth `--worth`, income
+  `--income`, expenses `--expense` (the hues they have everywhere), accounts `--trend-accounts` (sky-600) and debts
+  `--trend-debts` (amber-600). The five were checked together with the dataviz validator, every pair against every
+  other, on white: lightness, chroma, contrast and the normal-vision floor pass; the pair income and expenses sits in
+  the band that needs a second cue under red-green colour-blindness, which is why every line is named at its right
+  end and the tiles carry the same swatch. Text in a chart is ink; the mark beside it carries the colour.
+- **Labels are sparing.** A line is named once, at its end (11 px, a 12 px stroke of its colour before it); names that
+  would overlap are moved apart around the place they share and joined to their line by a short hairline
+  (`spreadLabels`). Below 640 px there is no room for names, and the tiles are the legend. No number stands on a
+  point: the axis says the size, the pointer the exact amount.
+- **Months under the axis** thin out by themselves so that labels stand at least 56 px apart: every month, every
+  second, quarters, half years, then years (`monthTicks`), counted from January so the labels fall on the same months
+  whatever month the range starts in. The first label and every January say the year (`Jan 2027`); an axis of years
+  says nothing else (`2028`).
+- **The pointer finds a month, not a mark.** Anywhere over the plot it snaps to the nearest month. A chart is one stop
+  for the Tab key (`role="group"` with a sentence that says what it shows; the drawing itself is `aria-hidden`): Left,
+  Right, Home and End move along the months, Escape lets go, and leaving the chart lets go too. The tip is a
+  `role="status"`, so a screen reader hears the month it lands on. On touch a tap points and stays.
+- **Sparkline** (`Sparkline.tsx`): a subject's months as a 1.5 px line in its colour with no axis, 24 px high and as
+  wide as its tile, solid for the past and dotted for the plan. It says the shape only.
+- **Trends** (`src/features/trends/TrendsScreen.tsx`, the figures in `src/engine/trends.ts`, the look ahead in
+  `src/store/projection.ts`) is the screen the charts were made for: the third tile of the rail. Its toolbar holds
+  "Looks ahead" as a `Segmented` (`Plan`, `3 years`, `5 years`, `10 years`); the subline names the household and the
+  months in view. A dense island titled with the current month holds **the five tiles** (`TrendTile`,
+  `grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2`): a `button aria-pressed` in the tile's look (§7), with a 10 px
+  square before the small-caps name (filled in the subject's colour when on, an outline of it when off), the current
+  month's figure without cents (`text-lg font-semibold`), the change from the month before as an arrow and an amount
+  in muted `text-[11px]` (`no change`, or `–` for the household's first month) and the sparkline. A tile that is on
+  has the lime border, the one pressed colour. Its accessible name says all of it in words (`Net worth: €27,965, up
+  €2,565 from October 2026`). The island "Amounts" holds the `LineChart` of the subjects that are on, 260 px high;
+  with none on it says `Press a tile above to put it on the chart.` What is on, and how far ahead the page looks,
+  are remembered on the device (`trends.subjects`, `trends.horizon`).
+

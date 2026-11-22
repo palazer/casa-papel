@@ -16,6 +16,7 @@ import { HouseholdScreen } from '@/features/household/HouseholdScreen'
 import { MainAccountQuestion } from '@/features/main/MainAccountQuestion'
 import { PastQuestionHost } from '@/features/past/PastQuestion'
 import { StatementScreen } from '@/features/statement/StatementScreen'
+import { TrendsScreen } from '@/features/trends/TrendsScreen'
 import { AccountDialog, type AccountStep } from '@/features/sync/AccountDialog'
 import { planHousekeeping, planMainAccount } from '@/store'
 import { SyncContext, createSyncEngine, useSyncEngine } from '@/sync/useSync'
@@ -122,6 +123,7 @@ function Shell() {
             ) : screen === 'data' ? <DataScreen />
               : screen === 'guide' ? <GuideScreen />
               : screen === 'grid' ? <GridScreen />
+              : screen === 'trends' ? <TrendsScreen />
               : screen === 'household' ? <HouseholdScreen />
               : <StatementScreen />}
           </div>

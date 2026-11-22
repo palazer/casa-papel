@@ -83,6 +83,19 @@
     --pool: oklch(51.1% 0.096 186.391);      /* teal-700 */
     --goal: oklch(76.9% 0.188 70.08);        /* amber-500: a fill, the one bold element */
     --draw: oklch(55.5% 0.163 48.998);       /* amber-700: money taken back out of savings */
+    /* Charts (DESIGN.md §11). The five subjects of the Trends page: net worth, income and expenses keep their hue
+       above; accounts and debts get one each. Checked as a set of five with the dataviz validator, every pair, on white. */
+    --trend-accounts: oklch(58.8% 0.158 241.966);  /* sky-600 */
+    --trend-debts: oklch(66.6% 0.179 58.318);      /* amber-600 */
+    /* The parts of a breakdown, in the order they are given out; neighbours in a stack are told apart with
+       colour-blindness too. The dataviz reference palette's first six, and a grey for "Other". */
+    --part-1: #2a78d6;
+    --part-2: #eb6834;
+    --part-3: #1baf7a;
+    --part-4: #eda100;
+    --part-5: #e87ba4;
+    --part-6: #008300;
+    --part-other: oklch(70.4% 0.014 214.4);
     /* State of an amount this month: nothing done / partly done / done. Kept apart from the money hues. */
     --todo: oklch(64.5% 0.246 16.439);       /* rose-500 */
     --partial: oklch(76.9% 0.188 70.08);     /* amber-500 */

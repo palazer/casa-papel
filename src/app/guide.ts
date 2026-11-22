@@ -272,6 +272,24 @@ export const GUIDE: GuideTopic[] = [
     open: 'statement',
   },
   {
+    key: 'trends',
+    title: 'Trends: how it moves',
+    summary: 'Trends draws net worth, income, expenses, accounts and debts over the months: what was, and what the plan says will be.',
+    what: [
+      'Trends reads the same plan as the Statement and the Grid and changes nothing in it. Five tiles say where each subject stands in the current month and how it moved from the month before: "Net worth", "Income", "Expenses", "Accounts" (everything you have) and "Debts" (what you owe on cards and loans). Every figure is the one the Statement shows for its month.',
+      'A tile is a switch: pressed, its subject is a line in "Amounts", and any number of them can be on at once, all on one scale. The solid part of a line is the months that are over; from "now" on it is dotted, because that is the plan.',
+      '"Looks ahead" sets how far the lines run: "Plan" ends where the plan ends, "3 years", "5 years" and "10 years" go on past it. Amounts carry on as they stand, schedules keep landing and investments grow at their rate, as if you had pressed "Add <year>", but the plan itself does not get longer.',
+    ],
+    steps: [
+      'Open "Trends" in the rail.',
+      'Press a tile, "Expenses" say, to put it on the chart; press it again to take it off.',
+      'Point at a month in "Amounts", or press Tab until the chart has the focus and use the arrow keys: a list says that month\'s amounts and how each moved from the month before.',
+      'Press "10 years" under "Looks ahead" to see where the plan leads; "Plan" goes back.',
+    ],
+    tips: ['trends.tiles', 'trends.amounts'],
+    open: 'trends',
+  },
+  {
     key: 'pocket-money',
     title: 'Pocket money & per person',
     summary: 'Each adult has a pocket money line with an amount or a rule of its own; "Per person" under the Statement shows what each adult brings and takes.',
