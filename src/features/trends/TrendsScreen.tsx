@@ -16,6 +16,7 @@ import { goalStatusLine } from '@/features/goals/goalText'
 import { cn } from '@/lib/utils'
 import { addMonths, compareMonths, currencyExponent, monthDiff, monthOfDate, parseMonth } from '@/model'
 import { HORIZONS, planEnd, projectTables, trendMonths, type Horizon } from '@/store'
+import { FiguresTable, type FigureColumn } from './FiguresTable'
 import { NET_WORTH_LINE, goalMarks, type GoalMark } from './goalMarks'
 import { HORIZON_LABEL, OTHER_COLOR, PART_COLORS, SUBJECTS, rememberedHorizon, rememberedSubjects } from './subjects'
 import { TrendTile } from './TrendTile'
@@ -49,6 +50,8 @@ export function TrendsScreen() {
   const [showParts, setShowParts] = useState(() => readPref('trends.breakdown', false))
   /** The goals that are on the chart; null until one is pressed: the net worth goals are on then. */
   const [goalIds, setGoalIds] = useState<string[] | null>(() => readPref<string[] | null>('trends.goals', null))
+  /** "Figures as a table" is open. */
+  const [figures, setFigures] = useState(false)
   /** The month pointed at, in every chart of the page. */
   const [at, setAt] = useState<number | null>(null)
 
@@ -136,6 +139,18 @@ export function TrendsScreen() {
     const d = values[i] - values[i - 1]
     return d === 0 ? 'no change' : `${formatAmount(d, ccy, locale, { sign: 'always' })} from ${formatMonth(months[i - 1], locale)}`
   }
+
+  /** What "Amounts" draws, as a table: the lines month by month, or the one subject and its parts column by column. */
+  const planNote = (from: number, to: number) => (now != null && now >= from && now <= to ? 'now' : to >= planFrom ? 'plan' : undefined)
+  const figureRows = broken
+    ? buckets.map((b) => ({ key: b.month, label: bucketName(b), note: planNote(b.from, b.to) }))
+    : months.map((m, i) => ({ key: m, label: formatMonth(m, locale), note: planNote(i, i) }))
+  const figureColumns: FigureColumn[] = broken && one
+    ? [
+        { id: one, label: SUBJECTS[one].label, values: buckets.map((b) => b.totals[one]), changes: buckets.map((_, k) => changeOf(k, one)) },
+        ...stack.map((p) => ({ id: p.id, label: p.label, values: columns.map((c) => c.parts[p.id] ?? 0) })),
+      ]
+    : lines.map((l) => ({ id: l.id, label: l.label, values: l.values, changes: l.values.map((v, i) => (i > 0 ? v - l.values[i - 1] : null)) }))
 
   return (
     <div className="space-y-4">
@@ -279,6 +294,16 @@ export function TrendsScreen() {
                 </>
               )
             }}
+          />
+        </Island>
+      )}
+
+      {/* the same figures without a chart: for a screen reader, for copying, for reading a month without pointing at it */}
+      {lines.length > 0 && (
+        <Island title="Figures as a table" folded={!figures} onFold={(f) => setFigures(!f)} data-testid="trend-table">
+          <FiguresTable
+            rows={figureRows} columns={figureColumns} amount={money} change={(v) => formatAmount(v, ccy, locale, { sign: 'always' })}
+            caption={`${figureColumns.map((c) => c.label).join(', ')} ${span}, ${broken && yearly ? 'by year' : 'by month'}`}
           />
         </Island>
       )}

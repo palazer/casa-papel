@@ -444,6 +444,47 @@ test.describe('Trends: goals', () => {
   })
 })
 
+test.describe('Trends: the figures as a table', () => {
+  test.use({ viewport: { width: 1440, height: 900 } })
+
+  test('folded away under the charts: a row per month and a column per line, with the change under each amount', async ({ page }) => {
+    await loadDemo(page)
+    await page.getByRole('button', { name: 'Expand all' }).click()
+    const netWorth = (await page.locator('[data-line="net-worth"]').first().innerText()).match(/[+-]?€[\d,]+\.\d\d/g)!
+    await openTrends(page)
+    await tile(page, 'Expenses').click()
+    const island = page.getByTestId('trend-table')
+    const table = page.getByTestId('trend-figures')
+    await expect(table).toHaveCount(0)
+    await island.getByRole('button', { name: 'Figures as a table' }).click()
+    await expect(table.getByRole('columnheader')).toHaveText(['Month', 'Net worth', 'Expenses'])
+    await expect(table.getByRole('rowheader')).toHaveCount(16)
+    // September has nothing before it; November is the current month and says what the Statement says
+    const september = table.getByRole('row', { name: /^Sept 2026/ })
+    await expect(september.getByRole('cell').first()).toContainText('–')
+    const november = table.getByRole('row', { name: /^Nov 2026 · now/ })
+    await expect(november.getByRole('cell').first()).toContainText(netWorth[netWorth.length - 1])
+    await expect(november.getByRole('cell').first()).toContainText(netWorth[0])
+    await expect(november.getByRole('cell').nth(1)).toContainText('€3,896.00')
+    await expect(table.getByRole('row', { name: /^Dec 2026 · plan/ })).toHaveCount(1)
+    await expect(table.getByRole('row', { name: /^Oct 2026/ })).not.toContainText('plan')
+    await page.screenshot({ path: 'e2e/output/trends-table.png', fullPage: true })
+
+    // one subject as its parts: its total, then a column per part
+    await tile(page, 'Net worth').click()
+    await page.getByTestId('trend-amounts').getByRole('radio', { name: 'Breakdown' }).click()
+    await expect(table.getByRole('columnheader')).toHaveText(['Month', 'Expenses', 'Housing', 'Living', 'Transport', 'Family & pets', 'Fun', 'Personal'])
+    await expect(table.getByRole('row', { name: /^November 2026 · now/ }).getByRole('cell')).toContainText(['€3,896.00', '€1,860.00', '€730.00', '€98.00', '€380.00', '€678.00', '€150.00'])
+    // by year on a long range
+    await page.getByRole('radio', { name: '10 years' }).click()
+    await expect(table.getByRole('rowheader')).toHaveCount(11)
+    await expect(table.getByRole('rowheader').first()).toHaveText('2026 · 4 months · now')
+    // it folds away again
+    await island.getByRole('button', { name: 'Figures as a table' }).click()
+    await expect(table).toHaveCount(0)
+  })
+})
+
 test.describe('Trends on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
 

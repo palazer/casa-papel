@@ -1067,6 +1067,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 2. It opens with `PageHeader` (name, subline, toolbar); every panel is an `Island` (`air` on a reading page), every tag a
    `Chip`, every number `tabular-nums`.
 3. Colours only from §5: money through `HUES`, states through the dots and chips, lime for the pressed control alone.
+   A chart follows §11: the app's own SVG pieces, a subject's one colour, text in ink, and its figures as a table too.
 4. Explanations inline, errors in place, a `help.ts` key for each (i).
 5. `npm run typecheck && npm run lint && npx vitest run && npm run build && npm run e2e`, then screenshots at 1440 × 900
    and 390 × 844 compared against the Statement and the Grid; extend this file in the same commit.
@@ -1177,4 +1178,9 @@ Tip        a popover-ground box beside the pointer (on the side with room): the 
   the choice (`trends.goals`). The goals are read over the months in view, so a longer look ahead can show a month
   the plan itself does not reach. A goal in another currency than the household's, or one that cannot be measured,
   keeps its chip and its sentence and is not drawn. With a goal's own line on the chart there is no `Breakdown`.
+  **"Figures as a table"** is the last island, folded until its title is pressed (`FiguresTable.tsx`): what "Amounts"
+  draws, as a table with a row per month (per year where the columns are by year) and a column per line or part,
+  the change from the row before in muted `text-[11px]` under an amount, `· now` and `· plan` after a row's name,
+  a sticky head and at most 384 px of height. Every figure a pointer can show is in it, so nothing on the page is
+  reachable with a pointer only.
 

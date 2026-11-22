@@ -287,6 +287,7 @@ export const GUIDE: GuideTopic[] = [
       'With one tile on, press "Breakdown" beside "Amounts": the line becomes columns stacked from its parts, named under the chart. "Total" brings the line back.',
       'Press "10 years" under "Looks ahead" to see where the plan leads; "Plan" goes back.',
       'A goal is a chip under the tiles: press it to draw its amount across the chart, with a flag at the month it is due and a dot where the plan gets there. A goal is set on the Statement, on the line it watches.',
+      'Open "Figures as a table" under the charts to read the same amounts and changes as a table.',
     ],
     tips: ['trends.tiles', 'trends.amounts', 'trends.changes', 'trends.breakdown', 'trends.goals'],
     open: 'trends',
