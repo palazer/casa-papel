@@ -1,23 +1,27 @@
 import { useMemo, useState } from 'react'
 import { DeltaBars, type DeltaRow } from '@/components/charts/DeltaBars'
 import { LineChart, type ChartLine } from '@/components/charts/LineChart'
+import { StackedColumns, type StackColumn, type StackPart } from '@/components/charts/StackedColumns'
+import { InfoTip } from '@/components/InfoTip'
 import { PageHeader } from '@/components/PageHeader'
 import { Segmented } from '@/components/Segmented'
 import { Island } from '@/components/ui/island'
+import { ViewToggle } from '@/components/ui/view-toggle'
 import { formatAmount, formatAxis, formatMonth } from '@/app/format'
-import { writePref } from '@/app/prefs'
+import { readPref, writePref } from '@/app/prefs'
 import { activeHousehold, useEngine, useTables } from '@/app/useEngine'
-import { TREND_SUBJECTS, buildTrends, byYear, isFlow, trendChange, type TrendPoint, type TrendSubject } from '@/engine'
+import { OTHER_PART, TREND_SUBJECTS, buildTrends, byYear, foldParts, isFlow, topParts, trendChange, type TrendPoint, type TrendSubject } from '@/engine'
 import { addMonths, compareMonths, currencyExponent, monthOfDate, parseMonth } from '@/model'
-import { HORIZONS, projectTables, trendMonths, type Horizon } from '@/store'
-import { HORIZON_LABEL, SUBJECTS, rememberedHorizon, rememberedSubjects } from './subjects'
+import { HORIZONS, planEnd, projectTables, trendMonths, type Horizon } from '@/store'
+import { HORIZON_LABEL, OTHER_COLOR, PART_COLORS, SUBJECTS, rememberedHorizon, rememberedSubjects } from './subjects'
 import { TrendTile } from './TrendTile'
 
 /**
  * Trends (DESIGN.md §11): how net worth, income, expenses, accounts and debts move over the months, what was and
  * what the plan says will be. Five tiles say where each stands this month and are the switches that put a subject on
  * the charts; "Amounts" draws the chosen ones as lines on one scale, and under it "Change from the month before"
- * draws how each moved, as a row of bars per subject on the same months. The figures are the Statement's own, month
+ * draws how each moved, as a row of bars per subject on the same months. With one subject on, "Breakdown" turns its
+ * line into columns stacked from its parts. The figures are the Statement's own, month
  * by month (`buildTrends`), and looking past the plan's end runs the plan's calculation for more months without
  * making the plan longer (`projectTables`). Nothing is edited here.
  */
@@ -35,6 +39,8 @@ export function TrendsScreen() {
   const today = monthOfDate()
   const [horizon, setHorizon] = useState<Horizon>(rememberedHorizon)
   const [on, setOn] = useState<TrendSubject[]>(rememberedSubjects)
+  /** One subject alone can be shown as its parts. */
+  const [showParts, setShowParts] = useState(() => readPref('trends.breakdown', false))
   /** The month pointed at, in every chart of the page. */
   const [at, setAt] = useState<number | null>(null)
 
@@ -83,6 +89,22 @@ export function TrendsScreen() {
   const partial = (b: Bucket) => yearly && b.span < 12
   const changeOf = (k: number, s: TrendSubject) => (isFlow(s) && k > 0 && (partial(buckets[k]) || partial(buckets[k - 1])) ? null : trendChange(buckets, k, s))
   const bucketName = (b: Bucket) => (yearly ? `${parseMonth(b.month).year}${partial(b) ? ` · ${b.span} months` : ''}` : formatMonth(b.month, locale, 'long'))
+
+  /** One subject as its parts: the six largest over the plan's months keep their name and colour, whatever range is in view. */
+  const one = on.length === 1 ? on[0] : null
+  const broken = one != null && showParts
+  const planLast = planEnd(household, tables, today)
+  const picked = one ? topParts(trends, one, (m) => compareMonths(m, planLast) <= 0) : { shown: [], other: false }
+  const stack: StackPart[] = [
+    ...picked.shown.map((p, k) => ({ id: p.id, label: p.label, color: PART_COLORS[k] })),
+    ...(picked.other ? [{ id: OTHER_PART, label: 'Other', color: OTHER_COLOR }] : []),
+  ]
+  const columns: StackColumn[] = one ? buckets.map((b) => ({ from: b.from, to: b.to, parts: foldParts(b, one, picked.shown) })) : []
+  const choosePartsView = (v: 'total' | 'parts') => {
+    setShowParts(v === 'parts')
+    writePref('trends.breakdown', v === 'parts')
+  }
+
   const rows: DeltaRow[] = on.map((s) => ({ id: s, label: SUBJECTS[s].label, color: SUBJECTS[s].color, bars: buckets.map((b, k) => ({ from: b.from, to: b.to, value: changeOf(k, s) })) }))
   const moved = (i: number, s: TrendSubject) => {
     const d = trendChange(points, i, s)
@@ -112,9 +134,44 @@ export function TrendsScreen() {
         </div>
       </Island>
 
-      <Island title="Amounts" help="trends.amounts" data-testid="trend-amounts">
+      <Island
+        title="Amounts" help="trends.amounts" data-testid="trend-amounts"
+        // one subject alone can be read as its parts
+        right={one && (
+          <span className="flex items-center gap-1">
+            <ViewToggle value={showParts ? 'parts' : 'total'} options={['total', 'parts'] as const} labels={{ total: 'Total', parts: 'Breakdown' }} onChange={choosePartsView} ariaLabel={`${SUBJECTS[one].label} as`} />
+            <InfoTip help="trends.breakdown" />
+          </span>
+        )}
+      >
         {lines.length === 0 ? (
           <p className="px-1 py-10 text-center text-xs text-muted-foreground">Press a tile above to put it on the chart.</p>
+        ) : broken && one ? (
+          <StackedColumns
+            months={months} columns={columns} parts={stack} planFrom={planFrom} now={now} at={at} onAt={setAt} locale={locale} unit={unit} axisText={axisText}
+            // net worth is not the height of its columns: what is owed stands below zero, and the line says what is left
+            across={one === 'netWorth' ? { label: SUBJECTS.netWorth.label, color: SUBJECTS.netWorth.color, values: buckets.map((b) => b.totals.netWorth) } : undefined}
+            label={`${SUBJECTS[one].label} by its parts (${stack.map((p) => p.label).join(', ')}), ${span}. The arrow keys read a ${yearly ? 'year' : 'month'}.`}
+            tip={(i) => {
+              const k = bucketAt(i)
+              const b = buckets[k]
+              return (
+                <>
+                  <p className="mb-1 font-medium">{bucketName(b)}{b.to >= planFrom && <span className="font-normal text-muted-foreground"> · {now != null && now >= b.from && now <= b.to ? 'now' : 'plan'}</span>}</p>
+                  <p className="mb-1"><span className="font-semibold tabular-nums">{money(b.totals[one])}</span> <span className="text-muted-foreground">{SUBJECTS[one].label}</span></p>
+                  <ul className="space-y-0.5 border-t pt-1">
+                    {/* from the top of the column down */}
+                    {[...stack].reverse().filter((p) => (columns[k].parts[p.id] ?? 0) !== 0).map((p) => (
+                      <li key={p.id} className="grid grid-cols-[auto_1fr] items-baseline gap-x-2">
+                        <span className="size-2 self-center rounded-[2px]" style={{ background: p.color }} aria-hidden />
+                        <span><span className="font-medium tabular-nums">{money(columns[k].parts[p.id])}</span> <span className="text-muted-foreground">{p.label}</span></span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )
+            }}
+          />
         ) : (
           <LineChart
             months={months} lines={lines} planFrom={planFrom} now={now} at={at} onAt={setAt} locale={locale} unit={unit} axisText={axisText}

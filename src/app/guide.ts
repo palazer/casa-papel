@@ -284,9 +284,10 @@ export const GUIDE: GuideTopic[] = [
       'Open "Trends" in the rail.',
       'Press a tile, "Expenses" say, to put it on the chart; press it again to take it off.',
       'Point at a month in "Amounts", or press Tab until the chart has the focus and use the arrow keys: a list says that month\'s amounts and how each moved from the month before.',
+      'With one tile on, press "Breakdown" beside "Amounts": the line becomes columns stacked from its parts, named under the chart. "Total" brings the line back.',
       'Press "10 years" under "Looks ahead" to see where the plan leads; "Plan" goes back.',
     ],
-    tips: ['trends.tiles', 'trends.amounts', 'trends.changes'],
+    tips: ['trends.tiles', 'trends.amounts', 'trends.changes', 'trends.breakdown'],
     open: 'trends',
   },
   {

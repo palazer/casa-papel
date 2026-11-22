@@ -1123,6 +1123,19 @@ Tip        a popover-ground box beside the pointer (on the side with room): the 
   (an 8 px square of its colour, the name in 11 px ink); its scale shows its two ends at the left and a
   `muted-foreground/50` line at zero; a subject that did not move says `· no change` after its name and shows no
   scale. Bars of the past are at 0.9 opacity, bars of the plan at 0.4, the bar pointed at at 1.
+- **Stacked columns** (`StackedColumns.tsx`): one subject as its parts. A column per month, or per year, stacked
+  from the parts in the order given, so its height is the subject's total; a part that is owed (the debts under net
+  worth) is stacked downwards from zero. 2 px of the ground show between two parts (no stroke around a part: that
+  would be ink that is no data), and only the part that ends the stack is rounded. Columns of the past are at 0.95
+  opacity, columns of the plan at 0.5, the column pointed at at 1. `across` draws a 2 px line with 3 px ringed dots
+  over the columns for a total that is not their height: net worth. **The parts wear the breakdown colours**
+  `--part-1` to `--part-6` (the dataviz reference palette's first six: blue, orange, aqua, yellow, magenta, green),
+  given out in the order of the stack and never repeated; what is left is `--part-other`, a grey, named "Other".
+  Neighbours in a stack pass the validator on white (9.1 at worst under colour-blindness); aqua, yellow and magenta
+  are under 3:1 against white, which the legend and the tip make up for. The **legend** is under the chart, names
+  only, in the order of the stack (a 10 px square each, a 12 px stroke for the line across).
+- **The amount axis ends on a step, except just below zero:** an amount less than a quarter of a step under it (a
+  small debt beneath large savings) gets that room and no step of its own.
 - **Sparkline** (`Sparkline.tsx`): a subject's months as a 1.5 px line in its colour with no axis, 24 px high and as
   wide as its tile, solid for the past and dotted for the plan. It says the shape only.
 - **Trends** (`src/features/trends/TrendsScreen.tsx`, the figures in `src/engine/trends.ts`, the look ahead in
@@ -1140,6 +1153,13 @@ Tip        a popover-ground box beside the pointer (on the side with room): the 
   amount beneath (`€27,965.41 at its end`, `€3,896.00 in the month`). **A range of more than 48 months is drawn by
   year in the bars** (the island is "Change from the year before"): what the year moved for income and expenses,
   what there was at its end for the other three (`byYear`), and a year of which only some months are in view (the
-  household's first) is not compared for income and expenses; the lines stay monthly. What is on, and how far ahead
-  the page looks, are remembered on the device (`trends.subjects`, `trends.horizon`).
+  household's first) is not compared for income and expenses; the lines stay monthly. **With exactly one subject on,
+  "Amounts" carries a `ViewToggle` `Total` / `Breakdown`** at the right of its title, with an (i): `Breakdown` shows
+  the subject as `StackedColumns` in place of its line. The parts are the Statement's first level under the subject:
+  the categories of income and of expenses (the rows where a section has none), every account for accounts, every
+  card and loan for debts, and for net worth the main account and the three kinds of assets above zero with the debts
+  below it and the net worth line across. The six largest parts over the plan's months keep a name and a colour, in
+  the Statement's order, whatever range is in view (`topParts`); the rest is "Other". Its tip says the total, then
+  every part from the top of the column down. What is on, how far ahead the page looks and whether the one subject
+  is shown as its parts are remembered on the device (`trends.subjects`, `trends.horizon`, `trends.breakdown`).
 

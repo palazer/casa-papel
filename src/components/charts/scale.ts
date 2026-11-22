@@ -14,7 +14,8 @@ export interface AmountScale {
 /**
  * An axis from round number to round number that holds `lo` to `hi` and always zero: lines and bars of different
  * subjects share it, and a bar must grow from zero. The step is 1, 2, 2.5 or 5 times a power of ten (in the currency's
- * main unit: `unit` is 100 for cents), chosen so that about `about` steps cover the range.
+ * main unit: `unit` is 100 for cents), chosen so that about `about` steps cover the range. The axis ends on a step,
+ * except just below zero: an amount less than a quarter of a step under it is given that room and nothing more.
  */
 export function amountScale(lo: number, hi: number, unit = 100, about = 4): AmountScale {
   const low = Math.min(0, lo)
@@ -23,11 +24,12 @@ export function amountScale(lo: number, hi: number, unit = 100, about = 4): Amou
   const rough = (high - low) / about / unit
   const power = 10 ** Math.floor(Math.log10(rough))
   const step = ([1, 2, 2.5, 5, 10].find((m) => m * power >= rough) ?? 10) * power * unit
-  const min = Math.floor(low / step) * step
+  // a little below zero (a small debt under large savings) gets the room it needs and no step of its own
+  const min = -low < step / 4 ? low : Math.floor(low / step) * step
   const max = Math.ceil(high / step) * step
   const ticks: number[] = []
   // counted in whole steps, so a step of 2.5 never drifts
-  for (let i = Math.round(min / step); i <= Math.round(max / step); i++) ticks.push(i * step)
+  for (let i = Math.ceil(min / step); i <= Math.round(max / step); i++) ticks.push(i * step === 0 ? 0 : i * step)
   return { min, max, ticks }
 }
 

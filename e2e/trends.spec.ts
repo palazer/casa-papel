@@ -243,6 +243,94 @@ test.describe('Trends: the change from the month before', () => {
   })
 })
 
+test.describe('Trends: one subject as its parts', () => {
+  test.use({ viewport: { width: 1440, height: 900 } })
+  const parts = (page: Page) => page.locator('[data-chart="parts"]')
+  const legend = (page: Page) => page.getByTestId('chart-legend').getByRole('listitem')
+  const only = async (page: Page, name: string) => {
+    // every tile off, then the one wanted
+    const pressed = page.locator('[data-subject-tile][aria-pressed="true"]')
+    while ((await pressed.count()) > 0) await pressed.first().click()
+    await tile(page, name).click()
+  }
+
+  test('"Breakdown" turns one subject\'s line into columns stacked from its parts, named under the chart', async ({ page }) => {
+    await loadDemo(page)
+    await openTrends(page)
+    const amounts = page.getByTestId('trend-amounts')
+    // one subject on: it can be read as its total or as its parts
+    const as = amounts.getByRole('radiogroup', { name: 'Net worth as' })
+    await expect(as.getByRole('radio')).toHaveText(['Total', 'Breakdown'])
+    await expect(as.getByRole('radio', { name: 'Total' })).toHaveAttribute('aria-checked', 'true')
+    // two on: nothing to break down
+    await tile(page, 'Expenses').click()
+    await expect(amounts.getByRole('radiogroup')).toHaveCount(0)
+
+    await only(page, 'Expenses')
+    await amounts.getByRole('radio', { name: 'Breakdown' }).click()
+    await expect(chart(page)).toHaveCount(0)
+    await expect(parts(page).locator('[data-column]')).toHaveCount(16)
+    // the Statement's categories, in its order; six of them, so there is no "Other"
+    await expect(legend(page)).toHaveText(['Housing', 'Living', 'Transport', 'Family & pets', 'Fun', 'Personal'])
+    // September and October are over; the plan's columns are paler
+    await expect(parts(page).locator('[data-column]:not([data-plan])')).toHaveCount(2)
+    // a column says its total and every part, as the Statement has them for November
+    await parts(page).focus()
+    await page.keyboard.press('ArrowRight')
+    const tip = page.getByTestId('chart-tip')
+    await expect(tip).toContainText('November 2026 · now')
+    await expect(tip).toContainText('€3,896.00 Expenses')
+    for (const part of ['€1,860.00 Housing', '€730.00 Living', '€98.00 Transport', '€380.00 Family & pets', '€678.00 Fun', '€150.00 Personal']) await expect(tip).toContainText(part)
+    await page.screenshot({ path: 'e2e/output/trends-breakdown.png', fullPage: true })
+    await page.keyboard.press('Escape')
+    // the change bars stay under it
+    await expect(page.locator('[data-chart="changes"] [data-row]')).toHaveCount(1)
+
+    // remembered; and a second subject brings the lines back
+    await page.reload()
+    await expect(parts(page).locator('[data-column]')).toHaveCount(16)
+    await tile(page, 'Income').click()
+    await expect(parts(page)).toHaveCount(0)
+    await expect(chart(page).locator('[data-line]')).toHaveCount(2)
+    await tile(page, 'Income').click()
+    await expect(parts(page)).toHaveCount(1)
+    await amounts.getByRole('radio', { name: 'Total' }).click()
+    await expect(chart(page).locator('[data-line="expenses"]')).toHaveCount(1)
+    // the (i) beside the switch says what the parts are
+    await amounts.getByRole('button', { name: 'About Breakdown' }).click()
+    await expect(page.getByText('The six largest parts have a colour of their own', { exact: false })).toBeVisible()
+  })
+
+  test('net worth is what you have above the line and what you owe below it, with the net worth line across; accounts are named one by one', async ({ page }) => {
+    await loadDemo(page)
+    await openTrends(page)
+    await page.getByTestId('trend-amounts').getByRole('radio', { name: 'Breakdown' }).click()
+    await expect(legend(page)).toHaveText(['Main account', 'Savings accounts', 'Investment accounts', 'Debts', 'Net worth'])
+    await expect(parts(page).locator('[data-across] path')).toHaveCount(1)
+    await parts(page).focus()
+    await page.keyboard.press('ArrowRight')
+    const tip = page.getByTestId('chart-tip')
+    await expect(tip).toContainText('Net worth')
+    // what is owed is a negative part
+    await expect(tip).toContainText(/-€\d+\.\d\d Debts/)
+    await page.keyboard.press('Escape')
+    await page.screenshot({ path: 'e2e/output/trends-breakdown-net-worth.png', fullPage: true })
+
+    await only(page, 'Accounts')
+    await expect(legend(page).first()).toHaveText('Main account')
+    await expect(legend(page).filter({ hasText: /^Savings$/ })).toHaveCount(1)
+    await expect(parts(page).locator('[data-across]')).toHaveCount(0)
+
+    // a long range: a column per year
+    await page.getByRole('radio', { name: '10 years' }).click()
+    await expect(parts(page).locator('[data-column]')).toHaveCount(11)
+    await parts(page).focus()
+    await page.keyboard.press('End')
+    await expect(tip).toContainText('2036 · plan')
+    await expect(tip).toContainText('Accounts')
+  })
+})
+
 test.describe('Trends on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
 

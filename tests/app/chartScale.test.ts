@@ -16,6 +16,14 @@ describe('the amount axis of a chart', () => {
     expect(s.max).toBe(3_000_00)
   })
 
+  it('a little below zero gets the room it needs, and no step of its own', () => {
+    const s = amountScale(-78_00, 61_000_00)
+    expect(s.min).toBe(-78_00)
+    expect(s.ticks).toEqual([0, 20_000_00, 40_000_00, 60_000_00, 80_000_00])
+    // a quarter of a step or more is a step
+    expect(amountScale(-5_000_00, 61_000_00).ticks[0]).toBe(-20_000_00)
+  })
+
   it('has something to draw when every amount is zero', () => {
     expect(amountScale(0, 0)).toEqual({ min: 0, max: 100, ticks: [0, 100] })
   })
