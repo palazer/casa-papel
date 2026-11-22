@@ -374,8 +374,9 @@ test.describe('working the month in the Statement', () => {
     await dlg.getByLabel('Amount in EUR').fill('200')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-    expect(euros(await total(page, 'in').innerText())).toBe(totalIn + 200)
-    expect(euros(await total(page, 'out').innerText())).toBe(totalIn + 200)
+    // waited for: the dialog closes before the page has the saved figures
+    await expect.poll(async () => euros(await total(page, 'in').innerText())).toBe(totalIn + 200)
+    await expect.poll(async () => euros(await total(page, 'out').innerText())).toBe(totalIn + 200)
     await page.screenshot({ path: 'e2e/output/statement-adding.png', fullPage: true })
   })
 
@@ -444,7 +445,8 @@ test.describe('working the month in the Statement', () => {
     await expect(dlg.getByTestId('estimate-left')).toHaveText('€140.00')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-    expect(await amountOf('Housing')).toBe(2000)
+    // the dialog closes before the page has the saved estimate: the figure is waited for, not read once
+    await expect.poll(() => amountOf('Housing')).toBe(2000)
     await expect(moneyOut.getByRole('button', { name: /^Not broken down yet:/ })).toHaveAccessibleName('Not broken down yet: €140.00, an estimate')
     await expect(page.getByRole('checkbox', { name: 'Not broken down yet done' })).toBeVisible()
     await sidesAgree()
@@ -465,7 +467,7 @@ test.describe('working the month in the Statement', () => {
     await page.getByRole('menuitem', { name: 'Change estimate…' }).click()
     await dlg.getByRole('button', { name: 'Remove estimate' }).click()
     await expect(dlg).toBeHidden()
-    expect(await amountOf('Housing')).toBe(1860)
+    await expect.poll(() => amountOf('Housing')).toBe(1860)
     await expect(line('Housing')).not.toContainText('estimate')
     await sidesAgree()
   })

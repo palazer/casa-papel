@@ -210,8 +210,9 @@ test.describe('Payments: "Paid on" and "Paid with"', () => {
     await dlg.getByRole('button', { name: 'Save' }).click()
     await saveAnyway(page)
     await expect(dlg).toBeHidden()
-    expect(await owedOnCard(page)).toBeLessThan(owed)
-    expect(await owedOnCard(page)).toBe(0)
+    // waited for: the dialog closes before the page has the saved figures
+    expect(owed).toBeGreaterThan(0)
+    await expect.poll(() => owedOnCard(page)).toBe(0)
   })
 
   test('the amount\'s dialog: "Usually paid" is saved with the amount, and a method on another account sets "Comes out of"', async ({ page }) => {
@@ -272,7 +273,7 @@ test.describe('Payments: "Paid on" and "Paid with"', () => {
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
     // paid by direct debit from the main account: no longer bought on the card this month
-    expect(await owedOnCard(page)).toBe(owed - 18)
+    await expect.poll(() => owedOnCard(page)).toBe(owed - 18)
 
     await page.getByRole('button', { name: /^Subscriptions:/ }).click()
     expect([await shown(day), await shown(method)]).toEqual(['As scheduled: 5th', 'As scheduled: Direct debit'])
@@ -473,7 +474,9 @@ test.describe('Payments: the page', () => {
     await dlg.getByLabel('Paid with, Music').selectOption({ label: 'Direct debit' })
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-    // the row is on the card, and the new item is not: what is owed on the card does not move
+    // once the page has the new item (18.00 and 12.00): the row is on the card, and the new item is not, so what is
+    // owed on the card has not moved
+    await expect(page.getByRole('button', { name: /^Subscriptions:/ })).toHaveAccessibleName(/^Subscriptions: €30\.00/)
     expect(await owedOnCard(page)).toBe(owed)
 
     await openPayments(page)
