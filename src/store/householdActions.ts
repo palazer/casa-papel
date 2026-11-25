@@ -2,13 +2,13 @@ import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing'
 import { buildDefaultCategoryMutations } from './categoryActions'
 import {
   AccountMonthSchema, AccountSchema, CellSchema, EntitySchema, HouseholdSchema, PoolSchema, RowSchema,
-  ENTITY_TEMPLATES, HOUSEHOLD_TEMPLATES, growthChangedFrom, growthIn, isOutsideNetWorth, monthOfDate, newId, pocketLandsIn, poolRef, poolRowName, templateTitle,
+  ACCOUNT_TYPE_INFO, ENTITY_TEMPLATES, HOUSEHOLD_TEMPLATES, accountRef, growthChangedFrom, growthIn, isOutsideNetWorth, monthOfDate, newId, pocketLandsIn, poolRef, poolRowName, templateTitle,
   type Account, type Entity, type EntityKind, type Household, type MonthKey, type Pool, type Row, type RowTemplate, type Tables,
 } from '@/model'
 import { NO_QUESTION, type Mutation, type Store } from './store'
 import { refuseThirdCurrency } from './currencies'
 import { assertMainAccount } from './mainAccount'
-import { loadTables, payOffKind, rowOfKindMutations } from './actions'
+import { accountTypeForRow, isPayOffRow, loadTables, payOffKind, payOffPatches, payOffPlace, rowOfKindMutations } from './actions'
 
 const now = () => Date.now()
 
@@ -128,10 +128,87 @@ export async function movePool(store: Store, id: string, direction: 'up' | 'down
   if (mutations.length) await store.commit(mutations)
 }
 
+const isDebt = (type: Account['type']): boolean => type === 'loan' || type === 'credit-card'
+const quoted = (rows: Array<{ name: string }>): string => rows.map((r) => `"${r.name}"`).join(', ')
+const TYPED_ROW_VERB: Partial<Record<Row['kind'], string>> = {
+  'to-savings': 'sends money to it', 'to-investment': 'sends money to it', 'from-investment': 'takes money from it', 'from-savings': 'takes money from it',
+  'debt-payment': 'pays it off', 'card-payment': 'pays it off',
+}
+
+/** What saving an account as `next` does beyond the account itself. */
+export interface AccountChange {
+  /** Why the account cannot become that type, or null where it can. */
+  refusal: string | null
+  /** The rows that pay it off and change with it, as they were. */
+  follows: Row[]
+  /** What those rows are afterwards (`payOffPlace`); null where the account is no loan and no card. */
+  place: ReturnType<typeof payOffPlace> | null
+  /** Expense rows that were "Paid by card" on it and are not any more: nothing is bought on a loan. */
+  unlinked: Row[]
+  /** The rows to write with the account. */
+  mutations: Mutation[]
+}
+
+/**
+ * What an account's rows need when the account is saved as `next`. Pure: the form asks it before saving, and
+ * `updateAccount` writes what it says.
+ *
+ * A loan and a card are paid off by a row whose kind and section follow the account (`payOffPlace`), so those rows
+ * change with it: a card that becomes a loan, a loan that becomes a card, a card that records something else. Rows
+ * that were left behind by an earlier save are put right the same way, whatever is changed now. Archived rows follow
+ * too: they still count in the months before they were archived.
+ *
+ * Every other change of type is refused while something is tied to the account that the new type cannot hold: a row
+ * made for the old type, a virtual account (only a savings account holds those), and, between an account that holds
+ * money and a debt, anything at all. The engine reads those links by the account's type, so they would count as
+ * nothing, or as something else, without saying so.
+ */
+export function planAccountChange(tables: Tables, account: Account, next: Pick<Account, 'type' | 'card'>, ts: number = now()): AccountChange {
+  const rows = tables.rows.filter((r) => !r.deletedAt && r.accountId === account.id)
+  const label = ACCOUNT_TYPE_INFO.find((i) => i.value === next.type)?.label ?? next.type
+  const between = isDebt(account.type) && isDebt(next.type)
+  let refusal: string | null = null
+  if (next.type !== account.type && !between) {
+    const held: string[] = rows.filter((r) => accountTypeForRow(r) && accountTypeForRow(r) !== next.type).map((r) => `"${r.name}" ${TYPED_ROW_VERB[r.kind] ?? 'uses it'}`)
+    if (next.type !== 'savings') held.push(...tables.pools.filter((p) => !p.deletedAt && p.accountId === account.id).map((p) => `the virtual account "${p.name}" is held in it`))
+    if (!held.length && isDebt(account.type) !== isDebt(next.type)) {
+      // money that is held and money that is owed count the other way round: nothing can come along
+      const ref = accountRef(account.id)
+      const named = tables.rows.filter((r) => !r.deletedAt && (r.accountId === account.id || r.defaultFundedBy === ref))
+      const schedules = tables.recurringItems.filter((s) => !s.deletedAt && (s.accountId === account.id || s.fundedBy === ref))
+      const amounts = tables.cells.some((c) => c.items.some((i) => i.fundedBy === ref))
+      const goals = tables.goals.filter((g) => !g.deletedAt && g.accountId === account.id)
+      const real = tables.accountMonths.some((m) => m.accountId === account.id && (m.actualBalance != null || m.actualDeposit != null || m.actualSpend != null))
+      if (named.length) held.push(`${quoted(named)} ${named.length === 1 ? 'names' : 'name'} it`)
+      if (schedules.length) held.push(`${quoted(schedules)} ${schedules.length === 1 ? 'names' : 'name'} it`)
+      if (amounts) held.push('amounts come out of it')
+      if (goals.length) held.push(`${quoted(goals)} ${goals.length === 1 ? 'watches' : 'watch'} it`)
+      if (real) held.push('real balances were entered for it')
+    }
+    if (held.length) refusal = `"${account.name}" cannot become an account of type ${label}: ${held.join('; ')}. Change or remove ${held.length === 1 ? 'that' : 'those'} first.`
+  }
+  if (refusal || !isDebt(next.type)) return { refusal, follows: [], place: null, unlinked: [], mutations: [] }
+  const patches = payOffPatches(tables, rows.filter(isPayOffRow), next)
+  // "Paid by card" is said of a card: a loan has no purchases, and a loan that becomes a card must not take rows that
+  // still name it for purchases
+  const unlinked = next.type === 'loan' || account.type === 'loan' ? rows.filter((r) => r.section === 'expense' && accountTypeForRow(r) == null) : []
+  const put = (r: Row, patch: Partial<Row>): Mutation => ({ op: 'put', table: 'rows', record: RowSchema.parse({ ...r, ...patch, updatedAt: ts }) })
+  return {
+    refusal: null,
+    follows: rows.filter((r) => patches.has(r.id)),
+    place: payOffPlace(next),
+    unlinked,
+    mutations: [...rows.filter((r) => patches.has(r.id)).map((r) => put(r, patches.get(r.id)!)), ...unlinked.map((r) => put(r, { accountId: null }))],
+  }
+}
+
 /**
  * Save an account's settings. The form sends an investment's growth as the current month's (`growthIn`): unchanged, the
  * account keeps its rate and the changes it has from a month on. Changed, it counts for every month (and the dated
  * changes go), and the save offers "Only from <Month> on" (rule T4): the months before keep the rate they had.
+ *
+ * The rows that pay a loan or a card off are written in the same step where they no longer fit the account, and a
+ * change of type that would leave something behind is refused (`planAccountChange`).
  */
 export async function updateAccount(store: Store, id: string, patch: Partial<Omit<Account, 'id' | 'createdAt'>>): Promise<void> {
   const tables = await loadTables(store)
@@ -150,7 +227,13 @@ export async function updateAccount(store: Store, id: string, patch: Partial<Omi
       patch = { ...patch, investment: { ...patch.investment, rateChanges: undefined } }
     }
   }
-  const next = AccountSchema.parse({ ...a, ...patch, updatedAt: ts })
+  // what belongs to one type goes with it: an old card setting must not come back when the account is a card again
+  const type = patch.type ?? a.type
+  const typed = { ...(type !== 'credit-card' ? { card: undefined } : {}), ...(type !== 'investment' ? { investment: undefined } : {}) }
+  const next = AccountSchema.parse({ ...a, ...patch, ...typed, updatedAt: ts })
+  // the rows that pay a loan or a card off follow it, and a type that would leave something behind is refused
+  const change = planAccountChange(tables, a, next, ts)
+  if (change.refusal) throw new Error(change.refusal)
   // pocket money lands only where net worth does not count it: while a row lands here the account stays left out
   if (isOutsideNetWorth(a) && !isOutsideNetWorth(next)) {
     const landing = tables.rows.filter((r) => !r.deletedAt && !r.archivedMonth && pocketLandsIn(r, a))
@@ -160,9 +243,9 @@ export async function updateAccount(store: Store, id: string, patch: Partial<Omi
   }
   // one main account open at a time, in the household's currency, and nothing moving money into it (rule B9)
   assertMainAccount(tables, next, a)
-  const mutations: Mutation[] = [{ op: 'put', table: 'accounts', record: next }]
+  const mutations: Mutation[] = [{ op: 'put', table: 'accounts', record: next }, ...change.mutations]
   refuseThirdCurrency(tables, mutations)
-  await store.commit(mutations, { fromNow })
+  await store.commit(mutations, { fromNow: fromNow && [...fromNow, ...change.mutations] })
 }
 
 /** Record (or clear with null) the real balance of an account at the end of a month. */

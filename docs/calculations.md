@@ -462,6 +462,18 @@ for the card (rule B5), and net worth falls by each payment (finding F5, closed)
     owes 500.00, 300.00 paid every month: still 500.00 owed in every month
     a real balance of 200.00 in March: 200.00 from March on, and net worth is 300.00 higher that month
 
+**What a payment row does follows the account it pays.** A loan (C1), a card whose purchases are expense rows (C2)
+and a card that records only its payments (C3) each read their payment row differently, so the row is written with
+the account when the account becomes another of the three: a card that becomes a loan is brought down by the
+payments that were recorded for it, in every month, and a change that moves a month that is over asks first (T4).
+The payment of a C2 card stands under Transfers and every other one under Expenses; a row that changes sides loses
+its category, and expense rows that were "Paid by card" on an account that becomes a loan lose that link.
+
+Any other change of an account's type is refused while something is tied to it that the new type cannot hold: a
+row made for the old type ("To savings", a payment), a virtual account (only a savings account holds those), and,
+between an account that holds money and a debt, anything at all. Those links are read by the account's type, so
+they would count as nothing, or as something else, without saying so.
+
 ## W. Payments by day and method
 
 **W1. A day and a payment method say when and how an amount is paid, and move no figure.** The day is a day of the

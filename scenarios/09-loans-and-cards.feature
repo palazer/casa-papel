@@ -136,3 +136,37 @@ Feature: Loans and credit cards
     And "Amex" ends December 2026 with 200.00
     And net worth changes by 1,800.00 in March 2026
     And of that, 300.00 is "real balances"
+
+  # What a payment row does follows the account it pays. The account's form writes the row with the account, so a
+  # card that is really a loan can be made one without adding everything again.
+  @C1 @C3
+  Scenario: A card that becomes a loan is brought down by the payments recorded for it
+    Given a credit card "Amex" owing 500.00, of which only the payments are recorded
+    And a payment "Amex – Payment" of 100.00 to "Amex" from January 2026
+    When "Amex" becomes a loan
+    Then "Amex" ends January 2026 with 400.00
+    And "Amex" ends March 2026 with 200.00
+    And the Statement of January 2026 shows "Expenses" at 1,300.00
+    And "Current account" ends January 2026 with 2,700.00
+
+  @C1 @C2
+  Scenario: A loan that becomes a card whose purchases are expense rows: its payment only moves money
+    Given a loan "Car loan" of 6,000.00, paid off with 250.00 a month from January 2026
+    When "Car loan" becomes a credit card whose purchases are expense rows
+    Then "Car loan" ends January 2026 with 5,750.00
+    And the Statement of January 2026 shows "Expenses" at 1,200.00
+    And "Current account" ends January 2026 with 2,550.00
+
+  @C1 @C3
+  Scenario: A loan that becomes a card of which only the payments are recorded stays owed as it is
+    Given a loan "Car loan" of 6,000.00, paid off with 250.00 a month from January 2026
+    When "Car loan" becomes a credit card of which only the payments are recorded
+    Then "Car loan" ends March 2026 with 6,000.00
+    And the Statement of January 2026 shows "Expenses" at 1,450.00
+
+  @C1
+  Scenario: A loan cannot become an account that holds money while a row pays it off
+    Given a loan "Car loan" of 6,000.00, paid off with 250.00 a month from January 2026
+    When "Car loan" becomes a savings account
+    Then it is refused with '"Car loan – Payment" pays it off'
+

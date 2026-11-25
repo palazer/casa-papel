@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computeEngine } from '@/engine'
 import { newId, type Row } from '@/model'
 import {
-  CasaDb, NO_QUESTION, PastChangeCancelled, PastChangeStale, Store, addAccount, addRow, changeLineText, changesBetween, defaultMonths, loadTables,
+  CasaDb, NO_QUESTION, PastChangeCancelled, PastChangeStale, Store, addAccount, addAccountWithRow, addRow, changeLineText, changesBetween, defaultMonths, loadTables,
   pastGuard, quickCreateHousehold, setAccountActual, setCellDone, setCellValue, setManualRate, updateAccount, updateRow,
   type PastAnswer, type PastQuestion,
 } from '@/store'
@@ -121,6 +121,44 @@ describe('a change that reaches into months that are over asks first', () => {
     await expect(updateAccount(store, savings.id, { outsideNetWorth: true })).rejects.toBeInstanceOf(PastChangeCancelled)
     // savings holds its 500.00 and every month's leftover: 9,500.00 by May; the current account 1,000.00
     expect(asked[0].changes.lines.map((l) => changeLineText(l, 'en-IE'))).toEqual(['Net worth at the end of May 2026: €10,500.00 → €1,000.00'])
+  })
+})
+
+describe('a card that becomes a loan, with payments in months that are over', () => {
+  beforeEach(() => setToday('2026-06-15'))
+  afterEach(restoreToday)
+
+  it('asks with the account and its row as one change; Cancel writes neither, "Save anyway" both', async () => {
+    const { store } = await fresh()
+    const { account, row } = await addAccountWithRow(store, { name: 'Card', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01', openingBalance: 5000_00, card: { cardMode: 'lump' } }, { kind: 'pay-off' })
+    await setCellValue(store, row.id, '2026-01', 100_00, 'from-now-on')
+    const { asked, say } = answering(store, 'cancel')
+    const stored = async () => {
+      const t = await loadTables(store)
+      return [t.accounts.find((a) => a.id === account.id)!.type, t.rows.find((r) => r.id === row.id)!.kind]
+    }
+
+    await expect(updateAccount(store, account.id, { type: 'loan', card: undefined })).rejects.toBeInstanceOf(PastChangeCancelled)
+    expect(asked).toHaveLength(1)
+    // what is owed falls with every payment that is over: the question says so before anything is written
+    expect(asked[0].changes.lines.map((l) => changeLineText(l, asked[0].locale))).toContain('"Card" at the end of May 2026: €5,000.00 → €4,500.00')
+    expect(await stored()).toEqual(['credit-card', 'card-payment'])
+
+    say.answer = 'save'
+    await updateAccount(store, account.id, { type: 'loan', card: undefined })
+    expect(await stored()).toEqual(['loan', 'debt-payment'])
+  })
+
+  it('a row that only moves to another section changes no figure, and asks nothing', async () => {
+    const { store } = await fresh()
+    const { account, row } = await addAccountWithRow(store, { name: 'Visa', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01', card: { cardMode: 'itemized' } }, { kind: 'pay-off' })
+    // what a save wrote before the rows followed: the card alone, now recording only its payments
+    const t = await loadTables(store)
+    await store.commit([{ op: 'put', table: 'accounts', record: { ...t.accounts.find((a) => a.id === account.id)!, card: { cardMode: 'lump' as const }, updatedAt: Date.now() } }], NO_QUESTION)
+    const { asked } = answering(store, 'cancel')
+    await updateAccount(store, account.id, { name: 'Visa card' })
+    expect(asked).toHaveLength(0)
+    expect((await loadTables(store)).rows.find((r) => r.id === row.id)).toMatchObject({ section: 'expense', kind: 'card-payment' })
   })
 })
 

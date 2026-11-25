@@ -1,4 +1,4 @@
-import { generateKeyBetween } from 'fractional-indexing'
+import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing'
 import { computeEngine, cellKey, sortRows, typedAmount, type EngineOutput } from '@/engine'
 import {
   ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RecurringItemSchema, RowSchema, accountIdOf, addMonths, canCarryRule, canTakeRest, cardIsItemized, compareMonths, currencyExponent, fromMinor, holdsBalance, isOldPocketShare, isOutsideNetWorth, isShareRule, monthKey, monthOfDate, monthRange, newId, ownBalance, parseMonth, paysExpenses, poolIdOf, resolveRules, sharePercent, toMinor,
@@ -460,6 +460,38 @@ export function payOffKind(account: Account): Pick<RowOfKindInput, 'section' | '
   return cardIsItemized(account) ? { section: 'transfer', kind: 'card-payment' } : { section: 'expense', kind: 'pay-off' }
 }
 
+/** A row that pays a loan or a card off, whichever of the two it was made for. */
+export const isPayOffRow = (row: Pick<Row, 'kind'>): boolean => row.kind === 'debt-payment' || row.kind === 'card-payment'
+
+/**
+ * What the row that pays an account off is, as it is stored: a loan's payment and a card's are two kinds, and the
+ * payment of a card whose purchases are expense rows stands under Transfers, every other one under Expenses. The one
+ * reading of it, for a new row (`rowOfKindMutations`) and for a row whose account changed (`payOffPatches`).
+ */
+export function payOffPlace(account: Pick<Account, 'type' | 'card'>): { section: 'expense' | 'transfer'; kind: 'debt-payment' | 'card-payment' } {
+  if (account.type === 'loan') return { section: 'expense', kind: 'debt-payment' }
+  return { section: cardIsItemized(account) ? 'transfer' : 'expense', kind: 'card-payment' }
+}
+
+/**
+ * What has to change on the rows that pay `account` off so that they fit it (`payOffPlace`): the account became a
+ * loan or a card, a card records something else now, or a row was pointed at it. A row that fits already is not in
+ * the result, so nothing is written for it. A row that changes section joins the end of the rows without a category
+ * there, the rows that move together in the order they had; it loses its category, which belongs to the section it
+ * leaves, and under Transfers also what it was deducted from, which only an expense can be. Pure.
+ */
+export function payOffPatches(tables: Tables, rows: Row[], account: Pick<Account, 'type' | 'card'>): Map<string, Partial<Row>> {
+  const place = payOffPlace(account)
+  const out = new Map<string, Partial<Row>>()
+  const moving = sortRows(rows.filter((r) => r.section !== place.section), tables.categories)
+  const ids = new Set(moving.map((r) => r.id))
+  const last = groupRows(tables, { section: place.section, categoryId: null }).filter((r) => !ids.has(r.id)).at(-1)?.order ?? null
+  const orders = generateNKeysBetween(last, null, moving.length)
+  moving.forEach((r, i) => out.set(r.id, { section: place.section, kind: place.kind, categoryId: null, order: orders[i], ...(place.section === 'transfer' ? { deductedFromRowId: null } : {}) }))
+  for (const r of rows) if (!out.has(r.id) && r.kind !== place.kind) out.set(r.id, { kind: place.kind })
+  return out
+}
+
 /**
  * The puts for a new row under Transfers or Expenses. A deposit row needs its account, a pool row the virtual account
  * it fills (one that lost its row), pocket money the adult it is for, a payment row the loan or card it brings down;
@@ -483,7 +515,7 @@ export function rowOfKindMutations(tables: Tables, input: RowOfKindInput): { row
     if (acc.archivedMonth) throw new Error(`"${acc.name}" is archived.`)
     if (cardIsItemized(acc)) throw new Error(`Purchases on "${acc.name}" are recorded as expense rows, so its payment is a transfer: add it under Transfers with "Pays off a credit card".`)
     if (!targets.payoff.some((a) => a.id === acc.id)) throw new Error(`"${acc.name}" is not a loan or a credit card.`)
-    base.kind = acc.type === 'loan' ? 'debt-payment' : 'card-payment'
+    base.kind = payOffPlace(acc).kind
     base.accountId = acc.id
     nameAfter(acc.name)
   } else if (input.kind === 'card-payment') {
@@ -976,8 +1008,10 @@ export async function setRowAccount(store: Store, rowId: string, accountId: stri
   const tables = await loadTables(store)
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
   if (!row) throw new Error('Row not found')
-  checkAccountForRow(tables, row, accountId)
-  await updateRow(store, rowId, { accountId })
+  const acc = checkAccountForRow(tables, row, accountId)
+  // a payment row stands where the account it pays puts it: another card can record something else
+  const fit = acc && isPayOffRow(row) ? payOffPatches(tables, [row], acc).get(row.id) : undefined
+  await updateRow(store, rowId, { accountId, ...fit })
 }
 
 /** The account a row may point at: it must exist, and a typed row (deposits, payments) needs the matching type. */

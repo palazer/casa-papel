@@ -1,4 +1,4 @@
-import { addAccount, addAccountWithRow, addRowOfKind, payOffKind, setCellValue, setRowAccount } from '@/store'
+import { addAccount, addAccountWithRow, addRowOfKind, payOffKind, setCellValue, setRowAccount, updateAccount } from '@/store'
 import { step } from '../registry'
 import type { World } from '../world'
 
@@ -42,4 +42,23 @@ step('a payment {string} of {money} to {string} from {month}', async (world: Wor
 // "Paid with": an expense bought on a card
 step('{string} is paid with {string}', async (world: World, rowName: string, accountName: string) => {
   await setRowAccount(world.store, (await world.row(rowName)).id, (await world.account(accountName)).id)
+})
+
+// ---------- an account that becomes something else ----------
+
+// the account's form, "Type": the rows that pay a loan or a card off follow it
+step('{string} becomes a loan', async (world: World, name: string) => {
+  await updateAccount(world.store, (await world.account(name)).id, { type: 'loan', card: undefined })
+})
+
+step('{string} becomes a credit card whose purchases are expense rows', async (world: World, name: string) => {
+  await updateAccount(world.store, (await world.account(name)).id, { type: 'credit-card', card: { cardMode: 'itemized' } })
+})
+
+step('{string} becomes a credit card of which only the payments are recorded', async (world: World, name: string) => {
+  await updateAccount(world.store, (await world.account(name)).id, { type: 'credit-card', card: { cardMode: 'lump' } })
+})
+
+step('{string} becomes a savings account', async (world: World, name: string) => {
+  await updateAccount(world.store, (await world.account(name)).id, { type: 'savings', card: undefined })
 })
