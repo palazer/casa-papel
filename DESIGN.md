@@ -961,6 +961,17 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   the box reads `Each payment counts as that month's spending; what is owed changes only with a real balance.`).
   Opened from the row form, the dialog says `Saving also adds the row "<name>", linked to
   this account.` in place of the box.
+  An account that changes says before saving what its rows do, asked of the planner the store writes with
+  (`planAccountChange`), so the form and the save never disagree. Under the "paid off by" line, in the same muted
+  `text-xs`: the rows that follow (`"Car loan – Payment" follows: each payment brings down what is owed and counts
+  as an expense of its month.`, with where the row goes when it changes sides: `It moves out of Expenses and loses
+  its category.`, `It moves under Expenses, into no category.`), and the rows that lose their card (`"Groceries" is
+  no longer "Paid by card" on it: nothing is bought on a loan.`). A type the account cannot take is said on the
+  spot, right under the name and the type and above the type's help, as a `role="alert"` line in `text-destructive`
+  that names what holds it; the select
+  is `aria-invalid` and Save is disabled while it shows. The button that adds a missing payment row shows only while
+  the type is the stored one. Picking a type with a tracked balance for an account that had none ticks `Track the
+  balance month by month in the grid`.
 - The goal dialog (`src/features/goals/GoalDialog.tsx`). A goal has two kinds: `Fill an account` (an account or a
   virtual account reaches an amount) and `Pay down a debt` (a card or loan comes down to an amount, zero unless another
   is typed); net worth is a third, set only from its own line. Opened from a line of the Statement it is titled

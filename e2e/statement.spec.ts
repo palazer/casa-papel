@@ -1337,6 +1337,80 @@ test.describe('working the month in the Statement', () => {
     await page.screenshot({ path: 'e2e/output/statement-accounts.png', fullPage: true })
   })
 
+  test('a card that is really a loan is made one from its form, and the row that pays it off follows; a type that would leave a row behind is refused', async ({ page }) => {
+    await openStatement(page)
+    await goToMonth(page, 'November 2026')
+    const moneyOut = page.getByRole('region', { name: 'Money out' })
+    const assets = page.getByRole('region', { name: 'Assets' })
+    const claims = page.getByRole('region', { name: 'Debts and net worth' })
+    const dlg = page.getByRole('dialog')
+
+    // a card of which only the payments are recorded: the payment is the spending, and what is owed stays
+    await claims.getByRole('button', { name: 'Add a card or loan' }).click()
+    await dlg.getByLabel('Name', { exact: true }).fill('Store card')
+    await dlg.getByLabel('Owed at the start of September 2026 (EUR)').fill('940')
+    await dlg.getByRole('radio', { name: 'Only what I pay to it' }).click()
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Store card – Payment · November 2026' })).toBeVisible()
+    await dlg.getByLabel('Amount in EUR').fill('50')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    const card = claims.locator('[data-line^="acc:"]').filter({ hasText: 'Store card' })
+    await expect(card).toContainText('changes with real balances only')
+    await expect(card).toContainText('€940.00')
+    const payment = moneyOut.getByRole('button', { name: /^Store card – Payment: €50\.00/ })
+    await expect(payment).toBeVisible()
+
+    // as a loan: the form says what the row does then, before anything is saved
+    await editFrom(page, claims, 'Store card')
+    await expect(dlg.getByTestId('acc-follows')).toHaveCount(0)
+    await dlg.getByLabel('Type').selectOption('loan')
+    await expect(dlg.getByTestId('acc-paid-by')).toHaveText('Paid off by "Store card – Payment".')
+    await expect(dlg.getByTestId('acc-follows')).toHaveText('"Store card – Payment" follows: each payment brings down what is owed and counts as an expense of its month.')
+    await settled(dlg)
+    await dlg.screenshot({ path: 'e2e/output/account-becomes-loan.png' })
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    // the payment brings it down, and is still an expense of the month
+    await expect(card).toContainText('€890.00')
+    await expect(card).not.toContainText('changes with real balances only')
+    await expect(payment).toBeVisible()
+
+    // the row takes a category of the expenses
+    await moneyOut.getByRole('button', { name: 'Row menu for Store card – Payment' }).click()
+    await page.getByRole('menuitem', { name: 'Category…' }).click()
+    await dlg.getByLabel('Category', { exact: true }).selectOption({ label: 'Transport' })
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(moneyOut.locator('[data-line^="cat:expense:"]').filter({ hasText: 'Transport' })).toContainText('€148.00')
+
+    // back to a card: what the row does depends on what is recorded for the card, and the form follows the choice
+    await editFrom(page, claims, 'Store card')
+    await dlg.getByLabel('Type').selectOption('credit-card')
+    await expect(dlg.getByTestId('acc-follows')).toHaveText('"Store card – Payment" follows: each payment brings down what is owed and only moves money, so it is not counted as spending again. It moves out of Expenses and loses its category.')
+    await dlg.getByRole('radio', { name: 'Only what I pay to it' }).click()
+    await expect(dlg.getByTestId('acc-follows')).toHaveText('"Store card – Payment" follows: each payment counts as that month\'s spending; what is owed changes only with a real balance.')
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+    await expect(dlg).toBeHidden()
+    await expect(card).toContainText('€890.00')
+
+    // a savings account that rows and virtual accounts are tied to cannot become an investment account
+    await editFrom(page, assets, 'Savings')
+    await expect(dlg.getByTestId('acc-type-refusal')).toHaveCount(0)
+    await dlg.getByLabel('Type').selectOption('investment')
+    const refusal = dlg.getByTestId('acc-type-refusal')
+    await expect(refusal).toContainText('"Savings" cannot become an account of type Investments: "To savings" sends money to it')
+    await expect(refusal).toContainText('the virtual account "Travel" is held in it')
+    await expect(dlg.getByLabel('Type')).toHaveAttribute('aria-invalid', 'true')
+    await expect(dlg.getByRole('button', { name: 'Save' })).toBeDisabled()
+    await settled(dlg)
+    await dlg.screenshot({ path: 'e2e/output/account-type-refused.png' })
+    await dlg.getByLabel('Type').selectOption('savings')
+    await expect(refusal).toHaveCount(0)
+    await expect(dlg.getByRole('button', { name: 'Save' })).toBeEnabled()
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+  })
+
   test('suggested rows are offered where they will appear: one is added with its amount, one is dismissed and leaves the page', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'November 2026')

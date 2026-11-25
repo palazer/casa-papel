@@ -15,7 +15,7 @@ import { amountToInput, formatMonth, parseAmount, unreadableAmount } from '@/app
 import { useStore } from '@/app/store'
 import { useTables } from '@/app/useEngine'
 import { ACCOUNT_TYPE_INFO, growthIn, monthOfDate, paysExpenses, type Account, type AccountType, type Entity, type Row } from '@/model'
-import { addAccount, addAccountWithRow, addPayOffRow, payOffRowsOf, rowNameFor, updateAccount, type AccountRowInput } from '@/store'
+import { addAccount, addAccountWithRow, addPayOffRow, payOffRowsOf, planAccountChange, rowNameFor, updateAccount, type AccountChange, type AccountRowInput } from '@/store'
 import { cn } from '@/lib/utils'
 import { saveError } from '@/app/saveError'
 import { growthText } from './growthText'
@@ -55,6 +55,25 @@ const CARD_HELP: Record<CardMode, string> = {
   lump: 'Only the payment is a row, and it counts as that month\'s spending. What you owe comes from the real balances you enter.',
 }
 const TRACKABLE: AccountType[] = ['savings', 'investment', 'credit-card', 'loan', 'other-asset']
+const quoted = (rows: Row[]) => rows.map((r) => `"${r.name}"`).join(', ')
+
+/**
+ * What the rows that pay the account off become when it is saved, said before saving: what a payment then does, and
+ * where the row goes when it changes sides.
+ */
+function followsText(change: AccountChange): string | null {
+  const { follows, place } = change
+  if (!follows.length || !place) return null
+  const does = place.kind === 'debt-payment' ? 'each payment brings down what is owed and counts as an expense of its month'
+    : place.section === 'transfer' ? 'each payment brings down what is owed and only moves money, so it is not counted as spending again'
+    : 'each payment counts as that month\'s spending; what is owed changes only with a real balance'
+  const moving = follows.filter((r) => r.section !== place.section)
+  const it = moving.length === 1 ? 'It' : 'They'
+  const moves = !moving.length ? ''
+    : place.section === 'transfer' ? ` ${moving.length === follows.length ? it : quoted(moving)} ${moving.length === 1 ? 'moves' : 'move'} out of Expenses and ${moving.length === 1 ? 'loses its category' : 'lose their categories'}.`
+    : ` ${moving.length === follows.length ? it : quoted(moving)} ${moving.length === 1 ? 'moves' : 'move'} under Expenses, into no category.`
+  return `${quoted(follows)} ${follows.length === 1 ? 'follows' : 'follow'}: ${does}.${moves}`
+}
 /** What the starting amount of an account is called: money held, money owed, or what a thing is worth. */
 const balanceWord = (type: AccountType) => (type === 'credit-card' || type === 'loan' ? 'Owed' : type === 'other-asset' ? 'Worth' : 'Holds')
 
@@ -111,7 +130,16 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
   const rowInput: AccountRowInput | null = account ? null : withRow ?? (offersRow && payOff ? { kind: 'pay-off' } : null)
   const rowName = rowInput ? rowInput.name?.trim() || (name.trim() ? rowNameFor(rowInput.kind, name.trim()) : null) : null
   // a saved loan or card says which row pays it off, and offers one while none does
-  const paidBy = account && rows && type === account.type && debt ? payOffRowsOf(rows, account.id) : null
+  const paidBy = account && rows && debt ? payOffRowsOf(rows, account.id) : null
+  // what saving does beyond the account: the rows that pay it off follow, and a type that would leave something
+  // behind is refused. Asked of the same planner the store writes with, so the form says what will happen
+  const change = account && tables ? planAccountChange(tables, account, { type, card: type === 'credit-card' ? { cardMode } : undefined }) : null
+  const follows = change ? followsText(change) : null
+  /** A type with a balance of its own, picked for an account that had none to track: the balance is tracked unless unticked. */
+  const pickType = (t: AccountType) => {
+    setType(t)
+    if (account && !TRACKABLE.includes(account.type) && TRACKABLE.includes(t)) setTracked(true)
+  }
 
   async function addRow() {
     if (!account || busy) return
@@ -173,7 +201,8 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
         <DialogHeader><DialogTitle>{account ? 'Edit account' : 'New account'}</DialogTitle></DialogHeader>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5"><Label htmlFor="acc-name">Name</Label><Input id="acc-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} /></div>
-          <div className="space-y-1.5"><Label htmlFor="acc-type">Type</Label><NativeSelect id="acc-type" className="w-full" value={type} onChange={(e) => setType(e.target.value as AccountType)}>{types.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</NativeSelect></div>
+          <div className="space-y-1.5"><Label htmlFor="acc-type">Type</Label><NativeSelect id="acc-type" className="w-full" value={type} aria-invalid={change?.refusal ? true : undefined} onChange={(e) => pickType(e.target.value as AccountType)}>{types.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</NativeSelect></div>
+          {change?.refusal && <p role="alert" className="-mt-1 text-xs text-destructive sm:col-span-2" data-testid="acc-type-refusal">{change.refusal}</p>}
           <p className="-mt-1 text-xs text-muted-foreground sm:col-span-2" data-testid="acc-type-help">{info?.help}{type === 'joint' && main ? ` The main account is "${main.name}".` : ''}{foreign ? ` Amounts are typed in ${ccy} and shown in ${baseCurrency} beneath. The rates come from the European Central Bank by themselves (only currency codes and dates are sent); change them under Household, "Currency rates".` : ''}</p>
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="acc-open">{balanceWord(type)} at the start of {formatMonth(openingMonth, locale, 'long')} ({ccy})</Label>
@@ -212,13 +241,19 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:col-span-2" data-testid="acc-paid-by">
               {paidBy.length > 0
                 ? <p>{onlyPayments ? 'Payments:' : 'Paid off by'} {paidBy.map((r) => `"${r.name}"`).join(', ')}.</p>
-                : (
+                : type === account?.type && (
                   <>
                     <p>No row pays this off yet.</p>
                     <Button size="xs" variant="outline" disabled={busy} onClick={() => void addRow()}>Add the row that pays it off</Button>
                   </>
                 )}
             </div>
+          )}
+          {follows && <p className="text-xs text-muted-foreground sm:col-span-2" data-testid="acc-follows">{follows}</p>}
+          {change && change.unlinked.length > 0 && (
+            <p className="text-xs text-muted-foreground sm:col-span-2" data-testid="acc-unlinked">
+              {quoted(change.unlinked)} {change.unlinked.length === 1 ? 'is' : 'are'} no longer "Paid by card" on it{type === 'loan' ? ': nothing is bought on a loan' : ''}.
+            </p>
           )}
           <div className="sm:col-span-2">
             <button
@@ -315,7 +350,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
           <div>{account && onRemove && <Button variant="ghost" size="sm" onClick={onRemove} disabled={busy}>{removeLabel}</Button>}</div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-            <Button disabled={busy || !name.trim() || ccy.length !== 3} onClick={() => void save()}>Save</Button>
+            <Button disabled={busy || !name.trim() || ccy.length !== 3 || !!change?.refusal} onClick={() => void save()}>Save</Button>
           </div>
         </DialogFooter>
       </DialogContent>
