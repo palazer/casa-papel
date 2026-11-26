@@ -18,6 +18,9 @@ import { addAccount, addAccountWithRow, addPayOffRow, payOffRowsOf, planAccountC
 import { cn } from '@/lib/utils'
 import { saveError } from '@/app/saveError'
 import { growthText } from './growthText'
+import { txt } from '@/i18n'
+
+const T = txt.household.account
 
 interface Props {
   account: Account | null
@@ -46,14 +49,14 @@ interface Props {
 
 const TRACKABLE: AccountType[] = ['savings', 'investment', 'credit-card', 'loan', 'other-asset']
 /** What the starting amount of an account is called: money held, money owed, or what a thing is worth. */
-const balanceWord = (type: AccountType) => (type === 'credit-card' || type === 'loan' ? 'Owed' : type === 'other-asset' ? 'Worth' : 'Holds')
+const balanceWord = (type: AccountType) => (type === 'credit-card' || type === 'loan' ? T.owed : type === 'other-asset' ? T.worth : T.holds)
 
 /**
  * An account (DESIGN.md §8). The short form asks what every account needs: its name, its type and what it holds, or
  * what is owed on it, when it starts. The rest (currency, owner, opening
  * month, tracking, how an investment grows) keeps its usual default behind "More options", which is open when editing.
  */
-export function HouseholdAccountDialog({ account, entities, baseCurrency, locale, startMonth, preset, rows, withRow, onClose, onSaved, onRowAdded, onRemove, removeLabel = 'Archive or delete…' }: Props) {
+export function HouseholdAccountDialog({ account, entities, baseCurrency, locale, startMonth, preset, rows, withRow, onClose, onSaved, onRowAdded, onRemove, removeLabel = txt.common.archiveOrDelete }: Props) {
   const store = useStore()
   const tables = useTables()
   // one main account open at a time (rule B9): while there is one, "Main account" is offered only on that account itself
@@ -117,7 +120,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
       onRowAdded?.(row)
       onClose()
     } catch (e) {
-      setError(saveError(e, 'Could not add the row.'))
+      setError(saveError(e, T.couldNotAddThe))
     } finally {
       setBusy(false)
     }
@@ -125,15 +128,15 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
 
   async function save() {
     const openingBalance = opening.trim() ? parseAmount(opening, ccy, locale) : 0
-    if (openingBalance == null) return setError(unreadableAmount(opening, `"${balanceWord(type)} at the start" is not a number I can read.`))
+    if (openingBalance == null) return setError(unreadableAmount(opening, T.startNotANumber(balanceWord(type))))
     // a payment stops at what is owed, so a loan or card that says nothing about it would take no payment at all
     if (debt && trackable && tracked && !opening.trim()) {
-      return setError(`Type what is still owed on the ${type === 'loan' ? 'loan' : 'card'}, or untick "Track the balance month by month in the grid". A payment stops at what is owed, so with nothing owed the payments to this ${type === 'loan' ? 'loan' : 'card'} would count as nothing.`)
+      return setError(T.typeWhatIsStill(type))
     }
     const annualRate = Number(annual.replace(',', '.')) / 100
-    if (type === 'investment' && !Number.isFinite(annualRate)) return setError('Growth per year is not a number.')
+    if (type === 'investment' && !Number.isFinite(annualRate)) return setError(T.growthPerYearIs)
     const fixed = Number(fixedRate.replace(',', '.'))
-    if (type === 'investment' && foreign && fxMode === 'fixed' && !(fixed > 0)) return setError('Give the fixed rate as a positive number.')
+    if (type === 'investment' && foreign && fxMode === 'fixed' && !(fixed > 0)) return setError(T.giveTheFixedRate)
     const patch = {
       name: name.trim(), type, currency: ccy, openingBalance, openingMonth, ownerEntityId: owner || null, tracked: trackable ? tracked : false,
       outsideNetWorth: canLeaveOut && outside,
@@ -155,7 +158,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
       }
       onClose()
     } catch (e) {
-      setError(saveError(e, 'Could not save.'))
+      setError(saveError(e, txt.common.couldNotSave))
     } finally {
       setBusy(false)
     }
@@ -164,46 +167,46 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
-        <DialogHeader><DialogTitle>{account ? 'Edit account' : 'New account'}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{account ? T.editAccount : T.newAccount}</DialogTitle></DialogHeader>
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5"><Label htmlFor="acc-name">Name</Label><Input id="acc-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} /></div>
-          <div className="space-y-1.5"><Label htmlFor="acc-type">Type</Label><NativeSelect id="acc-type" className="w-full" value={type} aria-invalid={change?.refusal ? true : undefined} onChange={(e) => pickType(e.target.value as AccountType)}>{types.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</NativeSelect></div>
+          <div className="space-y-1.5"><Label htmlFor="acc-name">{txt.common.name}</Label><Input id="acc-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} /></div>
+          <div className="space-y-1.5"><Label htmlFor="acc-type">{T.type}</Label><NativeSelect id="acc-type" className="w-full" value={type} aria-invalid={change?.refusal ? true : undefined} onChange={(e) => pickType(e.target.value as AccountType)}>{types.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</NativeSelect></div>
           {change?.refusal && <p role="alert" className="-mt-1 text-xs text-destructive sm:col-span-2" data-testid="acc-type-refusal">{change.refusal}</p>}
-          <p className="-mt-1 text-xs text-muted-foreground sm:col-span-2" data-testid="acc-type-help">{info?.help}{type === 'joint' && main ? ` The main account is "${main.name}".` : ''}{foreign ? ` Amounts are typed in ${ccy} and shown in ${baseCurrency} beneath. The rates come from the European Central Bank by themselves (only currency codes and dates are sent); change them under Household, "Currency rates".` : ''}</p>
+          <p className="-mt-1 text-xs text-muted-foreground sm:col-span-2" data-testid="acc-type-help">{T.typeHelp(info?.help ?? '', type === 'joint' && main ? main.name : null, foreign ? ccy : null, baseCurrency)}</p>
           <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="acc-open">{balanceWord(type)} at the start of {formatMonth(openingMonth, locale, 'long')} ({ccy})</Label>
+            <Label htmlFor="acc-open">{T.balanceAtStart(balanceWord(type), formatMonth(openingMonth, locale, 'long'), ccy)}</Label>
             <Input id="acc-open" className="sm:w-1/2" inputMode="decimal" value={opening} onChange={(e) => setOpening(e.target.value)} placeholder="0" />
             <AmountHint text={opening} currency={ccy} locale={locale} />
             <p className="text-xs text-muted-foreground">
-              {type === 'loan' ? 'What is still owed. A payment row that names this loan brings it down, and stops counting once nothing is owed.'
-                : type === 'credit-card' ? 'Everything you owe on the card: the whole debt, not the month\'s bill. A payment row that names this card brings it down. Once a month, press the card\'s amount on the Statement and type what its statement says.'
-                : type === 'other-asset' ? 'What it is worth. Enter a real value from its line whenever that changes.'
-                : 'From then on every month starts with what the month before ended on. Press the account\'s amount in a month to type what it really held at the start and at the end.'}
+              {type === 'loan' ? T.whatIsStillOwed
+                : type === 'credit-card' ? T.everythingYouOweOn
+                : type === 'other-asset' ? T.whatItIsWorth
+                : T.fromThenOnEvery}
             </p>
           </div>
           {offersRow && (
             <div className="space-y-1 sm:col-span-2">
-              <Check label="Add the row that pays it off" checked={payOff} onChange={(e) => setPayOff(e.target.checked)} />
+              <Check label={T.addTheRowThat} checked={payOff} onChange={(e) => setPayOff(e.target.checked)} />
               <p className="pl-6 text-xs text-muted-foreground" data-testid="acc-row">
                 {payOff
-                  ? <>{rowName ? `"${rowName}"` : 'Named after the account'}. Each payment brings down what is owed.{type === 'credit-card' && ' It holds what you pay beyond what you buy with the card that month: what you buy is in your rows already.'}</>
-                  : 'No row yet. One can be added later from this form.'}
+                  ? T.payOffRow(rowName, type === 'credit-card')
+                  : T.noRowYetOne}
               </p>
             </div>
           )}
           {withRow && (
             <p className="text-xs text-muted-foreground sm:col-span-2" data-testid="acc-row">
-              Saving also adds the row {rowName ? `"${rowName}"` : 'named after the account'}, linked to this account.
+              {T.savingAlsoAddsThe(rowName)}
             </p>
           )}
           {paidBy && (
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:col-span-2" data-testid="acc-paid-by">
               {paidBy.length > 0
-                ? <p>Paid off by {paidBy.map((r) => `"${r.name}"`).join(', ')}.</p>
+                ? <p>{T.paidOffBy(paidBy.map((r) => `"${r.name}"`).join(', '))}</p>
                 : type === account?.type && (
                   <>
-                    <p>No row pays this off yet.</p>
-                    <Button size="xs" variant="outline" disabled={busy} onClick={() => void addRow()}>Add the row that pays it off</Button>
+                    <p>{T.noRowPaysThis}</p>
+                    <Button size="xs" variant="outline" disabled={busy} onClick={() => void addRow()}>{T.addTheRowThat}</Button>
                   </>
                 )}
             </div>
@@ -214,81 +217,81 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
               className="flex items-center gap-1 rounded text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
             >
               <ChevronRight className={cn('size-3.5 transition-transform', more && 'rotate-90')} aria-hidden />
-              More options
-              {!more && <span className="text-muted-foreground/80">: currency, owner, opening month{trackable ? ', tracking' : ''}{canLeaveOut ? ', net worth' : ''}{type === 'investment' ? ', growth' : ''}</span>}
+              {T.moreOptions}
+              {!more && <span className="text-muted-foreground/80">{T.moreOptionsList(trackable, canLeaveOut, type)}</span>}
             </button>
           </div>
           {more && (
             <div id="acc-more" className="grid gap-3 sm:col-span-2 sm:grid-cols-2">
               {type === 'checking' ? (
                 <div className="space-y-1.5">
-                  <span className="text-sm font-medium">Currency</span>
-                  <p className="text-xs text-muted-foreground" data-testid="acc-main-currency">{currencyLabel(baseCurrency, baseCurrency)}{`: the main account is always in the household's currency. An account in another one is an "Other current account".`}</p>
+                  <span className="text-sm font-medium">{txt.common.currency}</span>
+                  <p className="text-xs text-muted-foreground" data-testid="acc-main-currency">{T.theMainAccountIs(currencyLabel(baseCurrency, baseCurrency))}</p>
                 </div>
               ) : (
                 <div className="space-y-1.5">
-                  <Label htmlFor="acc-ccy">Currency</Label>
+                  <Label htmlFor="acc-ccy">{txt.common.currency}</Label>
                   <NativeSelect id="acc-ccy" className="w-full" value={currency} onChange={(e) => setCurrency(e.target.value)}>
                     {currencyChoices(baseCurrency, account?.currency).map((c) => <option key={c} value={c}>{currencyLabel(c, baseCurrency)}</option>)}
                   </NativeSelect>
                 </div>
               )}
-              <div className="space-y-1.5"><Label htmlFor="acc-month">Opening month</Label><MonthField id="acc-month" label="Opening month" value={openingMonth} onChange={setOpeningMonth} locale={locale} /></div>
+              <div className="space-y-1.5"><Label htmlFor="acc-month">{T.openingMonth}</Label><MonthField id="acc-month" label={T.openingMonth} value={openingMonth} onChange={setOpeningMonth} locale={locale} /></div>
               <div className="space-y-1.5 sm:col-span-2">
-                <TipLabel htmlFor="acc-owner" help="setup.owner">Owner</TipLabel>
-                <NativeSelect id="acc-owner" className="w-full" value={owner} onChange={(e) => setOwner(e.target.value)}><option value="">Household / joint</option>{adults.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}{children.map((c) => <option key={c.id} value={c.id}>{c.name} · child</option>)}</NativeSelect>
+                <TipLabel htmlFor="acc-owner" help="setup.owner">{T.owner}</TipLabel>
+                <NativeSelect id="acc-owner" className="w-full" value={owner} onChange={(e) => setOwner(e.target.value)}><option value="">{T.householdJoint}</option>{adults.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}{children.map((c) => <option key={c.id} value={c.id}>{T.child(c.name)}</option>)}</NativeSelect>
               </div>
               {trackable && (
                 <div className="flex items-center gap-1 sm:col-span-2">
-                  <Check label="Track the balance month by month in the grid" checked={tracked} onChange={(e) => setTracked(e.target.checked)} />
+                  <Check label={T.trackTheBalanceMonth} checked={tracked} onChange={(e) => setTracked(e.target.checked)} />
                   <InfoTip help="household.tracked" />
                 </div>
               )}
               {canLeaveOut && (
                 <div className="space-y-1 sm:col-span-2">
-                  <Check label="Leave out of net worth" checked={outside} onChange={(e) => setOutside(e.target.checked)} />
+                  <Check label={T.leaveOutOfNet} checked={outside} onChange={(e) => setOutside(e.target.checked)} />
                   <p className="pl-6 text-xs text-muted-foreground" data-testid="acc-outside">
                     {outside
-                      ? 'It keeps its balance and can still pay into the month, but no total counts it, and net worth does not either. Pocket money can land in it.'
-                      : 'For money that is a person\'s own, like saved pocket money. The account keeps its balance, and net worth does not count it.'}
+                      ? T.itKeepsItsBalance
+                      : T.forMoneyThatIs}
                   </p>
                 </div>
               )}
               {type === 'investment' && (
                 <>
                   <div className="space-y-1.5">
-                    <Label htmlFor="acc-growth">Growth per year (%)</Label>
+                    <Label htmlFor="acc-growth">{T.growthPerYear}</Label>
                     <Input id="acc-growth" inputMode="decimal" value={annual} onChange={(e) => setAnnual(e.target.value)} />
-                    <p className="text-xs text-muted-foreground">Projects months without a real value. 5 means 5% a year, applied month by month.</p>
+                    <p className="text-xs text-muted-foreground">{T.projectsMonthsWithoutA}</p>
                     {dated && <p className="text-xs text-muted-foreground" data-testid="growth-changes">{dated}.</p>}
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="acc-proj">Projection</Label>
+                    <Label htmlFor="acc-proj">{T.projection}</Label>
                     <NativeSelect id="acc-proj" className="w-full" value={projection} onChange={(e) => setProjection(e.target.value as typeof projection)}>
-                      <option value="fixed-rate">Use the yearly growth</option>
-                      <option value="historical-average">Average of the real returns I enter</option>
+                      <option value="fixed-rate">{T.useTheYearlyGrowth}</option>
+                      <option value="historical-average">{T.averageOfTheReal}</option>
                     </NativeSelect>
                   </div>
                   <div className="space-y-1.5 sm:col-span-2">
-                    <Label htmlFor="acc-timing">Deposits count</Label>
+                    <Label htmlFor="acc-timing">{T.depositsCount}</Label>
                     <NativeSelect id="acc-timing" className="w-full" value={timing} onChange={(e) => setTiming(e.target.value as typeof timing)}>
-                      <option value="start">At the start of the month (they grow this month too)</option>
-                      <option value="end">At the end of the month (they grow from next month)</option>
+                      <option value="start">{T.depositsAtStart}</option>
+                      <option value="end">{T.atTheEndOf}</option>
                     </NativeSelect>
                   </div>
                   {foreign && (
                     <>
                       <div className="space-y-1.5">
-                        <Label htmlFor="acc-fxmode">Convert deposits</Label>
+                        <Label htmlFor="acc-fxmode">{T.convertDeposits}</Label>
                         <NativeSelect id="acc-fxmode" className="w-full" value={fxMode} onChange={(e) => setFxMode(e.target.value as typeof fxMode)}>
-                          <option value="monthly-rate">At that month's rate</option>
-                          <option value="fixed">At a fixed rate</option>
+                          <option value="monthly-rate">{T.atThatMonthsRate}</option>
+                          <option value="fixed">{T.atAFixedRate}</option>
                         </NativeSelect>
                       </div>
                       {fxMode === 'fixed' && (
                         <div className="space-y-1.5">
                           <Label htmlFor="acc-fixed">1 {baseCurrency} = ? {ccy}</Label>
-                          <Input id="acc-fixed" inputMode="decimal" value={fixedRate} onChange={(e) => setFixedRate(e.target.value)} placeholder="e.g. 1.10" />
+                          <Input id="acc-fixed" inputMode="decimal" value={fixedRate} onChange={(e) => setFixedRate(e.target.value)} placeholder={T.eG110} />
                         </div>
                       )}
                     </>
@@ -302,8 +305,8 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
         <DialogFooter className="flex-row flex-wrap gap-2 sm:justify-between">
           <div>{account && onRemove && <Button variant="ghost" size="sm" onClick={onRemove} disabled={busy}>{removeLabel}</Button>}</div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-            <Button disabled={busy || !name.trim() || ccy.length !== 3 || !!change?.refusal} onClick={() => void save()}>Save</Button>
+            <Button variant="outline" onClick={onClose} disabled={busy}>{txt.common.cancel}</Button>
+            <Button disabled={busy || !name.trim() || ccy.length !== 3 || !!change?.refusal} onClick={() => void save()}>{txt.common.save}</Button>
           </div>
         </DialogFooter>
       </DialogContent>

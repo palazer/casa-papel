@@ -2,6 +2,9 @@ import type { ChipTone } from '@/components/ui/chip'
 import type { RateInfo } from '@/engine'
 import { compareMonths, monthOfDate, type FxRate, type MonthKey } from '@/model'
 import { rateSettled } from '@/store'
+import { txt } from '@/i18n'
+
+const T = txt.household.rate
 
 /** Where a month's rate came from, as a chip: yours is sky, the ECB's a fact in zinc, a forecast amber, a gap rose. */
 export const TAG_TONE: Record<string, ChipTone> = { manual: 'sky', ECB: 'zinc', forecast: 'amber', carried: 'zinc', missing: 'rose' }
@@ -11,11 +14,11 @@ export function rateTag(rec: Pick<FxRate, 'source'> | undefined, info: RateInfo 
 }
 
 const SOURCE: Record<string, string> = {
-  manual: 'Your own rate for this month.',
-  ECB: 'The European Central Bank\'s rate.',
-  forecast: 'A forecast: worked out from the last official rate, the way "Months to come" under Household says.',
-  carried: 'Carried over from the nearest month with a rate.',
-  missing: 'No rate yet: amounts in this currency cannot be counted until there is one.',
+  manual: T.yourOwnRateFor,
+  ECB: T.ecb,
+  forecast: T.aForecastWorkedOut,
+  carried: T.carriedOverFromThe,
+  missing: T.noRateYetAmounts,
 }
 
 /**
@@ -25,8 +28,8 @@ const SOURCE: Record<string, string> = {
 export function rateSource(tag: string, rec: Pick<FxRate, 'source' | 'date' | 'updatedAt'> | undefined, month: MonthKey, locale: string, today: MonthKey = monthOfDate()): string {
   if (tag !== 'ECB' || !rec?.date) return SOURCE[tag] ?? ''
   const day = formatDay(rec.date, locale)
-  if (compareMonths(month, today) >= 0) return `The European Central Bank's latest rate, of ${day}. It moves until the month is over.`
-  return rateSettled(rec, month, today) ? `The European Central Bank's rate of ${day}, the month's last working day.` : `The European Central Bank's rate of ${day}.`
+  if (compareMonths(month, today) >= 0) return T.ecbLatest(day)
+  return rateSettled(rec, month, today) ? T.ecbLastWorkingDay(day) : T.ecbOf(day)
 }
 
 /** Two to four decimals, no grouping, so the text can go straight back into an input. */

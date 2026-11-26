@@ -8,6 +8,7 @@ import { goals } from './goals'
 import { guide } from './guide'
 import { help } from './help'
 import { home } from './home'
+import { household } from './household'
 import { impact } from './impact'
 import { main } from './main'
 import { model } from './model'
@@ -24,4 +25,4 @@ import { sync } from './sync'
 import { trends } from './trends'
 
 /** Every text the app shows, in English. English is the source: another language's catalogue has exactly this shape. */
-export const en = { app, common, components, data, engine, errors, goals, guide, help, home, impact, main, model, names, past, payments, recurring, remove, rules, setup, statement, store, sync, trends }
+export const en = { app, common, components, data, engine, errors, goals, guide, help, home, household, impact, main, model, names, past, payments, recurring, remove, rules, setup, statement, store, sync, trends }

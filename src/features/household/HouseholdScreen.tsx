@@ -31,6 +31,9 @@ import { addEntity, applyTemplates, restoreAccount, restoreEntity, restoredText,
 import { UndoNotice } from '@/components/UndoNotice'
 import { useUndoNotice } from '@/app/useUndoNotice'
 import { saveError, showSaveError } from '@/app/saveError'
+import { lower, txt } from '@/i18n'
+
+const T = txt.household.page
 
 const LOCALES = ['en-IE', 'en-GB', 'en-US', 'de-DE', 'de-AT', 'tr-TR', 'fr-FR', 'es-ES', 'nl-NL', 'it-IT', 'pt-PT', 'sv-SE']
 const ACCOUNT_TYPES = ACCOUNT_TYPE_INFO
@@ -47,14 +50,14 @@ export function HouseholdScreen() {
   /** What a restore brought back, with the way back: it goes with the next change. */
   const notice = useUndoNotice(store)
   if (!tables || !household || !engine) return null
-  const act = (fn: () => Promise<unknown>) => void fn().catch((e) => setError(saveError(e, 'Action failed')))
+  const act = (fn: () => Promise<unknown>) => void fn().catch((e) => setError(saveError(e, txt.common.actionFailed)))
   const onRestored = (r: Restored) => notice.say(restoredText(r))
   const people = tables.entities.filter((e) => !e.deletedAt && !e.archivedMonth).length
   const accounts = tables.accounts.filter((a) => !a.deletedAt && !a.archivedMonth).length
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 text-xs">
-      <PageHeader title="Household" subline={`${household.name} · ${people} ${people === 1 ? 'person or thing' : 'people & things'} · ${accounts} ${accounts === 1 ? 'account' : 'accounts'}`} notes={error && <p role="alert" className="text-destructive">{error}</p>} />
+      <PageHeader title={txt.common.household} subline={T.headerLine(household.name, people, accounts)} notes={error && <p role="alert" className="text-destructive">{error}</p>} />
       <GroupTabs />
       <SettingsCard household={household} tables={tables} onSave={(p) => act(() => updateHousehold(store, p))} onBuffer={(value, scope) => { const saving = setMonthlyDefault(store, value, scope, monthOfDate()); act(() => saving); return saving }} onPayments={(on) => act(() => setPaymentsOn(store, on))} />
       <EntitiesCard household={household} tables={tables} entities={tables.entities.filter((e) => !e.deletedAt)} onError={setError} onRestored={onRestored} />
@@ -64,7 +67,7 @@ export function HouseholdScreen() {
       <CategoriesCard household={household} tables={tables} onError={setError} />
       <ArchivedRowsCard household={household} tables={tables} onError={setError} onRestored={onRestored} />
       <FxCard household={household} tables={tables} months={months} onError={setError} />
-      <Island air tone={HUES.transfer} title="Schedules" description="Recurring payments and incomes: rent, salary, insurance, subscriptions, anything on a schedule. They land in their months by themselves, on the Statement and in the grid.">
+      <Island air tone={HUES.transfer} title={T.schedules} description={T.recurringPaymentsAndIncomes}>
         <RecurringList engine={engine} />
       </Island>
       {notice.notice && <UndoNotice text={notice.notice} onUndo={() => act(() => store.undo())} onDismiss={notice.clear} />}
@@ -89,40 +92,40 @@ function SettingsCard({ household: h, tables, onSave, onBuffer, onPayments }: { 
     if (v !== bufferNow) void onBuffer(v, scope).catch(() => setBuffer(amountToInput(bufferNow, h.baseCurrency, h.locale)))
   }
   return (
-    <Island air title="Household settings">
+    <Island air title={T.householdSettings}>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="s-name">Household name</Label>
+          <Label htmlFor="s-name">{T.householdName}</Label>
           <Input id="s-name" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => name.trim() && name !== h.name && onSave({ name: name.trim() })} />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="s-locale">Number format</Label>
+          <Label htmlFor="s-locale">{T.numberFormat}</Label>
           <NativeSelect id="s-locale" className="w-full" value={h.locale} onChange={(e) => onSave({ locale: e.target.value })}>{LOCALES.map((l) => <option key={l} value={l}>{localeLabel(l)} — {localeExample(l)}</option>)}</NativeSelect>
         </div>
         <div className="space-y-1.5 sm:col-span-2">
-          <TipLabel htmlFor="s-buffer" help="household.buffer">Cash kept in the account at month end ({h.baseCurrency})</TipLabel>
+          <TipLabel htmlFor="s-buffer" help="household.buffer">{T.cashKeptInThe(h.baseCurrency)}</TipLabel>
           <Input id="s-buffer" className="sm:w-64" inputMode="decimal" value={buffer} aria-invalid={bufferError ? true : undefined} onChange={(e) => { setBufferError(null); setBuffer(e.target.value) }} onBlur={saveBuffer} />
           <AmountHint text={buffer} currency={h.baseCurrency} locale={h.locale} />
           {bufferError && <p role="alert" className="text-xs text-destructive">{bufferError}</p>}
-          {bufferNow !== h.cashBuffer && <p className="text-muted-foreground">This month {formatAmount(bufferNow, h.baseCurrency, h.locale)} · default {formatAmount(h.cashBuffer, h.baseCurrency, h.locale)}</p>}
+          {bufferNow !== h.cashBuffer && <p className="text-muted-foreground">{T.thisMonthDefault(formatAmount(bufferNow, h.baseCurrency, h.locale), formatAmount(h.cashBuffer, h.baseCurrency, h.locale))}</p>}
         </div>
         <div className="space-y-1.5 sm:col-span-2">
-          <TipLabel htmlFor="s-scope" help="household.bufferScope">Cash buffer changes apply to</TipLabel>
+          <TipLabel htmlFor="s-scope" help="household.bufferScope">{T.cashBufferChangesApply}</TipLabel>
           <NativeSelect id="s-scope" className="w-full" value={scope} onChange={(e) => setScope(e.target.value as MonthlyDefaultScope)}>
-            <option value="from-now-on">This and following months (earlier months keep what they show)</option>
-            <option value="this-month">Only this month</option>
-            <option value="all-months">All months, past included</option>
+            <option value="from-now-on">{T.thisAndFollowingMonths}</option>
+            <option value="this-month">{txt.common.onlyThisMonth}</option>
+            <option value="all-months">{T.allMonthsPastIncluded}</option>
           </NativeSelect>
-          <p className="text-muted-foreground">"This month" is {formatMonth(thisMonth, h.locale)}.</p>
+          <p className="text-muted-foreground">{T.thisMonthIs(formatMonth(thisMonth, h.locale))}</p>
         </div>
         <div className="sm:col-span-2">
-          <Check label="Show expenses as negative red numbers" checked={h.displayExpensesNegative} onChange={(e) => onSave({ displayExpensesNegative: e.target.checked })} />
+          <Check label={T.showExpensesAsNegative} checked={h.displayExpensesNegative} onChange={(e) => onSave({ displayExpensesNegative: e.target.checked })} />
         </div>
         <div className="flex items-center gap-1 sm:col-span-2">
-          <Check label="Plan payments by day and method" checked={!!h.payments} onChange={(e) => onPayments(e.target.checked)} />
+          <Check label={T.planPaymentsByDay} checked={!!h.payments} onChange={(e) => onPayments(e.target.checked)} />
           <InfoTip help="payments.switch" />
         </div>
-        <p className="text-muted-foreground sm:col-span-2">Base currency {h.baseCurrency} · first month {formatMonth(h.startMonth, h.locale)}. These cannot be changed after setup.</p>
+        <p className="text-muted-foreground sm:col-span-2">{T.baseCurrencyFirstMonth(h.baseCurrency, formatMonth(h.startMonth, h.locale))}</p>
       </div>
     </Island>
   )
@@ -136,38 +139,38 @@ function EntitiesCard({ household, tables, entities: allEntities, onError, onRes
   const [removing, setRemoving] = useState<Entity | null>(null)
   const entities = allEntities.filter((e) => !e.archivedMonth)
   const archived = allEntities.filter((e) => e.archivedMonth)
-  const act = (fn: () => Promise<unknown>) => void fn().catch(showSaveError(onError, 'Action failed'))
+  const act = (fn: () => Promise<unknown>) => void fn().catch(showSaveError(onError, txt.common.actionFailed))
   const add = () => {
     act(() => addEntity(store, { kind, name: name.trim() }))
     setName('')
   }
 
   return (
-    <Island air title="People & things" description="Who and what the household pays for. Each one can bring suggested rows.">
+    <Island air title={T.peopleThings} description={T.whoAndWhatThe}>
       <div className="space-y-4">
         <ul className="divide-y divide-border/60">
           {entities.map((e) => (
             <li key={e.id} className="flex min-h-8 flex-wrap items-center gap-2 py-1">
-              <Chip tone="zinc">{ENTITY_KIND_LABEL[e.kind].toLowerCase()}</Chip>
+              <Chip tone="zinc">{lower(ENTITY_KIND_LABEL[e.kind])}</Chip>
               <span className="font-medium">{e.name}</span>
               <span className="ml-auto flex gap-1">
-                <Button size="xs" variant="outline" onClick={() => setTemplatesFor(e)}>Suggested rows…</Button>
-                <Button size="xs" variant="ghost" onClick={() => setRemoving(e)}>Archive or delete…</Button>
+                <Button size="xs" variant="outline" onClick={() => setTemplatesFor(e)}>{T.suggestedRows}</Button>
+                <Button size="xs" variant="ghost" onClick={() => setRemoving(e)}>{txt.common.archiveOrDelete}</Button>
               </span>
             </li>
           ))}
-          {entities.length === 0 && <li className="py-1 text-muted-foreground">Nobody yet.</li>}
+          {entities.length === 0 && <li className="py-1 text-muted-foreground">{T.nobodyYet}</li>}
         </ul>
         {archived.length > 0 && (
           <div className="space-y-1">
-            <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Archived <InfoTip help="household.archived" /></p>
+            <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{T.archived} <InfoTip help="household.archived" /></p>
             <ul className="divide-y divide-border/60">
               {archived.map((e) => (
                 <li key={e.id} className="flex min-h-8 flex-wrap items-center gap-2 py-1 text-muted-foreground">
-                  <Chip tone="zinc">{ENTITY_KIND_LABEL[e.kind].toLowerCase()}</Chip>
+                  <Chip tone="zinc">{lower(ENTITY_KIND_LABEL[e.kind])}</Chip>
                   <span>{e.name}</span>
-                  <span>since {formatMonth(e.archivedMonth!, household.locale)}</span>
-                  <Button size="xs" variant="outline" className="ml-auto" onClick={() => act(async () => onRestored(await restoreEntity(store, e.id)))}>Restore</Button>
+                  <span>{T.since(formatMonth(e.archivedMonth!, household.locale))}</span>
+                  <Button size="xs" variant="outline" className="ml-auto" onClick={() => act(async () => onRestored(await restoreEntity(store, e.id)))}>{txt.common.restore}</Button>
                 </li>
               ))}
             </ul>
@@ -176,16 +179,16 @@ function EntitiesCard({ household, tables, entities: allEntities, onError, onRes
         <div className="space-y-2">
           <div className="flex flex-wrap gap-1.5">
             {KINDS.map((k) => (
-              <Button key={k} size="xs" variant={kind === k ? 'default' : 'outline'} aria-pressed={kind === k} title={ENTITY_KIND_HELP[k]} onClick={() => setKind(k)}>Add {ENTITY_KIND_LABEL[k].toLowerCase()}</Button>
+              <Button key={k} size="xs" variant={kind === k ? 'default' : 'outline'} aria-pressed={kind === k} title={ENTITY_KIND_HELP[k]} onClick={() => setKind(k)}>{T.addKind(lower(ENTITY_KIND_LABEL[k]))}</Button>
             ))}
           </div>
           <p className="text-muted-foreground">{ENTITY_KIND_HELP[kind]}</p>
           <div className="flex flex-wrap items-end gap-2">
             <div className="space-y-1">
-              <Label htmlFor="e-name">{ENTITY_KIND_LABEL[kind]} name</Label>
-              <Input id="e-name" className="w-44" value={name} placeholder={kind === 'property' ? 'e.g. Flat, Elm Street' : 'Name'} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) add() }} />
+              <Label htmlFor="e-name">{T.nameOfKind(ENTITY_KIND_LABEL[kind])}</Label>
+              <Input id="e-name" className="w-44" value={name} placeholder={kind === 'property' ? T.eGFlatElm : txt.common.name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) add() }} />
             </div>
-            <Button size="sm" disabled={!name.trim()} onClick={add}>Add</Button>
+            <Button size="sm" disabled={!name.trim()} onClick={add}>{txt.common.add}</Button>
           </div>
         </div>
         {templatesFor && <TemplatesDialog entity={templatesFor} onClose={() => setTemplatesFor(null)} onError={onError} />}
@@ -203,15 +206,15 @@ function TemplatesDialog({ entity, onClose, onError }: { entity: Entity; onClose
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>Suggested rows for {entity.name}</DialogTitle>
-          <DialogDescription>Tick what applies. Rows are added at the end of their section.</DialogDescription>
+          <DialogTitle>{T.suggestedRowsFor(entity.name)}</DialogTitle>
+          <DialogDescription>{T.tickWhatAppliesRows}</DialogDescription>
         </DialogHeader>
         <div className="space-y-1.5">
           {all.map((t) => <Check key={t.key} label={templateTitle(t, entity.name)} checked={chosen.has(t.key)} onChange={(e) => { const s = new Set(chosen); if (e.target.checked) s.add(t.key); else s.delete(t.key); setChosen(s) }} />)}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button disabled={chosen.size === 0} onClick={() => { applyTemplates(store, [...chosen], entity.id).then(onClose).catch(showSaveError(onError, 'Failed')) }}>Add {chosen.size} row{chosen.size === 1 ? '' : 's'}</Button>
+          <Button variant="outline" onClick={onClose}>{txt.common.cancel}</Button>
+          <Button disabled={chosen.size === 0} onClick={() => { applyTemplates(store, [...chosen], entity.id).then(onClose).catch(showSaveError(onError, T.failed)) }}>{T.addRows(chosen.size)}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -226,25 +229,25 @@ function AccountsCard({ household, tables, accounts: allAccounts, entities, engi
   const { locale, baseCurrency } = household
   const accounts = allAccounts.filter((a) => !a.archivedMonth)
   const archived = allAccounts.filter((a) => a.archivedMonth)
-  const act = (fn: () => Promise<unknown>) => void fn().catch(showSaveError(onError, 'Action failed'))
+  const act = (fn: () => Promise<unknown>) => void fn().catch(showSaveError(onError, txt.common.actionFailed))
   return (
-    <Island air tone={HUES.worth} title="Accounts" description="Savings accounts get a running balance from your grid. Enter the real balance any month to keep it honest.">
+    <Island air tone={HUES.worth} title={txt.common.accounts} description={T.savingsAccountsGetA}>
       <div className="space-y-3">
         <ul className="divide-y divide-border/60">
           {accounts.map((a) => (
             <li key={a.id} className="py-1">
               <div className="flex min-h-6 flex-wrap items-center gap-2">
-                <Chip tone="zinc">{(ACCOUNT_TYPES.find((t) => t.value === a.type)?.label ?? a.type).toLowerCase()}</Chip>
+                <Chip tone="zinc">{lower(ACCOUNT_TYPES.find((t) => t.value === a.type)?.label ?? a.type)}</Chip>
                 <span className="font-medium">{a.name}</span>
-                <span className="text-muted-foreground">{a.currency}{a.ownerEntityId ? ` · ${entities.find((e) => e.id === a.ownerEntityId)?.name ?? ''}` : ''} · opening {formatAmount(a.openingBalance, a.currency, locale)} in {formatMonth(a.openingMonth, locale)}</span>
+                <span className="text-muted-foreground">{T.accountLine(a.currency, a.ownerEntityId ? entities.find((e) => e.id === a.ownerEntityId)?.name ?? '' : null, formatAmount(a.openingBalance, a.currency, locale), formatMonth(a.openingMonth, locale))}</span>
                 <span className="ml-auto flex gap-1">
-                  {(a.type === 'savings' || a.type === 'investment') && a.tracked && <Button size="xs" variant="outline" onClick={() => setActualsFor(actualsFor === a.id ? null : a.id)}>Real balances</Button>}
-                  <Button size="xs" variant="ghost" onClick={() => setEditing(a)}>Edit</Button>
+                  {(a.type === 'savings' || a.type === 'investment') && a.tracked && <Button size="xs" variant="outline" onClick={() => setActualsFor(actualsFor === a.id ? null : a.id)}>{T.realBalances}</Button>}
+                  <Button size="xs" variant="ghost" onClick={() => setEditing(a)}>{txt.common.edit}</Button>
                 </span>
               </div>
               {actualsFor === a.id && engine && (
                 <table className="mt-2 w-full">
-                  <thead><tr className="text-muted-foreground"><th className="py-1 text-left font-semibold">Month</th><th className="text-right font-semibold">Computed</th><th className="text-right font-semibold">Real balance</th></tr></thead>
+                  <thead><tr className="text-muted-foreground"><th className="py-1 text-left font-semibold">{txt.common.month}</th><th className="text-right font-semibold">{T.computed}</th><th className="text-right font-semibold">{T.realBalance}</th></tr></thead>
                   <tbody>
                     {months.filter((m) => m <= monthOfDate()).slice(-12).map((m) => {
                       const r = engine.accounts[a.id]?.months[m]
@@ -254,16 +257,16 @@ function AccountsCard({ household, tables, accounts: allAccounts, entities, engi
                           <td className="text-right tabular-nums">{r ? formatAmount(r.computed, a.currency, locale) : ''}</td>
                           <td className="text-right">
                             <Input
-                              aria-label={`Real balance ${formatMonth(m, locale)}`} className="ml-auto h-6 w-36 text-right" inputMode="decimal"
+                              aria-label={T.realBalanceIn(formatMonth(m, locale))} className="ml-auto h-6 w-36 text-right" inputMode="decimal"
                               // a real 0 is written out: an empty field means "no real balance", and leaving it would clear one
                               defaultValue={r?.entered ? (r.balance === 0 ? '0' : amountToInput(r.balance, a.currency, locale)) : ''}
-                              placeholder="same as computed"
+                              placeholder={T.sameAsComputed}
                               onBlur={(e) => {
                                 const typed = e.target.value
                                 const v = typed.trim() ? parseAmount(typed, a.currency, locale) : null
                                 // what cannot be read is said and nothing is written: an empty field alone clears the real balance
                                 if (typed.trim() && v == null) return onError(unreadableAmount(typed))
-                                setAccountActual(store, a.id, m, v).catch(showSaveError(onError, 'Failed'))
+                                setAccountActual(store, a.id, m, v).catch(showSaveError(onError, T.failed))
                               }}
                             />
                           </td>
@@ -278,20 +281,20 @@ function AccountsCard({ household, tables, accounts: allAccounts, entities, engi
         </ul>
         {archived.length > 0 && (
           <div className="space-y-1">
-            <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Archived <InfoTip help="household.archived" /></p>
+            <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{T.archived} <InfoTip help="household.archived" /></p>
             <ul className="divide-y divide-border/60">
               {archived.map((a) => (
                 <li key={a.id} className="flex min-h-8 flex-wrap items-center gap-2 py-1 text-muted-foreground">
-                  <Chip tone="zinc">{(ACCOUNT_TYPES.find((t) => t.value === a.type)?.label ?? a.type).toLowerCase()}</Chip>
+                  <Chip tone="zinc">{lower(ACCOUNT_TYPES.find((t) => t.value === a.type)?.label ?? a.type)}</Chip>
                   <span>{a.name}</span>
-                  <span>since {formatMonth(a.archivedMonth!, locale)}</span>
-                  <Button size="xs" variant="outline" className="ml-auto" onClick={() => act(async () => onRestored(await restoreAccount(store, a.id)))}>Restore</Button>
+                  <span>{T.since(formatMonth(a.archivedMonth!, locale))}</span>
+                  <Button size="xs" variant="outline" className="ml-auto" onClick={() => act(async () => onRestored(await restoreAccount(store, a.id)))}>{txt.common.restore}</Button>
                 </li>
               ))}
             </ul>
           </div>
         )}
-        <Button variant="outline" size="xs" onClick={() => setEditing('new')}>Add account</Button>
+        <Button variant="outline" size="xs" onClick={() => setEditing('new')}>{T.addAccount}</Button>
         {editing && (
           <HouseholdAccountDialog
             account={editing === 'new' ? null : editing} entities={entities} baseCurrency={baseCurrency} locale={locale} startMonth={household.startMonth} rows={tables.rows}

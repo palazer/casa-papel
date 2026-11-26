@@ -12,6 +12,9 @@ import { monthOfDate, type Household, type MonthKey, type Tables } from '@/model
 import { neededPairs, refreshRates, restoreEcbRate, setManualRate, setPairForecast } from '@/store'
 import { TAG_TONE, formatRate, rateTag, readableRate, toStored } from './fxDisplay'
 import { errorText, showSaveError } from '@/app/saveError'
+import { txt } from '@/i18n'
+
+const T = txt.household.fx
 
 /**
  * The rates table (DESIGN.md §8): one column per pair the household needs, one row per planned month. Each column is a
@@ -52,7 +55,7 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
   // a field whose change was not saved (Cancel at the question about the past, or refused) shows what is stored again
   const act = (fn: () => Promise<unknown>) => void fn().catch((e) => {
     setEmptied((n) => n + 1)
-    showSaveError(onError, 'Action failed')(e)
+    showSaveError(onError, txt.common.actionFailed)(e)
   })
   const pickForecast = (pair: string, mode: ForecastMode) => {
     setOwnOpen((o) => ({ ...o, [pair]: mode === 'own' }))
@@ -62,7 +65,7 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
   const saveOwn = (pair: string, text: string) => {
     if (text.trim() === '') return
     const v = Number(text.replace(',', '.'))
-    if (!Number.isFinite(v)) return onError('The change per month is not a number.')
+    if (!Number.isFinite(v)) return onError(T.theChangePerMonth)
     // nothing a month is "Hold the last rate"
     setOwnOpen((o) => ({ ...o, [pair]: false }))
     setOwnText((t) => ({ ...t, [pair]: '' }))
@@ -74,9 +77,9 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
     setNote(null)
     try {
       const res = await refreshRates(store)
-      setNote(`${res.written === 0 ? 'The official rates are up to date.' : `Stored ${res.written} month rate${res.written === 1 ? '' : 's'} from the ECB.`}${res.unsupported.length ? ` Not published by the ECB: ${res.unsupported.join(', ')}; enter those by hand.` : ''}`)
+      setNote(T.ratesFetched(res.written, res.unsupported.length, res.unsupported.join(', ')))
     } catch (e) {
-      onError(errorText(e, 'Could not fetch rates'))
+      onError(errorText(e, T.couldNotFetchRates))
     } finally {
       setBusy(false)
     }
@@ -84,57 +87,57 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
 
   return (
     <Island
-      air title="Currency rates"
+      air title={T.currencyRates}
       description={pairs.length === 0
-        ? `Everything is in ${base}; nothing to convert. Give a row or account another currency and the rates appear here.`
-        : `Each column is a price the way you would say it: 1 ${base} in another currency, or 1 of it in ${base}, whichever side is above one. The official rates are the European Central Bank's, and the app keeps them up to date by itself: the latest one while a month is running, the one of its last working day once it is over. Months to come are a forecast. Type a rate to override any month; empty it to take the official one back.`}
+        ? T.everythingIsInNothing(base)
+        : T.eachColumnIsA(base)}
     >
       {pairs.length > 0 && (
         <div className="space-y-4">
           <div>
             <div role="group" aria-labelledby="fx-forecast" className="space-y-1.5">
-              <p id="fx-forecast" className="flex items-center gap-1 text-sm font-medium leading-none">Months to come <InfoTip help="household.fxForecast" /></p>
+              <p id="fx-forecast" className="flex items-center gap-1 text-sm font-medium leading-none">{T.monthsToCome} <InfoTip help="household.fxForecast" /></p>
               {forecasts.map((f) => (
                 <div key={f.pair} className="flex flex-wrap items-center gap-2" data-testid={`forecast-${f.code}`}>
                   <span className="w-9 font-medium">{f.code}</span>
-                  <NativeSelect aria-label={`Months to come for ${f.code}`} className="w-56" value={f.mode} onChange={(e) => pickForecast(f.pair, e.target.value as ForecastMode)}>
-                    <option value="trend">Follow the recent trend</option>
-                    <option value="hold">Hold the last rate</option>
-                    <option value="own">My own change per month</option>
+                  <NativeSelect aria-label={T.monthsToComeFor(f.code)} className="w-56" value={f.mode} onChange={(e) => pickForecast(f.pair, e.target.value as ForecastMode)}>
+                    <option value="trend">{T.followTheRecentTrend}</option>
+                    <option value="hold">{T.holdTheLastRate}</option>
+                    <option value="own">{T.myOwnChangePer}</option>
                   </NativeSelect>
                   {f.mode === 'own' && (
                     <>
                       <Input
-                        aria-label={`Change per month for ${f.code} in %`} className="h-7 w-20 text-right tabular-nums" inputMode="decimal" placeholder="1.5"
+                        aria-label={T.changePerMonthFor(f.code)} className="h-7 w-20 text-right tabular-nums" inputMode="decimal" placeholder="1.5"
                         value={ownText[f.pair] || (f.own ? percentText(f.own) : '')}
                         onChange={(e) => setOwnText((t) => ({ ...t, [f.pair]: e.target.value }))}
                         onBlur={(e) => saveOwn(f.pair, e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
                       />
-                      <span>% a month</span>
+                      <span>{T.aMonth}</span>
                     </>
                   )}
                   <span className="text-muted-foreground">
-                    {f.mode === 'own' ? 'Every month to come moves by this, without fading.'
-                      : f.mode === 'hold' ? 'Every month to come uses the last official rate.'
-                        : f.enough ? `${pct(f.trend)} a month on average over the last 12 months; the change fades out.`
-                          : 'Less than a year of rates: the last rate is held until there is a year.'}
+                    {f.mode === 'own' ? T.everyMonthToCome
+                      : f.mode === 'hold' ? T.everyMonthUsesLast
+                        : f.enough ? T.aMonthOnAverage(pct(f.trend))
+                          : T.lessThanAYear}
                   </span>
                 </div>
               ))}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <Button size="xs" variant="outline" onClick={() => void fetchNow()} disabled={busy}>{busy ? 'Fetching…' : 'Fetch ECB rates'}</Button>
-            <span className="text-muted-foreground">Only currency codes and dates are sent to the rate service (frankfurter.dev, ECB data). Nothing about your household.</span>
+            <Button size="xs" variant="outline" onClick={() => void fetchNow()} disabled={busy}>{busy ? T.fetching : T.fetchEcbRates}</Button>
+            <span className="text-muted-foreground">{T.onlyCurrencyCodesAnd}</span>
           </div>
           {note && <p role="status">{note}</p>}
           <div className="overflow-x-auto rounded-md border">
             <table className="w-full">
               <thead className="bg-muted/50 text-left text-muted-foreground">
                 <tr>
-                  <th className="px-2 py-1 font-semibold">Month</th>
-                  {pairs.map((p) => { const o = orient(p); return <th key={p} className="px-2 py-1 font-semibold">1 {o.from} in {o.to}</th> })}
+                  <th className="px-2 py-1 font-semibold">{txt.common.month}</th>
+                  {pairs.map((p) => { const o = orient(p); return <th key={p} className="px-2 py-1 font-semibold">{T.oneIn(o.from, o.to)}</th> })}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
@@ -153,7 +156,7 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
                           <div className="flex items-center gap-2">
                             <Input
                               key={`${p}|${m}|${rec?.rate ?? ''}|${rec?.source ?? ''}|${emptied}`}
-                              aria-label={`1 ${o.from} in ${o.to} for ${formatMonth(m, locale)}`}
+                              aria-label={T.oneInFor(o.from, o.to, formatMonth(m, locale))}
                               className="h-6 w-28 text-right tabular-nums" inputMode="decimal"
                               defaultValue={rec ? shown(rec.rate) : ''}
                               placeholder={info ? shown(info.rate) : '—'}
@@ -168,7 +171,7 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
                                   return
                                 }
                                 const v = Number(t.replace(',', '.'))
-                                if (!(v > 0)) { onError('A rate must be a positive number.'); return }
+                                if (!(v > 0)) { onError(T.aRateMustBe); return }
                                 const value = toStored(o, base, v)
                                 if (rec && Math.abs(rec.rate - value) <= rec.rate * 1e-6) return
                                 act(() => setManualRate(store, p, m, value))
