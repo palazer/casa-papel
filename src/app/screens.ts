@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react'
 import { BookOpen, CalendarCheck, ChartLine, Database, Scale, Settings, Table2, Users, type LucideIcon } from 'lucide-react'
+import { txt } from '@/i18n'
 import { readPref, writePref } from './prefs'
 
 export type Screen = 'statement' | 'grid' | 'payments' | 'trends' | 'household' | 'data' | 'guide'
@@ -16,13 +17,13 @@ export interface ScreenDef {
 
 /** Every screen, in rail order; the last three are the Settings group's pages. */
 export const SCREENS: ScreenDef[] = [
-  { key: 'statement', label: 'Statement', icon: Scale },
-  { key: 'grid', label: 'Grid', icon: Table2 },
-  { key: 'payments', label: 'Payments', icon: CalendarCheck, switched: true },
-  { key: 'trends', label: 'Trends', icon: ChartLine },
-  { key: 'household', label: 'Household', icon: Users },
-  { key: 'data', label: 'Data', icon: Database, utility: true },
-  { key: 'guide', label: 'Guide', icon: BookOpen, utility: true },
+  { key: 'statement', label: txt.app.screen.statement, icon: Scale },
+  { key: 'grid', label: txt.app.screen.grid, icon: Table2 },
+  { key: 'payments', label: txt.app.screen.payments, icon: CalendarCheck, switched: true },
+  { key: 'trends', label: txt.app.screen.trends, icon: ChartLine },
+  { key: 'household', label: txt.app.screen.household, icon: Users },
+  { key: 'data', label: txt.app.screen.data, icon: Database, utility: true },
+  { key: 'guide', label: txt.app.screen.guide, icon: BookOpen, utility: true },
 ]
 
 export const screenDef = (s: Screen): ScreenDef => SCREENS.find((d) => d.key === s) ?? SCREENS[0]
@@ -44,7 +45,7 @@ export const RAIL: RailItem[] = [
   { kind: 'page', key: 'grid' },
   { kind: 'page', key: 'payments' },
   { kind: 'page', key: 'trends' },
-  { kind: 'group', key: 'settings', label: 'Settings', icon: Settings, pages: SETTINGS_PAGES },
+  { kind: 'group', key: 'settings', label: txt.app.settings, icon: Settings, pages: SETTINGS_PAGES },
 ]
 
 /** The rail as a household sees it: without the pages whose switch is off. */

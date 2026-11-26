@@ -1,3 +1,4 @@
+import { lang, txt } from '@/i18n'
 import { fromMinor, parseMonth, toMinor, type Money, type MonthKey } from '@/model'
 
 export function formatAmount(minor: Money, currency: string, locale: string, opts: { compact?: boolean; sign?: 'auto' | 'always' | 'never' | 'exceptZero' } = {}): string {
@@ -43,7 +44,7 @@ export function amountToInput(minor: Money, currency: string, locale: string): s
 }
 
 /** What a field says when someone tried to multiply or divide in it. */
-export const ONLY_PLUS_MINUS = 'Only + and - can be used in an amount.'
+export const ONLY_PLUS_MINUS = txt.app.onlyPlusMinus
 /**
  * Signs of a calculation the app does not do: `*`, `/`, their printed forms, and an `x` between two numbers. They
  * are refused, never dropped: `1200/12` must not be read as 120012.
@@ -113,14 +114,14 @@ export function sumResult(input: string, currency: string, locale: string): Mone
 }
 
 /** What to say about a typed amount that cannot be read: that only + and - work when another sign was tried, else the field's own words. */
-export function unreadableAmount(input: string, fallback = 'That is not a number I can read.'): string {
+export function unreadableAmount(input: string, fallback = txt.app.notANumber): string {
   return REFUSED_SIGN.test(input) ? ONLY_PLUS_MINUS : fallback
 }
 
 /** "English (Ireland)" for en-IE; falls back to the code. */
 export function localeLabel(locale: string): string {
   try {
-    return new Intl.DisplayNames(['en'], { type: 'language', languageDisplay: 'standard' }).of(locale) ?? locale
+    return new Intl.DisplayNames([lang], { type: 'language', languageDisplay: 'standard' }).of(locale) ?? locale
   } catch {
     return locale
   }
@@ -134,11 +135,7 @@ export function localeExample(locale: string): string {
 }
 
 /** A day of the month as it is said: 1st, 2nd, 3rd, 4th, 11th, 21st, 22nd, 23rd, 31st. */
-export function ordinalDay(day: number): string {
-  const teen = day % 100 >= 11 && day % 100 <= 13
-  const suffix = teen ? 'th' : day % 10 === 1 ? 'st' : day % 10 === 2 ? 'nd' : day % 10 === 3 ? 'rd' : 'th'
-  return `${day}${suffix}`
-}
+export const ordinalDay = (day: number): string => txt.app.ordinalDay(day)
 
 /** The weekday a day of a month falls on, short, in the household's language: `Sun`. */
 export function weekdayOf(month: MonthKey, day: number, locale: string): string {

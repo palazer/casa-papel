@@ -1,23 +1,18 @@
 import { ACCOUNT_TYPE_INFO, ENTITY_KIND_HELP, ENTITY_KIND_LABEL, GOAL_KIND_INFO, PAYMENT_KIND_INFO, RULE_KIND_INFO, type EntityKind } from '@/model'
+import { txt } from '@/i18n'
 import type { HelpKey } from './help'
 import type { Screen } from './screens'
 
 /**
- * The Guide's words (DESIGN.md §2): one module, no React, so a translation can follow later. Every quoted label is a
- * control's real text; the examples are the demo household's (Sam, Alex, Robin, Biscuit, The car, The flat). Topics
- * that explain a choice carry the model's own option texts as `facts`, so the Guide and the dialogs never disagree.
+ * The Guide (DESIGN.md §2): one module, no React. The words are in the catalogue (`src/i18n/en/guide.ts`); here is
+ * what does not change with the language: the order of the topics, their keys, their (i) texts and the screen each
+ * opens. Topics that explain a choice carry the model's own option texts as `facts`, so the Guide and the dialogs
+ * never disagree.
  */
 
 export const REPO_URL = 'https://github.com/palazer/casa-papel'
 
-export const GUIDE_LEAD = {
-  title: 'What Casa Papel is',
-  paragraphs: [
-    'Casa Papel is local-first household budgeting that knows what a household is: who lives in it, what it owns, what recurs, what is saved for. It opens on the Statement, one month in accounting form with money in beside money out and what you have beside what you owe; the Grid plans the months ahead. It runs in your browser, on your phone as well as your laptop, and works offline.',
-    'Money comes in three kinds, each with its own colour: Income, Expenses and Transfers, with Balances beneath them. You type positive numbers and the section says which way the money goes; the "Show expenses as negative red numbers" setting only changes how spending looks, never how it adds up. Nothing hides behind a formula: every total, balance and automatic row has an (i) that says in a sentence how it was worked out.',
-    'Your data stays on your device unless you export it; Casa Papel has no server of its own. Optional cloud sync keeps an encrypted copy that only your password can open, for the same household on several devices. Apart from that, only currency codes and dates ever leave the device, when rates are fetched. To try everything without touching your own numbers, the demo sandbox is a separate store with a made-up household: Sam and Alex, their child Robin, Biscuit the dog, The car and The flat.',
-  ],
-}
+export const GUIDE_LEAD = txt.guide.lead
 
 export interface GuideFact {
   label: string
@@ -49,396 +44,27 @@ const accountTypes: GuideFact[] = ACCOUNT_TYPE_INFO.map((a) => ({ label: a.label
 const goalKinds: GuideFact[] = GOAL_KIND_INFO.map((g) => ({ label: g.label, text: g.help }))
 const paymentKinds: GuideFact[] = PAYMENT_KIND_INFO.map((k) => ({ label: k.label, text: k.help }))
 
+const T = txt.guide.topics
+
+/** The topics in the Guide's order: the words from the catalogue, and what does not change with the language. */
 export const GUIDE: GuideTopic[] = [
-  {
-    key: 'statement',
-    title: 'Start & the Statement',
-    summary: 'One month on one page: money in beside money out, and under it what you have beside what you owe. The first screen, and the place to tick what has moved.',
-    what: [
-      'The Statement shows one month in two halves that always balance. "The month" has "Money in" on the left and "Money out" on the right. Money out reads in the order a month is decided: "Expenses" is what the month costs, a loan payment too, and "From what is left" is how the rest is shared out: pocket money, savings and investments; what is neither spent nor set aside closes the right side as the rest. "At the end of the month" has "Assets" on the left and "Debts and net worth" on the right, with a "change" column for how the month moved each figure. Assets stand under "Savings accounts", "Investment accounts" and "Other assets", each with its own sum. A category opens to its rows, an itemized row to its items. Above it all, a strip of chips shows every month of the plan in two lines, income + from accounts over expenses + what is left: grey chips are months that are over, "now" marks the current one, and pressing a chip opens that month.',
-      'Every line with an amount has a tick, and the progress line under the toolbar counts them: "7 of 21 done · €… still to pay · €… to come in", then "All 21 done". On a computer the toolbar and that line stay at the top while the page scrolls, so the month is always in view. An estimate sits on a light yellow shade; press a line to overwrite its amount or to say how sure you are. A line the app works out carries its rule as a small symbol, and the same dialog opens on that rule.',
-      '"Balances…" asks what every account really held at the start and at the end of the month, and can count the whole month as done in the same step. A month before the current one carries a grey chip "past" beside the household\'s name: it can still be changed, and it is not done by itself. With two or more adults the page ends with "Per person". While a household is new, the "Setting up" guide at the top leads through the page in six steps, and "Suggestions" offers the usual rows where they will appear.',
-    ],
-    steps: [
-      'A new household: "Start on this device" on the welcome screen, then "Household name", "Currency", "Number and date format", "First month" and the people and things, and "Open the Statement". The Statement opens on the first month with the "Setting up" guide: "Your first income", "Your first expenses", "Savings, and where the rest goes", "Your first virtual account", "Your first investment" and "Loans and cards". Each step lights its part of the page and locks the rest. Type an amount on a suggested line and press Enter; "Skip" or "Next" moves on, and "Leave setup" unlocks everything and puts the guide away.',
-      'Press a month in the strip at the top to open it; the strip stays in view while the page scrolls. "Add <year>" at its end grows the plan.',
-      'Open a category, "Housing" say, and tick "The flat – Rent" once the rent has left; a second press takes the tick back. An itemized row opens to its items, each with a tick of its own.',
-      'Press a line, "The flat – Utilities" say, to record what it really was: "Amount in EUR", "Only this month", "Certain", then "Save". The lower half works the same way: press an account, "Index fund" say, to open it; press its amount for what it held at the start and at the end of the month; the arrow in front of "Savings" opens its virtual accounts.',
-      'Press a heading, "From what is left" say, to fold it away with everything under it: its total stays, and it stays folded on this device. "Expand all" and "Collapse all" open and close every heading and category at once; "Colours and marks" is the legend.',
-      '"Balances…" when the month has ended: "Balances for <Month>" lists every account with "At the start" and "At the end". Type what the bank or the broker says, or leave a field empty to keep the calculated amount shown in grey. "Count everything in <Month> as done" ticks every line of the month and changes no amount; it is set for you when the month is over. Then "Save": one "Undo" takes the balances and the ticks back.',
-      'To plan the months ahead, open the Grid; a month name there → "Open in the Statement" comes back to that month.',
-      'Try things first: "Look at the demo first" on the welcome screen or "Open the demo sandbox" under Data; "Leave the demo" brings you back.',
-    ],
-    tips: ['statement.progress', 'cell.howSure', 'row.automatic', 'derived.keptInAccount', 'derived.leftover', 'statement.months', 'statement.month', 'statement.position', 'statement.expenses', 'statement.setAside', 'statement.fromAccounts', 'statement.setup', 'statement.suggestions', 'statement.mainAccount', 'statement.netWorth', 'statement.free', 'statement.perPerson'],
-    open: 'statement',
-  },
-  {
-    key: 'grid',
-    title: 'The grid: planning ahead',
-    summary: 'The Grid is the plan across time: months across, rows down, three sections and the balances beneath.',
-    what: [
-      'Every screen reads the same plan. The Grid shows it across time: one column per month from the current one on, one row per thing that comes in, goes out or moves, under the sections "Income", "Expenses" and "Transfers", with "Balances" and "Net worth" beneath. An amount carries forward until you change it, so a plan for a year is a handful of entries.',
-      '"Earlier months" in the toolbar brings back the months before the current one and stays as you left it on this device; the sums count every month either way. A month name opens a menu with that month\'s totals, "Open in the Statement" and "Balances for <Month>…". The columns of the months that are over are grey; they can be changed like any other.',
-      'The plan always ends in a December. "Add <year>" (at the end of the strip of months on the Statement, and in the toolbar of the Grid) grows it by a calendar year, and a change beyond the end grows it by itself. Every change is one undoable step: the two arrows at the right of every toolbar take it back and forward.',
-    ],
-    steps: [
-      'Click a cell, "Groceries" in this month, say; type in "Amount in EUR" and press "Save".',
-      'Under "Repeats", keep "This and following months" to change this month and the months after it, pick "Only this month", or put the amount "On a schedule". A new amount for the following months replaces what they held, and the line under the choice names those months first; a month that is ticked as done keeps its amount.',
-      'Add a row with "Add row" at the foot of a section: a "Row name", a category when the section has any, then "Add".',
-      '"Earlier months (2)" shows the months before the current one, the number says how many; press it again to start at this month.',
-      'Click a month name → "Open in the Statement" to read and tick that month there.',
-      'Grow the plan with "Add <year>" in the Grid toolbar or at the last month of the Statement.',
-      'Undo with the arrow in the toolbar or Cmd/Ctrl+Z; Shift redoes.',
-      'A change that reaches into a month that is over asks first: "This changes months that are over" names the months and what changes in them. "Cancel" goes back to the dialog with what you typed; "Save anyway" saves it, and Undo takes it back. A change in the current month or later, a tick, a real balance and something new never ask.',
-    ],
-    tips: ['section.income', 'section.expense', 'section.transfer', 'derived.incomeTotal', 'derived.expensesTotal', 'derived.netWorth', 'cell.repeats', 'past.question'],
-    open: 'grid',
-  },
-  {
-    key: 'people',
-    title: 'People & things',
-    summary: 'Tell the app who and what it pays for; each one suggests the rows it usually needs.',
-    what: [
-      'Under Household, "People & things" lists the adults, children, pets, vehicles, homes, companies and anything else with running costs.',
-      'Each kind suggests rows named subject first: "Sam – Salary", "Robin – Child benefit", "Biscuit – Food & supplies", "The car – Insurance". A row\'s person or thing can be changed any time with "Belongs to…" in the row menu.',
-    ],
-    steps: [
-      'Household → "People & things" → "Add adult", "Add child", "Add pet", "Add vehicle", "Add home", "Add company" or "Add other".',
-      'Type the name, then "Add".',
-      'Open "Suggested rows…" beside the new entry, tick the rows you want and press "Add 3 rows" (the count follows your ticks). Or Statement → "Suggestions": the same rows are offered where they will appear, each with a field for its monthly amount.',
-      'To move a row to someone else, open the row menu (the … at the right of its name) → "Belongs to…" → "This row is for": "The household (shared)", an adult, or a name under "Other people & things".',
-    ],
-    factsTitle: 'The kinds',
-    facts: kinds,
-    tips: ['row.belongsTo', 'household.archived'],
-    open: 'household',
-  },
-  {
-    key: 'income',
-    title: 'Income',
-    summary: 'Income rows are what arrives; a few switches say whose income it is and what comes off it first.',
-    what: [
-      'Salaries count as certain from the start; other income is an estimate until you say otherwise. An income line that belongs to an adult ("Belongs to…") is that adult\'s own: it shows under their name in "Per person" under the Statement, and a pocket money rule can take a percentage of it.',
-      'A tax or pension contribution is a spending row of its own, marked "Deducted from an income…". The salary cell then shows "net €…" beneath the gross, the cell editor lists what was taken off under "Deducted from this income" with a "Net" line, and percentages of income use the net amount.',
-      '"Follow another row…" makes a row mirror another month by month, whole or as a "Share (%)": a tax at 25 of a salary, or Robin\'s long-term savings following "Robin – Child benefit".',
-    ],
-    steps: [
-      'Statement → "Money in" → press "Sam – Salary" and type the salary with "This and following months".',
-      'Row menu (the … after the row\'s name, on the Statement and in the Grid) → "Belongs to…" → "This row is for" → "Sam" makes it Sam\'s own income; "Robin – Child benefit" stays with Robin.',
-      'For a tax: its row menu → "Deducted from an income…" → "This expense is taken off" → "Sam – Salary". The menu item then reads "Deducted from Sam – Salary…".',
-      'To mirror a row: row menu → "Follow another row…" → "Same amount as" → the row, then "Share (%)": 100 mirrors it, 25 takes a quarter. "Nothing: its own amounts" stops following.',
-    ],
-    tips: ['section.income', 'row.deductedFrom', 'cell.deductions', 'row.follows', 'row.followShare', 'derived.incomeTotal'],
-    open: 'statement',
-  },
-  {
-    key: 'spending',
-    title: 'Spending & categories',
-    summary: 'Spending rows hold what leaves; categories group them, and every amount says how sure you are and what it comes out of.',
-    what: [
-      'Every amount is an "Estimate" (on a light yellow shade), "Certain" or "Done" (green dot). That changes how it looks and what the month\'s progress counts, never how it adds up. "Treat new values as…" in the row menu sets the default for new amounts in that row.',
-      'A cell is a "Single amount" or "Itemized": a list of items with a "What", an amount, a status and a source each, and "Mark all done" for the whole list. Every amount field takes a sum: type "1200+150-30" and the result shows under the field, "= €1,320.00"; saving keeps the result. Only + and - are worked out.',
-      '"Comes out of" says where the money is taken from: "This month\'s income", one of your accounts ("Savings account: Savings", "Investment account: Index fund") or a "Virtual account: Travel". An account that pays falls by the amount, shows as "From Savings" under "From accounts" on the Statement, and never touches the month\'s leftover. Categories ("Housing", "Living", "Transport", "Family & pets", "Fun", "Personal") group rows under a label line on a faint band.',
-    ],
-    steps: [
-      'Press a line on the Statement, or a cell in the Grid, and set "How sure": "Row default (Estimate)", "Estimate", "Certain" or "Done".',
-      'Switch to "Itemized", press "Add item", fill "What" and the amount; "Mark all done" once everything is paid.',
-      'Pick "Comes out of" → "Savings account: Savings" or "Virtual account: Travel" for spending that should not reduce the leftover.',
-      'For a whole row: row menu → "Comes out of…" → "Single amounts in this row come out of" → "Applies to": "From <Month> on" or "All months, past included" → "Save".',
-      'Row menu → "Treat new values as certain" (or "…as estimates") for the row\'s default.',
-      'To move a row to another category, press it and pick under "Category" at the top right of its dialog, then "Save": the row is there in every month. Row menu → "Category…" does the same and adds "New category…" and "Add the usual categories"; rename and reorder them under Household → "Categories".',
-    ],
-    tips: ['section.expense', 'cell.howSure', 'cell.comesOutOf', 'row.category', 'household.categories', 'household.usualCategories', 'row.categoryEstimate', 'derived.expensesTotal', 'derived.fromSavings'],
-    open: 'statement',
-  },
-  {
-    key: 'schedules',
-    title: 'Schedules',
-    summary: 'Rent, insurance, subscriptions: set them once and they land in their due months by themselves.',
-    what: [
-      'A schedule lands an amount in a row in its own months: "Every month", "Every 2 months", "Every 3 months", "Every 6 months", "Every year" or "In chosen months". The demo has "Rent" at €1,650 every month in "The flat – Rent", "Car insurance" every 3 months in "The car – Insurance" and "Dog tax" every year in March in "Biscuit – Costs". A row on a schedule carries two arrows in a loop. What does not land in the month on screen is still listed, grey, with the month it lands in next and its amount; that amount is in no sum.',
-      'It is set where the amount is typed: the row\'s dialog has "Repeats" under a single amount and under every item, and it lists what repeats in the row in every month, also what does not land in the month on screen. A row on a schedule shows only what repeats; its other items are that month\'s alone, and the dialog says so before you save. The full list lives under Household → "Schedules" with a "due", "paid" or "skipped" chip per month.',
-    ],
-    steps: [
-      'Press a line on the Statement, or a cell in the Grid, type "Amount in EUR" and under "Repeats" pick "On a schedule": "How often", and "in" or "from" the month it counts from. The sentence under it says where it lands.',
-      'For one item of a row: "Itemized" → "Add item", then "Repeats" under that item: "Only this month", "Every month", "Every year" and so on. The line under the list says what the row shows next month.',
-      'Change how it repeats under the item, in any month: the new rhythm counts from the month on screen, and earlier months keep what they show. "Only this month" ends it after this month.',
-      'Change one amount: "Apply the change to" → "Only this month" or "This and following months".',
-      'Remove one: "Only this month" skips it ("Restore" brings it back), "This and following months" ends the schedule, "All occurrences" archives or deletes it. One that lands in another month is stopped with "From <Month> on".',
-      'Household → "Schedules": "Add schedule" and per schedule "Edit…" for the rest ("Paid from", "Whose", "Until month (optional)", "Notes"), "End after <Month>", "Reactivate", "Delete…"; tick a month\'s chip to mark it paid.',
-      'A change made in that list names no month, so a new amount, source or rhythm counts from the current month on, and earlier months keep what they had. "From month" and "Until month" count as you type them; "Reactivate" runs the schedule again from the current month. To change a month that is over, open that month.',
-      'Statement → open "Housing" and tick "The flat – Rent" once it is paid: the schedule shows "paid" for that month, and the progress line counts what is still to pay.',
-    ],
-    tips: ['schedule.status', 'statement.progress'],
-    open: 'household',
-  },
-  {
-    key: 'virtual-accounts',
-    title: 'Virtual accounts',
-    summary: 'Set money aside inside a savings account for one purpose and spend from it without touching the month\'s leftover.',
-    what: [
-      'A virtual account lives inside a savings account. A transfer row fills it every month, and spending that "comes out of" it draws it down; the savings balance already includes it. So "Already in it" is a part of what that account holds and adds no money: ask for more than the account has, and its "Not set aside" line goes below zero and says so. Money that is kept somewhere else is an account of its own. In the demo, "To Travel" moves €200 a month into "Travel", held in "Savings", and "Weekend in Lisbon" takes €480 out of it in October.',
-      'It shows as "Virtual account · Travel" under Balances in the Grid, on a line of its own under its savings account on the Statement, and as "€… now" under Household. It never goes below zero: when an expense takes more than it holds, its line on the Statement says "short" and offers "Top up…". A virtual account that lost its row can be filled again from "Add row" under Transfers with "Fills a virtual account".',
-    ],
-    steps: [
-      'Statement → "Assets" → "Add virtual account", or Household → "Virtual accounts" → "Add virtual account" (it needs a savings account: "Add a savings account first; virtual accounts live inside one.").',
-      'Fill "Name", "Held in", "Already in it (EUR)", "Set aside each month (EUR)"; keep "Also add a spending row "Gifts" that comes out of it" ticked, then "Save". Under "Already in it" the form says how much of the account is not set aside yet, and warns when you ask for more.',
-      'The row "To Gifts" appears under Transfers; type what goes in each month.',
-      'In any spending cell, "Comes out of" → "Virtual account: Gifts" draws from it.',
-      'Read it under its savings account on the Statement, or as "Virtual account · Gifts" under Balances in the Grid; a "short" chip means an expense took more than it held, and "Top up…" fills the gap.',
-    ],
-    tips: ['balance.pool', 'cell.comesOutOf', 'derived.fromSavings', 'balance.savings'],
-    open: 'household',
-  },
-  {
-    key: 'transfers',
-    title: 'Transfers & the rest of the month',
-    summary: 'Transfers move money between your accounts; a rule per account says how much goes to it, and one account can take the rest.',
-    what: [
-      'Deposits into savings or investments, the rows that fill virtual accounts and pocket money are transfers: not spending, so they never count as an expense; they show up as balances instead.',
-      'Every transfer into a savings account, an investment account or a virtual account has a rule that says how its amount is worked out. One account at a time can take "The rest", and the same account fills the gap in a month that overruns. While an account takes the rest, the total row reads "Kept in account", the cash buffer you keep; while none does, it reads "Leftover".',
-      'Pocket money is a line per adult, like "Sam – Pocket" and "Alex – Pocket", with a rule of its own: "A fixed amount", "A percentage of income", "A percentage of Sam\'s income", "A percentage of one income" or "A percentage of what is left", never the rest. Rows the app works out carry an (i), can be ticked when the money has moved, and cannot be typed into.',
-    ],
-    steps: [
-      'Statement → "From what is left" → press a transfer like "To investments": one dialog holds its amount and its rule, under "How the amount is set". The symbol beside an account or a virtual account under "Assets" opens the same dialog, and so does Grid → row menu → "Rule…".',
-      'Pick "A fixed amount", "A percentage of income", "A percentage of one income", "A percentage of what is left" or "The rest". A fixed amount is typed with "Repeats"; for a percentage or the rest, "Counts from" is the month the rule starts in, and earlier months keep their amounts.',
-      'To pass one income on in full, pick "A percentage of one income", choose it under "Which income" and type 100: in the demo, "Robin – Child benefit" into "To investments". The amount follows that income line, after what is deducted from it.',
-      'Household → "Household settings" → "Cash kept in the account at month end (EUR)"; "Cash buffer changes apply to" picks "This and following months (earlier months keep what they show)", "Only this month" or "All months, past included".',
-      'Statement → "From what is left" → "Add row" → "What is it for?": "Goes into a savings account", "Deposits into an investment account", "Fills a virtual account", "Pocket money for an adult" or "Moves money between your accounts". Pick the account under "Which one"; "New savings account…" and the entries like it make the account and the row together. "Moves money between your accounts" lists every account with a balance of its own (savings, investments, other current accounts, cash, other assets): the amount goes into it and net worth stays as it is. Its first entry, "No account: the money leaves the plan", is for money that no account of yours receives; that row stands under "Moved elsewhere", marked "leaves the plan", and net worth falls by it. The name may stay empty: the row is called after its account. Grid → Transfers → "Add row" asks the same after the name.',
-      'Row menu → "Goes into…" changes a deposit row\'s account for every month.',
-      'What is not passed on stays in the main account, the one account the month\'s money runs through, in the household\'s currency. Statement → "Assets" → press the amount of its line (or its row under "Balances" in the Grid) to type what the bank says, at the start and at the end of the month. The line then shows how far the plan was off, and later months continue from the real number; emptying the fields takes it back. Another everyday account (a joint account, a partner\'s own, one in another currency) is an "Other current account" with its own line under "Other assets": a transfer row moves money into it, and an expense can come out of it. Cash you hold is an account of type "Cash", under "Other assets" too.',
-      'Statement → "From what is left" lists them for the month, pocket money first, each with a tick for when the money has moved.',
-    ],
-    factsTitle: 'The rules',
-    facts: rules,
-    tips: ['section.transfer', 'derived.keptInAccount', 'derived.leftover', 'row.toSavingsPlug', 'household.buffer', 'household.bufferScope', 'row.automatic', 'row.rule', 'row.ruleFrom', 'statement.mainAccount', 'balance.currentAccount', 'statement.mainAccountQuestion'],
-    open: 'household',
-  },
-  {
-    key: 'investments',
-    title: 'Investment accounts',
-    summary: 'Deposits grow at a yearly rate you set, or at the average of the real values you enter.',
-    what: [
-      'An account of type "Investments" gets a "<Name> · value" row under Balances with "Deposited" and "Return" beneath it. The demo\'s "Index fund" starts at €12,000 and grows 5% a year, fed by "To investments" at €500 a month.',
-      'Click a value cell to enter what the broker says at the start and at the end of the month; later months continue from your number, and the start of a month is the end of the month before. With "Average of the real returns I enter" the projection follows your own history instead of a fixed rate. An account in another currency gets an "in EUR" line beneath its value. A savings or investment account added on the Statement is asked "How much goes to <account>?" as soon as it is saved, and an account whose "Owner" is a child feeds that child\'s long-term savings row.',
-    ],
-    steps: [
-      'Statement → "Assets" → "Add account" (or Household → "Accounts" → "Add account") → "Type": "Investments"; fill "Name" and "Holds at the start of <Month>". "More options" holds "Currency", "Opening month" and "Owner". After "Save" on the Statement, "How much goes to <account>?" asks for its monthly rule.',
-      'Under "More options" set "Growth per year (%)" and "Projection" ("Use the yearly growth" or "Average of the real returns I enter"), and "Deposits count" ("At the start of the month (they grow this month too)" or "At the end of the month (they grow from next month)").',
-      'For a foreign-currency account choose "Convert deposits": "At that month\'s rate" or "At a fixed rate" with "1 EUR = ? USD". Then "Save".',
-      'Grid → Transfers → "Add row" → "Deposits into an investment account" → the account; type the monthly deposit.',
-      'Statement → "Assets" → press the account\'s balance, or Grid → "<Name> · value" in a month → "At the end of <Month>" → "Save"; an empty field goes back to the calculated amount. "At the start of <Month>" corrects what the month before ended on. "Balances…" on the Statement asks for both for every account, and Household → Accounts → "Real balances" has a whole table ("Month", "Computed", "Real balance").',
-      'Read "Deposited", "Return" and, for a foreign account, "in EUR" under the value row.',
-    ],
-    factsTitle: 'Account types',
-    facts: accountTypes,
-    tips: ['balance.investmentValue', 'balance.deposited', 'balance.return', 'balance.inBase', 'household.tracked', 'setup.owner', 'derived.netWorth'],
-    open: 'household',
-  },
-  {
-    key: 'debts',
-    title: 'Debts & cards',
-    summary: 'A loan and a credit card are both a debt: each payment brings it down, and for a card you type once a month what the statement says.',
-    what: [
-      'A "Loan" account shows "<Name> · outstanding" under Balances, and a "Credit card" shows "<Name> · owed". A payment row that names the account brings the amount down and counts as an expense of its month. A payment stops at what is still owed: the last one is smaller, and after it the row is marked "paid off" and counts as nothing, until a real balance says more is owed.',
-      'A "Credit card" account is for a debt you carry on a card. What you buy with the card is not followed there: your purchases are expense rows like any others, and the payment row holds what you pay on top of them, which is what brings the debt down. Once a month, press the card\'s amount and type what the statement says is owed, everything and not only the month\'s bill. Until you have, the card says "not checked against the statement" in the current month. Afterwards its line shows how far the plan was off as "entered, … against the plan" and, opened, what was owed at the start of the month, what was "Paid" and what was "Not in the plan". The next months continue from the real figure. In the demo Sam owes €1,800 on "Credit card" and pays €60 a month; the statement at the start of November said €1,695, €15 more than the plan.',
-      'A card you pay off in full every month needs no account: there is no debt to follow, and what you buy with it is in your rows already. To say that something is paid with the card, use a payment method (see "Payments"). Interest is not modelled: the statement\'s figure, or the bank\'s for a loan, brings it in. "Net worth" subtracts cards and loans from what you own.',
-    ],
-    steps: [
-      'Statement → "Debts and net worth" → "Add a card or loan" (or Household → "Accounts" → "Add account"): "Name", "Type" ("Loan" or "Credit card") and "Owed at the start of <Month>", what you owed when that month began. A loan or card whose balance is tracked needs it: a payment stops at what is owed.',
-      '"Add the row that pays it off" is ticked: "Save" makes the loan or card and its payment row together, and on the Statement the row\'s dialog opens for the amount. Pick its "Category" there, "Transport" for a car loan say, and the payment stands beside the car\'s other costs.',
-      'A payment row can come later, or first. Later: the "…" of the loan or card → "Edit…" → "Add the row that pays it off". First: Statement → "Expenses" → "Add row" → "Pays off a loan or card" → the account, or "New loan…" to make both together; a category\'s "Add row to Transport" offers the same and keeps the line in that category, beside the car\'s other costs. In the Grid it is Expenses → "Add row" → "Pays off a loan or card". A vehicle\'s or company\'s suggestions offer a loan row too, with "Add a loan…" while there is none.',
-      'Row menu → "Pays off…" re-points a payment row at another loan or card.',
-      'Statement → "Debts and net worth" → press the balance, or Grid → "<Name> · owed" or "<Name> · outstanding" in a month → "At the start of <Month>" for what was owed when the month began, which is where a card\'s statement figure goes; "At the end of <Month>" corrects what is owed after it.',
-      'A loan can become a card and a card a loan: the "…" of the account → "Edit…" → "Type". No figure changes, and the payment row stays where it is.',
-    ],
-    tips: ['balance.cardOwed', 'balance.loanOutstanding', 'balance.otherAsset', 'derived.netWorth', 'household.tracked'],
-    open: 'household',
-  },
-  {
-    key: 'payments',
-    title: 'Payments: when and with what',
-    summary: 'Switched on, every amount that leaves can say the day it goes out on and the method it is paid with, from the household\'s own list of methods. Neither changes a figure.',
-    what: [
-      'Planning payments is off until you turn it on: Household → "Household settings" → "Plan payments by day and method". It is one switch for the whole household, on every device. Off again, everything it added is hidden and nothing is lost.',
-      'On, "Payment methods" appears under Household: your ways of paying, each with a name, a kind, who pays with it and, if you like, a note such as "main account". A method is a label for the Payments page and is tied to no account. "Comes out of" keeps saying whose money pays for an expense. So an expense can come out of your pocket money and still be paid with PayPal. A method can be changed at any time; one that amounts were paid with is archived, not deleted.',
-      'A row says how it is "Usually paid": a day of the month and a method, for every month. An item of a month can name its own, and so can something that repeats: each subscription in one row its own day and its own method. The nearest one counts: the item, then its schedule, then the row. An amount with a day or a method is tracked on the Payments page; one with neither is listed there as untracked.',
-    ],
-    steps: [
-      'Household → "Household settings" → tick "Plan payments by day and method".',
-      'Under "Payment methods" the app offers a first list: a direct debit, a standing order and a transfer by hand (noted with your main account\'s name), one method per credit card, and cash. Untick what you do not use and press "Add 5 methods" (the count follows your ticks).',
-      'For another one, "Add method": type a "Name" (your bank\'s word for it, "PayPal", "Bills automation"). If you like, choose its "Kind" and "Who pays with it" and type a "Note". "Save" is there as soon as it has a name.',
-      '"Edit" beside a method changes any of it. Its button at the bottom left says "Delete" while nothing uses the method, and "Archive" once something does.',
-      'An archived method stands under "Archived"; "Use again" brings it back.',
-      'For a whole row: open its amount on the Statement or in the Grid and set "Paid on" and "Paid with" under "Usually paid", or use the row menu (the … at the right of its name) → "Usually paid…". In a month shorter than the day you chose, the amount goes out on the last day.',
-      'For one thing in a row: open the amount, "Itemized", and set "Paid on" and "with" on the item\'s own line. If the item repeats, they are kept with its schedule; changed later, "Apply the change to" asks whether that is for "Only this month" or "This and following months".',
-      'Household → "Schedules" → "Edit" shows a schedule\'s "Paid on" and "Paid with" too. On the Payments page, pressing a line sets both without leaving the page.',
-    ],
-    factsTitle: 'The kinds of method',
-    facts: paymentKinds,
-    tips: ['payments.switch', 'payments.usual', 'payments.kind', 'payments.note', 'payments.owner', 'payments.archivedMethod'],
-    open: 'household',
-  },
-  {
-    key: 'payments-page',
-    title: 'The Payments page',
-    summary: 'Everything that leaves in a month: what has a day or a method day by day with its tick, the rest below as untracked, and sums by method and by person.',
-    what: [
-      'With "Plan payments by day and method" on, "Payments" is the third tile of the rail (the third tab on a phone). It shows the month chosen in the strip of months: every amount under "Money out" on the Statement. An amount is tracked once it has a day or a method: it then stands under "By day" with its tick, which is the tick on the Statement. Everything else stands below under "Untracked", a quiet list without ticks that counts in none of the page\'s sums.',
-      'In the current month "By day" starts with "Overdue" (the day has passed and the amount is not ticked), then "Today" and "Coming"; in any other month what is not ticked stands under "To pay". "No day" lists what has a method and no day, and "Done" at the foot unfolds when pressed. The line at the top counts it: what is tracked and still to pay, what is done, how many are overdue and how many are untracked.',
-      '"By method" adds up what is paid with each method in the month and what of it is still open, and "By person" who pays, by the owner of the method. A day and a method are labels: the page says nothing about an account\'s balance or what a card owes. What is paid with a card and the payment to that card are both on the list, because both are money that leaves. On the Statement a small grey day stands after a line\'s name ("1st" after "The flat – Rent"); pressing it opens Payments at that line.',
-    ],
-    steps: [
-      'Turn on Household → "Household settings" → "Plan payments by day and method", then open "Payments" in the rail.',
-      'Pick the month in the strip at the top; the current one says "now".',
-      'Under "Untracked", press an amount: "Payment" opens. Choose "Paid on", "Paid with" or both, then "Save". With a day it stands on its day; with a method alone, under "No day".',
-      'Tick a line once the amount has really left. It moves to "Done"; open "Done" and tick it again to take that back.',
-      'Press a tracked line to change its day or method. For something that repeats, "Counts for" asks whether that is for "This and following months" or "Only this month". "Amount…" there opens the amount itself.',
-      'To stop tracking an amount, open "Payment" and choose "No day" and "No method". Where it repeats, do that for "This and following months".',
-      'Press a sum under "By method", or a name under "By person", to list only its payments; "Show all" brings the whole list back. On a phone the sums stand above the lists, and each folds away when its title is pressed.',
-      'On the Statement, press the grey day after a line\'s name to see that amount among the month\'s payments.',
-    ],
-    tips: ['payments.toPay', 'payments.byDay', 'payments.untracked', 'payments.totals', 'payments.people'],
-    open: 'payments',
-  },
-  {
-    key: 'goals',
-    title: 'Goals',
-    summary: 'Pick a number to reach or a debt to clear; the bar shows how far the current plan gets.',
-    what: [
-      'A goal is measured against the plan in the grid every month, so the bar moves when the plan changes. Two kinds: "Fill an account" (an account or a virtual account reaches an amount) and "Pay down a debt" (a card or loan comes down to an amount, usually zero); net worth can have a goal too. With a target month the line says whether the plan gets there in time. Goals are the one thing on screen in gold.',
-    ],
-    steps: [
-      'Statement → hover a line under "Assets" or "Debts and net worth" → "Set a goal for …". What the goal watches is then settled: fill "Name", "Target (EUR)", or "Bring it down to (EUR)" for a debt, "Target month (optional)" and "Notes", then "Save".',
-      'A goal on net worth starts the same way, from the "Net worth" line. A line with a goal carries a small gold mark with how far it is.',
-      'Read the line under the bar: it says how far the plan gets ("€… of €… · reached by <Month> (target <Month>)"), when it is late ("… after the target of <Month>"), or that the goal is done ("Reached in <Month>", or "Nothing owed" for a debt brought to zero).',
-      'Open the line to see the goal\'s bar; "Edit" beside its name changes it, and "Delete…" in that dialog removes it.',
-    ],
-    factsTitle: 'Goal kinds',
-    facts: goalKinds,
-    tips: ['goal.status'],
-    open: 'statement',
-  },
-  {
-    key: 'trends',
-    title: 'Trends: how it moves',
-    summary: 'Trends draws net worth, income, expenses, accounts and debts over the months: what was, and what the plan says will be.',
-    what: [
-      'Trends reads the same plan as the Statement and the Grid and changes nothing in it. Five tiles say where each subject stands in the current month and how it moved from the month before: "Net worth", "Income", "Expenses", "Accounts" (everything you have) and "Debts" (what you owe on cards and loans). Every figure is the one the Statement shows for its month.',
-      'A tile is a switch: pressed, its subject is a line in "Amounts", and any number of them can be on at once, all on one scale. The solid part of a line is the months that are over; from "now" on it is dotted, because that is the plan. Under it "Change from the month before" shows how each moved, as a row of bars per subject on the same months: up above the line, down below it.',
-      '"Looks ahead" sets how far the lines run: "Plan" ends where the plan ends, "3 years", "5 years" and "10 years" go on past it. Amounts carry on as they stand, schedules keep landing and investments grow at their rate, as if you had pressed "Add <year>", but the plan itself does not get longer.',
-    ],
-    steps: [
-      'Open "Trends" in the rail.',
-      'Press a tile, "Expenses" say, to put it on the chart; press it again to take it off.',
-      'Point at a month in "Amounts", or press Tab until the chart has the focus and use the arrow keys: a list says that month\'s amounts and how each moved from the month before.',
-      'With one tile on, press "Breakdown" beside "Amounts": the line becomes columns stacked from its parts, named under the chart. "Total" brings the line back.',
-      'Press "10 years" under "Looks ahead" to see where the plan leads; "Plan" goes back.',
-      'A goal is a chip under the tiles: press it to draw its amount across the chart, with a flag at the month it is due and a dot where the plan gets there. A goal is set on the Statement, on the line it watches.',
-      'Open "Figures as a table" under the charts to read the same amounts and changes as a table.',
-    ],
-    tips: ['trends.tiles', 'trends.amounts', 'trends.changes', 'trends.breakdown', 'trends.goals'],
-    open: 'trends',
-  },
-  {
-    key: 'pocket-money',
-    title: 'Pocket money & per person',
-    summary: 'Each adult has a pocket money line with an amount or a rule of its own; "Per person" under the Statement shows what each adult brings and takes.',
-    what: [
-      'Pocket money is a line per adult at the top of "From what is left" on the Statement: "Sam – Pocket", "Alex – Pocket". It is shared out of what the month leaves, so it is not counted among the expenses. Each line has its own amount or its own rule, so two adults can take different amounts, and nothing is set for the household as a whole. How much each adult puts into the household is what their income lines say.',
-      'With two or more adults, the Statement ends with "Per person": "Income", "Own spending", "Pocket money" and "Leaves for the household" for each. A row counts for an adult when it belongs to them ("Belongs to…" in the row menu); rows for Robin, Biscuit, The car or The flat are the household\'s.',
-      'Pocket money is the adult\'s own, so the plan does not follow it once it is given. To follow it anyway, keep it in an account that is left out of net worth: such an account has a balance like any other, an expense can come out of it and a row under "From accounts" can take money from it into the month, but no total counts it, and net worth does not either. On the Statement it stands under its own heading with a crossed circle after its name and its figures in grey. A pocket money line can land in it.',
-    ],
-    steps: [
-      'Statement → "Suggestions" → under "From what is left", type an amount beside "Sam – Pocket" and press Enter; or press "Add" with the field empty to be asked for a rule.',
-      'To change it, press "Sam – Pocket" (or Grid → row menu → "Rule…"). "How the amount is set" offers "A fixed amount", "A percentage of income", "A percentage of Sam\'s income", "A percentage of one income" and "A percentage of what is left".',
-      'A fixed amount is typed with "Repeats": "This and following months" or "Only this month". For a percentage, "Counts from" is the month the rule starts in; earlier months keep what they showed.',
-      'For a line of your own: "Add row" under Transfers → "Pocket money for an adult" → pick the "Adult".',
-      'To follow saved pocket money: add an account for it, "Savings" say, and tick "Leave out of net worth" under "More options". Then row menu of "Sam – Pocket" → "Lands in…" → that account: every month\'s pocket money raises its balance. Press its amount to type what it really holds once you have spent from it, and Statement → "From accounts" → "Add row" → "Taken from a savings account" brings money back into the month.',
-      'Say whose a row is: row menu → "Belongs to…" → "This row is for". A percentage of Sam\'s income counts the income lines that belong to Sam.',
-      'Read "Per person" under the Statement\'s two halves to see what each adult leaves for the household this month.',
-    ],
-    tips: ['row.belongsTo', 'row.rule', 'row.ruleFrom', 'statement.perPerson'],
-    open: 'statement',
-  },
-  {
-    key: 'currencies',
-    title: 'Currencies',
-    summary: 'Rows and accounts can be in another currency; the grid shows what they are worth in EUR at each month\'s rate.',
-    what: [
-      '"Currency…" in the row menu sets a row\'s currency. The cell keeps the typed amount and shows "≈ €…" beneath; the row\'s name carries the code. The cell editor adds a rate line, "≈ €… · 1 EUR = 1.08 USD · ECB · 2 Nov 2026", with a chip that says where the rate came from: "ECB", "manual", "forecast", "carried" or "missing".',
-      'The app keeps the rates up to date by itself, once a day when it is opened: the European Central Bank\'s latest rate while a month is running, the one of its last working day once the month is over (only currency codes and dates leave the device). They live under Household → "Currency rates": "Fetch ECB rates" asks at once, "Months to come" says how each currency\'s rate goes on. Rates are always spelled with both codes in the direction whose number is at least 1.',
-      'An account can be kept in another currency too. Its balance stays in that currency, with what it is worth in EUR beside it. Money that goes into it or comes out of it is converted at the month\'s rate, and an amount typed in the account\'s own currency arrives exactly as typed. A virtual account is kept in the currency of its savings account: what is set aside arrives in it at the month\'s rate, and it moves only to a savings account in that currency. One amount spans two currencies at most: a pound expense comes out of an account in pounds or in EUR, and a EUR amount moves money into or out of an account in one other currency. A choice that would make a third says so at once, names the two the amount accepts, and is not saved. Amounts stored before this rule keep counting as they did.',
-    ],
-    steps: [
-      'Press a row to open its dialog and pick the currency beside the amount: it is the row\'s, for every month, and is saved with the amount. The same choice is in the row menu → "Currency…" → "Amounts in this row are in" (the first entry, "EUR (household currency)", is the default) → "Save".',
-      'Open a cell of that row; under the amount, "Change this month\'s rate…" → type after "1 USD =" → "Save rate". One rate per currency per month, for every row and balance in it. On the Statement the month\'s rate is a chip in the toolbar, "1 EUR = 1.08 USD": press it to type your own or to go back to the ECB\'s.',
-      '"Use the ECB rate again" drops a manual rate for the published one.',
-      'Where money is really changed into another currency, "Record the conversion…" under the amount keeps what it came to: type the amount in the other currency or the rate, or pick a day and "Use" its official rate. Two figures give the third. "Done", then "Save": the amount is Done, and a new rate for the month leaves it alone. "Change…" and "Remove" are on its line.',
-      'An account\'s currency is under "More options" in its dialog. Household → "Currency rates" → "Fetch ECB rates" brings the rates up to date at once, and is the way back after being offline.',
-      '"Months to come", per currency: "Follow the recent trend" (the average change per month of the last 12 months, each further month 80% of the step before), "Hold the last rate", or "My own change per month" with a %. With less than a year of rates the last rate is held. A rate typed for a month to come is used as it is, and the forecast goes on from it.',
-      'Type over a month in the "1 EUR in USD" column to set it by hand; empty it to take the official rate back. A month to come has none and goes back to its forecast.',
-    ],
-    tips: ['row.currency', 'cell.rate', 'cell.conversion', 'statement.rate', 'balance.inBase', 'household.fxForecast'],
-    open: 'household',
-  },
-  {
-    key: 'remove',
-    title: 'Archive or delete',
-    summary: 'One dialog removes anything; it says what archiving keeps, what deleting removes, and which months that are over would change with it.',
-    what: [
-      '"Archive or delete…" sits in every row menu, beside each person or thing, and in the account and virtual account dialogs; goals and schedules have "Delete…". Archiving hides something from a month on and keeps every earlier month exactly as it was. Deleting takes it out of every month, also the ones that are over.',
-      'The dialog lists "Deleting removes", "Also changes" and "Resolve these first" before you decide. Every removal is one undoable step, and archived things wait under Household with "Restore".',
-      '"Restore" puts back what the archive changed: a row\'s schedules run again and the rows that followed it follow it again; a virtual account\'s "To …" row fills it again; an account\'s virtual accounts come back with it, and what came out of them comes out of them again. Whatever you changed in between stays as it is.',
-    ],
-    steps: [
-      'Row menu (the "…" beside a row\'s name in the Grid and on the Statement) → "Archive or delete…". On the Statement a category, an account and a virtual account have a "…" too: an account\'s holds "Edit…", "Move up", "Move down" and "Archive or delete…", and moves it among the accounts under the same heading.',
-      'Choose "Archive from" a month → "Archive from <Month>"; or "Delete" once "Resolve these first" is empty.',
-      'If "Deleting removes" says "2 of these months are over (Sept–Oct 2026): they change too" and those months should stay as they were, archive it instead.',
-      'Changed your mind? Undo right after.',
-      'While a new household still shows "Setting up" on the Statement, the entry reads "Delete" and deletes at once; "Deleted …" appears at the foot of the window with "Undo". If more than the thing itself would change, the dialog still opens.',
-      'Bring something back: "Archived rows", or the "Archived" line under "Accounts", "Virtual accounts" and "People & things" → "Restore". An archived row still shown in the Grid has "Restore" in its row menu too.',
-      'A message at the foot of the window says what came back, like "Restored "Rent": its schedule "Rent" runs again.", and what stayed as it is. "Undo" beside it archives everything again.',
-      'A virtual account whose savings account is archived comes back with that account: restore the account. The same for the "To …" row of an archived virtual account.',
-    ],
-    tips: ['remove.archiveFrom', 'household.archived'],
-    open: 'household',
-  },
-  {
-    key: 'data',
-    title: 'Data, sync & privacy',
-    summary: 'Your data lives in this browser; export a file now and then, or sign in to keep an encrypted copy in the cloud.',
-    what: [
-      '"Where your data lives" under Data says it plainly: in this browser, on this device. "Ask the browser to keep my data" asks it not to evict the store. "Export now" writes one JSON file with every table and the change history; "Choose a file…" reads one back, to "Merge into this device" or "Replace everything here".',
-      'Cloud sync is optional and by invitation: "Sign in" or "I have an invite". Everything is encrypted on the device before it leaves, only your password opens it, and a recovery code shown once is the way back in. Apart from that, only currency codes and dates ever leave the device, when rates are fetched. "Demo household" opens the sandbox; the "Danger zone" wipes.',
-    ],
-    steps: [
-      'Data → "Export" → "Export now"; keep the file anywhere you like.',
-      '"Import" → "Choose a file…" → "Merge into this device" or "Replace everything here".',
-      '"Cloud sync" → "Sign in" ("Email", "Password"), or "I have an invite" ("Invite code", "Email", "New password", "New password again" → "Create account" → "Your recovery code" → "I have stored it").',
-      'Signed in: "Sync now", "Change password…", "New recovery code…", "Sign out". The owner invites with "Invite someone" → "Copy link".',
-      '"Demo household": "Open the demo sandbox" or "Load demo household"; "Leave the demo" returns.',
-      '"Danger zone": type WIPE for "Wipe this device" (or "Sign out and wipe this device"), DELETE for "Delete the cloud copy".',
-    ],
-    tips: ['data.export', 'sync.privacy'],
-    open: 'data',
-  },
-  {
-    key: 'marks',
-    title: 'Marks & keyboard',
-    summary: 'Every kind of money has one colour and every mark one meaning; the keyboard moves you around the grid.',
-    what: [
-      '"Colours and marks" at the right of the Statement and Grid toolbars is the legend. Kinds of money: "Income", "Expenses", "Transfers", "Balances and net worth", "Virtual accounts", "Goals". Marks: an estimate sits on a light yellow shade, certain is plain, done has a green dot; in the current month a red ring means nothing done yet and an amber half-dot partly done.',
-      'Spending shows as a red negative number when "Show expenses as negative red numbers" is on; an amber "+€…" is money drawn from savings this month; a dotted underline is a balance you entered yourself; a grey column in the Grid is a month that is over; a faint band is one category\'s rows. A crossed circle after an account\'s name on the Statement means it is not in net worth: its figures are grey and no total counts it. On the Statement two chain rings mark a row and the account it fills, takes from or pays off: press them to go to the other end, which is marked for a moment. Faint, open rings on a loan or card mean no row pays it off yet; pressing them adds the row. Two arrows in a loop mark a row or an item that is on a schedule; in a month where it does not land the line is grey and says when it lands next and with how much, "next Jan 2027" say.',
-      'In the grid the arrow keys move between cells, Enter or Space opens one, Escape closes the editor. Cmd/Ctrl+Z undoes and Shift redoes, like the two arrows at the right of every toolbar. While payments are planned by day, a small grey day after a line\'s name on the Statement ("12th") says when the amount goes out; pressing it opens the month\'s payments.',
-    ],
-    steps: [
-      'Open "Colours and marks" from the Statement or Grid toolbar.',
-      'Click a cell, then move with the arrow keys; Enter opens it, Escape closes it.',
-      'Cmd/Ctrl+Z undoes, Cmd/Ctrl+Shift+Z redoes.',
-      'Household → "Household settings" → "Show expenses as negative red numbers" switches the red negatives.',
-    ],
-    tips: ['cell.howSure', 'row.automatic'],
-    open: 'grid',
-  },
+  { key: 'statement', ...T.statement, tips: ['statement.progress', 'cell.howSure', 'row.automatic', 'derived.keptInAccount', 'derived.leftover', 'statement.months', 'statement.month', 'statement.position', 'statement.expenses', 'statement.setAside', 'statement.fromAccounts', 'statement.setup', 'statement.suggestions', 'statement.mainAccount', 'statement.netWorth', 'statement.free', 'statement.perPerson'], open: 'statement' },
+  { key: 'grid', ...T.grid, tips: ['section.income', 'section.expense', 'section.transfer', 'derived.incomeTotal', 'derived.expensesTotal', 'derived.netWorth', 'cell.repeats', 'past.question'], open: 'grid' },
+  { key: 'people', ...T.people, facts: kinds, tips: ['row.belongsTo', 'household.archived'], open: 'household' },
+  { key: 'income', ...T.income, tips: ['section.income', 'row.deductedFrom', 'cell.deductions', 'row.follows', 'row.followShare', 'derived.incomeTotal'], open: 'statement' },
+  { key: 'spending', ...T.spending, tips: ['section.expense', 'cell.howSure', 'cell.comesOutOf', 'row.category', 'household.categories', 'household.usualCategories', 'row.categoryEstimate', 'derived.expensesTotal', 'derived.fromSavings'], open: 'statement' },
+  { key: 'schedules', ...T.schedules, tips: ['schedule.status', 'statement.progress'], open: 'household' },
+  { key: 'virtual-accounts', ...T['virtual-accounts'], tips: ['balance.pool', 'cell.comesOutOf', 'derived.fromSavings', 'balance.savings'], open: 'household' },
+  { key: 'transfers', ...T.transfers, facts: rules, tips: ['section.transfer', 'derived.keptInAccount', 'derived.leftover', 'row.toSavingsPlug', 'household.buffer', 'household.bufferScope', 'row.automatic', 'row.rule', 'row.ruleFrom', 'statement.mainAccount', 'balance.currentAccount', 'statement.mainAccountQuestion'], open: 'household' },
+  { key: 'investments', ...T.investments, facts: accountTypes, tips: ['balance.investmentValue', 'balance.deposited', 'balance.return', 'balance.inBase', 'household.tracked', 'setup.owner', 'derived.netWorth'], open: 'household' },
+  { key: 'debts', ...T.debts, tips: ['balance.cardOwed', 'balance.loanOutstanding', 'balance.otherAsset', 'derived.netWorth', 'household.tracked'], open: 'household' },
+  { key: 'payments', ...T.payments, facts: paymentKinds, tips: ['payments.switch', 'payments.usual', 'payments.kind', 'payments.note', 'payments.owner', 'payments.archivedMethod'], open: 'household' },
+  { key: 'payments-page', ...T['payments-page'], tips: ['payments.toPay', 'payments.byDay', 'payments.untracked', 'payments.totals', 'payments.people'], open: 'payments' },
+  { key: 'goals', ...T.goals, facts: goalKinds, tips: ['goal.status'], open: 'statement' },
+  { key: 'trends', ...T.trends, tips: ['trends.tiles', 'trends.amounts', 'trends.changes', 'trends.breakdown', 'trends.goals'], open: 'trends' },
+  { key: 'pocket-money', ...T['pocket-money'], tips: ['row.belongsTo', 'row.rule', 'row.ruleFrom', 'statement.perPerson'], open: 'statement' },
+  { key: 'currencies', ...T.currencies, tips: ['row.currency', 'cell.rate', 'cell.conversion', 'statement.rate', 'balance.inBase', 'household.fxForecast'], open: 'household' },
+  { key: 'remove', ...T.remove, tips: ['remove.archiveFrom', 'household.archived'], open: 'household' },
+  { key: 'data', ...T.data, tips: ['data.export', 'sync.privacy'], open: 'data' },
+  { key: 'marks', ...T.marks, tips: ['cell.howSure', 'row.automatic'], open: 'grid' },
 ]

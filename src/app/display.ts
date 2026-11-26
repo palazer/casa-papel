@@ -1,4 +1,5 @@
 import type { CellResult, CellStatus, StatementRule } from '@/engine'
+import { txt } from '@/i18n'
 import type { Money, Row } from '@/model'
 import { formatAmount, formatShare } from './format'
 
@@ -52,21 +53,23 @@ export function doneness(cell: Pick<CellResult, 'status' | 'items'>): { done: nu
 }
 
 export function doneLabel(d: { done: number; total: number; state: DoneState }): string {
-  if (d.state === 'all') return 'Done'
-  if (d.state === 'none') return 'Not done yet'
-  return `${d.done} of ${d.total} done`
+  if (d.state === 'all') return txt.app.done.all
+  if (d.state === 'none') return txt.app.done.none
+  return txt.app.done.some(d.done, d.total)
 }
 
 /** A rule in the rule dialog's words: `a fixed amount`, `10% of income`, `30% of what is left`, `the rest`. */
 export function ruleText(rule: Pick<StatementRule, 'kind' | 'share' | 'of'>, locale: string): string {
+  const say = txt.app.rule
+  const share = formatShare(rule.share ?? 0, locale)
   switch (rule.kind) {
-    case 'share-of-income': return `${formatShare(rule.share ?? 0, locale)} of income`
-    case 'share-of-own-income': return `${formatShare(rule.share ?? 0, locale)} of their own income`
-    case 'share-of-row': return `${formatShare(rule.share ?? 0, locale)} of ${rule.of ?? 'an income line that is gone'}`
-    case 'share-of-rest': return `${formatShare(rule.share ?? 0, locale)} of what is left`
-    case 'rest': return 'the rest'
-    case 'idle': return 'nothing, another account takes the rest'
-    case 'none': return 'no rule yet'
-    default: return 'a fixed amount'
+    case 'share-of-income': return say.shareOfIncome(share)
+    case 'share-of-own-income': return say.shareOfOwnIncome(share)
+    case 'share-of-row': return say.shareOfRow(share, rule.of ?? null)
+    case 'share-of-rest': return say.shareOfRest(share)
+    case 'rest': return say.rest
+    case 'idle': return say.idle
+    case 'none': return say.none
+    default: return say.fixed
   }
 }

@@ -1,3 +1,5 @@
+import { txt } from '@/i18n'
+
 /**
  * The fifteen currencies offered wherever one is chosen (a household's own, a row's, an account's), rule X13 of
  * docs/calculations.md. The ECB publishes a rate for each against the euro, so the app can fetch it. A code outside
@@ -17,4 +19,4 @@ export function currencyChoices(base: string, current?: string | null): string[]
 }
 
 /** How a currency reads in a choice: the household's own says so. */
-export const currencyLabel = (code: string, base: string): string => (code === base ? `${code} (household currency)` : code)
+export const currencyLabel = (code: string, base: string): string => (code === base ? txt.app.householdCurrency(code) : code)
