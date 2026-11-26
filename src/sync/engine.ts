@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 import { liveQuery, type Subscription } from 'dexie'
 import { SCHEMA_VERSION, type ExportFile, type Meta, type SyncState } from '@/model'
 import { importReplace, mergeTables, parseExportFile, wipeAll, type Store } from '@/store'
@@ -406,7 +407,7 @@ export class SyncEngine {
     await this.remote.signIn(normalized, temporaryPassword)
     if (await this.remote.getMembership()) {
       await this.remote.signOut().catch(() => undefined)
-      throw new Error('This account already has a household. Sign in with its household password instead.')
+      throw new Error(txt.errors.accountAlreadyHouseholdSignHousehold)
     }
     const { authKey, wrapKey } = await deriveKeys(normalized, newPassword, this.kdfIterations)
     await this.remote.updatePassword(authKey)
@@ -420,7 +421,7 @@ export class SyncEngine {
   async join(code: string, email: string, password: string): Promise<{ recoveryCode: string }> {
     checkPassword(password)
     const normalized = normalizeEmail(email)
-    if (!(await this.remote.inviteValid(code))) throw new Error('This invite link is not valid any more. Ask for a new one.')
+    if (!(await this.remote.inviteValid(code))) throw new Error(txt.errors.inviteLinkNotValidAny)
     const { authKey, wrapKey } = await deriveKeys(normalized, password, this.kdfIterations)
     await this.remote.redeemInvite(code, normalized, authKey)
     await this.remote.signIn(normalized, authKey)
@@ -498,8 +499,8 @@ export class SyncEngine {
   private async wrapKeyForLocked(password: string | undefined): Promise<CryptoKey> {
     if (this.pendingWrapKey) return this.pendingWrapKey
     const s = this.sync
-    if (!s) throw new Error('Sign in first.')
-    if (!password) throw new Error('Type your password as well: the unlocked key is saved for it.')
+    if (!s) throw new Error(txt.errors.signFirst)
+    if (!password) throw new Error(txt.errors.typeYourPasswordWellUnlocked)
     const { authKey, wrapKey } = await deriveKeys(s.email, password, this.kdfIterations)
     await this.remote.signIn(s.email, authKey)
     this.pendingWrapKey = wrapKey
@@ -509,16 +510,16 @@ export class SyncEngine {
   /** Locked after a password reset elsewhere: the recovery code unlocks the household key and re-wraps it for the password just typed. */
   async unlockWithRecovery(code: string, password?: string): Promise<void> {
     const s = this.sync
-    if (!s) throw new Error('Sign in first.')
+    if (!s) throw new Error(txt.errors.signFirst)
     const wrapKey = await this.wrapKeyForLocked(password)
     const membership = await this.remote.getMembership()
-    if (!membership?.recovery) throw new Error('This household has no recovery code on file.')
+    if (!membership?.recovery) throw new Error(txt.errors.householdNoRecoveryCodeFile)
     const { recoveryKey } = await recoveryKeys(code)
     let householdKey: CryptoKey
     try {
       householdKey = await unwrapHouseholdKey(membership.recovery, recoveryKey)
     } catch {
-      throw new Error('That recovery code does not open this household.')
+      throw new Error(txt.errors.recoveryCodeDoesNotOpen)
     }
     await this.remote.updateMember(s.householdId, { wrappedKey: await wrapHouseholdKey(householdKey, wrapKey) })
     this.key = householdKey
@@ -534,7 +535,7 @@ export class SyncEngine {
    */
   async replaceCloudWithLocal(password?: string): Promise<string> {
     const s = this.sync
-    if (!s) throw new Error('Sign in first.')
+    if (!s) throw new Error(txt.errors.signFirst)
     const wrapKey = await this.wrapKeyForLocked(password)
     const householdKey = await generateHouseholdKey()
     const recoveryCode = generateRecoveryCode()
@@ -564,7 +565,7 @@ export class SyncEngine {
     await this.remote.resetWithRecovery(normalized, verifier, authKey)
     await this.remote.signIn(normalized, authKey)
     const membership = await this.remote.getMembership()
-    if (!membership?.recovery) throw new Error('This household has no recovery code on file.')
+    if (!membership?.recovery) throw new Error(txt.errors.householdNoRecoveryCodeFile)
     const householdKey = await unwrapHouseholdKey(membership.recovery, recoveryKey)
     const wrappedKey = await wrapHouseholdKey(householdKey, wrapKey)
     await this.remote.updateMember(membership.householdId, { wrappedKey })
@@ -576,14 +577,14 @@ export class SyncEngine {
   async changePassword(oldPassword: string, newPassword: string): Promise<void> {
     checkPassword(newPassword)
     const s = this.sync
-    if (!s || !this.key) throw new Error('Sign in first.')
+    if (!s || !this.key) throw new Error(txt.errors.signFirst)
     const old = await deriveKeys(s.email, oldPassword, this.kdfIterations)
     const membership = await this.remote.getMembership()
-    if (!membership) throw new Error('No household on the server.')
+    if (!membership) throw new Error(txt.errors.noHouseholdServer)
     try {
       await unwrapHouseholdKey(membership.wrappedKey, old.wrapKey)
     } catch {
-      throw new Error('The current password is wrong.')
+      throw new Error(txt.errors.currentPasswordWrong)
     }
     const fresh = await deriveKeys(s.email, newPassword, this.kdfIterations)
     const wrappedKey = await wrapHouseholdKey(this.key, fresh.wrapKey)
@@ -598,13 +599,13 @@ export class SyncEngine {
         lastError = e
       }
     }
-    throw new Error(`The password was changed, but saving the key for it failed (${describeRemoteError(lastError)}). This device keeps working; a device that asks to be unlocked takes the recovery code.`)
+    throw new Error(txt.errors.passwordChangedButSavingKey(describeRemoteError(lastError)))
   }
 
   /** Make a new recovery code; the old one stops working. */
   async newRecoveryCode(): Promise<string> {
     const s = this.sync
-    if (!s || !this.key) throw new Error('Sign in first.')
+    if (!s || !this.key) throw new Error(txt.errors.signFirst)
     const code = generateRecoveryCode()
     const { recoveryKey, verifier } = await recoveryKeys(code)
     await this.remote.updateMember(s.householdId, { recovery: await wrapHouseholdKey(this.key, recoveryKey), recoveryVerifier: verifier })
@@ -652,7 +653,7 @@ export class SyncEngine {
 }
 
 export function checkPassword(password: string): void {
-  if (password.length < MIN_PASSWORD) throw new Error(`Use at least ${MIN_PASSWORD} characters. A few words you will remember work well.`)
+  if (password.length < MIN_PASSWORD) throw new Error(txt.errors.passwordTooShort(MIN_PASSWORD))
 }
 
 function emptyView(): SyncView {

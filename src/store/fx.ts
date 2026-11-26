@@ -2,6 +2,7 @@
  * Currency rates: which pairs the household needs, the official month rates (the ECB's, via Frankfurter: no key,
  * only currency codes and dates leave the device), rates typed by hand, and how each currency's months to come run.
  */
+import { txt } from '@/i18n'
 import { withDeadline } from '@/lib/deadline'
 import {
   FxRateSchema, addMonths, compareMonths, isoDateOfToday, lastDayOfMonth, monthOfDate, monthRange, parseMonth,
@@ -117,13 +118,13 @@ export async function fetchEcbRates(
   const start = `${opts.from}-01`
   const end = lastDayOfMonth(opts.to) < today ? lastDayOfMonth(opts.to) : today
   if (start > end || opts.symbols.length === 0) return { ...NOTHING }
-  const get = withDeadline(fetchFn, timeoutMs, 'The rate service did not answer. Try again.')
+  const get = withDeadline(fetchFn, timeoutMs, txt.errors.rateServiceDidNotAnswer)
 
   async function getDaily(symbols: string[]): Promise<Record<string, Record<string, number>> | null> {
     const url = `https://api.frankfurter.dev/v1/${start}..${end}?base=${encodeURIComponent(opts.base)}&symbols=${encodeURIComponent(symbols.join(','))}`
     const res = await get(url)
     if (res.status === 404 || res.status === 422) return null
-    if (!res.ok) throw new Error(`The rate service answered ${res.status}. Try again later.`)
+    if (!res.ok) throw new Error(txt.errors.rateServiceAnsweredTryAgain(res.status))
     const json = (await res.json()) as { rates?: Record<string, Record<string, number>> }
     return json.rates ?? {}
   }
@@ -196,7 +197,7 @@ export async function setManualRate(store: Store, pair: string, month: MonthKey,
     await store.commit([{ op: 'delete', table: 'fxRates', key: [pair, month] }])
     return
   }
-  if (!(rate > 0)) throw new Error('A rate must be a positive number.')
+  if (!(rate > 0)) throw new Error(txt.errors.rateMustPositiveNumber)
   await store.commit([{ op: 'put', table: 'fxRates', record: FxRateSchema.parse({ pair, month, rate, source: 'manual', updatedAt: now() }) }])
 }
 
@@ -206,13 +207,13 @@ export async function setManualRate(store: Store, pair: string, month: MonthKey,
  * before it, so a weekend or a holiday takes the working day before. Only the two codes and the date are sent.
  */
 export async function fetchDayRate(base: string, foreign: string, day: string, fetchFn: typeof fetch = fetch, timeoutMs: number = RATE_TIMEOUT_MS): Promise<{ rate: number; date: string }> {
-  const get = withDeadline(fetchFn, timeoutMs, 'The rate service did not answer. Try again.')
+  const get = withDeadline(fetchFn, timeoutMs, txt.errors.rateServiceDidNotAnswer)
   const res = await get(`https://api.frankfurter.dev/v1/${day}..${day}?base=${encodeURIComponent(base)}&symbols=${encodeURIComponent(foreign)}`)
-  if (res.status === 404 || res.status === 422) throw new Error(`The European Central Bank publishes no ${foreign} rate.`)
-  if (!res.ok) throw new Error(`The rate service answered ${res.status}. Try again later.`)
+  if (res.status === 404 || res.status === 422) throw new Error(txt.errors.europeanCentralBankPublishesNo(foreign))
+  if (!res.ok) throw new Error(txt.errors.rateServiceAnsweredTryAgain(res.status))
   const json = (await res.json()) as { rates?: Record<string, Record<string, number>> }
   const found = Object.entries(json.rates ?? {}).filter(([date, rates]) => date <= day && rates[foreign] > 0).sort(([a], [b]) => (a < b ? -1 : 1)).at(-1)
-  if (!found) throw new Error(`The European Central Bank published no ${foreign} rate on or before ${day}.`)
+  if (!found) throw new Error(txt.errors.europeanCentralBankPublishedNo(foreign, day))
   return { rate: found[1][foreign], date: found[0] }
 }
 
@@ -224,18 +225,18 @@ export async function fetchDayRate(base: string, foreign: string, day: string, f
 export async function restoreEcbRate(store: Store, pair: string, month: MonthKey, fetchFn: typeof fetch = fetch): Promise<FetchResult> {
   const tables = await loadTables(store)
   const household = tables.household.find((h) => !h.deletedAt)
-  if (!household) throw new Error('No household yet')
+  if (!household) throw new Error(txt.errors.noHouseholdYet)
   const [base, symbol] = pair.split('/')
-  if (base !== household.baseCurrency) throw new Error(`Rates are fetched against ${household.baseCurrency}; ${pair} is not one of its pairs.`)
+  if (base !== household.baseCurrency) throw new Error(txt.errors.ratesFetchedAgainstNotOne(household.baseCurrency, pair))
   // fetch first: a failed fetch throws here and the stored rate stays; a fetched rate replaces it in one write
   const res = await fetchEcbRates(store, { base, symbols: [symbol], from: month, to: month, replaceSettled: true, byHand: true }, fetchFn)
-  if (res.unsupported.length) throw new Error(`The ECB does not publish ${symbol}. Keep entering its rate by hand.`)
+  if (res.unsupported.length) throw new Error(txt.errors.ecbDoesNotPublishKeep(symbol))
   if (res.written === 0) {
     // only a month the ECB cannot have yet (one to come) goes back to a forecast; otherwise what was typed stays
     if (compareMonths(month, monthOfDate()) > 0) {
       if (tables.fxRates.some((r) => r.pair === pair && r.month === month)) await setManualRate(store, pair, month, null)
     } else if (!tables.fxRates.some((r) => r.pair === pair && r.month === month && r.source === 'api')) {
-      throw new Error(`The ECB has no ${symbol} rate for that month yet; the one you typed stays.`)
+      throw new Error(txt.errors.ecbNoRateMonthYet(symbol))
     }
   }
   return res
@@ -247,8 +248,8 @@ export async function restoreEcbRate(store: Store, pair: string, month: MonthKey
  */
 export async function setPairForecast(store: Store, pair: string, change: number | null): Promise<void> {
   const household = (await loadTables(store)).household.find((h) => !h.deletedAt)
-  if (!household) throw new Error('No household yet')
-  if (change != null && !Number.isFinite(change)) throw new Error('The change per month is not a number.')
+  if (!household) throw new Error(txt.errors.noHouseholdYet)
+  if (change != null && !Number.isFinite(change)) throw new Error(txt.errors.changePerMonthNotNumber)
   const own = { ...(household.fxPairDrift ?? {}) }
   if (change == null) delete own[pair]
   else own[pair] = change

@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 /**
  * Everything cryptographic for cloud sync, on WebCrypto only.
  *
@@ -83,7 +84,7 @@ export function normalizeRecoveryCode(code: string): string {
 /** The key that wraps the household key for recovery, and a verifier the server can check without learning the code. */
 export async function recoveryKeys(code: string): Promise<{ recoveryKey: CryptoKey; verifier: string }> {
   const normalized = normalizeRecoveryCode(code)
-  if (normalized.length !== 26) throw new Error('A recovery code has 26 letters and digits.')
+  if (normalized.length !== 26) throw new Error(txt.errors.recoveryCodeLettersDigits)
   const ikm = await crypto.subtle.importKey('raw', base32Decode(normalized), 'HKDF', false, ['deriveBits', 'deriveKey'])
   const recoveryKey = await crypto.subtle.deriveKey(hkdf('casa-papel/recovery/v1'), ikm, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
   const verifier = toBase64Url(new Uint8Array(await crypto.subtle.deriveBits(hkdf('casa-papel/recovery-verify/v1'), ikm, 256)))
@@ -169,7 +170,7 @@ function base32Decode(chars: string): Uint8Array<ArrayBuffer> {
   const out: number[] = []
   for (const c of chars) {
     const idx = CROCKFORD.indexOf(c)
-    if (idx < 0) throw new Error(`Not a recovery code character: ${c}`)
+    if (idx < 0) throw new Error(txt.errors.notRecoveryCodeCharacter(c))
     value = (value << 5) | idx
     bits += 5
     if (bits >= 8) {

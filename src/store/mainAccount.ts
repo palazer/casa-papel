@@ -5,6 +5,7 @@
  * expenses can come out of it. A main account that was archived stays one, as the history of the line: its money
  * stays there (`engine/mainAccount.ts`).
  */
+import { txt } from '@/i18n'
 import { AccountSchema, HouseholdSchema, accountRef, compareMonths, movesInto, pocketLandsIn, type Account, type Tables } from '@/model'
 import { loadTables } from './actions'
 import { quoteNames } from './impact'
@@ -104,9 +105,9 @@ export function mainAccountChoice(tables: Tables): MainAccountChoice {
 export async function setMainAccount(store: Store, id: string | null): Promise<void> {
   const tables = await loadTables(store)
   const household = tables.household.find((h) => !h.deletedAt)
-  if (!household) throw new Error('No household yet')
+  if (!household) throw new Error(txt.errors.noHouseholdYet)
   const { eligible } = mainAccountChoice(tables)
-  if (id != null && !eligible.some((a) => a.id === id)) throw new Error(`The main account is an everyday account in the household's currency, ${household.baseCurrency}.`)
+  if (id != null && !eligible.some((a) => a.id === id)) throw new Error(txt.errors.mainAccountEverydayAccountHousehold(household.baseCurrency))
   const ts = Date.now()
   const out: Mutation[] = []
   if (id != null) {
@@ -131,9 +132,9 @@ export async function setMainAccount(store: Store, id: string | null): Promise<v
 export function mainAccountRefusal(tables: Tables, next: Account, before?: Account): string | null {
   if (next.type !== 'checking' || next.deletedAt || next.archivedMonth) return null
   const base = tables.household.find((h) => !h.deletedAt)?.baseCurrency
-  if (base && next.currency !== base) return `The main account is in the household's currency, ${base}. An account in ${next.currency} is an "Other current account".`
+  if (base && next.currency !== base) return txt.errors.mainAccountHouseholdSCurrency(base, next.currency)
   const other = tables.accounts.find((a) => a.id !== next.id && !a.deletedAt && !a.archivedMonth && a.type === 'checking')
-  if (other) return `"${next.name}" would be a second main account; the household has "${other.name}". Another everyday account is an "Other current account": it keeps a balance of its own.`
+  if (other) return txt.errors.wouldSecondMainAccountHousehold(next.name, other.name)
   if (before && before.type !== 'checking') {
     const ref = accountRef(before.id)
     const takes = new Set(tables.cells.filter((c) => c.items.some((i) => i.fundedBy === ref)).map((c) => c.rowId))
@@ -144,7 +145,7 @@ export function mainAccountRefusal(tables: Tables, next: Account, before?: Accou
     const names = [...new Set(named)]
     if (names.length) {
       const one = names.length === 1
-      return `${quoteNames(names)} ${one ? 'moves' : 'move'} money into "${before.name}" or out of it, and the main account is the month's money itself: that money would leave the plan. Point ${one ? 'it' : 'them'} at another account first.`
+      return txt.errors.mainAccountMovesMoney(quoteNames(names), one, before.name)
     }
   }
   return null

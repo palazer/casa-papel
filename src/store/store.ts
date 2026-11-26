@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 import {
   MetaSchema, SCHEMA_VERSION, TABLE_SCHEMAS, newId,
   type Meta, type StoreEvent, type TableName, type TableRecord,
@@ -44,7 +45,7 @@ export type CommitGuard = (mutations: Mutation[], opts: CommitOptions) => Promis
 /** "Cancel" to the question before a change alters the past: nothing is saved, and the dialog stays as it was. */
 export class PastChangeCancelled extends Error {
   constructor() {
-    super('Not saved: the months that are over stay as they were.')
+    super(txt.errors.notSavedMonthsOverStay)
     this.name = 'PastChangeCancelled'
   }
 }
@@ -56,7 +57,7 @@ export class PastChangeCancelled extends Error {
  */
 export class PastChangeStale extends Error {
   constructor() {
-    super('Something else was saved while the question was open. Nothing was saved: save again.')
+    super(txt.errors.somethingElseSavedWhileQuestion)
     this.name = 'PastChangeStale'
   }
 }

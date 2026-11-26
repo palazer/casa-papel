@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 import { cellKey, type EngineOutput } from '@/engine'
 import {
   RecurringItemSchema, cadenceOf, compareMonths, dayOfDate, isDue, monthOfDate, newId, repeatOf, sameRepeat,
@@ -50,7 +51,7 @@ const isCellPut = (m: Mutation, rowId: string, month: MonthKey) =>
 export function planRowMonthSave(stored: Tables, calculated: EngineOutput, rowId: string, month: MonthKey, save: RowMonthSave, ts: number): Mutation[] {
   const { tables, engine, pre } = rowInNewCurrency(stored, calculated, rowId, save.row, ts)
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
-  if (!row) throw new Error('That row is gone.')
+  if (!row) throw new Error(txt.errors.rowGone)
   const existing = tables.cells.find((c) => c.rowId === rowId && c.month === month)
   const before = new Map((existing?.items ?? []).map((i) => [i.id, i]))
   const muts: Mutation[] = []

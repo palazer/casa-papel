@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing'
 import { computeEngine, cellKey, sortRows, typedAmount, type EngineOutput } from '@/engine'
 import {
@@ -26,7 +27,7 @@ export async function loadTables(store: Store): Promise<Tables> {
 export async function engineUpTo(store: Store, month: MonthKey): Promise<{ tables: Tables; engine: EngineOutput; household: Household }> {
   const tables = await loadTables(store)
   const household = tables.household.find((h) => !h.deletedAt)
-  if (!household) throw new Error('No household yet')
+  if (!household) throw new Error(txt.errors.noHouseholdYet)
   return { tables, engine: engineFor(tables, household, month), household }
 }
 
@@ -260,10 +261,10 @@ export interface RowChange {
 export function categoryPlacement(tables: Tables, row: Row, categoryId: string | null): { categoryId: string | null; order: string } {
   if (categoryId) {
     const cat = tables.categories.find((c) => c.id === categoryId && !c.deletedAt)
-    if (!cat) throw new Error('That category no longer exists.')
-    if (cat.section !== row.section) throw new Error(`"${cat.name}" belongs to another section.`)
+    if (!cat) throw new Error(txt.errors.categoryNoLongerExists)
+    if (cat.section !== row.section) throw new Error(txt.errors.categoryInAnotherSection(cat.name))
   }
-  if (row.kind === 'category-estimate') throw new Error(`"${row.name}" is its category's estimate and stays with it.`)
+  if (row.kind === 'category-estimate') throw new Error(txt.errors.estimateStaysWithCategory(row.name))
   const group = sortRows(tables.rows.filter((r) => !r.deletedAt && r.id !== row.id && r.section === row.section && (r.categoryId ?? null) === categoryId), tables.categories)
   return { categoryId, order: generateKeyBetween(group.at(-1)?.order ?? null, null) }
 }
@@ -280,8 +281,8 @@ export function currencyHeldReason(tables: Tables, rowId: string, next: string |
   if (months.length === 0) return null
   const household = tables.household.find((h) => !h.deletedAt)
   const locale = household?.locale ?? 'en'
-  const where = months.length === 1 ? monthSpan(months, locale) : `${months.length} months, the first ${monthSpan(months.slice(0, 1), locale)}`
-  return `"${row.name}" has a conversion recorded in ${where}, so its currency stays ${row.currency ?? household?.baseCurrency ?? ''}. Remove the conversion there first.`
+  const where = months.length === 1 ? monthSpan(months, locale) : txt.errors.monthsTheFirst(months.length, monthSpan(months.slice(0, 1), locale))
+  return txt.errors.conversionHoldsCurrency(row.name, where, row.currency ?? household?.baseCurrency ?? '')
 }
 
 /** The row record that goes with a save of the row's dialog: one put for whatever changed on the row, none when nothing did. */
@@ -354,8 +355,8 @@ export function itemsFromCurrent(engineCell: { source: string; value: Money; ask
 export async function setItemStatus(store: Store, rowId: string, month: MonthKey, itemId: string, status: ItemStatus): Promise<void> {
   const tables = await loadTables(store)
   const cell = cellOf(tables, rowId, month)
-  if (!cell || cell.mode !== 'items') throw new Error('Cell has no items')
-  if (!cell.items.some((it) => it.id === itemId)) throw new Error('That item is gone.')
+  if (!cell || cell.mode !== 'items') throw new Error(txt.errors.cellNoItems)
+  if (!cell.items.some((it) => it.id === itemId)) throw new Error(txt.errors.itemGone)
   await store.commit([cellPut(cell, { rowId, month, items: cell.items.map((it) => (it.id === itemId ? { ...it, status } : it)) }, now())], NO_QUESTION)
 }
 
@@ -377,7 +378,7 @@ function groupRows(tables: Tables, r: Pick<Row, 'section' | 'categoryId'>): Row[
 export function newRowMutation(tables: Tables, input: Partial<Row> & { name: string; section: Row['section'] }, afterRowId?: string): { row: Row; mutation: Mutation } {
   const after = afterRowId ? tables.rows.find((r) => r.id === afterRowId && !r.deletedAt) : undefined
   const categoryId = input.categoryId !== undefined ? input.categoryId : after?.categoryId ?? null
-  if (categoryId && groupKey(tables, { section: input.section, categoryId }) === null) throw new Error('That category is not in this section.')
+  if (categoryId && groupKey(tables, { section: input.section, categoryId }) === null) throw new Error(txt.errors.categoryNotSection)
   const list = groupRows(tables, { section: input.section, categoryId })
   let prev: string | null = list.length ? list[list.length - 1].order : null
   let next: string | null = null
@@ -445,9 +446,9 @@ export interface RowOfKindInput {
 
 /** What a row is called when no name was typed: after the account it fills, takes from or pays off. */
 export function rowNameFor(kind: RowOfKindInput['kind'], target: string): string {
-  if (kind === 'from-savings' || kind === 'from-investment') return `From ${target}`
-  if (kind === 'pay-off') return `${target} – Payment`
-  return `To ${target}`
+  if (kind === 'from-savings' || kind === 'from-investment') return txt.names.rowFrom(target)
+  if (kind === 'pay-off') return txt.names.rowPaysOff(target)
+  return txt.names.rowTo(target)
 }
 
 /** The row that pays a loan or a card off is a row under Expenses: what `addRowOfKind` is asked for. */
@@ -488,7 +489,7 @@ export function rowOfKindMutations(tables: Tables, input: RowOfKindInput): { row
   const targets = rowTargets(tables, tables.household.find((h) => !h.deletedAt))
   const transferOnly: string[] = ['to-savings', 'to-investment', 'pool-allocation', 'pocket-money', 'from-savings', 'from-investment']
   if ((input.section === 'expense' && transferOnly.includes(input.kind)) || (input.section === 'transfer' && input.kind === 'pay-off')) {
-    throw new Error('That kind of row does not belong in this section.')
+    throw new Error(txt.errors.rowKindNotInSection)
   }
   const typed = input.name.trim()
   const base: Partial<Row> & { name: string; section: Row['section'] } = { name: typed, section: input.section, categoryId: input.categoryId, kind: input.kind === 'pay-off' ? 'plain' : input.kind }
@@ -496,14 +497,14 @@ export function rowOfKindMutations(tables: Tables, input: RowOfKindInput): { row
   if (input.kind !== 'plain') base.defaultStatus = 'committed'
   if (input.kind === 'pay-off') {
     const acc = tables.accounts.find((a) => a.id === input.accountId && !a.deletedAt)
-    if (!acc) throw new Error('Pick the loan or card this row pays off.')
-    if (acc.archivedMonth) throw new Error(`"${acc.name}" is archived.`)
-    if (!targets.payoff.some((a) => a.id === acc.id)) throw new Error(`"${acc.name}" is not a loan or a credit card.`)
+    if (!acc) throw new Error(txt.errors.pickLoanCardRowPays)
+    if (acc.archivedMonth) throw new Error(txt.errors.archived(acc.name))
+    if (!targets.payoff.some((a) => a.id === acc.id)) throw new Error(txt.errors.notLoanCreditCard(acc.name))
     base.kind = payOffKindOf(acc)
     base.accountId = acc.id
     nameAfter(acc.name)
   } else if (input.kind === 'to-savings' || input.kind === 'to-investment' || input.kind === 'from-savings' || input.kind === 'from-investment') {
-    const acc = checkAccountForRow(tables, { kind: input.kind, name: typed || 'The new row' }, input.accountId ?? null)
+    const acc = checkAccountForRow(tables, { kind: input.kind, name: typed || txt.errors.theNewRow }, input.accountId ?? null)
     if (acc) {
       base.accountId = acc.id
       nameAfter(acc.name)
@@ -512,27 +513,27 @@ export function rowOfKindMutations(tables: Tables, input: RowOfKindInput): { row
     if (input.kind === 'to-savings' && targets.plugTaken) base.rule = 'fixed'
   } else if (input.kind === 'plain' && input.section === 'transfer' && input.accountId) {
     // a row that moves money into another account: the account it names receives the amount, and may name the row
-    const acc = checkAccountForRow(tables, { kind: 'plain', section: 'transfer', name: typed || 'The new row' }, input.accountId)
+    const acc = checkAccountForRow(tables, { kind: 'plain', section: 'transfer', name: typed || txt.errors.theNewRow }, input.accountId)
     if (acc) {
       base.accountId = acc.id
       nameAfter(acc.name)
     }
   } else if (input.kind === 'pocket-money') {
     const adult = targets.adults.find((e) => e.id === input.adultId)
-    if (!adult) throw new Error('Pick the adult the pocket money is for.')
+    if (!adult) throw new Error(txt.errors.pickAdultPocketMoney)
     Object.assign(base, { scope: adult.id, entityTags: [adult.id], pocketMode: 'fixed' })
   }
   let pool: Pool | undefined
   if (input.kind === 'pool-allocation') {
     const found = tables.pools.find((p) => p.id === input.poolId && !p.deletedAt)
-    if (!found) throw new Error('Pick the virtual account this row fills.')
-    if (found.archivedMonth) throw new Error(`"${found.name}" is archived.`)
-    if (!targets.orphanPools.some((p) => p.id === found.id)) throw new Error(`"${found.name}" is already filled by another row.`)
+    if (!found) throw new Error(txt.errors.pickVirtualAccountRowFills)
+    if (found.archivedMonth) throw new Error(txt.errors.archived(found.name))
+    if (!targets.orphanPools.some((p) => p.id === found.id)) throw new Error(txt.errors.alreadyFilledAnotherRow(found.name))
     base.accountId = found.accountId
     nameAfter(found.name)
     pool = found
   }
-  if (!base.name) throw new Error('Give the row a name.')
+  if (!base.name) throw new Error(txt.errors.giveRowName)
   const { row, mutation } = newRowMutation(tables, base)
   const mutations: Mutation[] = [mutation]
   if (pool) mutations.push({ op: 'put', table: 'pools', record: PoolSchema.parse({ ...pool, allocationRowId: row.id, updatedAt: now() }) })
@@ -551,7 +552,7 @@ export async function addRowOfKind(store: Store, input: RowOfKindInput): Promise
 // ---------- category estimates ----------
 
 /** The row that carries a category's estimate; the Grid shows it by this name. */
-export const estimateRowName = (category: Pick<Category, 'name'>): string => `${category.name} – Not broken down yet`
+export const estimateRowName = (category: Pick<Category, 'name'>): string => txt.names.estimateRow(category.name)
 
 /** A category's estimate row, archived or not; there is one per category at most. */
 export const estimateRowOf = (tables: Tables, categoryId: string): Row | undefined =>
@@ -566,8 +567,8 @@ export const estimateRowOf = (tables: Tables, categoryId: string): Row | undefin
  * Pure; the caller commits, so a new category and its estimate can be one step.
  */
 export function categoryEstimateMutations(tables: Tables, category: Category, month: MonthKey, amount: Money, scope: EditScope, engine: EngineOutput | null = null): { row: Row; mutations: Mutation[] } {
-  if (category.section !== 'expense') throw new Error('Only an expense category can have an estimate.')
-  if (!Number.isFinite(amount) || amount < 0) throw new Error('An estimate cannot be below zero.')
+  if (category.section !== 'expense') throw new Error(txt.errors.onlyExpenseCategoryEstimate)
+  if (!Number.isFinite(amount) || amount < 0) throw new Error(txt.errors.estimateCannotBelowZero)
   const mutations: Mutation[] = []
   let row = estimateRowOf(tables, category.id)
   if (!row) {
@@ -595,7 +596,7 @@ export function categoryEstimateMutations(tables: Tables, category: Category, mo
 export async function setCategoryEstimate(store: Store, categoryId: string, month: MonthKey, amount: Money, scope: EditScope = 'from-now-on'): Promise<Row> {
   const { tables, engine } = await engineUpTo(store, month)
   const category = tables.categories.find((c) => c.id === categoryId && !c.deletedAt)
-  if (!category) throw new Error('That category no longer exists.')
+  if (!category) throw new Error(txt.errors.categoryNoLongerExists)
   const { row, mutations } = categoryEstimateMutations(tables, category, month, amount, scope, engine)
   await store.commit(mutations)
   return row
@@ -604,7 +605,7 @@ export async function setCategoryEstimate(store: Store, categoryId: string, mont
 export async function updateRow(store: Store, rowId: string, patch: Partial<Omit<Row, 'id' | 'createdAt'>>): Promise<void> {
   const tables = await loadTables(store)
   const row = tables.rows.find((r) => r.id === rowId)
-  if (!row) throw new Error('Row not found')
+  if (!row) throw new Error(txt.errors.rowNotFound)
   const ts = now()
   const held = patch.currency !== undefined ? currencyHeldReason(tables, rowId, patch.currency) : null
   if (held) throw new Error(held)
@@ -620,7 +621,7 @@ export const renameRow = (store: Store, rowId: string, name: string) => updateRo
 export async function moveRow(store: Store, rowId: string, direction: 'up' | 'down'): Promise<void> {
   const tables = await loadTables(store)
   const row = tables.rows.find((r) => r.id === rowId)
-  if (!row) throw new Error('Row not found')
+  if (!row) throw new Error(txt.errors.rowNotFound)
   const list = groupRows(tables, row)
   const i = list.findIndex((r) => r.id === rowId)
   const j = direction === 'up' ? i - 1 : i + 1
@@ -647,16 +648,16 @@ export async function quickCreateHousehold(store: Store, input: QuickHousehold):
   // made since rule B9: there is nothing from before it to put right
   const household = HouseholdSchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, askMainAccount: false, ...input })
   const savings: Account = AccountSchema.parse({
-    id: newId(), createdAt: ts, updatedAt: ts, name: 'Savings', type: 'savings', currency: input.baseCurrency,
+    id: newId(), createdAt: ts, updatedAt: ts, name: txt.names.starter.savings, type: 'savings', currency: input.baseCurrency,
     openingBalance: 0, openingMonth: input.startMonth, tracked: true,
   })
   const starters: Array<Partial<Row> & { name: string; section: Row['section'] }> = [
-    { name: 'Salary', section: 'income', kind: 'salary', defaultStatus: 'committed' },
-    { name: 'Other income', section: 'income' },
-    { name: 'Rent', section: 'expense', defaultStatus: 'committed' },
-    { name: 'Groceries', section: 'expense' },
-    { name: 'Other', section: 'expense' },
-    { name: 'To savings', section: 'transfer', kind: 'to-savings', accountId: savings.id, defaultStatus: 'committed' },
+    { name: txt.names.starter.salary, section: 'income', kind: 'salary', defaultStatus: 'committed' },
+    { name: txt.names.starter.otherIncome, section: 'income' },
+    { name: txt.names.starter.rent, section: 'expense', defaultStatus: 'committed' },
+    { name: txt.names.starter.groceries, section: 'expense' },
+    { name: txt.names.starter.other, section: 'expense' },
+    { name: txt.names.starter.toSavings, section: 'transfer', kind: 'to-savings', accountId: savings.id, defaultStatus: 'committed' },
   ]
   let prev: string | null = null
   const rows = starters.map((s) => {
@@ -675,7 +676,7 @@ export async function quickCreateHousehold(store: Store, input: QuickHousehold):
 export async function updateHousehold(store: Store, patch: Partial<Omit<Household, 'id' | 'createdAt'>>): Promise<void> {
   const tables = await loadTables(store)
   const h = tables.household.find((x) => !x.deletedAt)
-  if (!h) throw new Error('No household yet')
+  if (!h) throw new Error(txt.errors.noHouseholdYet)
   await store.commit([{ op: 'put', table: 'household', record: HouseholdSchema.parse({ ...h, ...patch, updatedAt: now() }) }])
 }
 
@@ -683,7 +684,7 @@ export async function updateHousehold(store: Store, patch: Partial<Omit<Househol
 export async function addPlanYear(store: Store, today: MonthKey = monthOfDate()): Promise<MonthKey> {
   const tables = await loadTables(store)
   const household = tables.household.find((h) => !h.deletedAt)
-  if (!household) throw new Error('No household yet')
+  if (!household) throw new Error(txt.errors.noHouseholdYet)
   const planUntil = monthKey(parseMonth(planEnd(household, tables, today)).year + 1, 12)
   await store.commit([{ op: 'put', table: 'household', record: HouseholdSchema.parse({ ...household, planUntil, updatedAt: now() }) }])
   return planUntil
@@ -736,7 +737,7 @@ export function countDoneMutations(tables: Tables, engine: EngineOutput, month: 
 export async function setCellDone(store: Store, rowId: string, month: MonthKey, done: boolean): Promise<void> {
   const { tables, engine } = await engineUpTo(store, month)
   const row = tables.rows.find((r) => r.id === rowId)
-  if (!row) throw new Error('Row not found')
+  if (!row) throw new Error(txt.errors.rowNotFound)
   const mutations = lineDoneMutations(tables, engine, row, month, done, now())
   if (mutations.length) await store.commit(mutations, NO_QUESTION)
 }
@@ -760,7 +761,7 @@ export type MonthlyDefaultScope = 'from-now-on' | 'this-month' | 'all-months'
 export async function setMonthlyDefault(store: Store, value: Money, scope: MonthlyDefaultScope, month: MonthKey): Promise<void> {
   const tables = await loadTables(store)
   const household = tables.household.find((h) => !h.deletedAt)
-  if (!household) throw new Error('No household yet')
+  if (!household) throw new Error(txt.errors.noHouseholdYet)
   const states = new Map(tables.monthStates.map((s) => [s.month, s]))
   const ts = now()
   const mutations: Mutation[] = []
@@ -797,8 +798,8 @@ export type RowSourceScope = { from: MonthKey } | 'all-months'
 export async function setRowFundedBy(store: Store, rowId: string, fundedBy: FundedBy, scope: RowSourceScope): Promise<void> {
   const tables = await loadTables(store)
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
-  if (!row) throw new Error('Row not found')
-  if (row.section !== 'expense') throw new Error('Only spending rows have a source.')
+  if (!row) throw new Error(txt.errors.rowNotFound)
+  if (row.section !== 'expense') throw new Error(txt.errors.onlySpendingRowsSource)
   const mutations = planRowFundedBy(tables, row, fundedBy, scope, now())
   refuseThirdCurrency(tables, mutations)
   await store.commit(mutations)
@@ -807,18 +808,18 @@ export async function setRowFundedBy(store: Store, rowId: string, fundedBy: Fund
 /** The mutations behind `setRowFundedBy`; archiving an account or a virtual account uses them too. */
 export function planRowFundedBy(tables: Tables, row: Row, fundedBy: FundedBy, scope: RowSourceScope, ts: number): Mutation[] {
   const poolId = poolIdOf(fundedBy)
-  if (poolId && !tables.pools.some((p) => p.id === poolId && !p.deletedAt)) throw new Error('That virtual account no longer exists.')
+  if (poolId && !tables.pools.some((p) => p.id === poolId && !p.deletedAt)) throw new Error(txt.errors.virtualAccountNoLongerExists)
   const accountId = accountIdOf(fundedBy)
   if (accountId) {
     const acc = tables.accounts.find((a) => a.id === accountId && !a.deletedAt)
-    if (!acc) throw new Error('That account no longer exists.')
-    if (!paysExpenses(acc)) throw new Error(`An expense cannot come straight out of "${acc.name}": pick a savings account, an investment account or an other asset.`)
-    if (acc.archivedMonth && fundedBy !== row.defaultFundedBy) throw new Error(`"${acc.name}" is archived: pick an account that is still open.`)
+    if (!acc) throw new Error(txt.errors.accountNoLongerExists)
+    if (!paysExpenses(acc)) throw new Error(txt.errors.expenseCannotComeStraightOut(acc.name))
+    if (acc.archivedMonth && fundedBy !== row.defaultFundedBy) throw new Error(txt.errors.archivedPickAccountStillOpen(acc.name))
   }
   const mutations: Mutation[] = []
   if (scope !== 'all-months' && fundedBy !== row.defaultFundedBy) {
     const household = tables.household.find((h) => !h.deletedAt)
-    if (!household) throw new Error('No household yet')
+    if (!household) throw new Error(txt.errors.noHouseholdYet)
     if (compareMonths(household.startMonth, scope.from) < 0) {
       const months = monthRange(household.startMonth, addMonths(scope.from, -1))
       const engine = computeEngine({ tables, months })
@@ -840,16 +841,16 @@ export function planRowFundedBy(tables: Tables, row: Row, fundedBy: FundedBy, sc
 
 /** Why a row has no amount of its own to mirror or replace, or null when it is an ordinary row. */
 export function derivedRowReason(row: Row, closingRule: Household['closingRule']): string | null {
-  if (row.kind === 'category-estimate') return `"${row.name}" is what is left of its category's estimate.`
+  if (row.kind === 'category-estimate') return txt.errors.estimateRest(row.name)
   const rule = row.rule ?? null
   if (canCarryRule(row) && isShareRule(rule)) {
-    return `"${row.name}" is worked out by its rule: ${sharePercent(row.ruleShare ?? 0)} of ${rule === 'share-of-income' ? 'income' : rule === 'share-of-own-income' ? 'their own income' : rule === 'share-of-row' ? 'one income line' : 'what is left'}.`
+    return txt.errors.workedOutByRule(row.name, sharePercent(row.ruleShare ?? 0), rule)
   }
   // the row that takes the rest (a transfer to any account), and under the first-savings-row default the idle ones
   // beside it; a savings row with a fixed amount is typed like any other
   const takesRest = closingRule === 'savings-plug' && ((canTakeRest(row) && rule === 'rest') || (row.kind === 'to-savings' && rule !== 'fixed'))
-  if (takesRest) return `"${row.name}" is worked out by the app from the rest of the month.`
-  if (isOldPocketShare(row)) return `"${row.name}" is a share of the pocket money total the household had before. Give it an amount or a rule of its own: row menu, "Rule…".`
+  if (takesRest) return txt.errors.workedOutFromRest(row.name)
+  if (isOldPocketShare(row)) return txt.errors.oldPocketShare(row.name)
   return null
 }
 
@@ -857,21 +858,21 @@ export function derivedRowReason(row: Row, closingRule: Household['closingRule']
 export async function followRow(store: Store, rowId: string, targetId: string | null, share: number | null = null): Promise<void> {
   const tables = await loadTables(store)
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
-  if (!row) throw new Error('Row not found')
+  if (!row) throw new Error(txt.errors.rowNotFound)
   if (targetId) {
     const household = tables.household.find((h) => !h.deletedAt)
     const rule = household?.closingRule ?? 'savings-plug'
     const own = derivedRowReason(row, rule)
-    if (own) throw new Error(`${own} It cannot follow another row.`)
-    if (targetId === rowId) throw new Error('A row cannot follow itself.')
+    if (own) throw new Error(txt.errors.cannotFollowAnotherRow(own))
+    if (targetId === rowId) throw new Error(txt.errors.rowCannotFollowItself)
     const target = tables.rows.find((r) => r.id === targetId && !r.deletedAt)
-    if (!target) throw new Error('Pick a row to follow.')
+    if (!target) throw new Error(txt.errors.pickRowFollow)
     const why = derivedRowReason(target, rule)
-    if (why) throw new Error(`${why} It cannot be followed.`)
-    if (target.followsRowId) throw new Error(`"${target.name}" follows another row itself. Follow that row instead.`)
-    if (target.archivedMonth) throw new Error(`"${target.name}" is archived.`)
-    if (tables.rows.some((r) => !r.deletedAt && r.followsRowId === rowId)) throw new Error(`Another row already follows "${row.name}". Chains are not supported.`)
-    if (share != null && !(share > 0)) throw new Error('A share must be above zero, like 0.25 for a quarter.')
+    if (why) throw new Error(txt.errors.cannotBeFollowed(why))
+    if (target.followsRowId) throw new Error(txt.errors.followsAnotherRowItselfFollow(target.name))
+    if (target.archivedMonth) throw new Error(txt.errors.archived(target.name))
+    if (tables.rows.some((r) => !r.deletedAt && r.followsRowId === rowId)) throw new Error(txt.errors.anotherRowAlreadyFollowsChains(row.name))
+    if (share != null && !(share > 0)) throw new Error(txt.errors.shareMustAboveZeroLike)
   }
   // the whole amount is stored as null, so "= Salary" and "= 100% of Salary" are one state
   const followShare = targetId && share != null && share !== 1 ? share : null
@@ -894,8 +895,8 @@ function scopePatch(row: Row, scope: string): Pick<Row, 'scope' | 'entityTags'> 
 export async function setRowScope(store: Store, rowId: string, scope: string): Promise<void> {
   const tables = await loadTables(store)
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
-  if (!row) throw new Error('Row not found')
-  if (scope !== 'shared' && !tables.entities.some((e) => e.id === scope && !e.deletedAt)) throw new Error('That person or thing no longer exists.')
+  if (!row) throw new Error(txt.errors.rowNotFound)
+  if (scope !== 'shared' && !tables.entities.some((e) => e.id === scope && !e.deletedAt)) throw new Error(txt.errors.personThingNoLongerExists)
   const ts = now()
   const mutations: Mutation[] = [{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, ...scopePatch(row, scope), updatedAt: ts }) }]
   if (row.section === 'income') {
@@ -908,15 +909,15 @@ export async function setRowScope(store: Store, rowId: string, scope: string): P
 export async function setRowDeductedFrom(store: Store, rowId: string, incomeRowId: string | null): Promise<void> {
   const tables = await loadTables(store)
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
-  if (!row) throw new Error('Row not found')
-  if (row.section !== 'expense') throw new Error('Only spending rows can be deducted from an income.')
+  if (!row) throw new Error(txt.errors.rowNotFound)
+  if (row.section !== 'expense') throw new Error(txt.errors.onlySpendingRowsDeductedIncome)
   let patch: Partial<Row> = { deductedFromRowId: null }
   if (incomeRowId) {
     const target = tables.rows.find((r) => r.id === incomeRowId && !r.deletedAt)
-    if (!target || target.section !== 'income') throw new Error('Pick an income row to deduct from.')
+    if (!target || target.section !== 'income') throw new Error(txt.errors.pickIncomeRowDeduct)
     const why = derivedRowReason(target, tables.household.find((h) => !h.deletedAt)?.closingRule ?? 'savings-plug')
-    if (why) throw new Error(`${why} Nothing can be deducted from it.`)
-    if (target.archivedMonth) throw new Error(`"${target.name}" is archived.`)
+    if (why) throw new Error(txt.errors.nothingCanBeDeducted(why))
+    if (target.archivedMonth) throw new Error(txt.errors.archived(target.name))
     patch = { deductedFromRowId: target.id, ...(target.scope !== 'shared' ? scopePatch(row, target.scope) : {}) }
   }
   await store.commit([{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, ...patch, updatedAt: now() }) }])
@@ -948,10 +949,10 @@ export function fitsRow(row: Pick<Row, 'kind'>, account: Pick<Account, 'type'>):
 export async function setRowAccount(store: Store, rowId: string, accountId: string | null): Promise<void> {
   const tables = await loadTables(store)
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
-  if (!row) throw new Error('Row not found')
+  if (!row) throw new Error(txt.errors.rowNotFound)
   const acc = checkAccountForRow(tables, row, accountId)
   if (acc && row.section === 'expense' && accountTypeForRow(row) == null && acc.id !== row.accountId) {
-    throw new Error(`"${row.name}" is an expense, and an expense names no account. To say it comes out of "${acc.name}", use "Comes out of…"; that it is paid with a card is said under "Usually paid…".`)
+    throw new Error(txt.errors.expenseNamesNoAccount(row.name, acc.name))
   }
   // a payment row is stored with the kind of the account it pays: a loan's or a card's
   const fit = acc && isPayOffRow(row) ? payOffPatches(tables, [row], () => payOffKindOf(acc)).get(row.id) : undefined
@@ -963,21 +964,21 @@ function checkAccountForRow(tables: Tables, row: Pick<Row, 'kind' | 'name'> & { 
   const need = accountTypeForRow(row)
   const label = (t: Account['type']) => ACCOUNT_TYPE_INFO.find((i) => i.value === t)?.label ?? t
   if (!accountId) {
-    if (need) throw new Error(`"${row.name}" needs an account of type ${label(need)}.`)
+    if (need) throw new Error(txt.errors.needsAccountType(row.name, label(need)))
     return null
   }
   const acc = tables.accounts.find((a) => a.id === accountId && !a.deletedAt)
-  if (!acc) throw new Error('That account no longer exists.')
-  if (acc.archivedMonth) throw new Error(`"${acc.name}" is archived.`)
-  if (need && !fitsRow(row, acc)) throw new Error(`"${row.name}" needs ${isPayOffRow(row) ? 'a loan or a credit card' : `an account of type ${label(need)}`}, and "${acc.name}" is of type ${label(acc.type)}.`)
+  if (!acc) throw new Error(txt.errors.accountNoLongerExists)
+  if (acc.archivedMonth) throw new Error(txt.errors.archived(acc.name))
+  if (need && !fitsRow(row, acc)) throw new Error(isPayOffRow(row) ? txt.errors.needsLoanOrCard(row.name, acc.name, label(acc.type)) : txt.errors.needsOtherType(row.name, label(need), acc.name, label(acc.type)))
   // a row that moves money sends it into the account it names, so only an account with a balance of its own can be named
   if (row.kind === 'plain' && row.section === 'transfer' && !holdsBalance(acc)) {
-    throw new Error(`"${acc.name}" has no balance of its own for the money to go into. Pick a savings account, an investment account, an other current account, cash or another asset, or no account: the money then leaves the plan.`)
+    throw new Error(txt.errors.noBalanceOwnMoneyGo(acc.name))
   }
   // pocket money is the adult's own: it lands only in an account that net worth leaves out, and one with a balance
   if (row.kind === 'pocket-money') {
-    if (!isOutsideNetWorth(acc)) throw new Error(`Pocket money can only land in an account that is left out of net worth. Tick "Leave out of net worth" in the form of "${acc.name}" first.`)
-    if (!ownBalance(acc)) throw new Error(`"${acc.name}" has no balance of its own for the pocket money to land in. Tick "Track the balance" in its form first.`)
+    if (!isOutsideNetWorth(acc)) throw new Error(txt.errors.pocketMoneyOnlyLandAccount(acc.name))
+    if (!ownBalance(acc)) throw new Error(txt.errors.noBalanceOwnPocketMoney(acc.name))
   }
   return acc
 }

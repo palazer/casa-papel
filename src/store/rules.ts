@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 import { cellKey, computeEngine, sortRows, type EngineOutput } from '@/engine'
 import {
   HouseholdSchema, PoolSchema, RowSchema, addMonths, canCarryRule, canTakeRest, compareMonths, isOldPocketShare, isPocketRow, isTakenFromAccount, monthRange, poolRowName,
@@ -29,21 +30,21 @@ export type RuleTarget = { rowId: string } | { accountId: string } | { poolId: s
 export function ruleRowOf(tables: Tables, target: RuleTarget): Row | null {
   if ('rowId' in target) {
     const row = tables.rows.find((r) => r.id === target.rowId && !r.deletedAt)
-    if (!row) throw new Error('Row not found')
+    if (!row) throw new Error(txt.errors.rowNotFound)
     return row
   }
   if ('poolId' in target) {
     const pool = tables.pools.find((p) => p.id === target.poolId && !p.deletedAt)
-    if (!pool) throw new Error('That virtual account no longer exists.')
-    if (pool.archivedMonth) throw new Error(`"${pool.name}" is archived.`)
+    if (!pool) throw new Error(txt.errors.virtualAccountNoLongerExists)
+    if (pool.archivedMonth) throw new Error(txt.errors.archived(pool.name))
     return tables.rows.find((r) => !r.deletedAt && r.id === pool.allocationRowId) ?? null
   }
   const acc = tables.accounts.find((a) => a.id === target.accountId && !a.deletedAt)
-  if (!acc) throw new Error('That account no longer exists.')
-  if (acc.archivedMonth) throw new Error(`"${acc.name}" is archived.`)
-  if (acc.type !== 'savings' && acc.type !== 'investment') throw new Error(`"${acc.name}" is not a savings or an investment account, so no rule moves money to it.`)
+  if (!acc) throw new Error(txt.errors.accountNoLongerExists)
+  if (acc.archivedMonth) throw new Error(txt.errors.archived(acc.name))
+  if (acc.type !== 'savings' && acc.type !== 'investment') throw new Error(txt.errors.notSavingsInvestmentAccountNo(acc.name))
   const feeding = rowsFeeding(tables.rows, acc)
-  if (feeding.length > 1) throw new Error(`Several rows move money to "${acc.name}": ${feeding.map((r) => r.name).join(', ')}. Set the rule on one of them.`)
+  if (feeding.length > 1) throw new Error(txt.errors.severalRowsFeed(acc.name, feeding.map((r) => r.name)))
   return feeding[0] ?? null
 }
 
@@ -71,13 +72,13 @@ function makeRuleRow(tables: Tables, target: { accountId: string } | { poolId: s
  */
 export function ruleMutations(tables: Tables, target: RuleTarget, choice: RuleChoice, from: MonthKey, ts: number = Date.now()): { row: Row; mutations: Mutation[] } {
   const household = tables.household.find((h) => !h.deletedAt)
-  if (!household) throw new Error('No household yet')
+  if (!household) throw new Error(txt.errors.noHouseholdYet)
   if (choice.kind === 'fixed') {
-    if (!Number.isFinite(choice.amount) || choice.amount < 0) throw new Error('The amount cannot be below zero.')
+    if (!Number.isFinite(choice.amount) || choice.amount < 0) throw new Error(txt.errors.amountCannotBelowZero)
   } else if (choice.kind !== 'rest' && !(choice.share > 0 && choice.share <= 1)) {
-    throw new Error('The percentage must be above 0 and at most 100.')
+    throw new Error(txt.errors.percentageMustAboveMost)
   }
-  if (compareMonths(from, household.startMonth) < 0) throw new Error(`The household starts in ${household.startMonth}; a rule cannot start before that.`)
+  if (compareMonths(from, household.startMonth) < 0) throw new Error(txt.errors.householdStartsRuleCannotStart(household.startMonth))
 
   const mutations: Mutation[] = []
   let working = tables
@@ -89,18 +90,18 @@ export function ruleMutations(tables: Tables, target: RuleTarget, choice: RuleCh
     working = applyMutations(tables, made.mutations)
   }
   const row = found
-  if (!canCarryRule(row)) throw new Error(`"${row.name}" cannot have a rule: only pocket money and the transfer to a savings account, an investment account or a virtual account can.`)
-  if (choice.kind === 'rest' && !canTakeRest(row)) throw new Error('Pocket money cannot take the rest of the month. Give it an amount or a percentage.')
+  if (!canCarryRule(row)) throw new Error(txt.errors.cannotRuleOnlyPocketMoney(row.name))
+  if (choice.kind === 'rest' && !canTakeRest(row)) throw new Error(txt.errors.pocketMoneyCannotTakeRest)
   if (choice.kind === 'share-of-own-income') {
-    if (!isPocketRow(row)) throw new Error(`Only pocket money can be a percentage of an adult's own income; "${row.name}" is not pocket money.`)
+    if (!isPocketRow(row)) throw new Error(txt.errors.onlyPocketMoneyPercentageAdult(row.name))
     const adult = tables.entities.find((e) => e.id === row.scope && !e.deletedAt && e.kind === 'adult')
-    if (!adult) throw new Error(`"${row.name}" does not belong to an adult. Say who it is for first: row menu, "Belongs to…".`)
+    if (!adult) throw new Error(txt.errors.doesNotBelongAdultSay(row.name))
   }
   if (choice.kind === 'share-of-row') {
     const of = working.rows.find((r) => r.id === choice.rowId && !r.deletedAt)
-    if (!of) throw new Error('Pick the income the percentage is taken of.')
-    if (of.section !== 'income' || isTakenFromAccount(of)) throw new Error(`"${of.name}" is not an income line, so there is nothing to take a percentage of.`)
-    if (of.archivedMonth && compareMonths(of.archivedMonth, from) <= 0) throw new Error(`"${of.name}" is archived in ${from}. Pick an income that is still coming in.`)
+    if (!of) throw new Error(txt.errors.pickIncomePercentageTaken)
+    if (of.section !== 'income' || isTakenFromAccount(of)) throw new Error(txt.errors.notIncomeLineThereNothing(of.name))
+    if (of.archivedMonth && compareMonths(of.archivedMonth, from) <= 0) throw new Error(txt.errors.archivedPickIncomeStillComing(of.name, from))
   }
 
   const liveRows = sortRows(working.rows.filter((r) => !r.deletedAt), working.categories)
@@ -111,7 +112,7 @@ export function ruleMutations(tables: Tables, target: RuleTarget, choice: RuleCh
     const others = liveRows.filter((r) => r.id !== row.id && before.byRow.get(r.id)?.kind === 'share-of-rest')
     const total = others.reduce((sum, r) => sum + (before.byRow.get(r.id)?.share ?? 0), 0) + choice.share
     if (total > 1.000001) {
-      throw new Error(`With ${others.map((r) => `"${r.name}"`).join(' and ')} the percentages of what is left would add up to ${sharePercent(total)}. Together they can take 100% at most.`)
+      throw new Error(txt.errors.sharesOfRestOver(others.map((r) => r.name), sharePercent(total)))
     }
   }
 

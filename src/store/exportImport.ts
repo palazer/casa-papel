@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 import {
   ExportFileSchema, SCHEMA_VERSION, TABLE_SCHEMAS, migrateExport, newId,
   type ExportFile, type StoreEvent, type Tables,
@@ -39,7 +40,7 @@ export function exportFileName(householdName: string, when: Date = new Date()): 
 /** Parse, migrate and validate a file produced by exportSnapshot. */
 export function parseExportFile(raw: unknown): ExportFile {
   if (typeof raw !== 'object' || raw === null || (raw as { format?: unknown }).format !== 'casa-papel') {
-    throw new Error('This is not a Casa Papel export file.')
+    throw new Error(txt.errors.notCasaPapelExportFile)
   }
   return ExportFileSchema.parse(migrateExport(raw))
 }

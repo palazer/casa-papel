@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 import { cellKey, computeEngine, typedAmount } from '@/engine'
 import {
   RecurringItemSchema, addMonths, compareMonths, dateOn, isDue, monthOfDate, monthRange, newId,
@@ -222,7 +223,7 @@ const afterMovedEnd = (was: MonthKey | null, now: MonthKey | null) => (m: MonthK
 export async function updateRecurringItem(store: Store, id: string, patch: Partial<RecurringInput>, newRow?: RecurringNewRow): Promise<void> {
   const tables = await loadTables(store)
   const item = tables.recurringItems.find((r) => r.id === id)
-  if (!item) throw new Error('Recurring item not found')
+  if (!item) throw new Error(txt.errors.recurringItemNotFound)
   const ts = now()
   const today = monthOfDate()
   const mutations: Mutation[] = []
@@ -266,7 +267,7 @@ export async function updateRecurringItem(store: Store, id: string, patch: Parti
   }
   if (!runsOn) {
     const locale = tables.household.find((h) => !h.deletedAt)?.locale ?? 'en'
-    throw new Error(`"${item.name}" ${ended ? 'ended' : 'would end'} in ${monthSpan([end!], locale)}, and a change made here counts from ${monthSpan([today], locale)} on. Change the amount of a month that is over in that month, or give the schedule a later last month to run it again.`)
+    throw new Error(txt.errors.scheduleOver(item.name, ended, monthSpan([end!], locale), monthSpan([today], locale)))
   }
   // it runs through the current month: the months before keep what it posted, a copy with the new values starts here
   const kept: RecurringItem = { ...item, name: next.name, accountId: next.accountId, scope: next.scope, notes: next.notes, startMonth: start }
@@ -299,7 +300,7 @@ function planReactivate(tables: Tables, item: RecurringItem, today: MonthKey, en
 export async function reactivateRecurringItem(store: Store, id: string): Promise<void> {
   const tables = await loadTables(store)
   const item = tables.recurringItems.find((r) => r.id === id && !r.deletedAt)
-  if (!item) throw new Error('Recurring item not found')
+  if (!item) throw new Error(txt.errors.recurringItemNotFound)
   if (item.endMonth == null) return
   await store.commit(withPosts(tables, planReactivate(tables, item, monthOfDate(), null, now()), [item.rowId]))
 }
@@ -344,7 +345,7 @@ export const endRecurringItem = (store: Store, id: string, endMonth: MonthKey) =
 export async function deleteRecurringItem(store: Store, id: string): Promise<void> {
   const tables = await loadTables(store)
   const item = tables.recurringItems.find((r) => r.id === id)
-  if (!item) throw new Error('Recurring item not found')
+  if (!item) throw new Error(txt.errors.recurringItemNotFound)
   await store.commit(planDropSchedule(tables, item, now()))
 }
 
@@ -352,10 +353,10 @@ export async function deleteRecurringItem(store: Store, id: string): Promise<voi
 export async function setRecurringPaid(store: Store, id: string, month: MonthKey, paid: boolean): Promise<void> {
   const tables = await loadTables(store)
   const item = tables.recurringItems.find((r) => r.id === id)
-  if (!item) throw new Error('Recurring item not found')
+  if (!item) throw new Error(txt.errors.recurringItemNotFound)
   const row = tables.rows.find((r) => r.id === item.rowId)
-  if (!row) throw new Error('Row not found')
-  if (!scheduleLive(tables, item, month)) throw new Error(`"${row.name}" is archived in ${month}.`)
+  if (!row) throw new Error(txt.errors.rowNotFound)
+  if (!scheduleLive(tables, item, month)) throw new Error(txt.errors.archivedIn(row.name, month))
   const cell: Cell | undefined = tables.cells.find((c) => c.rowId === item.rowId && c.month === month)
   const items = cell?.mode === 'items' ? [...cell.items] : []
   const idx = items.findIndex((i) => i.recurringItemId === id)
@@ -387,7 +388,7 @@ export function recurringStatus(tables: Tables, item: RecurringItem, month: Mont
 async function findLive(store: Store, id: string) {
   const tables = await loadTables(store)
   const item = tables.recurringItems.find((r) => r.id === id && !r.deletedAt)
-  if (!item) throw new Error('Recurring item not found')
+  if (!item) throw new Error(txt.errors.recurringItemNotFound)
   return { tables, item }
 }
 

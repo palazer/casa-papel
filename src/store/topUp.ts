@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 import { cellKey, computeEngine } from '@/engine'
 import {
   PoolSchema, compareMonths, monthRange, newId, poolRowName,
@@ -26,13 +27,13 @@ export type TopUpSource = { kind: 'account'; accountId: string } | { kind: 'inco
  */
 export function topUpMutations(tables: Tables, poolId: string, month: MonthKey, source: TopUpSource, amount: Money, ts: number = Date.now()): Mutation[] {
   const household = tables.household.find((h) => !h.deletedAt)
-  if (!household) throw new Error('No household yet')
+  if (!household) throw new Error(txt.errors.noHouseholdYet)
   const base = household.baseCurrency
   const pool = tables.pools.find((p) => p.id === poolId && !p.deletedAt)
-  if (!pool) throw new Error('That virtual account no longer exists.')
-  if (pool.archivedMonth && compareMonths(pool.archivedMonth, month) <= 0) throw new Error(`"${pool.name}" is archived in ${month}.`)
-  if (!Number.isFinite(amount) || !(amount > 0)) throw new Error('The top-up must be more than zero.')
-  if (compareMonths(month, household.startMonth) < 0) throw new Error(`The household starts in ${household.startMonth}.`)
+  if (!pool) throw new Error(txt.errors.virtualAccountNoLongerExists)
+  if (pool.archivedMonth && compareMonths(pool.archivedMonth, month) <= 0) throw new Error(txt.errors.archivedIn(pool.name, month))
+  if (!Number.isFinite(amount) || !(amount > 0)) throw new Error(txt.errors.topUpMustMoreThan)
+  if (compareMonths(month, household.startMonth) < 0) throw new Error(txt.errors.householdStarts(household.startMonth))
 
   const mutations: Mutation[] = []
   let working = tables
@@ -48,16 +49,16 @@ export function topUpMutations(tables: Tables, poolId: string, month: MonthKey, 
     setAside = made.row
     add([made.mutation, { op: 'put', table: 'pools', record: PoolSchema.parse({ ...pool, allocationRowId: made.row.id, updatedAt: ts }) }])
   } else if (setAside.archivedMonth && compareMonths(setAside.archivedMonth, month) <= 0) {
-    throw new Error(`"${setAside.name}" is archived in ${month}. Restore it first.`)
+    throw new Error(txt.errors.archivedRestoreFirst(setAside.name, month))
   }
 
   let from: Row | undefined
-  let sourceName = 'this month\'s income'
+  let sourceName: string | null = null
   if (source.kind === 'account') {
     const acc = working.accounts.find((a) => a.id === source.accountId && !a.deletedAt)
-    if (!acc) throw new Error('That account no longer exists.')
-    if (acc.archivedMonth && compareMonths(acc.archivedMonth, month) <= 0) throw new Error(`"${acc.name}" is archived in ${month}.`)
-    if (acc.type !== 'savings' && acc.type !== 'investment') throw new Error(`A top-up comes from a savings or an investment account, and "${acc.name}" is neither.`)
+    if (!acc) throw new Error(txt.errors.accountNoLongerExists)
+    if (acc.archivedMonth && compareMonths(acc.archivedMonth, month) <= 0) throw new Error(txt.errors.archivedIn(acc.name, month))
+    if (acc.type !== 'savings' && acc.type !== 'investment') throw new Error(txt.errors.topUpComesSavingsInvestment(acc.name))
     const kind = acc.type === 'savings' ? 'from-savings' : 'from-investment'
     sourceName = acc.name
     // the row that takes money out of that account, kept in the household currency like the virtual account itself
@@ -93,8 +94,8 @@ export function topUpMutations(tables: Tables, poolId: string, month: MonthKey, 
     return out
   }
 
-  if (from) mutations.push(...oneOff(from, `Top-up for ${pool.name}`))
-  mutations.push(...oneOff(setAside, `Top-up from ${sourceName}`))
+  if (from) mutations.push(...oneOff(from, txt.names.topUp.forPool(pool.name)))
+  mutations.push(...oneOff(setAside, sourceName == null ? txt.names.topUp.fromIncome : txt.names.topUp.fromAccount(sourceName)))
   return mutations
 }
 

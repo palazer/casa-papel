@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 import { generateKeyBetween } from 'fractional-indexing'
 import { sortRows } from '@/engine'
 import {
@@ -108,8 +109,8 @@ export function accountSuggestions(tables: Tables): AccountSuggestion[] {
   // an archived account was there once: it is not suggested again
   const accounts = tables.accounts.filter((a) => !a.deletedAt)
   const all: AccountSuggestion[] = []
-  if (!accounts.some((a) => a.type === 'checking')) all.push({ id: 'account:checking', name: 'Main account', type: 'checking', description: 'The account your income lands in and your bills leave from: the month\'s money runs through it.' })
-  if (!accounts.some((a) => a.type === 'savings')) all.push({ id: 'account:savings', name: 'Savings', type: 'savings', description: 'Where the rest of the month can go. Virtual accounts live inside it.' })
+  if (!accounts.some((a) => a.type === 'checking')) all.push({ id: 'account:checking', name: txt.names.suggested.mainAccount, type: 'checking', description: txt.store.suggestedAccount.main })
+  if (!accounts.some((a) => a.type === 'savings')) all.push({ id: 'account:savings', name: txt.names.suggested.savings, type: 'savings', description: txt.store.suggestedAccount.savings })
   return all.filter((s) => !dismissed.has(s.id))
 }
 
@@ -131,14 +132,15 @@ export function setupSteps(tables: Tables): SetupStep[] {
   const household = tables.household.find((h) => !h.deletedAt)
   const rows = live(tables.rows)
   const accounts = live(tables.accounts)
+  const STEP = txt.store.setupStep
   const rest = household ? resolveRules(sortRows(tables.rows.filter((r) => !r.deletedAt), tables.categories), household.closingRule).restRowId !== null : false
   return [
-    { key: 'income', label: 'Income', done: rows.some((r) => r.section === 'income') },
-    { key: 'expenses', label: 'Expenses', done: rows.some((r) => r.section === 'expense') },
-    { key: 'savings', label: 'Savings', done: rest },
-    { key: 'virtual', label: 'Virtual accounts', done: live(tables.pools).length > 0 },
-    { key: 'investments', label: 'Investments', done: accounts.some((a) => a.type === 'investment') },
-    { key: 'debts', label: 'Loans and cards', done: accounts.some((a) => a.type === 'loan' || a.type === 'credit-card') },
+    { key: 'income', label: STEP.income, done: rows.some((r) => r.section === 'income') },
+    { key: 'expenses', label: STEP.expenses, done: rows.some((r) => r.section === 'expense') },
+    { key: 'savings', label: STEP.savings, done: rest },
+    { key: 'virtual', label: STEP.virtual, done: live(tables.pools).length > 0 },
+    { key: 'investments', label: STEP.investments, done: accounts.some((a) => a.type === 'investment') },
+    { key: 'debts', label: STEP.debts, done: accounts.some((a) => a.type === 'loan' || a.type === 'credit-card') },
   ]
 }
 
@@ -181,15 +183,15 @@ export function stepSuggestions(step: SetupStepKey, all: RowSuggestion[]): RowSu
  */
 export function suggestionMutations(tables: Tables, id: string, opts: { amount?: Money | null; month?: MonthKey } = {}): { mutations: Mutation[]; row: Row } {
   const household = tables.household.find((h) => !h.deletedAt)
-  if (!household) throw new Error('No household yet')
+  if (!household) throw new Error(txt.errors.noHouseholdYet)
   const s = rowSuggestions(tables).find((x) => x.id === id)
-  if (!s) throw new Error('That suggestion is no longer there.')
-  if (s.needs) throw new Error(`"${s.title}" needs ${s.needs === 'investment' ? 'an investment' : `a ${s.needs}`} account. Add one first.`)
+  if (!s) throw new Error(txt.errors.suggestionNoLongerThere)
+  if (s.needs) throw new Error(txt.errors.suggestionNeedsAccount(s.title, s.needs))
   const amount = opts.amount ?? null
-  if (amount != null && (!Number.isFinite(amount) || amount < 0)) throw new Error('The amount cannot be below zero.')
+  if (amount != null && (!Number.isFinite(amount) || amount < 0)) throw new Error(txt.errors.amountCannotBelowZero)
   const month = opts.month ?? household.startMonth
   if (amount != null && amount > 0) {
-    if (compareMonths(month, household.startMonth) < 0) throw new Error(`The household starts in ${household.startMonth}.`)
+    if (compareMonths(month, household.startMonth) < 0) throw new Error(txt.errors.householdStarts(household.startMonth))
   }
   const entity = s.entityId ? tables.entities.find((e) => e.id === s.entityId && !e.deletedAt) : undefined
   const accounts = live(tables.accounts).sort(byOrder)
@@ -211,7 +213,7 @@ export async function addSuggestion(store: Store, id: string, opts: { amount?: M
 /** "Not for us": the suggestion leaves the page. Undo brings it back; the row can still be added by hand. */
 export async function dismissSuggestion(store: Store, id: string): Promise<void> {
   const household = (await loadTables(store)).household.find((h) => !h.deletedAt)
-  if (!household) throw new Error('No household yet')
+  if (!household) throw new Error(txt.errors.noHouseholdYet)
   const dismissed = household.dismissedSuggestions ?? []
   if (!dismissed.includes(id)) await updateHousehold(store, { dismissedSuggestions: [...dismissed, id] })
 }

@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 import { generateKeyBetween } from 'fractional-indexing'
 import {
   HouseholdSchema, PaymentMethodSchema, RowSchema, compareMonths, dateOn, isPaymentRow, methodNote, newId, payContext,
@@ -15,7 +16,7 @@ const now = () => Date.now()
 export async function setPaymentsOn(store: Store, on: boolean): Promise<void> {
   const tables = await loadTables(store)
   const household = tables.household.find((h) => !h.deletedAt)
-  if (!household) throw new Error('No household yet')
+  if (!household) throw new Error(txt.errors.noHouseholdYet)
   if (!!household.payments === on) return
   await store.commit([{ op: 'put', table: 'household', record: HouseholdSchema.parse({ ...household, payments: on, updatedAt: now() }) }], NO_QUESTION)
 }
@@ -31,8 +32,8 @@ export interface PaymentMethodInput {
 }
 
 function checkMethod(tables: Tables, m: { name: string; ownerEntityId: string | null }): void {
-  if (!m.name.trim()) throw new Error('Give the payment method a name.')
-  if (m.ownerEntityId && !tables.entities.some((e) => e.id === m.ownerEntityId && !e.deletedAt)) throw new Error('That person no longer exists.')
+  if (!m.name.trim()) throw new Error(txt.errors.givePaymentMethodName)
+  if (m.ownerEntityId && !tables.entities.some((e) => e.id === m.ownerEntityId && !e.deletedAt)) throw new Error(txt.errors.personNoLongerExists)
 }
 
 /** Whether an amount, a schedule or a row names the method: such a method is archived, not deleted, so what was paid with it keeps its name. */
@@ -79,7 +80,7 @@ export async function addPaymentMethods(store: Store, inputs: PaymentMethodInput
 export async function updatePaymentMethod(store: Store, id: string, patch: Partial<PaymentMethodInput> & { archived?: boolean }): Promise<void> {
   const tables = await loadTables(store)
   const method = tables.paymentMethods.find((m) => m.id === id && !m.deletedAt)
-  if (!method) throw new Error('Payment method not found')
+  if (!method) throw new Error(txt.errors.paymentMethodNotFound)
   const note = (patch.note ?? methodNote(method, tables.accounts)).trim()
   const next = { ...method, ...patch, name: (patch.name ?? method.name).trim(), note, accountId: null }
   // an archived method only has to keep saying what it said; one that is offered has to be sound
@@ -91,7 +92,7 @@ export async function updatePaymentMethod(store: Store, id: string, patch: Parti
 export async function removePaymentMethod(store: Store, id: string): Promise<'deleted' | 'archived'> {
   const tables = await loadTables(store)
   const method = tables.paymentMethods.find((m) => m.id === id && !m.deletedAt)
-  if (!method) throw new Error('Payment method not found')
+  if (!method) throw new Error(txt.errors.paymentMethodNotFound)
   const ts = now()
   const used = methodInUse(tables, id)
   const record = PaymentMethodSchema.parse(used ? { ...method, archived: true, updatedAt: ts } : { ...method, deletedAt: ts, updatedAt: ts })
@@ -112,11 +113,11 @@ export function starterMethods(tables: Pick<Tables, 'accounts' | 'paymentMethods
   const offer = (kind: PaymentKind, name: string, ownerEntityId: string | null, note: string) => {
     if (!have.has(`${kind}|${name.trim().toLowerCase()}`)) out.push({ kind, name, ownerEntityId, note })
   }
-  offer('direct-debit', 'Direct debit', null, main?.name ?? '')
-  offer('standing-order', 'Standing order', null, main?.name ?? '')
-  offer('transfer', 'Transfer by hand', null, main?.name ?? '')
+  offer('direct-debit', txt.names.starterMethod.directDebit, null, main?.name ?? '')
+  offer('standing-order', txt.names.starterMethod.standingOrder, null, main?.name ?? '')
+  offer('transfer', txt.names.starterMethod.transfer, null, main?.name ?? '')
   for (const a of accounts) if (a.type === 'credit-card') offer('credit-card', a.name, a.ownerEntityId, '')
-  offer('cash', 'Cash', null, '')
+  offer('cash', txt.names.starterMethod.cash, null, '')
   return out
 }
 
@@ -134,12 +135,12 @@ export interface UsualPayment {
  */
 export function planUsualPayment(tables: Tables, rowId: string, usual: UsualPayment, ts: number): Mutation[] {
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
-  if (!row) throw new Error('Row not found')
-  if (!isPaymentRow(row)) throw new Error(`"${row.name}" is money that comes in: it has no payment day or method.`)
-  if (usual.payDay != null && !(Number.isInteger(usual.payDay) && usual.payDay >= 1 && usual.payDay <= 31)) throw new Error('The day is a day of the month, 1 to 31.')
+  if (!row) throw new Error(txt.errors.rowNotFound)
+  if (!isPaymentRow(row)) throw new Error(txt.errors.moneyComesNoPaymentDay(row.name))
+  if (usual.payDay != null && !(Number.isInteger(usual.payDay) && usual.payDay >= 1 && usual.payDay <= 31)) throw new Error(txt.errors.dayDayMonth)
   const method = usual.payMethodId ? payContext(tables).methods.get(usual.payMethodId) : null
-  if (usual.payMethodId && !method) throw new Error('That payment method no longer exists.')
-  if (method?.archived && method.id !== row.payMethodId) throw new Error(`"${method.name}" is archived: pick a method that is still in use.`)
+  if (usual.payMethodId && !method) throw new Error(txt.errors.paymentMethodNoLongerExists)
+  if (method?.archived && method.id !== row.payMethodId) throw new Error(txt.errors.archivedPickMethodStillUse(method.name))
   return [{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, payDay: usual.payDay, payMethodId: method?.id ?? null, updatedAt: ts }) }]
 }
 
@@ -191,10 +192,10 @@ export interface PaymentOf {
  */
 export function planPaymentOf(tables: Tables, target: PaymentTarget, pay: PaymentOf, ts: number): Mutation[] {
   const row = tables.rows.find((r) => r.id === target.rowId && !r.deletedAt)
-  if (!row) throw new Error('Row not found')
+  if (!row) throw new Error(txt.errors.rowNotFound)
   const cell = target.month ? tables.cells.find((c) => c.rowId === row.id && c.month === target.month) : undefined
   const item = target.itemId ? cell?.items.find((i) => i.id === target.itemId) : undefined
-  if (target.itemId && (!cell || cell.mode !== 'items' || !item)) throw new Error('That item is gone.')
+  if (target.itemId && (!cell || cell.mode !== 'items' || !item)) throw new Error(txt.errors.itemGone)
   /** The month's own item as `change` leaves it, in the month's record as `from` holds it. */
   const itemPut = (from: Cell, change: (i: CellItem) => CellItem): Mutation =>
     cellPut(from, { rowId: from.rowId, month: from.month, items: from.items.map((i) => (i.id === target.itemId ? change(i) : i)) }, ts)
@@ -208,13 +209,13 @@ export function planPaymentOf(tables: Tables, target: PaymentTarget, pay: Paymen
     return [...(same ? [] : planUsualPayment(tables, row.id, { payDay: pay.day, payMethodId: pay.methodId }, ts)), ...itemFollows(cell)]
   }
 
-  if (!isPaymentRow(row)) throw new Error(`"${row.name}" is money that comes in: it has no payment day or method.`)
-  if (pay.day != null && !(Number.isInteger(pay.day) && pay.day >= 1 && pay.day <= 31)) throw new Error('The day is a day of the month, 1 to 31.')
+  if (!isPaymentRow(row)) throw new Error(txt.errors.moneyComesNoPaymentDay(row.name))
+  if (pay.day != null && !(Number.isInteger(pay.day) && pay.day >= 1 && pay.day <= 31)) throw new Error(txt.errors.dayDayMonth)
   const schedule = target.level === 'schedule' ? tables.recurringItems.find((r) => r.id === target.scheduleId && !r.deletedAt) : undefined
   const method = pay.methodId ? payContext(tables).methods.get(pay.methodId) : null
-  if (pay.methodId && !method) throw new Error('That payment method no longer exists.')
+  if (pay.methodId && !method) throw new Error(txt.errors.paymentMethodNoLongerExists)
   const had = target.level === 'schedule' ? schedule?.methodId : item?.methodId
-  if (method?.archived && method.id !== had) throw new Error(`"${method.name}" is archived: pick a method that is still in use.`)
+  if (method?.archived && method.id !== had) throw new Error(txt.errors.archivedPickMethodStillUse(method.name))
 
   if (target.level === 'item') {
     const date = pay.day != null ? dateOn(target.month, pay.day) : null
@@ -222,8 +223,8 @@ export function planPaymentOf(tables: Tables, target: PaymentTarget, pay: Paymen
     return [itemPut(cell!, (i) => ({ ...i, date, methodId: method?.id ?? null }))]
   }
 
-  if (!schedule || schedule.rowId !== row.id || item?.recurringItemId !== schedule.id) throw new Error('That schedule is gone.')
-  if (schedule.endMonth && compareMonths(target.month, schedule.endMonth) > 0) throw new Error('That schedule has ended.')
+  if (!schedule || schedule.rowId !== row.id || item?.recurringItemId !== schedule.id) throw new Error(txt.errors.scheduleGone)
+  if (schedule.endMonth && compareMonths(target.month, schedule.endMonth) > 0) throw new Error(txt.errors.scheduleEnded)
   // a schedule that says this already is left as it is: changing it from a month on would cut it in two for nothing
   if ((schedule.payDay ?? null) === pay.day && (schedule.methodId ?? null) === (method?.id ?? null)) return itemFollows(cell)
   const { mutations } = planChangeRecurringFrom(tables, schedule, target.month, { payDay: pay.day, methodId: method?.id ?? null }, ts)

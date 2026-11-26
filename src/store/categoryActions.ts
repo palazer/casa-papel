@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing'
 import { CategorySchema, DEFAULT_CATEGORIES, RowSchema, newId, type Category, type Money, type MonthKey, type Section, type Tables } from '@/model'
 import { NO_QUESTION, type Mutation, type Store } from './store'
@@ -9,16 +10,16 @@ const byOrder = (a: Category, b: Category) => (a.order < b.order ? -1 : a.order 
 
 function assertName(tables: Tables, section: Section, name: string, exceptId?: string): string {
   const n = name.trim()
-  if (!n) throw new Error('Give the category a name.')
+  if (!n) throw new Error(txt.errors.giveCategoryName)
   if (live(tables.categories).some((c) => c.section === section && c.id !== exceptId && c.name.toLowerCase() === n.toLowerCase())) {
-    throw new Error(`There is already a category called "${n}" in this section.`)
+    throw new Error(txt.errors.categoryNameTaken(n))
   }
   return n
 }
 
 function findCategory(tables: Tables, id: string): Category {
   const c = tables.categories.find((x) => x.id === id && !x.deletedAt)
-  if (!c) throw new Error('That category no longer exists.')
+  if (!c) throw new Error(txt.errors.categoryNoLongerExists)
   return c
 }
 
@@ -36,7 +37,7 @@ export async function addCategory(store: Store, input: { name: string; section: 
   for (const id of input.rowIds ?? []) {
     const row = tables.rows.find((r) => r.id === id && !r.deletedAt)
     if (!row) continue
-    if (row.section !== input.section) throw new Error(`"${row.name}" is not in this section.`)
+    if (row.section !== input.section) throw new Error(txt.errors.rowNotInSection(row.name))
     mutations.push({ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, categoryId: category.id, updatedAt: ts }) })
   }
   if (input.estimate && input.estimate.amount > 0) {
@@ -88,10 +89,10 @@ export async function deleteCategory(store: Store, id: string): Promise<void> {
 export async function setRowCategory(store: Store, rowId: string, categoryId: string | null): Promise<void> {
   const tables = await loadTables(store)
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
-  if (!row) throw new Error('Row not found')
+  if (!row) throw new Error(txt.errors.rowNotFound)
   if (categoryId) {
     const cat = findCategory(tables, categoryId)
-    if (cat.section !== row.section) throw new Error(`"${cat.name}" belongs to another section.`)
+    if (cat.section !== row.section) throw new Error(txt.errors.categoryInAnotherSection(cat.name))
   }
   if ((row.categoryId ?? null) === categoryId) return
   await store.commit([{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, ...categoryPlacement(tables, row, categoryId), updatedAt: now() }) }])

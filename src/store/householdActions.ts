@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing'
 import { buildDefaultCategoryMutations } from './categoryActions'
 import {
@@ -26,7 +27,7 @@ export async function addEntity(store: Store, input: { kind: EntityKind; name: s
 export async function updateEntity(store: Store, id: string, patch: Partial<Omit<Entity, 'id' | 'createdAt'>>): Promise<void> {
   const tables = await loadTables(store)
   const e = tables.entities.find((x) => x.id === id)
-  if (!e) throw new Error('Not found')
+  if (!e) throw new Error(txt.errors.notFound)
   await store.commit([{ op: 'put', table: 'entities', record: EntitySchema.parse({ ...e, ...patch, updatedAt: now() }) }])
 }
 
@@ -83,7 +84,7 @@ export function payOffRowsOf(rows: Row[], accountId: string): Row[] {
 export async function addPayOffRow(store: Store, accountId: string): Promise<Row> {
   const tables = await loadTables(store)
   const account = tables.accounts.find((a) => a.id === accountId && !a.deletedAt)
-  if (!account || (account.type !== 'loan' && account.type !== 'credit-card')) throw new Error('Only a loan or a card has a row that pays it off.')
+  if (!account || (account.type !== 'loan' && account.type !== 'credit-card')) throw new Error(txt.errors.onlyLoanCardRowPays)
   const { row, mutations } = rowOfKindMutations(tables, { ...PAY_OFF, name: '', categoryId: null, accountId })
   await store.commit(mutations, NO_QUESTION)
   return row
@@ -129,10 +130,12 @@ export async function movePool(store: Store, id: string, direction: 'up' | 'down
 }
 
 const isDebt = (type: Account['type']): boolean => type === 'loan' || type === 'credit-card'
-const quoted = (rows: Array<{ name: string }>): string => rows.map((r) => `"${r.name}"`).join(', ')
-const TYPED_ROW_VERB: Partial<Record<Row['kind'], string>> = {
-  'to-savings': 'sends money to it', 'to-investment': 'sends money to it', 'from-investment': 'takes money from it', 'from-savings': 'takes money from it',
-  'debt-payment': 'pays it off', 'card-payment': 'pays it off',
+const namesOf = (list: Array<{ name: string }>): string[] => list.map((r) => r.name)
+/** What holds an account to its type, in words (`src/i18n`). */
+const HELD = txt.errors.typeHeld
+const TYPED_ROW_HOLDS: Partial<Record<Row['kind'], (row: string) => string>> = {
+  'to-savings': HELD.sends, 'to-investment': HELD.sends, 'from-investment': HELD.takes, 'from-savings': HELD.takes,
+  'debt-payment': HELD.paysOff, 'card-payment': HELD.paysOff,
 }
 
 /** What saving an account as `next` does beyond the account itself. */
@@ -162,8 +165,8 @@ export function planAccountChange(tables: Tables, account: Account, next: Pick<A
   const between = isDebt(account.type) && isDebt(next.type)
   let refusal: string | null = null
   if (next.type !== account.type && !between) {
-    const held: string[] = rows.filter((r) => accountTypeForRow(r) && !fitsRow(r, next)).map((r) => `"${r.name}" ${TYPED_ROW_VERB[r.kind] ?? 'uses it'}`)
-    if (next.type !== 'savings') held.push(...tables.pools.filter((p) => !p.deletedAt && p.accountId === account.id).map((p) => `the virtual account "${p.name}" is held in it`))
+    const held: string[] = rows.filter((r) => accountTypeForRow(r) && !fitsRow(r, next)).map((r) => (TYPED_ROW_HOLDS[r.kind] ?? HELD.uses)(r.name))
+    if (next.type !== 'savings') held.push(...tables.pools.filter((p) => !p.deletedAt && p.accountId === account.id).map((p) => HELD.holdsVirtualAccount(p.name)))
     if (!held.length && isDebt(account.type) !== isDebt(next.type)) {
       // money that is held and money that is owed count the other way round: nothing can come along
       const ref = accountRef(account.id)
@@ -172,13 +175,13 @@ export function planAccountChange(tables: Tables, account: Account, next: Pick<A
       const amounts = tables.cells.some((c) => c.items.some((i) => i.fundedBy === ref))
       const goals = tables.goals.filter((g) => !g.deletedAt && g.accountId === account.id)
       const real = tables.accountMonths.some((m) => m.accountId === account.id && (m.actualBalance != null || m.actualDeposit != null || m.actualSpend != null))
-      if (named.length) held.push(`${quoted(named)} ${named.length === 1 ? 'names' : 'name'} it`)
-      if (schedules.length) held.push(`${quoted(schedules)} ${schedules.length === 1 ? 'names' : 'name'} it`)
-      if (amounts) held.push('amounts come out of it')
-      if (goals.length) held.push(`${quoted(goals)} ${goals.length === 1 ? 'watches' : 'watch'} it`)
-      if (real) held.push('real balances were entered for it')
+      if (named.length) held.push(HELD.named(namesOf(named)))
+      if (schedules.length) held.push(HELD.named(namesOf(schedules)))
+      if (amounts) held.push(HELD.amounts)
+      if (goals.length) held.push(HELD.watched(namesOf(goals)))
+      if (real) held.push(HELD.realBalances)
     }
-    if (held.length) refusal = `"${account.name}" cannot become an account of type ${label}: ${held.join('; ')}. Change or remove ${held.length === 1 ? 'that' : 'those'} first.`
+    if (held.length) refusal = HELD.refused(account.name, label, held)
   }
   if (refusal || !isDebt(next.type)) return { refusal, mutations: [] }
   const patches = payOffPatches(tables, rows.filter(isPayOffRow), () => payOffKindOf(next))
@@ -197,7 +200,7 @@ export function planAccountChange(tables: Tables, account: Account, next: Pick<A
 export async function updateAccount(store: Store, id: string, patch: Partial<Omit<Account, 'id' | 'createdAt'>>): Promise<void> {
   const tables = await loadTables(store)
   const a = tables.accounts.find((x) => x.id === id)
-  if (!a) throw new Error('Not found')
+  if (!a) throw new Error(txt.errors.notFound)
   const ts = now()
   let fromNow: Mutation[] | undefined
   if (patch.investment && a.investment) {
@@ -222,7 +225,7 @@ export async function updateAccount(store: Store, id: string, patch: Partial<Omi
   if (isOutsideNetWorth(a) && !isOutsideNetWorth(next)) {
     const landing = tables.rows.filter((r) => !r.deletedAt && !r.archivedMonth && pocketLandsIn(r, a))
     if (landing.length) {
-      throw new Error(`${landing.map((r) => `"${r.name}"`).join(', ')} ${landing.length === 1 ? 'lands' : 'land'} in "${a.name}", and pocket money can only land in an account that is left out of net worth. Change "Lands in…" in the row's menu first.`)
+      throw new Error(txt.errors.pocketLandsHere(namesOf(landing), a.name))
     }
   }
   // one main account open at a time, in the household's currency, and nothing moving money into it (rule B9)
@@ -309,7 +312,7 @@ export function buildTemplateMutations(t: RowTemplate, ctx: TemplateContext, ord
 export async function applyTemplates(store: Store, keys: string[], entityId?: string): Promise<void> {
   const tables = await loadTables(store)
   const household = tables.household.find((h) => !h.deletedAt)
-  if (!household) throw new Error('No household')
+  if (!household) throw new Error(txt.errors.noHousehold)
   const entity = entityId ? tables.entities.find((e) => e.id === entityId) : undefined
   const all = entity ? ENTITY_TEMPLATES[entity.kind] : HOUSEHOLD_TEMPLATES
   const chosen = all.filter((t) => keys.includes(t.key))
@@ -480,13 +483,13 @@ export async function addPool(store: Store, input: PoolInput): Promise<Pool> {
 export async function updatePool(store: Store, id: string, patch: Partial<Pick<Pool, 'name' | 'accountId' | 'openingBalance'>>): Promise<void> {
   const tables = await loadTables(store)
   const p = tables.pools.find((x) => x.id === id)
-  if (!p) throw new Error('Virtual account not found')
+  if (!p) throw new Error(txt.errors.virtualAccountNotFound)
   // it is kept in the currency of the savings account that holds it (rule X14), and stays in it
   if (patch.accountId != null && patch.accountId !== p.accountId) {
     const from = tables.accounts.find((a) => a.id === p.accountId)
     const to = tables.accounts.find((a) => a.id === patch.accountId && !a.deletedAt)
     if (from && to && from.currency !== to.currency) {
-      throw new Error(`"${p.name}" is kept in ${from.currency}, the currency of the savings account that holds it, so it can move to a savings account in ${from.currency}. "${to.name}" is in ${to.currency}.`)
+      throw new Error(txt.errors.keptCurrencySavingsAccountHolds(p.name, from.currency, to.name, to.currency))
     }
   }
   const mutations: Mutation[] = [{ op: 'put', table: 'pools', record: PoolSchema.parse({ ...p, ...patch, updatedAt: now() }) }]

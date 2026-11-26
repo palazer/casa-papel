@@ -6,6 +6,7 @@
  * Every balance dialog writes through here. "Balances…" can tick every line of the month in the same step
  * (`opts.done`).
  */
+import { txt } from '@/i18n'
 import { mainAccountsIn, type AccountMonthResult, type EngineOutput, type MainAccountMonth } from '@/engine'
 import {
   AccountMonthSchema, AccountSchema, accountGroup, addMonths, compareMonths,
@@ -53,7 +54,7 @@ export interface MonthBalances {
 }
 
 /** In a month where an archived main account and the one that replaced it were both open, the line is the two together (rule B9). */
-export const FILL_EVERY_MAIN = 'Both main accounts were open in this month, the one archived and the one that replaced it: fill in both, or leave both empty to use the calculated amount.'
+export const FILL_EVERY_MAIN = txt.errors.bothMainAccountsOpenMonth
 
 const GROUP_ORDER: AccountGroup[] = ['current', 'savings', 'investment', 'other', 'debt']
 const byOrder = (a: Account, b: Account) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0)
@@ -120,7 +121,7 @@ function startMutations(tables: Tables, engine: EngineOutput, month: MonthKey, s
       continue
     }
     if (value == null) {
-      if (strict) throw new Error(`"${acc.name}" has no earlier month, so its starting amount cannot be left empty. Type 0 if it held nothing.`)
+      if (strict) throw new Error(txt.errors.noEarlierMonthStartingAmount(acc.name))
       continue
     }
     if (acc.openingBalance !== value) out.push({ op: 'put', table: 'accounts', record: AccountSchema.parse({ ...acc, openingBalance: value, updatedAt: ts }) })
@@ -140,7 +141,7 @@ function assertAllOrNone(tables: Tables, month: MonthKey, listed: ReadonlySet<st
   if (missing.length === 0 || missing.length === open.length) return
   const elsewhere = missing.find((a) => !listed.has(a.id))
   throw new Error(elsewhere
-    ? `"${elsewhere.name}" was still open in ${month} and has no real balance there. Enter it in ${month} first, or leave the main account empty.`
+    ? txt.errors.stillOpenNoRealBalance(elsewhere.name, month)
     : FILL_EVERY_MAIN)
 }
 
@@ -153,13 +154,13 @@ export function monthBalanceMutations(tables: Tables, household: Household, mont
   const ends = entry.ends ?? {}
   const touched = [...Object.keys(starts), ...Object.keys(ends)]
   if (touched.length === 0) return []
-  for (const v of [...Object.values(starts), ...Object.values(ends)]) if (v != null && !Number.isFinite(v)) throw new Error('That is not a number I can read.')
+  for (const v of [...Object.values(starts), ...Object.values(ends)]) if (v != null && !Number.isFinite(v)) throw new Error(txt.errors.notNumberIRead)
   const ts = Date.now()
   const prev = addMonths(month, -1)
   const engine = engineFor(tables, household, month)
   const lines = new Map(monthBalances(tables, engine, month).lines.map((l) => [l.account.id, l]))
   const listed = new Set(lines.keys())
-  for (const id of touched) if (!lines.has(id)) throw new Error(`That account has no balance in ${month}.`)
+  for (const id of touched) if (!lines.has(id)) throw new Error(txt.errors.accountNoBalance(month))
   const isCurrent = (id: string) => lines.get(id)!.group === 'current'
 
   const first = startMutations(tables, engine, month, starts, ts, true)
@@ -195,7 +196,7 @@ export function previewMonthBalances(tables: Tables, household: Household, month
 export async function setMonthBalances(store: Store, month: MonthKey, entry: BalanceEntry, opts: { done?: boolean } = {}): Promise<void> {
   const tables = await loadTables(store)
   const household = tables.household.find((h) => !h.deletedAt)
-  if (!household) throw new Error('No household yet')
+  if (!household) throw new Error(txt.errors.noHouseholdYet)
   const mutations = monthBalanceMutations(tables, household, month, entry)
   if (opts.done) {
     const after = mutations.length ? applyMutations(tables, mutations) : tables

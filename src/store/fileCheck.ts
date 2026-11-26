@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 import { computeEngine } from '@/engine'
 import { compareMonths, monthRange, type ExportFile, type MonthKey, type TableName, type TableRecord, type Tables } from '@/model'
 import { loadTables } from './actions'
@@ -89,5 +90,5 @@ export async function checkFile(store: Store, file: ExportFile): Promise<FileChe
 /** "and 4 other changes: names, settings, notes or schedules", for the records a list of amounts does not show. */
 export function otherText(n: number): string | null {
   if (n === 0) return null
-  return `and ${n} other ${n === 1 ? 'change' : 'changes'}: names, settings, notes or schedules`
+  return txt.store.otherChanges(n)
 }

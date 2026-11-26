@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { withDeadline } from '@/lib/deadline'
 import type { SyncConfig } from './config'
@@ -61,7 +62,7 @@ export class SupabaseRemote implements SyncRemote {
     }
     if (res.error) throw toRemoteError(new Error(res.error.message))
     const u = res.data.user
-    if (!u?.email) throw new Error('Sign-in did not return a user.')
+    if (!u?.email) throw new Error(txt.errors.signDidNotReturnUser)
     return { userId: u.id, email: u.email }
   }
 
@@ -163,7 +164,7 @@ export class SupabaseRemote implements SyncRemote {
   async createInvite(code: string): Promise<Invite> {
     const uid = await this.uid()
     const row = await call(this.client.from('invites').insert({ code, created_by: uid }).select('code, created_at, expires_at, used_at').single<InviteRow>())
-    if (!row) throw new Error('The invite was not saved.')
+    if (!row) throw new Error(txt.errors.inviteNotSaved)
     return toInvite(row)
   }
 
@@ -179,7 +180,7 @@ export class SupabaseRemote implements SyncRemote {
   private async uid(): Promise<string> {
     const { data } = await this.client.auth.getSession()
     const id = data.session?.user.id
-    if (!id) throw new Error('Not signed in.')
+    if (!id) throw new Error(txt.errors.notSigned)
     return id
   }
 }

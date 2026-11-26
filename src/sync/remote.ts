@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 import type { KdfParams, Wrapped } from './crypto'
 
 /** Everything the sync engine and the account dialogs need from the server, behind one interface so tests can fake it. */
@@ -80,7 +81,7 @@ export class SyncConflictError extends Error {
 /** The cloud copy was written by a newer app than this one. */
 export class StaleSchemaError extends Error {
   constructor() {
-    super('Update the app to sync: the cloud copy comes from a newer version.')
+    super(txt.errors.updateAppSyncCloudCopy)
     this.name = 'StaleSchemaError'
   }
 }
@@ -95,13 +96,13 @@ export class OfflineError extends Error {
 
 /** Plain-words messages for errors the server function and the auth API return. */
 export function describeRemoteError(e: unknown): string {
-  if (e instanceof OfflineError) return 'You are offline. Changes will sync when you are back.'
+  if (e instanceof OfflineError) return txt.errors.youOfflineChangesSyncWhen
   if (e instanceof StaleSchemaError) return e.message
   if (e instanceof Error) {
     const m = e.message
-    if (/invalid login credentials/i.test(m)) return 'Email or password is wrong.'
-    if (/fetch|network/i.test(m)) return 'Could not reach the sync server.'
+    if (/invalid login credentials/i.test(m)) return txt.errors.emailPasswordWrong
+    if (/fetch|network/i.test(m)) return txt.errors.couldNotReachSyncServer
     return m
   }
-  return 'Something went wrong.'
+  return txt.errors.somethingWentWrong
 }

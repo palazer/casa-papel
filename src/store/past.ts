@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 import { cellKey, computeEngine, mainAccountLabel, type EngineOutput } from '@/engine'
 import { addMonths, compareMonths, formatMoney, monthOfDate, monthRange, type Money, type MonthKey, type Tables } from '@/model'
 import { loadTables } from './actions'
@@ -175,30 +176,31 @@ export function changesBetween(before: Worked, after: Worked, months: MonthKey[]
  * of an amount that reaches it reads "from <Month>".
  */
 export function changeLineText(line: ChangeLine, locale: string, opts: { planEnd?: MonthKey } = {}): string {
-  const money = (v: Money | null) => (v == null ? 'nothing' : formatMoney(v, line.currency, locale))
-  const figures = `${money(line.before)} → ${money(line.after)}`
+  const say = txt.store.change
+  const money = (v: Money | null) => (v == null ? say.nothing : formatMoney(v, line.currency, locale))
+  const figures = say.figures(money(line.before), money(line.after))
   const span = monthSpan(line.months, locale)
   switch (line.kind) {
     case 'amount':
       if (line.each) {
         const { months, by } = line.each
-        if (by == null || by === 0) return `"${line.name}", ${span}: changes in ${months} months`
-        return `"${line.name}", ${span}: ${formatMoney(Math.abs(by), line.currency, locale)} ${by > 0 ? 'more' : 'less'} in each of ${months} months`
+        if (by == null || by === 0) return say.amountChanges(line.name, span, months)
+        return say.amountEach(line.name, span, formatMoney(Math.abs(by), line.currency, locale), by > 0, months)
       }
       return line.months.length > 1 && line.months[line.months.length - 1] === opts.planEnd
-        ? `"${line.name}" from ${monthSpan([line.months[0]], locale)}: ${figures}`
-        : `"${line.name}", ${span}: ${figures}`
+        ? say.amountFrom(line.name, monthSpan([line.months[0]], locale), figures)
+        : say.amount(line.name, span, figures)
     case 'balance':
-      return `"${line.name}" at the end of ${span}: ${figures}`
+      return say.balance(line.name, span, figures)
     case 'net-worth':
-      return `Net worth at the end of ${span}: ${figures}`
+      return say.netWorth(span, figures)
     case 'sums':
-      return `The month's sums, ${span}`
+      return say.sums(span)
   }
 }
 
 /** "and 3 more", for the lines left out. */
-export const moreText = (more: number): string | null => (more > 0 ? `and ${more} more` : null)
+export const moreText = (more: number): string | null => (more > 0 ? txt.store.change.andMore(more) : null)
 
 /** The question a save that alters the past waits on. */
 export interface PastQuestion {
@@ -254,7 +256,7 @@ export function pastGuard(store: Store, ask: (q: PastQuestion) => Promise<PastAn
     const fromNow = opts.fromNow && !changesBetween(before, work(applyMutations(tables, opts.fromNow), months), months, household.baseCurrency) ? today : null
     const answer = await ask({ changes, fromNow, locale: household.locale })
     if (answer === 'cancel') throw new PastChangeCancelled()
-    if (answer === 'from-now' && !(fromNow && opts.fromNow)) throw new Error('"Only from <Month> on" was not offered for this change.')
+    if (answer === 'from-now' && !(fromNow && opts.fromNow)) throw new Error(txt.errors.onlyMonthNotOfferedChange)
     return { mutations: answer === 'from-now' ? opts.fromNow! : mutations, asked: true }
   }
 }
