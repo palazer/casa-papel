@@ -11,7 +11,7 @@ test.describe('tracking the month on a phone', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Statement' })).toBeVisible()
     await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
     const progress = page.getByTestId('progress')
-    await expect(progress).toHaveText('0 of 21 done · €8,065.00 still to pay · €7,405.00 to come in')
+    await expect(progress).toHaveText('0 of 22 done · €8,065.00 still to pay · €7,405.00 to come in')
     await expect(page.getByRole('button', { name: 'Balances…' })).toBeVisible()
     await page.screenshot({ path: 'e2e/output/statement-track-phone.png', fullPage: true })
     const moneyOut = page.getByRole('region', { name: 'Money out' })
@@ -22,7 +22,7 @@ test.describe('tracking the month on a phone', () => {
     await expect(rent).not.toBeChecked()
     await rent.tap()
     await expect(rent).toBeChecked()
-    await expect(progress).toHaveText('1 of 21 done · €6,415.00 still to pay · €7,405.00 to come in')
+    await expect(progress).toHaveText('1 of 22 done · €6,415.00 still to pay · €7,405.00 to come in')
 
     // what it really was: Utilities cost 199 this month and are paid; December keeps its 210
     await moneyOut.getByRole('button', { name: /^The flat – Utilities:/ }).tap()
@@ -38,7 +38,7 @@ test.describe('tracking the month on a phone', () => {
     await expect(editor).toBeHidden()
     await expect(moneyOut.getByRole('button', { name: /^The flat – Utilities:/ })).toHaveAccessibleName('The flat – Utilities: €199.00')
     await expect(page.getByRole('checkbox', { name: 'The flat – Utilities done' })).toBeChecked()
-    await expect(progress).toHaveText('2 of 21 done · €6,216.00 still to pay · €7,405.00 to come in')
+    await expect(progress).toHaveText('2 of 22 done · €6,216.00 still to pay · €7,405.00 to come in')
     await stepMonth(page, 1)
     await expect(page.getByRole('heading', { name: 'December 2026' })).toBeVisible()
     await expect(moneyOut.getByRole('button', { name: /^The flat – Utilities:/ })).toHaveAccessibleName('The flat – Utilities: €210.00, an estimate')
@@ -56,7 +56,7 @@ test.describe('tracking the month on a phone', () => {
     await editor.getByRole('button', { name: 'Save' }).tap()
     await expect(editor).toBeHidden()
     // one more thing to tick; the 120 more for groceries is 120 less for savings, so the open amount stays
-    await expect(progress).toHaveText('2 of 22 done · €6,216.00 still to pay · €7,405.00 to come in')
+    await expect(progress).toHaveText('2 of 23 done · €6,216.00 still to pay · €7,405.00 to come in')
     const items = moneyOut.getByRole('button', { name: 'Items of Groceries' })
     await expect(items).toHaveAttribute('aria-expanded', 'false')
     await items.tap()
@@ -66,25 +66,25 @@ test.describe('tracking the month on a phone', () => {
     await market.tap()
     await expect(market).toBeChecked()
     await expect(page.getByRole('checkbox', { name: 'Groceries done' })).toHaveAttribute('aria-checked', 'mixed')
-    await expect(progress).toHaveText('3 of 22 done · €6,096.00 still to pay · €7,405.00 to come in')
+    await expect(progress).toHaveText('3 of 23 done · €6,096.00 still to pay · €7,405.00 to come in')
     await page.screenshot({ path: 'e2e/output/statement-items-phone.png', fullPage: true })
     await page.getByRole('checkbox', { name: 'Groceries done' }).tap()
     await expect(page.getByRole('checkbox', { name: 'Groceries done' })).toBeChecked()
     await expect(page.getByRole('checkbox', { name: 'Groceries: Amount done' })).toBeChecked()
-    await expect(progress).toHaveText('4 of 22 done · €5,396.00 still to pay · €7,405.00 to come in')
+    await expect(progress).toHaveText('4 of 23 done · €5,396.00 still to pay · €7,405.00 to come in')
 
     // an automatic row can be ticked too
     const toSavings = page.getByRole('checkbox', { name: 'To savings done' })
     await toSavings.tap()
     await expect(toSavings).toBeChecked()
-    await expect(progress).toHaveText('5 of 22 done · €3,136.00 still to pay · €7,405.00 to come in')
+    await expect(progress).toHaveText('5 of 23 done · €3,136.00 still to pay · €7,405.00 to come in')
 
     // the Grid shows the same ticks as done dots
     const tabs = page.getByRole('navigation', { name: 'Screens' })
     await tabs.getByRole('link', { name: 'Grid' }).tap()
     await expect(page.getByRole('button', { name: /^The flat – Rent Nov 2026/ }).getByRole('img', { name: 'Done', exact: true })).toBeVisible()
     await tabs.getByRole('link', { name: 'Statement' }).tap()
-    await expect(progress).toHaveText(/^5 of 22 done/)
+    await expect(progress).toHaveText(/^5 of 23 done/)
 
     // what the accounts really held is typed under "Balances…", which fits a phone. Its tick counts the whole month as
     // done; it is not set for the current month, and it locks nothing
@@ -99,7 +99,7 @@ test.describe('tracking the month on a phone', () => {
     await expect(all).toBeChecked()
     await balances.getByRole('button', { name: 'Save' }).tap()
     await expect(balances).toBeHidden()
-    await expect(progress).toHaveText('All 22 done')
+    await expect(progress).toHaveText('All 23 done')
     await expect(page.getByRole('button', { name: /Close month|Reopen month/ })).toHaveCount(0)
     await page.screenshot({ path: 'e2e/output/statement-all-done-phone.png' })
     // every tick is there to be taken off again

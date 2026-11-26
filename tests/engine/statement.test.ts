@@ -71,9 +71,11 @@ describe('the Statement balances', () => {
         const r = out.accounts[a.id].months[m]
         return g + line.change! - r.inflow + r.outflow
       }, 0)
+      // what a statement says is owed beyond what the plan worked out (the demo's card, in October) is a debt the month did not plan
+      const unplanned = t.accounts.filter((a) => a.type === 'credit-card' || a.type === 'loan').reduce((d, a) => d + (out.accounts[a.id]?.months[m]?.adjustment ?? 0), 0)
       // money taken out of your own accounts comes in without being earned
       // a payment brings a debt down, so it costs the month and leaves net worth as it was; pocket money and money moved elsewhere are gone
-      expect(topLine(s, 'claims', 'net-worth')!.change, m).toBe(tot.income - tot.fromAccounts - (tot.expensesTotal - tot.debt + tot.pocket + tot.moved) + growth)
+      expect(topLine(s, 'claims', 'net-worth')!.change, m).toBe(tot.income - tot.fromAccounts - (tot.expensesTotal - tot.debt + tot.pocket + tot.moved) + growth - unplanned)
     }
   })
 })
@@ -92,7 +94,7 @@ describe('the Statement, the month', () => {
     expect(expenses.children.map((c) => c.label)).toEqual(['Housing', 'Living', 'Transport', 'Family & pets', 'Fun', 'Personal'])
     expect(expenses.children.find((c) => c.label === 'Housing')).toMatchObject({ kind: 'category', amount: 186000 })
     // an itemized row opens to its items
-    expect(find(s, expenses.children.find((c) => c.label === 'Personal')!.children[0].id)!.children.map((c) => [c.label, c.amount, c.status])).toEqual([['Concert tickets', 9000, 'done'], ['Books', 3200, 'done']])
+    expect(find(s, expenses.children.find((c) => c.label === 'Personal')!.children[0].id)!.children.map((c) => [c.label, c.amount, c.status])).toEqual([['Concert tickets', 4500, 'done'], ['Books', 1700, 'done']])
     // pocket money is shared out of what is left, so it leads that block, a line per adult
     const setAside = topLine(s, 'out', 'set-aside')!
     expect(setAside.children.map((c) => [c.label, c.kind])).toEqual([['Sam – Pocket', 'row'], ['Alex – Pocket', 'row'], ['To savings', 'row'], ['To investments', 'row'], ['To Travel', 'row'], ['To Clothing', 'row']])

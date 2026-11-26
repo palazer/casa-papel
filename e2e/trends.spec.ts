@@ -311,8 +311,8 @@ test.describe('Trends: one subject as its parts', () => {
     await page.keyboard.press('ArrowRight')
     const tip = page.getByTestId('chart-tip')
     await expect(tip).toContainText('Net worth')
-    // what is owed is a negative part; nothing is owed on the demo's card, so the month names no debt
-    await expect(tip).not.toContainText('Debts')
+    // what is owed is a negative part
+    await expect(tip).toContainText('-€1,635.00 Debts')
     await page.keyboard.press('Escape')
     await page.screenshot({ path: 'e2e/output/trends-breakdown-net-worth.png', fullPage: true })
 
@@ -374,7 +374,7 @@ test.describe('Trends: goals', () => {
     expect(reached.x).toBeGreaterThan(due.x + due.width)
     // the Statement's own sentence
     await expect(said(page)).toHaveCount(1)
-    await expect(said(page)).toContainText(/House: €27,965\.\d\d of €50,000\.00 · reached by \w+ 2027, after the target of Jun 2027/)
+    await expect(said(page)).toContainText(/House: €26,330\.\d\d of €50,000\.00 · reached by \w+ 2027, after the target of Jun 2027/)
     await page.screenshot({ path: 'e2e/output/trends-goal.png', fullPage: true })
 
     // the chip is a switch, remembered on the device
@@ -405,7 +405,7 @@ test.describe('Trends: goals', () => {
     await loadDemo(page)
     await setGoal(page, 'Debts and net worth', 'Net worth', 'Freedom', '200000')
     await openTrends(page)
-    await expect(said(page)).toContainText('Freedom: €27,965')
+    await expect(said(page)).toContainText('Freedom: €26,330')
     await expect(said(page)).toContainText('not reached in the next 13 months')
     await expect(chart(page).locator('[data-target]')).toContainText('Freedom: €200,000')
     await expect(chart(page).locator('[data-reached]')).toHaveCount(0)

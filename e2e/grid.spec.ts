@@ -207,7 +207,7 @@ test.describe('grid: the main account', () => {
     await expect(nov).toHaveText('€0.00')
     // with it the rows add up: 0 + 14,236 savings + 13,729.16 investments, and nothing is owed on the card
     const netWorth = page.getByRole('row', { name: /^Net worth/ }).getByRole('cell').first()
-    await expect(netWorth).toHaveText('€27,965.16')
+    await expect(netWorth).toHaveText('€26,330.16')
 
     // a click on a month opens the same dialog as on the Statement
     await nov.click()
@@ -219,7 +219,7 @@ test.describe('grid: the main account', () => {
     // the entered month is underlined, net worth follows, and December continues from the real number
     await expect(nov).toHaveText('€1,150.00')
     await expect(nov).toHaveClass(/underline/)
-    await expect(netWorth).toHaveText('€29,115.16')
+    await expect(netWorth).toHaveText('€27,480.16')
     const dec = page.getByRole('button', { name: /^Main account Dec 2026:/ })
     await expect(dec).toHaveText('€1,150.00')
     await expect(dec).not.toHaveClass(/underline/)

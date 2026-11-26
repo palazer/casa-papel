@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { computeEngine } from '@/engine'
 import { monthRange, newId } from '@/model'
-import { CasaDb, Store, planUsualPayment } from '@/store'
+import { CasaDb, Store, planCards, planUsualPayment } from '@/store'
 import { buildDemoTables } from '@/demo/demoHousehold'
 import { loadDemo } from '@/demo/loadDemo'
 
@@ -45,6 +45,22 @@ describe('demo household', () => {
     const figures = (x: typeof t) => { const e = computeEngine({ tables: x, months }); return { totals: e.totals, accounts: e.accounts, main: e.main } }
     expect(figures(on)).toEqual(figures(t))
     expect(figures(without)).toEqual(figures(t))
+  })
+  it('has a card that carries a debt: its payment brings it down, and October ends on what the statement said', () => {
+    const t = buildDemoTables()
+    const months = monthRange('2026-09', '2026-12')
+    const out = computeEngine({ tables: t, months })
+    const card = t.accounts.find((a) => a.type === 'credit-card')!
+    expect(months.map((m) => out.accounts[card.id].months[m].balance)).toEqual([1740_00, 1695_00, 1635_00, 1575_00])
+    // the plan had 1,680.00 for the end of October; the statement at the start of November said 15.00 more
+    expect(out.accounts[card.id].months['2026-10']).toMatchObject({ computed: 1680_00, entered: true, adjustment: 15_00 })
+    // the payment is an expense of its month, among Sam's own
+    const pay = t.rows.find((r) => r.kind === 'card-payment')!
+    expect(pay).toMatchObject({ name: 'Credit card – Payment', section: 'expense', accountId: card.id, scope: t.entities.find((e) => e.name === 'Sam')!.id })
+    expect(months.map((m) => out.totals[m].debt)).toEqual([60_00, 60_00, 60_00, 60_00])
+    // no expense names the card, and nothing in the demo is as it was before schema 23
+    expect(t.rows.filter((r) => r.accountId === card.id).map((r) => r.name)).toEqual(['Credit card – Payment'])
+    expect(planCards(t)).toEqual([])
   })
   it('loads into a store', async () => {
     const s = new Store(new CasaDb(`test-${newId()}`))

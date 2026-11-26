@@ -358,7 +358,7 @@ test.describe('Payments: the page', () => {
     // the subscriptions name a method and no day; everything else of the month is untracked, below
     await expect(group(page, 'no-day').getByRole('heading')).toHaveText(/^No day\s*1 · €18\.00$/)
     await expect(lines(group(page, 'no-day'))).toHaveText([/–\s*Subscriptions\s*Credit card/])
-    await expect(page.getByTestId('payments-summary')).toHaveText(/€4,627\.00 to pay · €0\.00 done · 2 overdue · 12 untracked/)
+    await expect(page.getByTestId('payments-summary')).toHaveText(/€4,627\.00 to pay · €0\.00 done · 2 overdue · 13 untracked/)
     // the address is the page's own, and a reload stays on it
     await page.reload()
     await expect(page.getByRole('heading', { level: 1, name: 'Payments' })).toBeVisible()
@@ -434,13 +434,13 @@ test.describe('Payments: the page', () => {
     const totals = page.getByTestId('payment-totals')
     // twelve amounts of the demo's November name neither: a quiet list with no ticks
     await expect(untracked(page).getByRole('heading')).toHaveText('Untracked')
-    await expect(untracked(page)).toContainText('12 · €3,438.00')
-    await expect(lines(untracked(page))).toHaveCount(12)
+    await expect(untracked(page)).toContainText('13 · €3,438.00')
+    await expect(lines(untracked(page))).toHaveCount(13)
     await expect(lines(untracked(page)).first()).toHaveText(/^Groceries\s*Track…\s*€700\.00$/)
     await expect(untracked(page).getByRole('checkbox')).toHaveCount(0)
     // "to pay" is what is tracked, and the two lists together are the month's "Money out" rows
     const tracked = total(await amounts(list))
-    await expect(summary).toHaveText(new RegExp(`${inEuros(tracked).replace('.', '\\.')} to pay · €0\\.00 done · 1 overdue · 12 untracked`))
+    await expect(summary).toHaveText(new RegExp(`${inEuros(tracked).replace('.', '\\.')} to pay · €0\\.00 done · 1 overdue · 13 untracked`))
     expect(tracked).toBe(4627)
 
     // "Track…" with a method alone: it has no day to stand on
@@ -456,9 +456,9 @@ test.describe('Payments: the page', () => {
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
     await expect(lines(group(page, 'no-day'))).toHaveText([/–\s*Groceries\s*Direct debit/, /–\s*Subscriptions\s*Credit card/])
-    await expect(untracked(page)).toContainText('11 · €2,738.00')
+    await expect(untracked(page)).toContainText('12 · €2,738.00')
     await expect(summary).toContainText('€5,327.00 to pay')
-    await expect(summary).toContainText('11 untracked')
+    await expect(summary).toContainText('12 untracked')
     await expect(totals.getByRole('button', { name: /^Direct debit: €910\.00, 2 payments, €910\.00 not done yet$/ })).toBeVisible()
     // the keyboard stays in the list it was in: on the line that stood after the one that left
     await expect(untracked(page).getByRole('button', { name: /^Track Health: / })).toBeFocused()
@@ -490,18 +490,18 @@ test.describe('Payments: the page', () => {
     await expect(dlg.getByTestId('payment-untracked')).toContainText('it is not tracked')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-    await expect(untracked(page)).toContainText('12 · €3,438.00')
+    await expect(untracked(page)).toContainText('13 · €3,438.00')
     await expect(summary).toContainText('€4,627.00 to pay')
     await expect(totals.getByRole('button', { name: /^Direct debit: €210\.00, 1 payment, / })).toBeVisible()
 
     // the list folds, and the device remembers it
     await untracked(page).getByRole('button', { name: 'Untracked', exact: true }).click()
     await expect(lines(untracked(page))).toHaveCount(0)
-    await expect(untracked(page)).toContainText('12 · €3,438.00')
+    await expect(untracked(page)).toContainText('13 · €3,438.00')
     await page.reload()
     await expect(untracked(page).getByRole('button', { name: 'Untracked', exact: true })).toHaveAttribute('aria-expanded', 'false')
     await untracked(page).getByRole('button', { name: 'Untracked', exact: true }).click()
-    await expect(lines(untracked(page))).toHaveCount(12)
+    await expect(lines(untracked(page))).toHaveCount(13)
   })
 
   test('something that repeats: "This and following months" changes its schedule from here, "Only this month" the month alone', async ({ page }) => {

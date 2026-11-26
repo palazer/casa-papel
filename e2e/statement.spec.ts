@@ -53,8 +53,8 @@ test.describe('the Statement', () => {
     expect(assets).toBe(claims)
     await expect(total(page, 'assets')).toContainText('€23,018.00')
     const position = page.getByRole('region', { name: 'Debts and net worth' })
-    await expect(position.locator('[data-line="net-worth"]')).toContainText('€23,018.00')
-    await expect(position.locator('[data-line="free"]')).toContainText('€21,968.00')
+    await expect(position.locator('[data-line="net-worth"]')).toContainText('€21,278.00')
+    await expect(position.locator('[data-line="free"]')).toContainText('€20,228.00')
     // virtual accounts sit under the savings account that holds them
     const assetsSide = page.getByRole('region', { name: 'Assets' })
     await expect(assetsSide.getByText('Travel', { exact: true })).toBeVisible()
@@ -289,13 +289,13 @@ test.describe('working the month in the Statement', () => {
 
     // one click on a tick marks a row done, and the progress line counts it
     const progress = page.getByTestId('progress')
-    await expect(progress).toHaveText(/^0 of 21 done · €[\d,.]+ still to pay · €7,405\.00 to come in$/)
+    await expect(progress).toHaveText(/^0 of 22 done · €[\d,.]+ still to pay · €7,405\.00 to come in$/)
     await moneyOut.getByRole('button', { name: 'Family & pets', exact: true }).click()
     const childcare = page.getByRole('checkbox', { name: 'Robin – Childcare done' })
     await expect(childcare).not.toBeChecked()
     await childcare.click()
     await expect(childcare).toBeChecked()
-    await expect(progress).toHaveText(/^1 of 21 done/)
+    await expect(progress).toHaveText(/^1 of 22 done/)
 
     // an automatic row can be ticked as moved but not typed over: its dialog opens on the rule that works it out
     await expect(page.getByRole('checkbox', { name: 'To savings done' })).toBeVisible()
@@ -484,10 +484,10 @@ test.describe('working the month in the Statement', () => {
     const amountOf = async (line: string) => euros((await claims.locator(`[data-line="${line}"]`).innerText()).split('\n').pop()!)
     const netWorthBefore = await amountOf('net-worth')
 
-    // the card: the statement says 400 is owed, the plan had nothing
+    // the card: the statement says 2,000 is owed at the end of the month, the plan had 1,635
     await claims.getByRole('button', { name: /^Credit card balance:/ }).click()
     await expect(dlg.getByRole('heading', { name: 'Credit card · November 2026' })).toBeVisible()
-    await dlg.getByLabel('At the end of November 2026 (EUR)').fill('400')
+    await dlg.getByLabel('At the end of November 2026 (EUR)').fill('2000')
     // nothing offers to turn the difference into spending
     await expect(dlg.getByTestId('book-difference')).toHaveCount(0)
     await expect(dlg.getByRole('checkbox')).toHaveCount(0)
@@ -496,12 +496,12 @@ test.describe('working the month in the Statement', () => {
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
 
-    // the debt is 400, entered, and the line says how far the plan was off; the month's spending is what it was
-    await expect(claims.getByRole('button', { name: /^Credit card balance:/ })).toHaveAccessibleName('Credit card balance: €400.00, entered')
-    await expect(claims.locator('[data-line^="acc:"]').filter({ hasText: 'Credit card' })).toContainText('entered, +€400.00 against the plan')
+    // the debt is 2,000, entered, and the line says how far the plan was off; the month's spending is what it was
+    await expect(claims.getByRole('button', { name: /^Credit card balance:/ })).toHaveAccessibleName('Credit card balance: €2,000.00, entered')
+    await expect(claims.locator('[data-line^="acc:"]').filter({ hasText: 'Credit card' })).toContainText('entered, +€365.00 against the plan')
     expect(euros(await moneyOut.locator('[data-line="expenses"]').innerText())).toBe(expensesBefore)
     expect(euros(await moneyOut.locator('[data-line]').filter({ has: page.locator('[data-rule="rest"]') }).innerText())).toBe(restBefore)
-    expect(await amountOf('net-worth')).toBe(netWorthBefore - 400)
+    expect(await amountOf('net-worth')).toBe(netWorthBefore - 365)
     expect((await total(page, 'in').innerText()).replace(/^Total in\s*/, '')).toBe((await total(page, 'out').innerText()).replace(/^Total out\s*/, ''))
     expect((await total(page, 'assets').innerText()).replace(/^Total\s*/, '')).toBe((await total(page, 'claims').innerText()).replace(/^Total\s*/, ''))
 
@@ -691,7 +691,7 @@ test.describe('working the month in the Statement', () => {
     const netWorth = claims.locator('[data-line="net-worth"]')
     await expect(group).toContainText('€14,236.00')
     await expect(total(page, 'assets')).toContainText('€27,965.16')
-    await expect(netWorth).toContainText('€27,965.16')
+    await expect(netWorth).toContainText('€26,330.16')
 
     // the box is with the account's other options, and says what it does before and after it is ticked
     await assets.getByRole('button', { name: 'Add account' }).click()
@@ -725,7 +725,7 @@ test.describe('working the month in the Statement', () => {
     await expect(assets.locator('[data-outside]')).toHaveCount(1)
     await expect(group).toContainText('€14,236.00')
     await expect(total(page, 'assets')).toContainText('€27,965.16')
-    await expect(netWorth).toContainText('€27,965.16')
+    await expect(netWorth).toContainText('€26,330.16')
     // its figure is grey, as a figure in no sum is; the account above it is not
     const grey = await line.getByRole('button', { name: 'Pocket savings balance: €2,000.00' }).evaluate((el) => getComputedStyle(el).color)
     const plain = await assets.getByRole('button', { name: /^Index fund balance:/ }).evaluate((el) => getComputedStyle(el).color)
@@ -744,7 +744,7 @@ test.describe('working the month in the Statement', () => {
     // September and October brought 500 each, and so does November; the month and net worth are what they were
     await expect(line).toContainText('€3,500.00')
     await expect(moneyOut.getByRole('button', { name: 'Sam – Pocket: €500.00' })).toBeVisible()
-    await expect(netWorth).toContainText('€27,965.16')
+    await expect(netWorth).toContainText('€26,330.16')
     // the row and the account point at each other
     await moneyOut.getByRole('button', { name: 'Lands in Pocket savings: go there' }).click()
     await expect(line).toHaveAttribute('data-marked', 'true')
@@ -766,7 +766,7 @@ test.describe('working the month in the Statement', () => {
     await expect(moneyIn.getByRole('button', { name: /^From Pocket savings: €60\.00/ })).toBeVisible()
     await expect(moneyIn.locator('[data-line="income"]')).toContainText('€7,405.00')
     await expect(line).toContainText('€3,440.00')
-    await expect(netWorth).toContainText('€28,025.16')
+    await expect(netWorth).toContainText('€26,390.16')
     await page.screenshot({ path: 'e2e/output/statement-outside-net-worth.png', fullPage: true })
 
     // the box cannot be unticked while the pocket money lands there: the form says which row, and nothing changes
@@ -1813,8 +1813,8 @@ test.describe('working the month in the Statement', () => {
     // the form is closed again
     await expect(does).toHaveCount(0)
 
-    // the card the household has is paid off from there too. Nothing is owed on it, so the payment counts as nothing
-    // and says so: "paid off", with what was planned beside it
+    // the card the household has is paid off from there too: a second payment counts like the first, and brings the
+    // card down with it
     await moneyOut.getByRole('button', { name: 'Add expense row' }).click()
     await does.selectOption('pay-off')
     await expect(paid.locator('option')).toHaveText(['Car loan · Loan', 'Credit card · Credit card', 'New loan…', 'New credit card…'])
@@ -1822,15 +1822,18 @@ test.describe('working the month in the Statement', () => {
     await paid.selectOption({ label: 'Credit card · Credit card' })
     await expect(text).toHaveText('A payment brings down what is owed on a loan or a card, and counts as an expense of its month. It stops at what is owed.')
     await expect(moneyOut.getByLabel('New expense row name')).toHaveAttribute('placeholder', 'Credit card – Payment')
+    await moneyOut.getByLabel('New expense row name').fill('Card – Extra payment')
     await moneyOut.getByRole('button', { name: 'Add', exact: true }).click()
-    await expect(dlg.getByRole('heading', { name: 'Credit card – Payment · November 2026' })).toBeVisible()
-    await dlg.getByLabel('Amount in EUR').fill('60')
+    await expect(dlg.getByRole('heading', { name: 'Card – Extra payment · November 2026' })).toBeVisible()
+    await dlg.getByLabel('Amount in EUR').fill('100')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-    const cardPayment = part('expenses').locator('[data-line^="row:"], [data-line]').filter({ hasText: 'Credit card – Payment' }).last()
-    await expect(cardPayment).toContainText('paid off')
-    await expect(cardPayment).toContainText('€60.00 planned')
+    const cardPayment = part('expenses').locator('[data-line]').filter({ hasText: 'Card – Extra payment' }).last()
+    await expect(cardPayment).toContainText('€100.00')
+    await expect(cardPayment).not.toContainText('paid off')
     await expect(cardPayment).toBeInViewport()
+    // 1,695 at the start of November, less the 60 it had and the 100 on top
+    await expect(page.getByRole('region', { name: 'Debts and net worth' }).locator('[data-line^="acc:"]').filter({ hasText: 'Credit card' })).toContainText('€1,535.00')
     // no payment only "moves money" any more
     await expect(moneyOut.locator('[data-line="moved"]')).toHaveCount(0)
 
@@ -2280,13 +2283,14 @@ test.describe('working the month in the Statement', () => {
     const dlg = page.getByRole('dialog')
     const line = (side: typeof assets, name: string) => side.locator('[data-line]').filter({ hasText: name }).first()
 
-    // a month that is over shows what is linked, and the link that is still open, as any month does
+    // a month that is over shows what is linked, as any month does; nothing in the demo is left without its row
     await goToMonth(page, 'September 2026')
     await expect(moneyOut.getByRole('button', { name: 'Goes into Index fund: go there' })).toBeVisible()
-    await expect(page.locator('[data-link="open"]')).toHaveCount(1)
+    await expect(page.locator('[data-link="open"]')).toHaveCount(0)
 
     await goToMonth(page, 'November 2026')
-    // income and plain expenses move no account of the lower half: no symbol
+    // income and plain expenses move no account of the lower half: no symbol (the card's payment has one, and is
+    // inside its category until something opens it)
     await expect(moneyIn.locator('[data-link]')).toHaveCount(0)
     await expect(moneyOut.locator('[data-link]')).toHaveCount(4)
 
@@ -2312,20 +2316,32 @@ test.describe('working the month in the Statement', () => {
     // the savings account names the row that fills it
     await expect(assets.getByRole('button', { name: 'Filled by To savings: go there' })).toBeVisible()
 
-    // the card has no row that pays it off: its link is open, and pressing it adds the row
+    // the card and the row that pays it off find each other
     const card = claims.locator('[data-line^="acc:"]').filter({ hasText: 'Credit card' })
-    await expect(card.locator('[data-link="open"]')).toHaveCount(1)
-    await claims.getByRole('button', { name: 'No row pays off Credit card yet: add the row that pays it off' }).click()
-    await expect(dlg.getByRole('heading', { name: 'Credit card – Payment · November 2026' })).toBeVisible()
-    await dlg.getByLabel('Amount in EUR').fill('60')
-    await dlg.getByRole('button', { name: 'Save' }).click()
-    await expect(dlg).toBeHidden()
-    // now both ends carry the closed link, and they find each other
     await expect(card.locator('[data-link="open"]')).toHaveCount(0)
     await claims.getByRole('button', { name: 'Paid off by Credit card – Payment: go there' }).click()
     await expect(line(moneyOut, 'Credit card – Payment')).toHaveAttribute('data-marked', 'true')
     await moneyOut.getByRole('button', { name: 'Pays off Credit card: go there' }).click()
     await expect(card).toHaveAttribute('data-marked', 'true')
+
+    // a card that is added without its row: its link is open, and pressing it adds the row
+    await claims.getByRole('button', { name: 'Add a card or loan' }).click()
+    await dlg.getByLabel('Name', { exact: true }).fill('Visa')
+    await dlg.getByLabel('Owed at the start of September 2026 (EUR)').fill('300')
+    await dlg.getByRole('checkbox', { name: 'Add the row that pays it off' }).uncheck()
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    const visa = claims.locator('[data-line^="acc:"]').filter({ hasText: 'Visa' })
+    await expect(visa.locator('[data-link="open"]')).toHaveCount(1)
+    await claims.getByRole('button', { name: 'No row pays off Visa yet: add the row that pays it off' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Visa – Payment · November 2026' })).toBeVisible()
+    await dlg.getByLabel('Amount in EUR').fill('60')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    // now both ends carry the closed link
+    await expect(visa.locator('[data-link="open"]')).toHaveCount(0)
+    await claims.getByRole('button', { name: 'Paid off by Visa – Payment: go there' }).click()
+    await expect(line(moneyOut, 'Visa – Payment')).toHaveAttribute('data-marked', 'true')
 
     // the legend says what the symbol means
     await page.getByRole('button', { name: 'Colours and marks' }).click()
