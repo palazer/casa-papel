@@ -3,15 +3,18 @@ import { Button } from '@/components/ui/button'
 import { Island } from '@/components/ui/island'
 import { cn } from '@/lib/utils'
 import type { SetupStep, SetupStepKey } from '@/store'
+import { txt } from '@/i18n'
+
+const T = txt.statement.setupGuide
 
 /** What each step asks for: the prompt, and one sentence that says how. */
 const STEP: Record<SetupStepKey, { title: string; text: string }> = {
-  income: { title: 'Your first income', text: 'Type what comes in each month on a suggested line and press Enter. Amounts carry forward to the months after.' },
-  expenses: { title: 'Your first expenses', text: 'Type what a usual month costs. A guess is fine: it shows as an estimate until you know.' },
-  savings: { title: 'Savings, and where the rest goes', text: 'Add a savings account under Assets. It is then asked to take what is left of each month.' },
-  virtual: { title: 'Your first virtual account', text: 'Money set aside inside savings for one purpose, like travel or clothes: add one under Assets with what goes in each month.' },
-  investments: { title: 'Your first investment', text: 'Add an investment account under Assets. It then asks how much goes in each month.' },
-  debts: { title: 'Loans and cards', text: 'Add what you owe under Debts. It comes with the row that pays it off.' },
+  income: { title: T.yourFirstIncome, text: T.typeWhatComesIn },
+  expenses: { title: T.yourFirstExpenses, text: T.typeWhatAUsual },
+  savings: { title: T.savingsAndWhereThe, text: T.addASavingsAccount },
+  virtual: { title: T.yourFirstVirtualAccount, text: T.moneySetAsideInside },
+  investments: { title: T.yourFirstInvestment, text: T.addAnInvestmentAccount },
+  debts: { title: T.loansAndCards, text: T.addWhatYouOwe },
 }
 
 /**
@@ -39,12 +42,12 @@ export function SetupGuide({ steps, current, action, onStep, onDone }: {
   const { title, text } = STEP[step.key]
   return (
     <Island
-      title="Setting up" help="statement.setup" aria-label="Setting up" data-testid="setup-guide"
+      title={T.settingUp} help="statement.setup" aria-label={T.settingUp} data-testid="setup-guide"
       className="sticky top-0 z-30 shadow-sm" bodyClassName="flex flex-wrap items-center gap-x-3 gap-y-1.5"
       right={(
         <span className="flex items-center gap-2">
-          <span className="whitespace-nowrap tabular-nums" data-testid="setup-count">{at + 1} of {steps.length}</span>
-          <Button size="xs" variant="ghost" onClick={onDone}>Leave setup</Button>
+          <span className="whitespace-nowrap tabular-nums" data-testid="setup-count">{T.stepOf(at, steps.length)}</span>
+          <Button size="xs" variant="ghost" onClick={onDone}>{T.leaveSetup}</Button>
         </span>
       )}
     >
@@ -54,7 +57,7 @@ export function SetupGuide({ steps, current, action, onStep, onDone }: {
           <li key={s.key}>
             <button
               type="button" onClick={() => onStep(s.key)} data-step={s.key} data-done={s.done} aria-current={i === at ? 'step' : undefined}
-              aria-label={`Step ${i + 1}, ${s.label}: ${s.done ? 'done' : 'still to do'}`} title={s.label}
+              aria-label={T.step(i, s.label, s.done)} title={s.label}
               className={cn(
                 'inline-flex size-6 items-center justify-center rounded-full border text-[11px] font-medium tabular-nums outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:size-8',
                 // the step the guide is on is the pressed one (DESIGN.md §1: the lime is for what is pressed)
@@ -72,10 +75,10 @@ export function SetupGuide({ steps, current, action, onStep, onDone }: {
       </div>
       <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
         {action && <Button size="sm" variant="outline" onClick={action.run}>{action.label}</Button>}
-        <Button size="sm" variant="ghost" disabled={at === 0} onClick={() => onStep(steps[at - 1].key)}>Back</Button>
+        <Button size="sm" variant="ghost" disabled={at === 0} onClick={() => onStep(steps[at - 1].key)}>{T.back}</Button>
         {last
-          ? <Button size="sm" variant={step.done ? 'default' : 'outline'} onClick={onDone}>Finish</Button>
-          : <Button size="sm" variant={step.done ? 'default' : 'outline'} onClick={() => onStep(steps[at + 1].key)}>{step.done ? 'Next' : 'Skip'}</Button>}
+          ? <Button size="sm" variant={step.done ? 'default' : 'outline'} onClick={onDone}>{T.finish}</Button>
+          : <Button size="sm" variant={step.done ? 'default' : 'outline'} onClick={() => onStep(steps[at + 1].key)}>{step.done ? T.next : T.skip}</Button>}
       </div>
     </Island>
   )

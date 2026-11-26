@@ -9,6 +9,9 @@ import type { Category, Household, Tables } from '@/model'
 import { moveCategory, removeIfFree, renameCategory } from '@/store'
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
 import { saveError, showSaveError } from '@/app/saveError'
+import { txt } from '@/i18n'
+
+const T = txt.statement.categoryMenu
 
 const byOrder = (a: Category, b: Category) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0)
 
@@ -34,7 +37,7 @@ export function CategoryMenu({ category, tables, household, onError, onDeleted, 
   const [problem, setProblem] = useState<string | null>(null)
   const siblings = tables.categories.filter((c) => !c.deletedAt && c.section === category.section).sort(byOrder)
   const at = siblings.findIndex((c) => c.id === category.id)
-  const act = (fn: () => Promise<unknown>) => () => void fn().catch(showSaveError(onError, 'Action failed'))
+  const act = (fn: () => Promise<unknown>) => () => void fn().catch(showSaveError(onError, txt.common.actionFailed))
   const close = () => setOpen(null)
   // cheap while the household is being set up; a category that still has rows opens the dialog, which says they are kept
   const cheap = household.setupOpen ?? false
@@ -49,33 +52,33 @@ export function CategoryMenu({ category, tables, household, onError, onDeleted, 
     if (!n) return
     if (n === category.name) return close()
     // a name that is taken stays in the dialog, beside the field that caused it
-    renameCategory(store, category.id, n).then(close).catch((e) => setProblem(saveError(e, 'That name cannot be used.')))
+    renameCategory(store, category.id, n).then(close).catch((e) => setProblem(saveError(e, T.thatNameCannotBe)))
   }
 
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className={triggerClassName ?? 'size-6'} aria-label={`Category menu for ${category.name}`} />}>
+        <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className={triggerClassName ?? 'size-6'} aria-label={T.categoryMenuFor(category.name)} />}>
           <MoreHorizontal />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-max">
-          <DropdownMenuItem onClick={() => { setName(category.name); setProblem(null); setOpen('rename') }}>Rename…</DropdownMenuItem>
-          {onEstimate && <DropdownMenuItem onClick={onEstimate}>{hasEstimate ? 'Change estimate…' : 'Set estimate…'}</DropdownMenuItem>}
-          <DropdownMenuItem disabled={at <= 0} onClick={act(() => moveCategory(store, category.id, 'up'))}>Move up</DropdownMenuItem>
-          <DropdownMenuItem disabled={at === siblings.length - 1} onClick={act(() => moveCategory(store, category.id, 'down'))}>Move down</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => { setName(category.name); setProblem(null); setOpen('rename') }}>{txt.common.renameMore}</DropdownMenuItem>
+          {onEstimate && <DropdownMenuItem onClick={onEstimate}>{hasEstimate ? T.changeEstimate : T.setEstimate}</DropdownMenuItem>}
+          <DropdownMenuItem disabled={at <= 0} onClick={act(() => moveCategory(store, category.id, 'up'))}>{txt.common.moveUp}</DropdownMenuItem>
+          <DropdownMenuItem disabled={at === siblings.length - 1} onClick={act(() => moveCategory(store, category.id, 'down'))}>{txt.common.moveDown}</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={cheap ? act(removeNow) : () => setOpen('remove')}>{cheap ? 'Delete' : 'Remove…'}</DropdownMenuItem>
+          <DropdownMenuItem onClick={cheap ? act(removeNow) : () => setOpen('remove')}>{cheap ? txt.common.delete : txt.common.removeMore}</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
       <Dialog open={open === 'rename'} onOpenChange={(o) => { if (!o) close() }}>
         <DialogContent className="sm:max-w-sm" aria-describedby={undefined}>
-          <DialogHeader><DialogTitle>Rename category</DialogTitle></DialogHeader>
-          <Input autoFocus aria-label="Category name" aria-invalid={!!problem || undefined} value={name} onChange={(e) => { setName(e.target.value); setProblem(null) }} onKeyDown={(e) => { if (e.key === 'Enter') rename() }} />
+          <DialogHeader><DialogTitle>{T.renameCategory}</DialogTitle></DialogHeader>
+          <Input autoFocus aria-label={T.categoryName} aria-invalid={!!problem || undefined} value={name} onChange={(e) => { setName(e.target.value); setProblem(null) }} onKeyDown={(e) => { if (e.key === 'Enter') rename() }} />
           {problem && <p role="alert" className="text-sm text-destructive">{problem}</p>}
           <DialogFooter>
-            <Button variant="outline" onClick={close}>Cancel</Button>
-            <Button disabled={!name.trim()} onClick={rename}>Save</Button>
+            <Button variant="outline" onClick={close}>{txt.common.cancel}</Button>
+            <Button disabled={!name.trim()} onClick={rename}>{txt.common.save}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

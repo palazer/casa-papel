@@ -10,13 +10,16 @@ import { AddLead } from './AddLead'
 import type { MonthKey, Row } from '@/model'
 import { addSuggestion, dismissSuggestion, type AccountSuggestion, type RowSuggestion } from '@/store'
 import { showSaveError } from '@/app/saveError'
+import { txt } from '@/i18n'
+
+const T = txt.statement.suggestions
 
 type Need = NonNullable<RowSuggestion['needs']>
 /** A suggested row that needs an account says so with the way to make it. */
 const NEEDS: Record<Need, string> = {
-  savings: 'Add a savings account…',
-  investment: 'Add an investment account…',
-  loan: 'Add a loan…',
+  savings: T.addASavingsAccount,
+  investment: T.addAnInvestmentAccount,
+  loan: T.addALoan,
 }
 const LINE = 'flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs'
 const CONTROLS = 'ml-auto flex shrink-0 items-center gap-1.5'
@@ -47,7 +50,7 @@ export function SuggestionLines({ suggestions, label, month, currency, locale, o
 }) {
   if (suggestions.length === 0) return null
   return (
-    <div className="basis-full space-y-1" role="group" aria-label={`Suggestions for ${label}`} data-testid="suggestions">
+    <div className="basis-full space-y-1" role="group" aria-label={T.suggestionsFor(label)} data-testid="suggestions">
       {suggestions.map((s) => <SuggestionLine key={s.id} suggestion={s} month={month} currency={currency} locale={locale} onAdded={onAdded} onError={onError} onNeed={onNeed} ticks={ticks} />)}
     </div>
   )
@@ -62,7 +65,7 @@ function SuggestionLine({ suggestion: s, month, currency, locale, onAdded, onErr
   const [busy, setBusy] = useState(false)
   const amount = text.trim() === '' ? null : parseAmount(text, currency, locale)
   const unreadable = text.trim() !== '' && (amount == null || amount < 0)
-  const fail = showSaveError(onError, 'That did not work.')
+  const fail = showSaveError(onError, T.thatDidNotWork)
 
   function add() {
     if (unreadable || busy || s.needs) return
@@ -74,24 +77,24 @@ function SuggestionLine({ suggestion: s, month, currency, locale, onAdded, onErr
     <div className={LINE} data-suggestion={s.id}>
       <AddLead ticks={ticks} />
       <span className="min-w-0 truncate font-medium text-muted-foreground" data-lead="text">{s.title}</span>
-      <InfoTip help="statement.suggestions" title={s.title} text={s.pool ? `${s.description} The amount is what you set aside each month.` : s.description} />
+      <InfoTip help="statement.suggestions" title={s.title} text={s.pool ? T.theAmountIsWhat(s.description) : s.description} />
       {/* the field and its buttons stay together: on a narrow screen they move under the name as one */}
       <span className={CONTROLS}>
-        {s.needs ? <Button size="xs" variant="outline" aria-label={`${NEEDS[s.needs].replace('…', '')} for ${s.title}`} onClick={() => onNeed(s.needs!)}>{NEEDS[s.needs]}</Button> : (
+        {s.needs ? <Button size="xs" variant="outline" aria-label={T.needsFor(NEEDS[s.needs].replace('…', ''), s.title)} onClick={() => onNeed(s.needs!)}>{NEEDS[s.needs]}</Button> : (
           <>
             <Input
-              aria-label={`${s.pool ? 'Set aside per month' : 'Amount per month'} for ${s.title}`} aria-invalid={unreadable || undefined}
-              className="h-7 w-28 text-right" inputMode="decimal" placeholder="per month"
+              aria-label={T.amountFor(s.pool, s.title)} aria-invalid={unreadable || undefined}
+              className="h-7 w-28 text-right" inputMode="decimal" placeholder={T.perMonth}
               value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add() }}
             />
-            <Button size="xs" variant="outline" aria-label={`Add ${s.title}`} disabled={busy || unreadable} onClick={add}>Add</Button>
+            <Button size="xs" variant="outline" aria-label={T.add(s.title)} disabled={busy || unreadable} onClick={add}>{txt.common.add}</Button>
           </>
         )}
-        <button type="button" className={DISMISS} aria-label={`Dismiss ${s.title}`} title="Not for us" onClick={() => void dismissSuggestion(store, s.id).catch(fail)}>
+        <button type="button" className={DISMISS} aria-label={T.dismiss(s.title)} title={T.notForUs} onClick={() => void dismissSuggestion(store, s.id).catch(fail)}>
           <X className="size-3.5" aria-hidden />
         </button>
       </span>
-      {unreadable && <p role="alert" className="basis-full text-destructive">{unreadableAmount(text, 'That is not an amount I can read.')}</p>}
+      {unreadable && <p role="alert" className="basis-full text-destructive">{unreadableAmount(text, T.thatIsNotAn)}</p>}
       {!unreadable && <AmountHint text={text} currency={currency} locale={locale} className="basis-full text-right" />}
     </div>
   )
@@ -106,17 +109,17 @@ export function AccountSuggestionLines({ suggestions, onAdd, onError }: {
   const store = useStore()
   if (suggestions.length === 0) return null
   return (
-    <div className="basis-full space-y-1" role="group" aria-label="Suggested accounts" data-testid="account-suggestions">
+    <div className="basis-full space-y-1" role="group" aria-label={T.suggestedAccounts} data-testid="account-suggestions">
       {suggestions.map((s) => (
         <div key={s.id} className={LINE} data-suggestion={s.id}>
           <AddLead ticks={false} />
           <span className="min-w-0 truncate font-medium text-muted-foreground" data-lead="text">{s.name}</span>
           <InfoTip help="statement.suggestions" title={s.name} text={s.description} />
           <span className={CONTROLS}>
-            <Button size="xs" variant="outline" aria-label={`Add ${s.name}`} onClick={() => onAdd(s)}>Add</Button>
+            <Button size="xs" variant="outline" aria-label={T.addAccount(s.name)} onClick={() => onAdd(s)}>{txt.common.add}</Button>
             <button
-              type="button" className={DISMISS} aria-label={`Dismiss ${s.name}`} title="Not for us"
-              onClick={() => void dismissSuggestion(store, s.id).catch(showSaveError(onError, 'That did not work.'))}
+              type="button" className={DISMISS} aria-label={T.dismissAccount(s.name)} title={T.notForUs}
+              onClick={() => void dismissSuggestion(store, s.id).catch(showSaveError(onError, T.thatDidNotWork))}
             >
               <X className="size-3.5" aria-hidden />
             </button>

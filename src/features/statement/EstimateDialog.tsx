@@ -12,6 +12,9 @@ import { followingText, onlyThisMonthText } from '@/features/grid/followingText'
 import { addMonths, type Category, type Household, type Money, type MonthKey, type Tables } from '@/model'
 import { estimateRowOf, planFollowing, setCategoryEstimate, type EditScope } from '@/store'
 import { saveError } from '@/app/saveError'
+import { txt } from '@/i18n'
+
+const T = txt.statement.estimate
 
 interface Props {
   category: Category
@@ -56,14 +59,14 @@ export function EstimateDialog({ category, month, tables, engine, household, cur
       await setCategoryEstimate(store, category.id, month, amount, scope)
       onClose()
     } catch (e) {
-      setError(saveError(e, 'Could not save.'))
+      setError(saveError(e, txt.common.couldNotSave))
     } finally {
       setBusy(false)
     }
   }
   function submit() {
-    if (typed == null) return setError(text.trim() === '' ? 'Type what the category should come to.' : unreadableAmount(text))
-    if (typed < 0) return setError('An estimate cannot be below zero.')
+    if (typed == null) return setError(text.trim() === '' ? T.typeWhatTheCategory : unreadableAmount(text))
+    if (typed < 0) return setError(T.anEstimateCannotBe)
     void save(typed)
   }
 
@@ -71,34 +74,34 @@ export function EstimateDialog({ category, month, tables, engine, household, cur
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>Estimate for {category.name} · {formatMonth(month, locale, 'long')}</DialogTitle>
+          <DialogTitle>{T.estimateFor(category.name, formatMonth(month, locale, 'long'))}</DialogTitle>
           <DialogDescription>
-            What {category.name} should come to in a month, before you know every row. Its rows are taken off it and the rest shows as &quot;Not broken down yet&quot;.
+            {T.whatShouldComeTo(category.name)}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-1.5">
-          <TipLabel htmlFor="category-estimate" help="row.categoryEstimate">Estimate per month in {ccy}</TipLabel>
-          <Input id="category-estimate" autoFocus inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} placeholder="e.g. 1450" />
+          <TipLabel htmlFor="category-estimate" help="row.categoryEstimate">{T.estimatePerMonthIn(ccy)}</TipLabel>
+          <Input id="category-estimate" autoFocus inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} placeholder={T.eG1450} />
           <AmountHint text={text} currency={ccy} locale={locale} />
         </div>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-          <dt className="text-muted-foreground">Rows this month</dt><dd className="text-right tabular-nums">{formatAmount(rows, ccy, locale)}</dd>
-          <dt className="text-muted-foreground">Not broken down yet</dt><dd className="text-right tabular-nums" data-testid="estimate-left">{left != null ? formatAmount(left, ccy, locale) : '—'}</dd>
+          <dt className="text-muted-foreground">{T.rowsThisMonth}</dt><dd className="text-right tabular-nums">{formatAmount(rows, ccy, locale)}</dd>
+          <dt className="text-muted-foreground">{T.notBrokenDownYet}</dt><dd className="text-right tabular-nums" data-testid="estimate-left">{left != null ? formatAmount(left, ccy, locale) : '—'}</dd>
         </dl>
-        {typed != null && typed > 0 && typed < rows && <p className="text-xs text-muted-foreground">The rows already add up to more, so {category.name} will show their sum.</p>}
+        {typed != null && typed > 0 && typed < rows && <p className="text-xs text-muted-foreground">{T.theRowsAlreadyAdd(category.name)}</p>}
         <fieldset className="space-y-1.5">
-          <legend className="text-sm font-medium">Applies to</legend>
-          <Segmented value={scope} onChange={(v) => setScope(v as EditScope)} options={[{ value: 'from-now-on', label: 'This and following months' }, { value: 'this-month', label: 'Only this month' }]} />
+          <legend className="text-sm font-medium">{T.appliesTo}</legend>
+          <Segmented value={scope} onChange={(v) => setScope(v as EditScope)} options={[{ value: 'from-now-on', label: txt.common.thisAndFollowing }, { value: 'this-month', label: txt.common.onlyThisMonth }]} />
           <p className="text-xs text-muted-foreground" data-testid="scope-says">
-            {scope === 'from-now-on' ? followingText(month, following, locale, 'The estimate stays in every later month until you change it.') : onlyThisMonthText(month, goesOn, ccy, locale, 'has no estimate')}
+            {scope === 'from-now-on' ? followingText(month, following, locale, T.theEstimateStaysIn) : onlyThisMonthText(month, goesOn, ccy, locale, T.hasNoEstimate)}
           </p>
         </fieldset>
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         <DialogFooter className="flex-row flex-wrap gap-2 sm:justify-between">
-          <div>{current > 0 && <Button variant="ghost" onClick={() => void save(0)} disabled={busy}>Remove estimate</Button>}</div>
+          <div>{current > 0 && <Button variant="ghost" onClick={() => void save(0)} disabled={busy}>{T.removeEstimate}</Button>}</div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-            <Button onClick={submit} disabled={busy}>Save</Button>
+            <Button variant="outline" onClick={onClose} disabled={busy}>{txt.common.cancel}</Button>
+            <Button onClick={submit} disabled={busy}>{txt.common.save}</Button>
           </div>
         </DialogFooter>
       </DialogContent>

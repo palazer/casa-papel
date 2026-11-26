@@ -6,11 +6,14 @@ import { computePersonBudgets, type EngineOutput, type PersonBudget } from '@/en
 import type { Household, MonthKey, Tables } from '@/model'
 import { AMOUNT_COL } from './StatementLine'
 import { LOCKED } from './lead'
+import { txt } from '@/i18n'
+
+const T = txt.statement.perPerson
 
 const LINES: Array<{ label: string; of: (p: PersonBudget) => number }> = [
-  { label: 'Income', of: (p) => p.income },
-  { label: 'Own spending', of: (p) => p.ownSpend },
-  { label: 'Pocket money', of: (p) => p.pocket },
+  { label: txt.common.income, of: (p) => p.income },
+  { label: T.ownSpending, of: (p) => p.ownSpend },
+  { label: T.pocketMoney, of: (p) => p.pocket },
 ]
 const CELL = 'h-11 px-2 md:h-7'
 
@@ -28,7 +31,7 @@ export function PerPerson({ household, tables, engine, month, locked = false }: 
   const people = useMemo(() => computePersonBudgets(tables, engine, month), [tables, engine, month])
   if (people.length < 2) return null
   return (
-    <Island title="Per person" help="statement.perPerson" className={cn('lg:w-1/2', locked && LOCKED)} bodyClassName="overflow-x-auto px-0 pb-0 pt-1" inert={locked || undefined} data-testid="per-person">
+    <Island title={T.perPerson} help="statement.perPerson" className={cn('lg:w-1/2', locked && LOCKED)} bodyClassName="overflow-x-auto px-0 pb-0 pt-1" inert={locked || undefined} data-testid="per-person">
       <table className="w-full text-sm md:text-xs">
         <thead>
           <tr className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -44,7 +47,7 @@ export function PerPerson({ household, tables, engine, month, locked = false }: 
             </tr>
           ))}
           <tr className="border-t font-semibold">
-            <th scope="row" className={cn(CELL, 'text-left font-semibold')}>Leaves for the household</th>
+            <th scope="row" className={cn(CELL, 'text-left font-semibold')}>{T.leavesForTheHousehold}</th>
             {people.map((p) => <td key={p.entityId} className={cn(CELL, AMOUNT_COL, p.contribution < 0 && 'text-expense')}>{formatAmount(p.contribution, ccy, locale, { sign: 'exceptZero' })}</td>)}
           </tr>
         </tbody>

@@ -5,6 +5,9 @@ import { HUES } from '@/app/hues'
 import { cn } from '@/lib/utils'
 import { isPastMonth, parseMonth, type Money, type MonthKey } from '@/model'
 import { stripStart, type StripMonth } from './stripMonths'
+import { txt } from '@/i18n'
+
+const T = txt.statement.monthStrip
 
 /**
  * The months of the plan as a strip of chips, first thing on the Statement (DESIGN.md §7), and the one place where
@@ -66,7 +69,7 @@ export function MonthStrip({ months, month, today, currency, locale, onChange, o
   }
 
   return (
-    <nav aria-label="Months" className="flex items-start gap-1" data-testid="month-strip">
+    <nav aria-label={T.months} className="flex items-start gap-1" data-testid="month-strip">
       <div
         ref={strip} onKeyDown={onKeyDown}
         className="relative flex min-w-0 flex-1 snap-x gap-1.5 overflow-x-auto scroll-smooth pb-0.5 [scrollbar-width:none] motion-reduce:scroll-auto [&::-webkit-scrollbar]:hidden"
@@ -75,13 +78,13 @@ export function MonthStrip({ months, month, today, currency, locale, onChange, o
           const pressed = s.month === month
           const now = s.month === today
           const past = isPastMonth(s.month, today)
-          const figures: Array<[string, Money]> = [['income', s.income], ['from accounts', s.fromAccounts], ['expenses', s.expenses], ['from what is left', s.left]]
+          const figures: Array<[string, Money]> = [[T.income, s.income], [T.fromAccounts, s.fromAccounts], [T.expenses, s.expenses], [T.fromWhatIsLeft, s.left]]
           const said = figures.filter(([, v]) => v !== 0).map(([what, v]) => `${what} ${formatAmount(v, currency, locale, { compact: true })}`)
           return (
             <button
               key={s.month} type="button" data-month={s.month} tabIndex={pressed ? 0 : -1}
               aria-pressed={pressed} aria-current={now ? 'date' : undefined}
-              aria-label={`${formatMonth(s.month, locale, 'long')}${now ? ', now' : past ? ', past' : ''}${said.length ? `: ${said.join(', ')}` : ': nothing yet'}`}
+              aria-label={T.monthSaid(formatMonth(s.month, locale, 'long'), now, past, said.length, said.join(', '))}
               onClick={() => onChange(s.month)}
               className={cn(
                 'min-w-[5.5rem] shrink-0 grow-0 basis-[5.5rem] snap-start rounded-md border px-2 py-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring md:basis-[calc((100%_-_4.125rem)/12)]',
@@ -90,7 +93,7 @@ export function MonthStrip({ months, month, today, currency, locale, onChange, o
             >
               <span className="flex items-baseline justify-between gap-1 whitespace-nowrap text-xs leading-4">
                 <span className={cn(now ? 'font-semibold' : 'font-medium', !pressed && !now && 'text-muted-foreground')}>{formatMonth(s.month, locale)}</span>
-                {now && <span className={cn('text-[10px]', !pressed && 'text-muted-foreground')}>now</span>}
+                {now && <span className={cn('text-[10px]', !pressed && 'text-muted-foreground')}>{T.now}</span>}
               </span>
               <Figures a={s.income} b={s.fromAccounts} hues={[HUES.income.text, HUES.worth.text]} plain={pressed} currency={currency} locale={locale} />
               <Figures a={s.expenses} b={s.left} hues={[HUES.expense.text, HUES.transfer.text]} plain={pressed} currency={currency} locale={locale} />
@@ -103,7 +106,7 @@ export function MonthStrip({ months, month, today, currency, locale, onChange, o
             type="button" onClick={onAddYear}
             className="shrink-0 rounded-md border border-dashed px-3 text-xs font-medium whitespace-nowrap text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
-            Add {parseMonth(keys[keys.length - 1]).year + 1}
+            {T.addYear(parseMonth(keys[keys.length - 1]).year)}
           </button>
         )}
       </div>

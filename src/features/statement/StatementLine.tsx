@@ -11,6 +11,9 @@ import type { HelpKey } from '@/app/help'
 import { HUES, type Hue } from '@/app/hues'
 import type { GoalProgress, StatementHue, StatementLine as Line } from '@/engine'
 import { CHEVRON_SLOT, LEAD_HANG, LEAD_PAD, LOCKED, TICK_GAP, TICK_SLOT } from './lead'
+import { txt } from '@/i18n'
+
+const T = txt.statement.line
 
 /** What every line of a side needs to draw itself. The working parts are optional: a side without them is read-only. */
 export interface LineContext {
@@ -167,26 +170,26 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
     <>
       {/* left out of net worth: the mark says why the figures are grey and why the sums above pass the line by */}
       {line.outside && (
-        <span role="img" aria-label="Not in net worth" title="Not in net worth: no total counts this account" className="inline-flex shrink-0" data-outside>
+        <span role="img" aria-label={T.notInNetWorth} title={T.notInNetWorth2} className="inline-flex shrink-0" data-outside>
           <CircleSlash className="size-3 text-muted-foreground" aria-hidden />
         </span>
       )}
       {/* on a schedule: an item a schedule posted, and the row that has one, also in a month where nothing lands */}
       {line.scheduled && (
-        <span role="img" aria-label={line.repeats ? `Repeats: ${line.repeats}` : 'Repeats'} title={line.repeats ? `Repeats: ${line.repeats}` : 'Repeats'} className="inline-flex shrink-0" data-repeats>
+        <span role="img" aria-label={line.repeats ? T.repeatsWhen(line.repeats) : txt.common.repeats} title={line.repeats ? T.repeatsWhen(line.repeats) : txt.common.repeats} className="inline-flex shrink-0" data-repeats>
           <Repeat className="size-3 text-muted-foreground" aria-hidden />
         </span>
       )}
       {/* the day it goes out on, while payments are planned by day: quiet, and the way to the month's payments */}
       {line.day != null && (ctx.onDay ? (
         <button
-          type="button" data-day aria-label={`Paid on the ${ordinalDay(line.day)}: show in Payments`} title={`Paid on the ${ordinalDay(line.day)}. Press for the month's payments.`} onClick={() => ctx.onDay!(line)}
+          type="button" data-day aria-label={T.paidOnShow(ordinalDay(line.day))} title={T.paidOnPress(ordinalDay(line.day))} onClick={() => ctx.onDay!(line)}
           className={cn(ABOVE, 'shrink-0 rounded text-[11px] tabular-nums text-muted-foreground outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:-my-2 pointer-coarse:py-2')}
         >
           {ordinalDay(line.day)}
         </button>
-      ) : <span data-day className="shrink-0 text-[11px] tabular-nums text-muted-foreground" title={`Paid on the ${ordinalDay(line.day)}`}>{ordinalDay(line.day)}</span>)}
-      {line.nextDue && <span className="shrink-0 text-[11px] text-muted-foreground">next {formatMonth(line.nextDue, locale)}</span>}
+      ) : <span data-day className="shrink-0 text-[11px] tabular-nums text-muted-foreground" title={T.paidOnThe(ordinalDay(line.day))}>{ordinalDay(line.day)}</span>)}
+      {line.nextDue && <span className="shrink-0 text-[11px] text-muted-foreground">{T.nextIn(formatMonth(line.nextDue, locale))}</span>}
       {line.accountKind && <span className="shrink-0 text-[11px] text-muted-foreground">{line.accountKind}</span>}
       {line.native && (
         <>
@@ -194,21 +197,21 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
           <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{formatAmount(line.native.amount, line.native.currency, locale)}</span>
         </>
       )}
-      {line.missingRate && <Chip tone="rose">no rate</Chip>}
-      {line.net != null && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">net {formatAmount(line.net, ccy, locale)}</span>}
-      {line.budget != null && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">estimate {formatAmount(line.budget, ccy, locale)}</span>}
+      {line.missingRate && <Chip tone="rose">{T.noRate}</Chip>}
+      {line.net != null && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{T.net(formatAmount(line.net, ccy, locale))}</span>}
+      {line.budget != null && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{T.estimate(formatAmount(line.budget, ccy, locale))}</span>}
       {line.chip && <Chip tone="zinc">{line.chip}</Chip>}
       {/* a payment to a loan that counts for less than was planned: what was planned, beside the "paid off" chip */}
-      {line.planned && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground" data-planned>{formatAmount(line.planned.amount, line.planned.currency, locale)} planned</span>}
-      {!!line.paidFor?.length && <span className="min-w-0 max-w-64 truncate text-[11px] text-muted-foreground" title={line.paidFor.join(', ')}>for {line.paidFor.join(', ')}</span>}
+      {line.planned && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground" data-planned>{T.planned(formatAmount(line.planned.amount, line.planned.currency, locale))}</span>}
+      {!!line.paidFor?.length && <span className="min-w-0 max-w-64 truncate text-[11px] text-muted-foreground" title={line.paidFor.join(', ')}>{T.paidFor(line.paidFor.join(', '))}</span>}
       {line.ownName && <span className="min-w-0 max-w-64 truncate text-[11px] text-muted-foreground" title={line.ownName}>{line.ownName}</span>}
       {line.note && <span className="min-w-0 max-w-64 truncate text-[11px] text-muted-foreground" title={line.note}>{line.note}</span>}
-      {line.short != null && line.kind === 'pool' && <Chip tone="rose">short {formatAmount(line.short, ccy, locale)}</Chip>}
+      {line.short != null && line.kind === 'pool' && <Chip tone="rose">{T.short(formatAmount(line.short, ccy, locale))}</Chip>}
       {line.short != null && line.kind === 'source' && (
-        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{formatAmount(line.short, ccy, locale)} more than it held{line.shortFrom ? `, taken from ${line.shortFrom}` : ''}</span>
+        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{T.moreThanItHeld(formatAmount(line.short, ccy, locale), line.shortFrom)}</span>
       )}
-      {line.adjustment != null && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">entered, {formatAmount(line.adjustment, ccy, locale, { sign: 'exceptZero' })} against the plan</span>}
-      {line.skipped && <Chip tone="zinc">skipped</Chip>}
+      {line.adjustment != null && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{T.enteredAgainstThePlan(formatAmount(line.adjustment, ccy, locale, { sign: 'exceptZero' }))}</span>}
+      {line.skipped && <Chip tone="zinc">{T.skipped}</Chip>}
       {line.goals?.map((g) => <GoalMark key={g.goal.id} goal={g} locale={locale} />)}
     </>
   )
@@ -229,8 +232,8 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
     // what is left of a category's estimate is worked out, so the line opens the estimate it comes from
     const estimateOf = ctx.onEstimate ? line.estimateFor : undefined
     const busy = ctx.busy != null && (ctx.busy === line.id || ctx.busy === line.rowId || ctx.busy.startsWith(`${line.rowId}:`))
-    const comes = upcomingText && line.nextDue ? `, ${upcomingText} next in ${formatMonth(line.nextDue, locale)}` : ''
-    const said = `${fullLabel}: ${line.empty ? `empty${comes}` : amountText}${shaded ? ', an estimate' : ''}`
+    const comes = upcomingText && line.nextDue ? T.comesNext(upcomingText, formatMonth(line.nextDue, locale)) : ''
+    const said = T.said(fullLabel, line.empty, comes, amountText, shaded)
     // a row carries its menu; what is left of an estimate is not a row of its own
     const menu = line.kind === 'row' && line.rowId && line.estimateFor == null ? ctx.rowMenu?.(line.rowId) : null
     const press = estimateOf ? () => ctx.onEstimate!(estimateOf) : editable ? () => ctx.onEdit!(line.rowId!) : null
@@ -270,14 +273,14 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
         <div className={cn(ROW, pad, 'group/line', item && 'bg-muted/20', marked && MARKED)} data-line={line.id} data-marked={marked || undefined} data-resting={line.resting || undefined}>
           {expandable ? (
             <button
-              type="button" aria-label={`Items of ${nameOf(line)}`} aria-expanded={open} aria-controls={listId} onClick={() => ctx.onToggle(line)}
+              type="button" aria-label={T.itemsOf(nameOf(line))} aria-expanded={open} aria-controls={listId} onClick={() => ctx.onToggle(line)}
               className={cn(CHEVRON_SLOT, 'rounded outline-none focus-visible:ring-2 focus-visible:ring-ring')}
             >
               <ChevronRight className={cn('size-3.5 shrink-0 text-muted-foreground transition-transform', open && 'rotate-90')} aria-hidden />
             </button>
           ) : <span className={CHEVRON_SLOT} aria-hidden />}
           {working && (d ? (
-            <Tick done={d.done} total={d.total} state={d.state} label={`${fullLabel} done`} disabled={busy} onToggle={() => ctx.onTick?.(line, d.state !== 'all')} className={cn(TICK_SLOT, 'md:rounded')} dotClassName="md:size-3" />
+            <Tick done={d.done} total={d.total} state={d.state} label={T.tickLabel(fullLabel)} disabled={busy} onToggle={() => ctx.onTick?.(line, d.state !== 'all')} className={cn(TICK_SLOT, 'md:rounded')} dotClassName="md:size-3" />
           ) : <span className={TICK_SLOT} aria-hidden />)}
           {main}
         </div>
@@ -303,14 +306,14 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
     <span className={cn('flex min-w-0 items-center gap-1.5', LEAD_HANG[lead])}>
       {expandable ? (
         <button
-          type="button" aria-label={`What is under ${line.label}`} aria-expanded={open} aria-controls={listId} onClick={() => ctx.onToggle(line)}
+          type="button" aria-label={T.whatIsUnder(line.label)} aria-expanded={open} aria-controls={listId} onClick={() => ctx.onToggle(line)}
           className={cn(ABOVE, '-m-1.5 inline-flex shrink-0 rounded p-1.5 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:-m-3 pointer-coarse:p-3')}
         >
           {chevron}
         </button>
       ) : <span className="w-3.5 shrink-0" aria-hidden />}
       {tickGap}
-      <button type="button" aria-label={`Edit ${line.label}`} onClick={press} className={cn(nameLook, STRETCHED)}>{line.label}</button>
+      <button type="button" aria-label={T.edit(line.label)} onClick={press} className={cn(nameLook, STRETCHED)}>{line.label}</button>
     </span>
   ) : expandable ? (
     <button
@@ -338,12 +341,12 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
           <LinkMark line={line} ctx={ctx} className={ABOVE} />
           {line.rule && <RuleMark line={line} ctx={ctx} className={ABOVE} />}
           {line.short != null && line.poolId && ctx.onTopUp && (
-            <Button size="xs" variant="outline" className={ABOVE} aria-label={`Top up ${line.label}`} onClick={() => ctx.onTopUp!(line.poolId!)}>Top up…</Button>
+            <Button size="xs" variant="outline" className={ABOVE} aria-label={T.topUp(line.label)} onClick={() => ctx.onTopUp!(line.poolId!)}>{T.topUp2}</Button>
           )}
           {tip && <InfoTip help={tip} className={ABOVE} />}
           {canGoal && !line.goals?.length && (
             <button
-              type="button" aria-label={`Set a goal for ${line.label}`} title="Set a goal" onClick={() => ctx.onGoal!(line)}
+              type="button" aria-label={T.setAGoalFor(line.label)} title={T.setAGoal} onClick={() => ctx.onGoal!(line)}
               className={cn(ABOVE, 'inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 outline-none hover:bg-muted hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover/line:opacity-100 pointer-coarse:size-8 pointer-coarse:opacity-100')}
             >
               <Target className="size-3.5" aria-hidden />
@@ -355,7 +358,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
         {(ctx.onBalance && line.accountId) || (ctx.onCurrentBalance && line.currentAccountIds?.length) ? (
           <button
             // a current account that is counted with the others has no amount of its own to read out
-            type="button" aria-label={`${line.label} balance: ${line.empty ? line.chip ?? 'none' : amountText}${line.entered ? ', entered' : ''}`} onClick={() => (line.accountId ? ctx.onBalance!(line.accountId) : ctx.onCurrentBalance!())}
+            type="button" aria-label={T.balanceSaid(line.label, line.empty, line.chip, amountText, line.entered)} onClick={() => (line.accountId ? ctx.onBalance!(line.accountId) : ctx.onCurrentBalance!())}
             className={cn(AMOUNT_COL, ABOVE, '-my-1 rounded py-1 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring', line.empty && 'text-muted-foreground/40', line.outside && 'text-muted-foreground', line.amount < 0 && 'text-expense', line.entered && 'underline decoration-dotted underline-offset-4')}
           >
             {amountText}
@@ -378,7 +381,7 @@ function StatementLineItem({ line, level, ctx, parent }: { line: Line; level: nu
 function RuleMark({ line, ctx, className }: { line: Line; ctx: LineContext; className?: string }) {
   const rule = line.rule
   if (!rule) return null
-  const said = rule.kind === 'none' ? `Set a rule for ${line.label}` : `Rule for ${line.label}: ${ruleText(rule, ctx.locale)}`
+  const said = rule.kind === 'none' ? T.setARuleFor(line.label) : T.ruleFor(line.label, ruleText(rule, ctx.locale))
   const pct = rule.share != null ? <span className="tabular-nums">{formatShare(rule.share, ctx.locale)}</span> : null
   const glyph = rule.kind === 'rest' ? <ArrowDownToLine className="size-3.5" aria-hidden />
     : rule.kind === 'share-of-income' ? pct
@@ -413,7 +416,7 @@ function LinkMark({ line, ctx, className }: { line: Line; ctx: LineContext; clas
   const act = link.open ? ctx.onLinkOpen : link.to.length ? ctx.onLink : undefined
   // an open link that cannot be closed from here has nothing to say
   if (link.open && !act) return null
-  const said = link.open ? `${link.text}: add the row that pays it off` : `${link.text}: go there`
+  const said = link.open ? T.linkAddRow(link.text) : T.linkGoThere(link.text)
   const look = cn('inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded text-muted-foreground', link.open && 'text-muted-foreground/50', className)
   const glyph = link.open ? <Link2Off className="size-3.5" aria-hidden /> : <Link2 className="size-3.5" aria-hidden />
   if (!act) return <span className={look} title={link.text} data-link="linked">{glyph}<span className="sr-only">{link.text}</span></span>
@@ -435,10 +438,10 @@ function GoalMark({ goal, locale }: { goal: GoalProgress; locale: string }) {
     <span className="inline-flex shrink-0 items-center gap-1" title={goal.goal.name}>
       <span className={cn('inline-flex items-center gap-0.5 text-[11px] tabular-nums text-muted-foreground', goal.status === 'reached' && HUES.income.text)}>
         <Target className={cn('size-3', goal.status !== 'reached' && HUES.goal.text)} aria-hidden />
-        <span className="sr-only">Goal {goal.goal.name}:</span>
+        <span className="sr-only">{T.goal(goal.goal.name)}</span>
         {pct}
       </span>
-      {late && <Chip tone="rose">{goal.status === 'broken' ? 'broken' : 'late'}</Chip>}
+      {late && <Chip tone="rose">{goal.status === 'broken' ? T.broken : T.late}</Chip>}
     </span>
   )
 }
@@ -456,7 +459,7 @@ function GoalDetail({ goals, line: owner, level, ctx }: { goals: GoalProgress[];
               <span className="font-medium">{g.goal.name}</span>
               <span className="flex items-center gap-2">
                 <span className={cn('tabular-nums', g.status === 'reached' && HUES.income.text)}>{formatPercent(g.progress, ctx.locale)}</span>
-                {ctx.onGoal && <Button size="xs" variant="ghost" aria-label={`Edit goal ${g.goal.name}`} onClick={() => ctx.onGoal!(owner, g)}>Edit</Button>}
+                {ctx.onGoal && <Button size="xs" variant="ghost" aria-label={T.editGoal(g.goal.name)} onClick={() => ctx.onGoal!(owner, g)}>{txt.common.edit}</Button>}
               </span>
             </div>
             <div role="progressbar" aria-label={g.goal.name} aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} className="h-2 w-full overflow-hidden rounded-full bg-goal-tint">

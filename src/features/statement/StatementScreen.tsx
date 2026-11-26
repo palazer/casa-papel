@@ -47,6 +47,9 @@ import { AddLead } from './AddLead'
 import { LEAD_BUTTON, LEAD_PAD } from './lead'
 import { cn } from '@/lib/utils'
 import { saveError } from '@/app/saveError'
+import { txt } from '@/i18n'
+
+const T = txt.statement.page
 
 const walk = (lines: StatementLine[]): StatementLine[] => lines.flatMap((l) => [l, ...walk(l.children)])
 /** Every top line of both halves, to look a line up in. */
@@ -301,7 +304,7 @@ export function StatementScreen() {
     const run = line.itemId
       ? setItemStatus(store, row.id, m, line.itemId, done ? 'done' : row.defaultStatus)
       : cell.source === 'derived' ? setDerivedDone(store, row.id, m, done) : setCellDone(store, row.id, m, done)
-    run.catch((e) => setError(saveError(e, 'Action failed'))).finally(() => setBusy(null))
+    run.catch((e) => setError(saveError(e, txt.common.actionFailed))).finally(() => setBusy(null))
   }
 
   /**
@@ -334,7 +337,7 @@ export function StatementScreen() {
     const guide = document.querySelector<HTMLElement>('[data-testid="setup-guide"]')?.offsetHeight ?? 0
     window.scrollTo({ top: Math.max(0, part.getBoundingClientRect().top + window.scrollY - guide - 8), behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
     // the first thing that takes an entry; an (i) explains and is never where the cursor should land
-    const act = 'button:not([aria-label^="About "])'
+    const act = 'button:not([data-info])'
     const first = part.querySelector<HTMLElement>('input') ?? part.querySelector<HTMLElement>(`[data-testid="suggestions"] ${act}, [data-testid^="foot-"] ${act}`)
     first?.focus({ preventScroll: true })
   }
@@ -427,11 +430,11 @@ export function StatementScreen() {
     if (line.id === 'from-accounts') return addRow(line, 'transfer', { only: ['from-savings', 'from-investment'] })
     if (line.kind === 'category' && line.id.startsWith('cat:')) {
       const [, section, categoryId] = line.id.split(':')
-      if (categoryId === 'none') return addRow(line, section as Section, { label: 'Add row without a category' })
+      if (categoryId === 'none') return addRow(line, section as Section, { label: T.addRowWithoutA })
       return (
         <>
           {suggested(line)}
-          {addRow(line, section as Section, { label: `Add row to ${line.label}`, defaultCategoryId: categoryId })}
+          {addRow(line, section as Section, { label: T.addRowTo(line.label), defaultCategoryId: categoryId })}
         </>
       )
     }
@@ -447,7 +450,7 @@ export function StatementScreen() {
   }
 
   /** A one-click delete went through: say what is gone, with the way back, until something else changes. */
-  const onDeleted = (name: string) => notice.say(`Deleted "${name}".`)
+  const onDeleted = (name: string) => notice.say(T.deleted(name))
   /**
    * Removing from an account's or a virtual account's dialog. While the household is being set up it is one click, unless
    * more than the thing itself would change; then, and always afterwards, the remove dialog asks.
@@ -521,13 +524,13 @@ export function StatementScreen() {
         />
       ) : null
     }
-    const removeLabel = settingUp ? 'Delete' : 'Archive or delete…'
+    const removeLabel = settingUp ? txt.common.delete : txt.common.archiveOrDelete
     if (line.kind === 'pool' && line.poolId) {
       const id = line.poolId
       const among = (beside.get(line.id) ?? [line]).map((l) => l.poolId!)
       return (
         <AccountMenu
-          what="Virtual account" name={line.label} at={among.indexOf(id)} count={among.length} removeLabel={removeLabel} triggerClassName={LINE_MENU}
+          what={T.virtualAccount} name={line.label} at={among.indexOf(id)} count={among.length} removeLabel={removeLabel} triggerClassName={LINE_MENU}
           onEdit={() => setPoolEdit(id)} onMove={(direction) => act(() => movePool(store, id, direction, among))} onRemove={() => removeFrom({ kind: 'pool', id })}
         />
       )
@@ -537,7 +540,7 @@ export function StatementScreen() {
       const among = (beside.get(line.id) ?? [line]).map((l) => l.accountId!)
       return (
         <AccountMenu
-          what="Account" name={line.label} at={among.indexOf(id)} count={among.length} removeLabel={removeLabel} triggerClassName={LINE_MENU}
+          what={txt.common.account} name={line.label} at={among.indexOf(id)} count={among.length} removeLabel={removeLabel} triggerClassName={LINE_MENU}
           onEdit={() => setAccountEdit(id)} onMove={(direction) => act(() => moveAccount(store, id, direction, among))} onRemove={() => removeFrom({ kind: 'account', id })}
         />
       )
@@ -549,7 +552,7 @@ export function StatementScreen() {
       if (!only) return null
       return (
         <AccountMenu
-          what="Account" name={only.name} at={0} count={1} removeLabel={removeLabel} triggerClassName={LINE_MENU}
+          what={txt.common.account} name={only.name} at={0} count={1} removeLabel={removeLabel} triggerClassName={LINE_MENU}
           onEdit={() => setAccountEdit(only.id)} onMove={() => undefined} onRemove={() => removeFrom({ kind: 'account', id: only.id })}
         />
       )
@@ -573,18 +576,18 @@ export function StatementScreen() {
   const estimateRest = estimateLine?.children.find((l) => l.estimateFor != null)?.amount ?? 0
   // a card or a loan is added under Debts; while the household owes nothing, at the foot of that side
   const hasDebts = statement.position.right.lines.some((l) => l.id === 'debts')
-  const debtsFoot = <Button variant="ghost" size="sm" className={cn(ADD, LEAD_BUTTON)} onClick={() => setAccountNew({ types: DEBT_TYPES })}><AddLead ticks={false} /> <span data-lead="text">Add a card or loan</span></Button>
+  const debtsFoot = <Button variant="ghost" size="sm" className={cn(ADD, LEAD_BUTTON)} onClick={() => setAccountNew({ types: DEBT_TYPES })}><AddLead ticks={false} /> <span data-lead="text">{T.addACardOr}</span></Button>
   const positionCtx: LineContext = { ...base, withChange: true, onGoal, onBalance: openBalance, onCurrentBalance: () => setCurrentBalance(true), footer: (line) => (line.id === 'debts' ? debtsFoot : null), menu: lineMenu, onOpen: lineOpen }
   const day = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${lastDayOfMonth(m)}T00:00:00Z`))
   const foldable = walk([...statement.flow.left.lines, ...statement.flow.right.lines, ...statement.position.left.lines, ...statement.position.right.lines])
     .filter((l) => l.kind === 'group' || l.children.length > 0 || !!l.goals?.length || autoOpen.has(l.id))
   const setAll = (open: boolean) => setOpenLines(Object.fromEntries(foldable.map((l) => [l.id, open])))
-  const act = (fn: () => Promise<unknown>) => void fn().catch((e) => setError(saveError(e, 'Action failed')))
+  const act = (fn: () => Promise<unknown>) => void fn().catch((e) => setError(saveError(e, txt.common.actionFailed)))
   // Accounts are added where they will show: what the household has under Assets, what it owes under Debts
   const savingsAccounts = tables.accounts.filter((a) => a.type === 'savings' && !a.deletedAt && !a.archivedMonth)
   // step 3 once there is a savings account and nothing takes the rest of the month yet: one press asks the first of them
   const stepAction = step === 'savings' && savingsAccounts.length > 0 && !steps.find((s) => s.key === 'savings')?.done
-    ? { label: 'Choose where the rest goes', run: () => askRule({ accountId: savingsAccounts[0].id }, 'rest') }
+    ? { label: T.chooseWhereTheRest, run: () => askRule({ accountId: savingsAccounts[0].id }, 'rest') }
     : undefined
   const assetsFoot = (
     <>
@@ -592,12 +595,12 @@ export function StatementScreen() {
       {showing && (!settingUp || step === 'savings') && <AccountSuggestionLines suggestions={accountSuggestions(tables)} onAdd={(s) => setAccountNew({ name: s.name, type: s.type, types: ASSET_TYPES })} onError={setError} />}
       {showing && offers.pools.length > 0 && (
         <SuggestionLines
-          suggestions={offers.pools} label="Virtual accounts" month={m} currency={ccy} locale={locale} onAdded={onSuggested} onError={setError} ticks={false}
+          suggestions={offers.pools} label={txt.common.virtualAccounts} month={m} currency={ccy} locale={locale} onAdded={onSuggested} onError={setError} ticks={false}
           onNeed={(type) => setAccountNew({ type, types: [type], payOff: false })}
         />
       )}
-      <Button variant="ghost" size="sm" className={cn(ADD, LEAD_BUTTON)} onClick={() => setAccountNew({ types: ASSET_TYPES, type: settingUp ? STEP_ACCOUNT[step] : undefined })}><AddLead ticks={false} /> <span data-lead="text">Add account</span></Button>
-      {savingsAccounts.length > 0 && <Button variant="ghost" size="sm" className={ADD} onClick={() => setPoolNew(true)}><Plus /> Add virtual account</Button>}
+      <Button variant="ghost" size="sm" className={cn(ADD, LEAD_BUTTON)} onClick={() => setAccountNew({ types: ASSET_TYPES, type: settingUp ? STEP_ACCOUNT[step] : undefined })}><AddLead ticks={false} /> <span data-lead="text">{T.addAccount}</span></Button>
+      {savingsAccounts.length > 0 && <Button variant="ghost" size="sm" className={ADD} onClick={() => setPoolNew(true)}><Plus /> {T.addVirtualAccount}</Button>}
     </>
   )
   // the account a rule is asked for may have been saved a moment ago: wait until it is on the page
@@ -610,17 +613,17 @@ export function StatementScreen() {
           rates. While a household is being set up the guide holds the top of the window instead, and there is no
           strip: the month keeps its arrows there. */}
       <PageHeader
-        title="Statement" subline={household.name}
+        title={T.statement} subline={household.name}
         sticky={!settingUp}
         above={strip.length > 0 && <MonthStrip months={strip} month={m} today={monthOfDate()} currency={ccy} locale={locale} onChange={setMonth} onAddYear={() => act(() => addPlanYear(store))} />}
         // how the page is shown: quiet buttons at the right end, before Undo and Redo
         tools={<>
           <span className="flex items-center gap-1">
-            <Button size="xs" variant={showing ? 'default' : 'ghost'} aria-pressed={showing} onClick={() => setSuggest(!showing)}>Suggestions</Button>
+            <Button size="xs" variant={showing ? 'default' : 'ghost'} aria-pressed={showing} onClick={() => setSuggest(!showing)}>{T.suggestions}</Button>
             <InfoTip help="statement.suggestions" />
           </span>
-          <Button size="xs" variant="ghost" onClick={() => setAll(true)}>Expand all</Button>
-          <Button size="xs" variant="ghost" onClick={() => setAll(false)}>Collapse all</Button>
+          <Button size="xs" variant="ghost" onClick={() => setAll(true)}>{T.expandAll}</Button>
+          <Button size="xs" variant="ghost" onClick={() => setAll(false)}>{T.collapseAll}</Button>
           <MarksLegend neg={neg} />
         </>}
         notes={<>
@@ -631,7 +634,7 @@ export function StatementScreen() {
         {settingUp
           ? <MonthPicker months={months} month={m} onChange={setMonth} locale={locale} onAddYear={() => act(() => addPlanYear(store))} />
           : <h2 className="text-sm font-semibold leading-5">{formatMonth(m, locale, 'long')}</h2>}
-        {isPastMonth(m) && <Chip tone="zinc" title="This month is over. It can still be changed.">past</Chip>}
+        {isPastMonth(m) && <Chip tone="zinc" title={T.thisMonthIsOver}>{T.past}</Chip>}
         {progress.total > 0 && (
           // How much of the month is ticked and what is still open; a month with nothing in it has nothing to count
           <p role="status" className="flex items-center gap-1 text-muted-foreground" data-testid="progress">
@@ -641,7 +644,7 @@ export function StatementScreen() {
         )}
         {/* what every account really held, and the tick that counts the month as done, beside the count it changes;
             a household that is still being set up has no month to look back on yet */}
-        {!settingUp && <Button size="xs" variant="outline" onClick={() => setBalances(true)}>Balances…</Button>}
+        {!settingUp && <Button size="xs" variant="outline" onClick={() => setBalances(true)}>{T.balances}</Button>}
         {/* What another currency is worth this month: a chip to read, and to press for a rate of one's own */}
         {currencies.length > 0 && (
           <span className="inline-flex flex-wrap items-center gap-1.5" data-testid="month-rates">
@@ -651,9 +654,9 @@ export function StatementScreen() {
       </PageHeader>
 
       {settingUp && <SetupGuide steps={steps} current={step} action={stepAction} onStep={onStep} onDone={leaveSetup} />}
-      <StatementBand title="The month" help="statement.month" band={statement.flow} ctx={flowCtx} totals={['Total in', 'Total out']} locked={[lockedSide('in'), lockedSide('out')]} />
+      <StatementBand title={T.theMonth} help="statement.month" band={statement.flow} ctx={flowCtx} totals={[T.totalIn, T.totalOut]} locked={[lockedSide('in'), lockedSide('out')]} />
       <StatementBand
-        title="At the end of the month" help="statement.position" band={statement.position} ctx={positionCtx} totals={['Total', 'Total']} amountHead={day}
+        title={T.atTheEndOf} help="statement.position" band={statement.position} ctx={positionCtx} totals={[txt.common.total, txt.common.total]} amountHead={day}
         feet={[assetsFoot, hasDebts ? null : debtsFoot]} locked={[lockedSide('assets'), lockedSide('claims')]}
       />
       <PerPerson household={household} tables={tables} engine={engine} month={m} locked={settingUp} />
@@ -701,14 +704,14 @@ export function StatementScreen() {
         <HouseholdAccountDialog
           key={accountEditing.id} account={accountEditing} entities={tables.entities} baseCurrency={ccy} locale={locale} startMonth={household.startMonth}
           rows={tables.rows} onRowAdded={onAdded}
-          onClose={() => setAccountEdit(null)} removeLabel={settingUp ? 'Delete' : undefined}
+          onClose={() => setAccountEdit(null)} removeLabel={settingUp ? txt.common.delete : undefined}
           onRemove={() => { setAccountEdit(null); removeFrom({ kind: 'account', id: accountEditing.id }) }}
         />
       )}
       {poolEditing && (
         <PoolDialog
           key={poolEditing.id} pool={poolEditing} savings={savingsAccounts} baseCurrency={ccy} locale={locale}
-          onClose={() => setPoolEdit(null)} removeLabel={settingUp ? 'Delete' : undefined}
+          onClose={() => setPoolEdit(null)} removeLabel={settingUp ? txt.common.delete : undefined}
           onRemove={() => { setPoolEdit(null); removeFrom({ kind: 'pool', id: poolEditing.id }) }}
         />
       )}

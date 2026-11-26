@@ -8,6 +8,9 @@ import { useStore } from '@/app/store'
 import type { MonthKey, Section } from '@/model'
 import { addCategory } from '@/store'
 import { showSaveError } from '@/app/saveError'
+import { txt } from '@/i18n'
+
+const T = txt.statement.addCategory
 
 /**
  * "Add category" at the foot of Income and Expenses: a name, then the category appears as a line, ready for its first
@@ -29,34 +32,34 @@ export function AddCategoryInline({ section, onError, estimate }: { section: Sec
     const n = name.trim()
     if (!n) return
     const typed = estimate && amount.trim() !== '' ? parseAmount(amount, estimate.currency, estimate.locale) : 0
-    if (typed == null || typed < 0) return onError(unreadableAmount(amount, 'The estimate is not a number I can read.'))
+    if (typed == null || typed < 0) return onError(unreadableAmount(amount, T.theEstimateIsNot))
     try {
       await addCategory(store, { name: n, section, estimate: estimate && typed > 0 ? { month: estimate.month, amount: typed } : undefined })
       reset()
     } catch (e) {
-      showSaveError(onError, 'Could not add the category')(e)
+      showSaveError(onError, T.couldNotAddThe)(e)
     }
   }
 
   if (!open) {
     return (
-      <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setOpen(true)} aria-label={`Add ${section} category`}>
-        <Plus /> Add category
+      <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setOpen(true)} aria-label={T.addCategoryIn(section)}>
+        <Plus /> {T.addCategory}
       </Button>
     )
   }
   const keys = (e: KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') void save(); if (e.key === 'Escape') reset() }
   return (
     <div className="flex flex-wrap items-center gap-1">
-      <Input autoFocus className="h-7 w-44" placeholder="Category name" value={name} aria-label={`New ${section} category name`} onChange={(e) => setName(e.target.value)} onKeyDown={keys} />
+      <Input autoFocus className="h-7 w-44" placeholder={T.categoryName} value={name} aria-label={T.newCategoryName(section)} onChange={(e) => setName(e.target.value)} onKeyDown={keys} />
       {estimate && (
         <>
-          <Input className="h-7 w-28" inputMode="decimal" placeholder="Estimate" value={amount} aria-label={`Estimate per month for the new ${section} category`} onChange={(e) => setAmount(e.target.value)} onKeyDown={keys} />
-          <span className="text-muted-foreground">{estimate.currency} per month, optional</span>
+          <Input className="h-7 w-28" inputMode="decimal" placeholder={txt.common.estimate} value={amount} aria-label={T.estimatePerMonthFor(section)} onChange={(e) => setAmount(e.target.value)} onKeyDown={keys} />
+          <span className="text-muted-foreground">{T.perMonthOptional(estimate.currency)}</span>
         </>
       )}
-      <Button size="sm" onClick={() => void save()}>Add</Button>
-      <Button size="sm" variant="ghost" onClick={reset}>Cancel</Button>
+      <Button size="sm" onClick={() => void save()}>{txt.common.add}</Button>
+      <Button size="sm" variant="ghost" onClick={reset}>{txt.common.cancel}</Button>
       {estimate && <AmountHint text={amount} currency={estimate.currency} locale={estimate.locale} className="basis-full" />}
     </div>
   )

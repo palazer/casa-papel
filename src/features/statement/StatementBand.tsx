@@ -6,6 +6,9 @@ import type { HelpKey } from '@/app/help'
 import type { StatementBand as Band, StatementSide } from '@/engine'
 import { AMOUNT_COL, CHANGE_COL, StatementLines, changeText, type LineContext } from './StatementLine'
 import { LOCKED } from './lead'
+import { txt } from '@/i18n'
+
+const TX = txt.statement.band
 
 /**
  * One half of the Statement (DESIGN.md §2, the statement frame): an island holding two sides, side by side from
@@ -35,7 +38,7 @@ export function StatementBand({ title, help, band, ctx, totals, amountHead, righ
       </div>
       {band.difference !== 0 && (
         <p role="alert" className="border-t px-2 py-1.5 text-xs text-destructive">
-          The two sides differ by {formatAmount(Math.abs(band.difference), ctx.ccy, ctx.locale)}. That should never happen; please report it.
+          {TX.theTwoSidesDiffer(formatAmount(Math.abs(band.difference), ctx.ccy, ctx.locale))}
         </p>
       )}
     </Island>
@@ -47,7 +50,7 @@ function Side({ side, total, ctx, amountHead, foot, locked }: { side: StatementS
     <section aria-label={side.label} data-side={side.key} inert={locked || undefined} className={cn('flex min-w-0 flex-col', locked && LOCKED)}>
       <div className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         <h4 className="min-w-0 flex-1 truncate">{side.label}</h4>
-        {ctx.withChange && <span className={CHANGE_COL}>change</span>}
+        {ctx.withChange && <span className={CHANGE_COL}>{TX.change}</span>}
         {amountHead && <span className={AMOUNT_COL}>{amountHead}</span>}
       </div>
       <div className="border-t border-border/60">

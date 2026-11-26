@@ -2,6 +2,9 @@ import { cellKey, type CellResult } from '@/engine'
 import { formatAmount } from '@/app/format'
 import type { Money, MonthKey, Row } from '@/model'
 import { doneness, flowOf } from '@/app/display'
+import { txt } from '@/i18n'
+
+const T = txt.statement.progress
 
 export interface MonthProgress {
   /** Units done and units in all: a line is one unit, an itemized line one per live item. */
@@ -37,11 +40,11 @@ export function monthProgress(rows: Row[], cells: Record<string, CellResult>, mo
 }
 
 export function progressText(p: MonthProgress, currency: string, locale: string): string {
-  if (p.total === 0) return 'Nothing in this month yet'
-  if (p.done === p.total) return `All ${p.total} done`
-  const parts = [`${p.done} of ${p.total} done`]
-  if (p.toPay > 0) parts.push(`${formatAmount(p.toPay, currency, locale)} still to pay`)
-  if (p.toComeIn > 0) parts.push(`${formatAmount(p.toComeIn, currency, locale)} to come in`)
+  if (p.total === 0) return T.nothingInThisMonth
+  if (p.done === p.total) return T.allDone(p.total)
+  const parts = [T.ofDone(p.done, p.total)]
+  if (p.toPay > 0) parts.push(T.stillToPay(formatAmount(p.toPay, currency, locale)))
+  if (p.toComeIn > 0) parts.push(T.toComeIn(formatAmount(p.toComeIn, currency, locale)))
   return parts.join(' · ')
 }
 

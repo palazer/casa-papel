@@ -13,6 +13,9 @@ import { resolveRules, type Household, type MonthKey, type Tables } from '@/mode
 import { applyMutations, topUpMutations, topUpPool, type TopUpSource } from '@/store'
 import { useSave } from '@/features/grid/RowDialogs'
 import { errorText } from '@/app/saveError'
+import { txt } from '@/i18n'
+
+const T = txt.statement.topUp
 
 interface Props {
   tables: Tables
@@ -51,7 +54,7 @@ export function TopUpDialog({ tables, engine, household, poolId, month, onClose 
       const balance = engine.accounts[a.id]?.months[month]?.balanceBase
       // what is free in a savings account is what its virtual accounts have not set aside
       const free = balance == null ? null : a.type === 'savings' ? balance - set(a.id) : balance
-      return { id: a.id, label: a.type === 'savings' ? `${a.name}, not set aside` : a.name, name: a.name, free }
+      return { id: a.id, label: a.type === 'savings' ? T.notSetAside(a.name) : a.name, name: a.name, free }
     })
   }, [tables, engine, month, pool?.accountId])
   // A set-aside that a rule works out this month stops following the rule once it is topped up: the month keeps what
@@ -83,7 +86,7 @@ export function TopUpDialog({ tables, engine, household, poolId, month, onClose 
         rest: out.totals[month]?.rest ?? null,
       }
     } catch (e) {
-      return { error: errorText(e, 'That top-up cannot be saved.') }
+      return { error: errorText(e, T.thatTopUpCannot) }
     }
   }, [tables, poolId, month, sourceId, amount])
   const problem = text.trim() !== '' && amount == null ? unreadableAmount(text) : preview && 'error' in preview ? preview.error : null
@@ -100,46 +103,46 @@ export function TopUpDialog({ tables, engine, household, poolId, month, onClose 
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>{short > 0 ? `${pool.name} is short in ${monthName}` : `Top up ${pool.name} in ${monthName}`}</DialogTitle>
+          <DialogTitle>{short > 0 ? T.isShortIn(pool.name, monthName) : T.topUpIn(pool.name, monthName)}</DialogTitle>
           <DialogDescription>
             {short > 0
-              ? <>{held(now.spend)} comes out of {pool.name} this month and it holds {held(now.spend - short)}: {held(short)} is missing{own !== ccy ? `, ${money(now.shortBase)}` : ''}. Until it is topped up, the missing part comes out of the unassigned savings without a line of its own.</>
-              : <>{pool.name} holds {held(now.balance)} at the end of {monthName}. A top-up adds to it this month only.</>}
-            {own !== ccy && <> The top-up is typed in {ccy} and arrives in {own} at the month's rate.</>}
+              ? <>{T.shortNow(held(now.spend), pool.name, held(now.spend - short), held(short), own, ccy, money(now.shortBase))}</>
+              : <>{T.holdsAtTheEnd(pool.name, held(now.balance), monthName)}</>}
+            {own !== ccy && <> {T.theTopUpIs(ccy, own)}</>}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <fieldset className="space-y-1.5">
-            <legend className="text-sm font-medium">Top it up from</legend>
+            <legend className="text-sm font-medium">{T.topItUpFrom}</legend>
             <Segmented
-              label="Top it up from" value={sourceId} onChange={setSourceId}
-              options={[...sources.map((s) => ({ value: s.id, label: s.free != null ? `${s.label} · ${money(s.free)}` : s.label })), { value: INCOME, label: 'This month\'s income' }]}
+              label={T.topItUpFrom} value={sourceId} onChange={setSourceId}
+              options={[...sources.map((s) => ({ value: s.id, label: s.free != null ? `${s.label} · ${money(s.free)}` : s.label })), { value: INCOME, label: T.thisMonthsIncome }]}
             />
             <p className="text-xs text-muted-foreground">
               {sourceId === INCOME
-                ? `More of this month's income is set aside for ${pool.name}, so the rest of the month shrinks by the amount. Nothing is taken from an account.`
-                : `The month takes the money out of ${chosen?.name ?? 'the account'} and sets it aside for ${pool.name}. Both show as a line, and the rest of the month stays as it is.`}
+                ? T.moreOfThisMonths(pool.name)
+                : T.theMonthTakesThe(chosen?.name, pool.name)}
             </p>
             {rule && setAsideCell && (
               <p className="text-xs text-muted-foreground" data-testid="top-up-rule">
                 {rule.kind === 'rest'
-                  ? `${pool.name} takes the rest of the month. A top-up fixes what it gets in ${monthName} at what that is now, ${money(setAsideCell.valueBase)}, plus the top-up; from then on, what ${monthName} has left over or is short stays in the main account. The rest goes to ${pool.name} again the month after.`
-                  : `What ${pool.name} gets is worked out by its rule (${ruleText({ ...rule, of: rule.ofRowId ? engine.rows.find((r) => r.id === rule.ofRowId)?.name : undefined }, locale)}). A top-up fixes it for ${monthName} at what it is now, ${money(setAsideCell.valueBase)}, plus the top-up; the rule goes on the month after.`}
+                  ? T.takesTheRestOf(pool.name, monthName, money(setAsideCell.valueBase))
+                  : T.whatGetsIsWorked(pool.name, ruleText({ ...rule, of: rule.ofRowId ? engine.rows.find((r) => r.id === rule.ofRowId)?.name : undefined }, locale), monthName, money(setAsideCell.valueBase))}
               </p>
             )}
           </fieldset>
           <div className="space-y-1.5">
-            <Label htmlFor="top-up-amount">Amount in {ccy}</Label>
+            <Label htmlFor="top-up-amount">{T.amountIn(ccy)}</Label>
             <Input id="top-up-amount" className="w-40" autoFocus inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
             <AmountHint text={text} currency={ccy} locale={locale} />
           </div>
           {lines && (
             <div className="space-y-1">
-              <p className="text-sm font-medium">{monthName} will then show</p>
+              <p className="text-sm font-medium">{T.willThenShow(monthName)}</p>
               <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm" data-testid="top-up-preview">
-                {lines.from && (<><dt className="text-muted-foreground">Money in · {lines.from.name}</dt><dd className="text-right tabular-nums">{money(lines.from.amount)}</dd></>)}
-                {lines.setAside && (<><dt className="text-muted-foreground">Money out · {lines.setAside.name}, this month</dt><dd className="text-right tabular-nums">{money(lines.setAside.amount)}</dd></>)}
-                <dt className="text-muted-foreground">{pool.name} at the end of the month{lines.short > 0 ? `, still short by ${held(lines.short)}` : ''}</dt>
+                {lines.from && (<><dt className="text-muted-foreground">{T.moneyIn(lines.from.name)}</dt><dd className="text-right tabular-nums">{money(lines.from.amount)}</dd></>)}
+                {lines.setAside && (<><dt className="text-muted-foreground">{T.moneyOutThisMonth(lines.setAside.name)}</dt><dd className="text-right tabular-nums">{money(lines.setAside.amount)}</dd></>)}
+                <dt className="text-muted-foreground">{T.atTheEndOf(pool.name, lines.short, held(lines.short))}</dt>
                 <dd className="text-right tabular-nums" data-testid="top-up-balance">{held(lines.balance)}</dd>
               </dl>
             </div>
@@ -147,8 +150,8 @@ export function TopUpDialog({ tables, engine, household, poolId, month, onClose 
           {(problem || error) && <p className="text-sm text-destructive" role="alert">{problem ?? error}</p>}
         </div>
         <DialogFooter className="flex-row flex-wrap gap-2 sm:justify-between">
-          <Button variant="ghost" onClick={onClose} disabled={busy}>Not now</Button>
-          <Button onClick={submit} disabled={busy || amount == null || !!problem}>Top up</Button>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>{T.notNow}</Button>
+          <Button onClick={submit} disabled={busy || amount == null || !!problem}>{T.topUp}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
