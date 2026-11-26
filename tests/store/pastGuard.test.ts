@@ -143,25 +143,6 @@ describe('a card that becomes a loan, with payments in months that are over', ()
     expect(await stored()).toEqual(['loan', 'debt-payment'])
   })
 
-  it('a card whose purchases are expense rows: the payment becomes an expense of months that are over, so the change asks; Cancel writes neither record', async () => {
-    const { store } = await fresh()
-    const { account, row } = await addAccountWithRow(store, { name: 'Card', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01', openingBalance: 5000_00, card: { cardMode: 'itemized' } }, { kind: 'pay-off' })
-    await setCellValue(store, row.id, '2026-01', 100_00, 'from-now-on')
-    const { asked, say } = answering(store, 'cancel')
-    const stored = async () => {
-      const t = await loadTables(store)
-      return [t.accounts.find((a) => a.id === account.id)!.type, t.rows.find((r) => r.id === row.id)!.kind]
-    }
-
-    await expect(updateAccount(store, account.id, { type: 'loan', card: undefined })).rejects.toBeInstanceOf(PastChangeCancelled)
-    expect(asked).toHaveLength(1)
-    expect(await stored()).toEqual(['credit-card', 'card-payment'])
-
-    say.answer = 'save'
-    await updateAccount(store, account.id, { type: 'loan', card: undefined })
-    expect(await stored()).toEqual(['loan', 'debt-payment'])
-  })
-
   it('a row that only moves to another section changes no figure, and asks nothing', async () => {
     const { store } = await fresh()
     const { account, row } = await addAccountWithRow(store, { name: 'Visa', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01', card: { cardMode: 'itemized' } }, { kind: 'pay-off' })

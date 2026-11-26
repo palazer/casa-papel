@@ -18,7 +18,7 @@ describe('the main account: what stays behind', () => {
     const out = computeEngine({ tables: t, months })
     const s = out.main!
     expect(s.accountIds).toEqual([main.id])
-    for (const m of months) expect(s.months[m]).toEqual({ start: 1200_00, kept: 0, cardBought: 0, cardPaid: 0, computed: 1200_00, entered: false, adjustment: 0, balance: 1200_00 })
+    for (const m of months) expect(s.months[m]).toEqual({ start: 1200_00, kept: 0, computed: 1200_00, entered: false, adjustment: 0, balance: 1200_00 })
     // its flag says untracked, as every current account was stored: it has a balance all the same, counted in net worth
     expect(months.map((m) => out.accounts[joint.id].months[m].balance)).toEqual([300_00, 300_00, 300_00])
     for (const m of months) expect(out.netWorth[m]).toBe(1200_00 + 300_00 + out.accounts[savings.id].months[m].balance)
@@ -64,28 +64,20 @@ describe('the main account: what stays behind', () => {
     expect(s.months['2026-02']).toMatchObject({ kept: -300_00, balance: 400_00 })
   })
 
-  it('holds the money for an itemized card until the bill is paid', () => {
-    const card = account({ name: 'Visa', type: 'credit-card', openingBalance: 200_00, card: { cardMode: 'itemized' } })
+  it('a card takes nothing out of the main account but its payment, which is an outflow of the month like any other', () => {
+    const card = account({ name: 'Visa', type: 'credit-card', openingBalance: 500_00 })
     const salary = row({ name: 'Salary', section: 'income' })
+    // a row that still names the card, as "Paid by card" did before schema 23: it comes out of the month like any expense
     const shopping = row({ name: 'Shopping', section: 'expense', accountId: card.id, order: 'b0' })
-    const pay = row({ name: 'Pay Visa', section: 'transfer', kind: 'card-payment', accountId: card.id, order: 'c0' })
-    const t = tables({ household: [household()], accounts: [card], rows: [salary, shopping, pay], cells: [cellValue(salary.id, '2026-01', 2000_00), cellValue(shopping.id, '2026-01', 150_00), cellValue(pay.id, '2026-01', 200_00), cellValue(pay.id, '2026-02', 150_00)] })
+    const pay = row({ name: 'Pay Visa', section: 'expense', kind: 'card-payment', accountId: card.id, order: 'c0' })
+    const t = tables({ household: [household()], accounts: [card], rows: [salary, shopping, pay], cells: [cellValue(salary.id, '2026-01', 2000_00), cellValue(shopping.id, '2026-01', 150_00), cellValue(pay.id, '2026-01', 200_00)] })
     const out = computeEngine({ tables: t, months })
     const s = out.main!
     expect(s.accountIds).toEqual([])
-    // January: 150 bought and still to pay, 200 paid for what was owed before
-    expect(s.months['2026-01']).toEqual({ start: 0, kept: 0, cardBought: 150_00, cardPaid: 200_00, computed: -50_00, entered: false, adjustment: 0, balance: -50_00 })
-    // with the card's debt beside it, the two always net to what was owed at the start
-    for (const m of months) expect(s.months[m].balance - out.accounts[card.id].months[m].balance).toBe(-200_00)
-  })
-
-  it('leaves a lump card alone: its payment is already an outflow of the month', () => {
-    const card = account({ name: 'Amex', type: 'credit-card', openingBalance: 500_00, card: { cardMode: 'lump' } })
-    const salary = row({ name: 'Salary', section: 'income' })
-    const pay = row({ name: 'Pay Amex', section: 'transfer', kind: 'card-payment', accountId: card.id, order: 'c0' })
-    const t = tables({ household: [household()], accounts: [card], rows: [salary, pay], cells: [cellValue(salary.id, '2026-01', 2000_00), cellValue(pay.id, '2026-01', 300_00)] })
-    const s = computeEngine({ tables: t, months }).main!
-    expect(s.months['2026-01']).toMatchObject({ cardBought: 0, cardPaid: 0, balance: 0 })
+    // the plug takes what the month leaves after the shopping and the payment: nothing waits in the account for a bill
+    expect(s.months['2026-01']).toEqual({ start: 0, kept: 0, computed: 0, entered: false, adjustment: 0, balance: 0 })
+    expect(out.totals['2026-01'].toSavings).toBe(2000_00 - 150_00 - 200_00)
+    expect(out.accounts[card.id].months['2026-01'].balance).toBe(300_00)
   })
 
   it('in data from before rule B9, a second main account opened later joins in its own month, converted at that month\'s rate, until the upgrade puts it right', () => {
@@ -141,8 +133,8 @@ describe('the main account: what the bank says', () => {
     const out = computeEngine({ tables: t, months })
     const s = out.main!
     // the plan says 1,500; the bank says 1,400
-    expect(s.months['2026-01']).toEqual({ start: 1200_00, kept: 300_00, cardBought: 0, cardPaid: 0, computed: 1500_00, entered: true, adjustment: -100_00, balance: 1400_00, real: { [main.id]: { own: 1400_00, base: 1400_00 } } })
-    expect(s.months['2026-02']).toEqual({ start: 1400_00, kept: 300_00, cardBought: 0, cardPaid: 0, computed: 1700_00, entered: false, adjustment: 0, balance: 1700_00 })
+    expect(s.months['2026-01']).toEqual({ start: 1200_00, kept: 300_00, computed: 1500_00, entered: true, adjustment: -100_00, balance: 1400_00, real: { [main.id]: { own: 1400_00, base: 1400_00 } } })
+    expect(s.months['2026-02']).toEqual({ start: 1400_00, kept: 300_00, computed: 1700_00, entered: false, adjustment: 0, balance: 1700_00 })
     expect(s.months['2026-03'].balance).toBe(2000_00)
     expect(out.accounts[joint.id].months['2026-01']).toMatchObject({ computed: 300_00, entered: true, adjustment: -50_00, balance: 250_00 })
     expect(out.accounts[joint.id].months['2026-03'].balance).toBe(250_00)

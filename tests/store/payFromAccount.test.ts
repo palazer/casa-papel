@@ -3,7 +3,7 @@ import { cellKey, computeEngine } from '@/engine'
 import { accountRef, monthRange, newId, poolRef, type CellItem } from '@/model'
 import {
   CasaDb, Store, addAccount, addPool, addRecurringItem, addRow, archiveAccount, archivePool, describeRemoval, loadTables, postRecurring, quickCreateHousehold,
-  removeAccount, removeIfFree, setCellItems, setCellValue, setRowAccount, setRowFundedBy,
+  removeAccount, removeIfFree, setCellItems, setCellValue, setRowFundedBy, updateRow,
 } from '@/store'
 import { fundingOptions } from '@/features/grid/funding'
 import { restoreToday, setToday } from '../today'
@@ -109,8 +109,8 @@ describe('"Comes out of" an account: removing the account', () => {
 
   it('deleting it moves what came out of it to the month\'s income, in one write per row and schedule', async () => {
     const { store, rainy, school } = await fresh()
-    // the row both names the account and comes out of it
-    await setRowAccount(store, school.id, rainy.id)
+    // the row both names the account (kept from an older version, for the overview) and comes out of it
+    await updateRow(store, school.id, { accountId: rainy.id })
     await setRowFundedBy(store, school.id, accountRef(rainy.id), 'all-months')
     const boiler = await addRow(store, { name: 'Boiler', section: 'expense' })
     await setCellItems(store, boiler.id, '2026-02', [item(900_00, accountRef(rainy.id), 'New boiler'), item(50_00, 'cash', 'Fitting')], 'this-month')

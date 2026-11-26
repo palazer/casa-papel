@@ -39,6 +39,8 @@ async function newHousehold(page: Page) {
   await page.getByRole('button', { name: 'Add a card or loan' }).click()
   await dlg.getByLabel('Name', { exact: true }).fill('Visa')
   await dlg.getByLabel('Type').selectOption({ label: 'Credit card' })
+  // a card account is a debt that is carried: it says what is owed
+  await dlg.getByLabel(/^Owed at the start of/).fill('300')
   await dlg.getByRole('button', { name: /^More options/ }).click()
   await dlg.getByLabel('Owner', { exact: true }).selectOption({ label: 'Sam' })
   await dlg.getByRole('button', { name: 'Save' }).click()
@@ -195,7 +197,7 @@ async function owedOnCard(page: Page): Promise<number> {
 test.describe('Payments: "Paid on" and "Paid with"', () => {
   test.use({ viewport: { width: 1440, height: 900 } })
 
-  test('"Usually paid…" in the row menu: a day and a method for the row, beside "Paid by card…", and no figure moves', async ({ page }) => {
+  test('"Usually paid…" in the row menu: a day and a method for the row, a credit card among the methods, and no figure moves', async ({ page }) => {
     await withMethods(page)
     await openStatement(page)
     await page.getByRole('button', { name: 'Row menu for The flat – Rent' }).click()
@@ -214,14 +216,14 @@ test.describe('Payments: "Paid on" and "Paid with"', () => {
     expect([await shown(paidOn(dlg)), await shown(paidWith(dlg))]).toEqual(['1st', choice('Standing order')])
     await dlg.getByRole('button', { name: 'Cancel' }).click()
 
-    // "Subscriptions" is on the card through "Paid by card…", which is in the menu beside "Usually paid…"
+    // "Subscriptions" is paid with the credit card: that is its method, and nothing in the menu puts the row on a card
     const owed = await owedOnCard(page)
-    expect(owed).toBeGreaterThan(0)
     await page.getByRole('button', { name: 'Row menu for Subscriptions' }).click()
-    await expect(page.getByRole('menuitem', { name: 'Paid by card…' })).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: 'Paid by card…' })).toHaveCount(0)
+    await expect(page.getByRole('menuitem', { name: 'Paid from…' })).toHaveCount(0)
     await page.getByRole('menuitem', { name: 'Usually paid…' }).click()
     expect(await shown(paidWith(dlg))).toBe('Credit card')
-    // paid by direct debit instead: a label changes, the row stays on its card, and no month that is over is asked about
+    // paid by direct debit instead: a label changes, and no month that is over is asked about
     await paidWith(dlg).selectOption({ label: choice('Direct debit') })
     await paidOn(dlg).selectOption('7th')
     await dlg.getByRole('button', { name: 'Save' }).click()
@@ -293,7 +295,7 @@ test.describe('Payments: "Paid on" and "Paid with"', () => {
     expect(await shown(day)).toBe('9th')
     await expect(day.getByRole('option').first()).toHaveText('As scheduled: 5th')
     await dlg.getByRole('button', { name: 'Cancel' }).click()
-    // the row is on the card ("Paid by card…"), and a method is a label: what is owed there has not moved
+    // a method is a label: what is owed on the card has not moved
     expect(await owedOnCard(page)).toBe(owed)
   })
 })
@@ -612,10 +614,9 @@ test.describe('Payments: the page', () => {
     await dlg.getByLabel('Paid with, Music').selectOption({ label: choice('Direct debit') })
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-    // once the page has the new item (18.00 and 12.00): the row is on the card ("Paid by card…"), and so is the new
-    // item, whatever it is paid with
+    // once the page has the new item (18.00 and 12.00): whatever the items are paid with, nothing is put on the card
     await expect(page.getByRole('button', { name: /^Subscriptions:/ })).toHaveAccessibleName(/^Subscriptions: €30\.00/)
-    expect(await owedOnCard(page)).toBe(owed + 12)
+    expect(await owedOnCard(page)).toBe(owed)
 
     await openPayments(page)
     await expect(page.getByRole('button', { name: /^Subscriptions: Streaming: €18\.00, no day, Credit card$/ })).toBeVisible()
@@ -647,7 +648,7 @@ test.describe('Payments: the page', () => {
     await expect(page.getByRole('checkbox', { name: 'Subscriptions: Music done' })).toBeChecked()
     await expect(page.getByRole('checkbox', { name: 'Subscriptions: Streaming done' })).not.toBeChecked()
     // a day and a method changed since: what is owed on the card is what it was
-    expect(await owedOnCard(page)).toBe(owed + 12)
+    expect(await owedOnCard(page)).toBe(owed)
   })
 })
 

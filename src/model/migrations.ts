@@ -91,6 +91,13 @@ const STEPS: Record<number, Step> = {
   // every method, and it counts an item paid with a method on a card as bought on that card, where this one counts a
   // card's purchases by the row again (rule C2).
   21: (raw) => raw,
+  // 22 → 23: a credit card is a debt that its payment brings down, like a loan (rule C1), and nothing is bought on a
+  // card any more: a card has no mode, and an expense row no longer names the card it was bought on. Nothing is
+  // rewritten here; the app puts older cards right when it opens the data (`planCards`): a payment row that stood
+  // under Transfers moves under Expenses, rows and schedules lose their card, and a card that only ever recorded its
+  // bill stops being tracked. The version keeps an older app from syncing: it would read a card without a mode as one
+  // whose purchases are expense rows, and leave its payment out of the month.
+  22: (raw) => raw,
 }
 
 export function migrateExport(raw: unknown): unknown {

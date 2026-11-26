@@ -142,7 +142,7 @@ export const ACCOUNT_TYPE_INFO: Array<{ value: AccountType; label: string; help:
   { value: 'joint', label: 'Other current account', help: 'Another everyday account: a joint account, a partner\'s own, or one in another currency. It has a balance of its own under Other assets: a transfer row moves money into it, and an expense can come out of it.' },
   { value: 'savings', label: 'Savings', help: 'Where the month\'s leftover goes. The balance is tracked month by month, and virtual accounts live inside it.' },
   { value: 'investment', label: 'Investments', help: 'Broker, fund or pension account. Deposits and value are tracked.' },
-  { value: 'credit-card', label: 'Credit card', help: 'Spend now, pay later. The open balance is tracked.' },
+  { value: 'credit-card', label: 'Credit card', help: 'A debt you carry on a card. Each payment brings it down, and once a month you type what the statement says. A card you pay off in full every month needs no account: what you buy with it is in your rows already, and a payment method can say it was the card.' },
   { value: 'loan', label: 'Loan', help: 'Money you owe. Payments bring the outstanding amount down.' },
   { value: 'other-asset', label: 'Other asset', help: 'Something you own with a value, like a rental deposit. Counts towards net worth.' },
   { value: 'cash', label: 'Cash', help: 'Money you hold as cash, at home or in a wallet. It has a balance of its own under Other assets, and an expense can come out of it.' },

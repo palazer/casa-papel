@@ -108,12 +108,11 @@ describe('a change that brings in a third currency is refused', () => {
     await expect(updateRow(store, salary.id, { currency: 'USD' })).rejects.toThrow('"Tax" goes into "Pound savings", in GBP, so it can follow a row in GBP or in EUR. "Salary" is in USD.')
   })
 
-  it('in the household\'s currency, between accounts in two others', async () => {
+  it('an expense that still names a card in another currency, as "Paid by card" did before schema 23: the card is no end of the amount, so nothing is refused', async () => {
     const { store, dollars } = await fresh()
     const card = await addAccount(store, { name: 'Pound card', type: 'credit-card', currency: 'GBP', openingMonth: '2026-01', openingBalance: 0 })
     const taxi = await addRow(store, { name: 'Taxi', section: 'expense', categoryId: null, accountId: card.id })
-    await expect(setRowFundedBy(store, taxi.id, accountRef(dollars.id), 'all-months'))
-      .rejects.toThrow('"Taxi" comes out of "Pound card", in GBP, so it can come out of an account in GBP or in EUR. "Dollar savings" is in USD.')
+    await expect(setRowFundedBy(store, taxi.id, accountRef(dollars.id), 'all-months')).resolves.toBeUndefined()
   })
 
   it('a refused change writes nothing', async () => {

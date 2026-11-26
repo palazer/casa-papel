@@ -2,10 +2,8 @@
  * The main account, read as what stays behind (rule B9). The month's money passes through it: the Statement's upper
  * half is its month. The engine keeps no balance of its own for it, so this works one out from what it already knows:
  *
- *   balance = opening balances + every month's leftover + bought on an itemized card − paid to it
+ *   balance = opening balances + every month's leftover
  *
- * The card term is there because a card purchase counts as spent in the month it is made while the cash only leaves
- * when the bill is paid; until then the money waits in the account and the card shows the same amount as a debt.
  * It is a calculated figure until someone says what the bank says: a month in which the main account has a real
  * balance (`AccountMonth.actualBalance`) takes it instead, and later months continue from it. The engine works the
  * series out over its whole range (`EngineOutput.main`) and counts it in net worth.
@@ -16,9 +14,9 @@
  * before rule B9 can hold several main accounts until the app's upgrade has run (`planMainAccount`); they count
  * together in the same way, and one in another currency is converted once, when it opens, as it was then.
  */
-import { cardIsItemized, compareMonths, type Account, type AccountMonth, type Money, type MonthKey, type Row } from '@/model'
+import { compareMonths, type Account, type AccountMonth, type Money, type MonthKey } from '@/model'
 import { convertMoney, type FxIndex } from './fx'
-import { cellKey, type CellResult, type MainAccountSeries, type MonthTotals } from './types'
+import type { MainAccountSeries, MonthTotals } from './types'
 
 /**
  * Whether an account is a main account (type `checking`). An other current account (type `joint`) and cash have a
@@ -52,12 +50,10 @@ export function mainAccountLabel(series: MainAccountSeries, accounts: Account[])
 
 /**
  * The running balance over `months`, which must begin at the household's first month (or before it) for the balance
- * to be a balance. `accounts` are the live ones; `cells` and `totals` cover every one of `months`.
+ * to be a balance. `accounts` are the live ones; `totals` cover every one of `months`.
  */
 export function mainAccountSeries(input: {
   months: MonthKey[]
-  rows: Row[]
-  cells: Record<string, CellResult>
   totals: Record<MonthKey, MonthTotals>
   accounts: Account[]
   /** Real balances by `<accountId>|<month>`. */
@@ -65,10 +61,8 @@ export function mainAccountSeries(input: {
   fx: FxIndex
   base: string
 }): MainAccountSeries {
-  const { months, rows, cells, totals, accounts, actuals, fx, base } = input
+  const { months, totals, accounts, actuals, fx, base } = input
   const current = accounts.filter(isMainAccount).sort(byOrder)
-  const itemizedCards = new Set(accounts.filter((a) => cardIsItemized(a)).map((a) => a.id))
-  const cardRows = rows.filter((r) => r.accountId != null && itemizedCards.has(r.accountId))
 
   const series: MainAccountSeries = { accountIds: current.map((a) => a.id), missingRate: false, months: {} }
   const entered = new Set<string>()
@@ -84,15 +78,7 @@ export function mainAccountSeries(input: {
     }
     const start = balance
     const kept = totals[m]?.leftover ?? 0
-    let cardBought: Money = 0
-    let cardPaid: Money = 0
-    for (const row of cardRows) {
-      const c = cells[cellKey(row.id, m)]
-      if (!c || c.value === 0 || c.source === 'archived') continue
-      if (row.kind === 'card-payment') cardPaid += c.valueBase
-      else if (row.section === 'expense') cardBought += c.valueBase
-    }
-    const computed = start + kept + cardBought - cardPaid
+    const computed = start + kept
     // the real balance, of every main account open this month (one, but for the month an old one was replaced)
     const open = mainAccountsIn(current, m)
     let real: Money | null = open.length > 0 ? 0 : null
@@ -109,7 +95,7 @@ export function mainAccountSeries(input: {
       each[acc.id] = { own: typed, base: conv.value }
     }
     balance = real ?? computed
-    series.months[m] = { start, kept, cardBought, cardPaid, computed, entered: real != null, adjustment: real != null ? real - computed : 0, balance, ...(real != null ? { real: each } : {}) }
+    series.months[m] = { start, kept, computed, entered: real != null, adjustment: real != null ? real - computed : 0, balance, ...(real != null ? { real: each } : {}) }
   }
   return series
 }

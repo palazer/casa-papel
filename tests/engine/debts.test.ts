@@ -6,23 +6,26 @@ import { account, actual, cellItems, cellValue, household, row, tables } from '.
 const months = monthRange('2026-01', '2026-03')
 
 describe('cards, loans, other assets and net worth', () => {
-  it('itemized card: spending on the card raises what is owed, the payment lowers it and stays out of the plug', () => {
-    const card = account({ name: 'Visa', type: 'credit-card', openingBalance: 200_00, card: { cardMode: 'itemized' } })
+  it('card: what is bought with it is an expense like any other; the payment is an expense too and brings down what is owed', () => {
+    const card = account({ name: 'Visa', type: 'credit-card', openingBalance: 200_00 })
     const salary = row({ name: 'Salary', section: 'income' })
+    // a row that still names the card, as "Paid by card" did before schema 23: it raises nothing that is owed
     const shopping = row({ name: 'Shopping', section: 'expense', accountId: card.id, order: 'b0' })
-    const pay = row({ name: 'Pay Visa', section: 'transfer', kind: 'card-payment', accountId: card.id, order: 'c0' })
+    const pay = row({ name: 'Pay Visa', section: 'expense', kind: 'card-payment', accountId: card.id, order: 'c0' })
     const t = tables({ household: [household()], accounts: [card], rows: [salary, shopping, pay], cells: [cellValue(salary.id, '2026-01', 2000_00), cellValue(shopping.id, '2026-01', 150_00), cellValue(pay.id, '2026-01', 200_00), cellValue(pay.id, '2026-02', 150_00)] })
     const out = computeEngine({ tables: t, months })
     const s = out.accounts[card.id]
     expect(s.liability).toBe(true)
-    expect(s.months['2026-01']).toMatchObject({ inflow: 150_00, outflow: 200_00, balance: 150_00 })
-    expect(s.months['2026-02'].balance).toBe(150_00) // shopping carries 150 onto the card again, payment 150 clears January's
-    // the plug counts the shopping (cash expense) but not the card payment
-    expect(out.totals['2026-01'].toSavings).toBe(2000_00 - 150_00)
-    expect(out.totals['2026-01'].debt).toBe(0)
-    // net worth: the 150 on the card, and the main account, which paid 200 while the month set 150 against the card
-    expect(out.main!.months['2026-01'].balance).toBe(-50_00)
-    expect(out.netWorth['2026-01']).toBe(-150_00 - 50_00)
+    expect(s.months['2026-01']).toMatchObject({ inflow: 0, outflow: 200_00, balance: 0 })
+    // nothing is owed any more: February's payment counts as nothing
+    expect(s.months['2026-02']).toMatchObject({ outflow: 0, balance: 0 })
+    expect(out.totals['2026-02'].debt).toBe(0)
+    // the plug counts the shopping and the payment
+    expect(out.totals['2026-01'].toSavings).toBe(2000_00 - 150_00 - 200_00)
+    expect(out.totals['2026-01'].debt).toBe(200_00)
+    // the shopping came out of the main account like any expense, and the month's rest left it
+    expect(out.main!.months['2026-01'].balance).toBe(0)
+    expect(out.netWorth['2026-01']).toBe(0)
   })
   it('lump card: the payment is the expense and brings down what is owed; a real balance says what the statement says', () => {
     const card = account({ name: 'Amex', type: 'credit-card', openingBalance: 500_00, card: { cardMode: 'lump' } })

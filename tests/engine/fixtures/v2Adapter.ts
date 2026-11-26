@@ -40,7 +40,7 @@ export function v2ToTables(fx: RawFixture) {
 
   const loans = AccountSchema.parse({ ...base(), name: 'Loans', type: 'loan', currency: 'TRY', openingMonth: months[0], tracked: true, openingBalance: minor(num(rows.get(9)?.b)) })
   const companyDebt = AccountSchema.parse({ ...base(), name: 'Company debt', type: 'loan', currency: 'TRY', openingMonth: months[0], tracked: true, openingBalance: minor(num(rows.get(10)?.b)) })
-  const card = AccountSchema.parse({ ...base(), name: 'Card', type: 'credit-card', currency: 'TRY', openingMonth: months[0], tracked: true, openingBalance: minor(num(rows.get(7)?.b)), card: { cardMode: 'itemized' } })
+  const card = AccountSchema.parse({ ...base(), name: 'Card', type: 'credit-card', currency: 'TRY', openingMonth: months[0], tracked: true, openingBalance: minor(num(rows.get(7)?.b)) })
 
   type Spec = { r: number; section: Row['section']; kind?: Row['kind']; currency?: string; scope?: string; accountId?: string }
   const specs: Spec[] = [
@@ -84,13 +84,10 @@ export function v2ToTables(fx: RawFixture) {
   })
   const toSavings = RowSchema.parse({ ...base(), name: label(24), section: 'transfer', kind: 'to-savings', accountId: savings.id, order: '900' })
   appRows.push(toSavings)
-  // card payment (row 6) sits in the balances block, outside the sheet's expense range; row 7 is the real remaining debt
-  const cardPayment = RowSchema.parse({ ...base(), name: label(6), section: 'transfer', kind: 'card-payment', accountId: card.id, order: '901' })
-  appRows.push(cardPayment)
-  months.forEach((m, mi) => {
-    const v = num(rows.get(6)?.cells[mi])
-    cells.push(CellSchema.parse({ rowId: cardPayment.id, month: m, mode: 'value', value: minor(v), items: [], updatedAt: T0 }))
-  })
+  // The card payment (row 6) sits in the balances block, outside the sheet's expense range: what was bought with the
+  // card is in the expense rows, and the card was paid in full. Such a card needs no payment row in the app (a
+  // payment is an expense there, and would count the purchases twice), so the sheet's row 6 has none. Row 7 is the
+  // real remaining debt, typed as the card's real balance.
   const accountMonths = months.flatMap((m, mi) => {
     const c = rows.get(7)?.cells[mi]
     return c && typeof c.v === 'number' ? [AccountMonthSchema.parse({ accountId: card.id, month: m, actualBalance: minor(c.v), updatedAt: T0 })] : []

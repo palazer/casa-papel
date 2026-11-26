@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { computeEngine } from '@/engine'
 import { monthRange, newId } from '@/model'
-import { CasaDb, Store, addAccount, addAccountWithRow, addCategory, addPayOffRow, addPool, addRow, addRowOfKind, archiveThing, loadTables, payOffRowsOf, planAccountChange, quickCreateHousehold, setCellValue, setRowAccount, setRowCategory, setRowDeductedFrom, updateAccount } from '@/store'
+import { CasaDb, Store, addAccount, addAccountWithRow, addCategory, addPayOffRow, addPool, addRow, addRowOfKind, archiveThing, loadTables, payOffRowsOf, planAccountChange, quickCreateHousehold, setCellValue, setRowAccount, updateAccount } from '@/store'
 
 const months = monthRange('2026-01', '2026-03')
 const live = <T extends { deletedAt: number | null }>(xs: T[]) => xs.filter((x) => !x.deletedAt)
@@ -30,12 +30,12 @@ describe('an account and its row, made together', () => {
     expect(live(after.rows).map((r) => r.id)).toEqual(live(before.rows).map((r) => r.id))
   })
 
-  it('where a card\'s payment row lives follows what is recorded for the card', async () => {
+  it('a card comes with the row that pays it off too, under Expenses, called after the card or as typed', async () => {
     const store = await fresh()
-    const itemized = await addAccountWithRow(store, { name: 'Visa', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01', card: { cardMode: 'itemized' } }, { kind: 'pay-off' })
-    expect(itemized.row).toMatchObject({ name: 'Visa – Payment', section: 'transfer', kind: 'card-payment', accountId: itemized.account.id })
-    const lump = await addAccountWithRow(store, { name: 'Store card', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01', card: { cardMode: 'lump' } }, { kind: 'pay-off', name: 'Store card bill' })
-    expect(lump.row).toMatchObject({ name: 'Store card bill', section: 'expense', kind: 'card-payment', accountId: lump.account.id })
+    const visa = await addAccountWithRow(store, { name: 'Visa', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01' }, { kind: 'pay-off' })
+    expect(visa.row).toMatchObject({ name: 'Visa – Payment', section: 'expense', kind: 'card-payment', accountId: visa.account.id })
+    const named = await addAccountWithRow(store, { name: 'Store card', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01' }, { kind: 'pay-off', name: 'Store card bill' })
+    expect(named.row).toMatchObject({ name: 'Store card bill', section: 'expense', kind: 'card-payment', accountId: named.account.id })
   })
 
   it('a savings or an investment account comes with the row that fills it or takes from it, called after the account', async () => {
@@ -56,8 +56,12 @@ describe('an account and its row, made together', () => {
     const expense = await addCategory(store, { name: 'Transport', section: 'expense' })
     const loan = await addAccountWithRow(store, { name: 'Loan', type: 'loan', currency: 'EUR', openingMonth: '2026-01' }, { kind: 'pay-off', categoryId: expense.id })
     expect(loan.row.categoryId).toBe(expense.id)
-    const visa = await addAccountWithRow(store, { name: 'Visa', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01', card: { cardMode: 'itemized' } }, { kind: 'pay-off', categoryId: expense.id })
-    expect(visa.row).toMatchObject({ section: 'transfer', categoryId: null })
+    const visa = await addAccountWithRow(store, { name: 'Visa', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01' }, { kind: 'pay-off', categoryId: expense.id })
+    expect(visa.row).toMatchObject({ section: 'expense', categoryId: expense.id })
+    // a category of another section does not come along
+    const transfers = await addCategory(store, { name: 'Moves', section: 'transfer' })
+    const amex = await addAccountWithRow(store, { name: 'Amex', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01' }, { kind: 'pay-off', categoryId: transfers.id })
+    expect(amex.row).toMatchObject({ section: 'expense', categoryId: null })
   })
 })
 
@@ -87,116 +91,81 @@ describe('a row without a name', () => {
   })
 })
 
-describe('a loan or a card that changes: the row that pays it off follows', () => {
+describe('a loan and a card become each other with everything they have', () => {
   const rowOf = async (store: Store, id: string) => (await loadTables(store)).rows.find((r) => r.id === id)!
   const accountOf = async (store: Store, id: string) => (await loadTables(store)).accounts.find((a) => a.id === id)!
   const engineOf = async (store: Store) => computeEngine({ tables: await loadTables(store), months })
 
-  it('a card that becomes a loan is brought down by its payment as before, and the payment stays an expense', async () => {
+  it('a card that becomes a loan, and back: no figure changes, the row keeps its category and takes the kind of what it pays, and one undo takes account and row back', async () => {
     const store = await fresh()
-    const { account, row } = await addAccountWithRow(store, { name: 'Card', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01', openingBalance: 94000_00, card: { cardMode: 'lump' } }, { kind: 'pay-off' })
+    const cat = await addCategory(store, { name: 'Debts', section: 'expense' })
+    const { account, row } = await addAccountWithRow(store, { name: 'Card', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01', openingBalance: 94000_00 }, { kind: 'pay-off', categoryId: cat.id })
     await setCellValue(store, row.id, '2026-01', 5000_00, 'from-now-on')
-    // a card that records only its payments comes down with them, as a loan does
-    expect((await engineOf(store)).accounts[account.id].months['2026-02'].balance).toBe(84000_00)
-    const expenses = (await engineOf(store)).totals['2026-01'].expensesTotal
+    const figures = async () => { const out = await engineOf(store); return months.map((m) => [out.accounts[account.id].months[m].balance, out.totals[m].expensesTotal, out.netWorth[m]]) }
+    const before = await figures()
+    expect(before.map((f) => f[0])).toEqual([89000_00, 84000_00, 79000_00])
 
-    await updateAccount(store, account.id, { type: 'loan', card: undefined })
-    expect(await rowOf(store, row.id)).toMatchObject({ kind: 'debt-payment', section: 'expense', accountId: account.id })
-    expect((await accountOf(store, account.id)).card).toBeUndefined()
-    const out = await engineOf(store)
-    expect(out.accounts[account.id].months['2026-01'].balance).toBe(89000_00)
-    expect(out.accounts[account.id].months['2026-02'].balance).toBe(84000_00)
-    expect(out.totals['2026-01'].expensesTotal).toBe(expenses)
+    await updateAccount(store, account.id, { type: 'loan' })
+    expect(await rowOf(store, row.id)).toMatchObject({ kind: 'debt-payment', section: 'expense', accountId: account.id, categoryId: cat.id })
+    expect(await figures()).toEqual(before)
 
-    // one step back: the card and its row are as they were
     await store.undo()
-    expect(await accountOf(store, account.id)).toMatchObject({ type: 'credit-card', card: { cardMode: 'lump' } })
-    expect(await rowOf(store, row.id)).toMatchObject({ kind: 'card-payment', section: 'expense' })
+    expect((await accountOf(store, account.id)).type).toBe('credit-card')
+    expect((await rowOf(store, row.id)).kind).toBe('card-payment')
+
+    await updateAccount(store, account.id, { type: 'loan' })
+    await updateAccount(store, account.id, { type: 'credit-card' })
+    expect(await rowOf(store, row.id)).toMatchObject({ kind: 'card-payment', section: 'expense', categoryId: cat.id })
+    expect(await figures()).toEqual(before)
   })
 
-  it('a card whose purchases are expense rows becomes a loan: its payment moves under Expenses, and nothing is "Paid by card" on a loan', async () => {
+  it('the plan says nothing is refused and writes only the rows whose kind changes, an archived one too; saved again, nothing about the rows is written', async () => {
     const store = await fresh()
-    const { account, row } = await addAccountWithRow(store, { name: 'Visa', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01', openingBalance: 1000_00, card: { cardMode: 'itemized' } }, { kind: 'pay-off' })
-    const bought = await addRow(store, { name: 'Groceries', section: 'expense' })
-    await setRowAccount(store, bought.id, account.id)
-    expect(row.section).toBe('transfer')
-
+    const { account, row: first } = await addAccountWithRow(store, { name: 'Visa', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01', openingBalance: 900_00 }, { kind: 'pay-off' })
+    const second = await addRowOfKind(store, { section: 'expense', name: 'Visa – Old', categoryId: null, kind: 'pay-off', accountId: account.id })
+    await archiveThing(store, { kind: 'row', id: second.id }, '2026-03')
     const plan = planAccountChange(await loadTables(store), account, { type: 'loan' })
     expect(plan.refusal).toBeNull()
-    expect(plan.follows.map((r) => r.id)).toEqual([row.id])
-    expect(plan.place).toEqual({ section: 'expense', kind: 'debt-payment' })
-    expect(plan.unlinked.map((r) => r.id)).toEqual([bought.id])
+    expect(plan.mutations).toHaveLength(2)
 
-    await updateAccount(store, account.id, { type: 'loan', card: undefined })
-    expect(await rowOf(store, row.id)).toMatchObject({ kind: 'debt-payment', section: 'expense', categoryId: null })
-    expect((await rowOf(store, bought.id)).accountId).toBeNull()
-    // under Expenses it can be given a category of that section
-    const cat = await addCategory(store, { name: 'Debts', section: 'expense' })
-    await setRowCategory(store, row.id, cat.id)
-    expect((await rowOf(store, row.id)).categoryId).toBe(cat.id)
-  })
-
-  it('a loan that becomes a card: the payment is a card payment, under Transfers where everything bought is recorded', async () => {
-    const store = await fresh()
-    const cat = await addCategory(store, { name: 'Debts', section: 'expense' })
-    const { account, row } = await addAccountWithRow(store, { name: 'Loan', type: 'loan', currency: 'EUR', openingMonth: '2026-01', openingBalance: 5000_00 }, { kind: 'pay-off', categoryId: cat.id })
-    const salary = (await loadTables(store)).rows.find((r) => r.section === 'income' && !r.deletedAt)!
-    await setRowDeductedFrom(store, row.id, salary.id)
-    await setCellValue(store, row.id, '2026-01', 250_00, 'from-now-on')
-
-    await updateAccount(store, account.id, { type: 'credit-card', card: { cardMode: 'itemized' } })
-    expect(await rowOf(store, row.id)).toMatchObject({ kind: 'card-payment', section: 'transfer', categoryId: null, deductedFromRowId: null })
-    const out = await engineOf(store)
-    // the payment brings the card down and is no purchase on it
-    expect(out.accounts[account.id].months['2026-01'].balance).toBe(4750_00)
-
-    // "Only what I pay to it": back under Expenses, where the payment is the spending and still brings the card down
-    await updateAccount(store, account.id, { card: { cardMode: 'lump' } })
-    expect(await rowOf(store, row.id)).toMatchObject({ kind: 'card-payment', section: 'expense', categoryId: null })
-    expect((await engineOf(store)).accounts[account.id].months['2026-02'].balance).toBe(4500_00)
-  })
-
-  it('several rows move together in the order they had, an archived one too, and a row that fits is not written', async () => {
-    const store = await fresh()
-    const { account, row: first } = await addAccountWithRow(store, { name: 'Visa', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01', card: { cardMode: 'itemized' } }, { kind: 'pay-off' })
-    const second = await addRowOfKind(store, { section: 'transfer', name: 'Visa – Extra', categoryId: null, kind: 'card-payment', accountId: account.id })
-    const third = await addRowOfKind(store, { section: 'transfer', name: 'Visa – Old', categoryId: null, kind: 'card-payment', accountId: account.id })
-    await archiveThing(store, { kind: 'row', id: third.id }, '2026-03')
-
-    await updateAccount(store, account.id, { type: 'loan', card: undefined, openingBalance: 900_00 })
+    await updateAccount(store, account.id, { type: 'loan' })
     const rows = (await loadTables(store)).rows
-    const moved = [first, second, third].map((r) => rows.find((x) => x.id === r.id)!)
-    expect(moved.map((r) => [r.kind, r.section])).toEqual([['debt-payment', 'expense'], ['debt-payment', 'expense'], ['debt-payment', 'expense']])
-    expect(moved.map((r) => r.order)).toEqual([...moved.map((r) => r.order)].sort())
-    expect(new Set(moved.map((r) => r.order)).size).toBe(3)
-    // they stand after the expense rows that were there
-    const before = rows.filter((r) => !r.deletedAt && r.section === 'expense' && !moved.some((m) => m.id === r.id)).map((r) => r.order).sort().at(-1)
-    if (before) expect(moved[0].order > before).toBe(true)
-
-    // saved again, nothing about the rows is written: another device's edit of one of them stays the newer record
-    const stamps = moved.map((r) => r.updatedAt)
+    expect([first, second].map((r) => rows.find((x) => x.id === r.id)!.kind)).toEqual(['debt-payment', 'debt-payment'])
+    // another device's edit of one of them stays the newer record
+    const stamps = [first, second].map((r) => rows.find((x) => x.id === r.id)!.updatedAt)
     await updateAccount(store, account.id, { name: 'Car loan' })
     const again = (await loadTables(store)).rows
-    expect([first, second, third].map((r) => again.find((x) => x.id === r.id)!.updatedAt)).toEqual(stamps)
+    expect([first, second].map((r) => again.find((x) => x.id === r.id)!.updatedAt)).toEqual(stamps)
   })
 
-  it('a row left behind by an earlier save is put right the next time the account is saved', async () => {
+  it('a payment row can be pointed at a loan or at a card, and takes the kind of what it pays; an expense cannot be put on a card', async () => {
     const store = await fresh()
-    const { account, row } = await addAccountWithRow(store, { name: 'Card', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01', openingBalance: 600_00, card: { cardMode: 'lump' } }, { kind: 'pay-off' })
-    // what a save wrote before the rows followed: the account alone
+    const { row } = await addAccountWithRow(store, { name: 'Store card', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01', openingBalance: 300_00 }, { kind: 'pay-off' })
+    const loan = await addAccount(store, { name: 'Car loan', type: 'loan', currency: 'EUR', openingMonth: '2026-01', openingBalance: 500_00 })
+    const visa = await addAccount(store, { name: 'Visa', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01', openingBalance: 200_00 })
+    await setRowAccount(store, row.id, loan.id)
+    expect(await rowOf(store, row.id)).toMatchObject({ accountId: loan.id, kind: 'debt-payment', section: 'expense' })
+    await setRowAccount(store, row.id, visa.id)
+    expect(await rowOf(store, row.id)).toMatchObject({ accountId: visa.id, kind: 'card-payment', section: 'expense' })
+    const savings = (await loadTables(store)).accounts.find((a) => a.type === 'savings')!
+    await expect(setRowAccount(store, row.id, savings.id)).rejects.toThrow(/needs a loan or a credit card/)
+
+    const groceries = await addRow(store, { name: 'Groceries', section: 'expense' })
+    await expect(setRowAccount(store, groceries.id, visa.id)).rejects.toThrow(/an expense names no account/)
+    expect((await rowOf(store, groceries.id)).accountId).toBeNull()
+  })
+
+  it('a row that pays a loan off and was stored with a card\'s kind counts all the same, and is put right the next time the account is saved', async () => {
+    const store = await fresh()
+    const { account, row } = await addAccountWithRow(store, { name: 'Card', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01', openingBalance: 600_00 }, { kind: 'pay-off' })
+    await setCellValue(store, row.id, '2026-01', 100_00, 'from-now-on')
+    // what a merge can leave: the account is a loan on one device, the row still a card's on the other
     const stale = await accountOf(store, account.id)
-    await store.commit([{ op: 'put', table: 'accounts', record: { ...stale, type: 'loan', card: undefined, updatedAt: Date.now() } }])
+    await store.commit([{ op: 'put', table: 'accounts', record: { ...stale, type: 'loan', updatedAt: Date.now() } }])
     expect((await rowOf(store, row.id)).kind).toBe('card-payment')
+    expect((await engineOf(store)).accounts[account.id].months['2026-02'].balance).toBe(400_00)
     await updateAccount(store, account.id, { name: 'Card, now a loan' })
     expect(await rowOf(store, row.id)).toMatchObject({ kind: 'debt-payment', section: 'expense' })
-  })
-
-  it('a payment row pointed at a card that records something else moves to where that card puts it', async () => {
-    const store = await fresh()
-    const { row } = await addAccountWithRow(store, { name: 'Store card', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01', card: { cardMode: 'lump' } }, { kind: 'pay-off' })
-    const visa = await addAccount(store, { name: 'Visa', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01', card: { cardMode: 'itemized' } })
-    await setRowAccount(store, row.id, visa.id)
-    expect(await rowOf(store, row.id)).toMatchObject({ accountId: visa.id, kind: 'card-payment', section: 'transfer', categoryId: null })
   })
 })
 
@@ -217,7 +186,7 @@ describe('any other change of type is refused while something is tied to the acc
     const store = await fresh()
     const { account } = await addAccountWithRow(store, { name: 'Loan', type: 'loan', currency: 'EUR', openingMonth: '2026-01', openingBalance: 100_00 }, { kind: 'pay-off' })
     await expect(updateAccount(store, account.id, { type: 'savings' })).rejects.toThrow(/"Loan – Payment" pays it off/)
-    await expect(updateAccount(store, account.id, { type: 'credit-card', card: { cardMode: 'lump' } })).resolves.toBeUndefined()
+    await expect(updateAccount(store, account.id, { type: 'credit-card' })).resolves.toBeUndefined()
   })
 
   it('a virtual account holds its savings account', async () => {

@@ -20,8 +20,7 @@ interface Props {
 /**
  * What an account really held when a month began and when it ended (DESIGN.md §8). The start is the end of the month
  * before, so changing it corrects that month too; the engine shows the gap and continues from the real
- * numbers. For a card whose purchases are expense rows, owing more than the plan expects means spending that was
- * never typed: the dialog offers to count the difference as that month's spending, so expenses and the debt agree.
+ * numbers. For a card this is where what its statement says is typed.
  */
 export function BalanceDialog({ account, month, tables, household, onClose }: Props) {
   const store = useStore()

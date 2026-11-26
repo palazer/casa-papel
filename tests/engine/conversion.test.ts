@@ -120,13 +120,13 @@ describe('an amount that moves an account in another currency', () => {
     expect(out.accounts[loan.id].months['2026-01'].balance).toBe(0)
   })
 
-  it('a purchase on a card in another currency is owed as recorded', () => {
+  it('a payment to a card in another currency brings it down by what was recorded', () => {
     const h = household()
-    const card = account({ name: 'Dollar card', type: 'credit-card', currency: 'USD', card: { cardMode: 'itemized' } })
-    const hotel = row({ name: 'Hotel', section: 'expense', accountId: card.id })
-    const cells = [cellItems(hotel.id, '2026-01', [{ amount: 200_00, status: 'done', conversion: { foreign: 'USD', foreignAmount: 228_00, homeAmount: 200_00, rate: 1.14, date: null } }])]
-    const out = computeEngine({ tables: tables({ household: [h], rows: [hotel], accounts: [card], cells, fxRates: RATES }), months })
-    expect(out.accounts[card.id].months['2026-01'].balance).toBe(228_00)
+    const card = account({ name: 'Dollar card', type: 'credit-card', currency: 'USD', openingBalance: 330_00 })
+    const payment = row({ name: 'Dollar card – Payment', section: 'expense', kind: 'card-payment', accountId: card.id })
+    const cells = [cellItems(payment.id, '2026-01', [{ amount: 200_00, status: 'done', conversion: { foreign: 'USD', foreignAmount: 210_00, homeAmount: 200_00, rate: 1.05, date: null } }])]
+    const out = computeEngine({ tables: tables({ household: [h], rows: [payment], accounts: [card], cells, fxRates: RATES }), months })
+    expect(out.accounts[card.id].months['2026-01'].balance).toBe(120_00)
   })
 })
 

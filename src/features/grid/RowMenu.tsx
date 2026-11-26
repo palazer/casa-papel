@@ -76,7 +76,7 @@ export function RowMenu({ row, tables, household, onError, onDeleted, onRestored
           )}
           {row.section === 'expense' && <DropdownMenuItem onClick={() => setOpen('source')}>Comes out of…</DropdownMenuItem>}
           {row.section === 'expense' && <DropdownMenuItem onClick={() => setOpen('deduction')}>{deductedFrom ? `Deducted from ${deductedFrom.name}…` : 'Deducted from an income…'}</DropdownMenuItem>}
-          {row.kind !== 'pool-allocation' && hasAccountChoice(row, tables.accounts) && <DropdownMenuItem onClick={() => setOpen('account')}>{accountVerb(row)}…</DropdownMenuItem>}
+          {row.kind !== 'pool-allocation' && hasAccountChoice(row) && <DropdownMenuItem onClick={() => setOpen('account')}>{accountVerb(row)}…</DropdownMenuItem>}
           {paid && <DropdownMenuItem onClick={() => setOpen('paid')}>Usually paid…</DropdownMenuItem>}
           {onRule && canCarryRule(row) && !row.archivedMonth && <DropdownMenuItem onClick={onRule}>Rule…</DropdownMenuItem>}
           {canFollow && <DropdownMenuItem onClick={() => setOpen('follow')}>{followed ? `Follows ${followed.name}…` : 'Follow another row…'}</DropdownMenuItem>}

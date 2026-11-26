@@ -129,8 +129,8 @@ export interface UsualPayment {
 
 /**
  * "Usually paid…": the day and the method of a row's amounts, in every month where an item says nothing of its own.
- * It writes the row and nothing else, and moves no figure (rule W1): the row's card stays "Paid by card…", and where
- * its amounts come out of stays "Comes out of".
+ * It writes the row and nothing else, and moves no figure (rule W1): where its amounts come out of stays
+ * "Comes out of".
  */
 export function planUsualPayment(tables: Tables, rowId: string, usual: UsualPayment, ts: number): Mutation[] {
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)

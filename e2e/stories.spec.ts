@@ -220,14 +220,13 @@ test.describe('whole stories, as the scenarios tell them', () => {
   })
 
   // scenarios/09: "The last payment to such a card is what is still owed, and after it the payment counts as nothing"
-  test('a card that records only its payments: the payment is spending, brings down what is owed and stops at it', async ({ page }) => {
+  test('a card that carries a debt: the payment is spending, brings down what is owed and stops at it', async ({ page }) => {
     const s = await household(page)
     const claims = page.getByRole('region', { name: 'Debts and net worth' })
     await claims.getByRole('button', { name: 'Add a card or loan' }).click()
     await s.dlg.getByLabel('Name', { exact: true }).fill('Amex')
-    await s.dlg.getByRole('radio', { name: 'Only what I pay to it' }).click()
     await s.dlg.getByLabel(/^Owed at the start of November 2026/).fill('500')
-    // the form says what a payment to such a card is
+    // the form says what a payment to a card is
     await expect(s.dlg.getByTestId('acc-row')).toHaveText('"Amex – Payment". Each payment brings down what is owed.')
     await s.dlg.getByRole('button', { name: 'Save' }).click()
     await expect(s.dlg.getByRole('heading', { name: 'Amex – Payment · November 2026' })).toBeVisible()

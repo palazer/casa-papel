@@ -19,7 +19,7 @@ import { PaymentsScreen } from '@/features/payments/PaymentsScreen'
 import { StatementScreen } from '@/features/statement/StatementScreen'
 import { TrendsScreen } from '@/features/trends/TrendsScreen'
 import { AccountDialog, type AccountStep } from '@/features/sync/AccountDialog'
-import { planHousekeeping, planMainAccount } from '@/store'
+import { planCards, planHousekeeping, planMainAccount } from '@/store'
 import { SyncContext, createSyncEngine, useSyncEngine } from '@/sync/useSync'
 
 export default function App() {
@@ -95,6 +95,12 @@ function Shell() {
   useEffect(() => {
     if (!tables || !household || !synced) return
     const mutations = planMainAccount(tables)
+    if (mutations.length) void store.commitSystem(mutations)
+  }, [tables, household, synced, store])
+  // a card is a debt and nothing else (schema 23): cards from before are put right, after the first sync for the same reason
+  useEffect(() => {
+    if (!tables || !household || !synced) return
+    const mutations = planCards(tables)
     if (mutations.length) void store.commitSystem(mutations)
   }, [tables, household, synced, store])
   // the official rates of the currencies in use are kept up to date, once a day, after the first sync

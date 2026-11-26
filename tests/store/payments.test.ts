@@ -6,7 +6,7 @@ import {
 } from '@/model'
 import {
   CasaDb, Store, addAccount, addPaymentMethod, addPaymentMethods, addRecurringItem, addRow, changeRecurringFrom, describeRemoval, exportSnapshot, importMerge, loadTables, methodInUse,
-  quickCreateHousehold, removeAccount, removeEntity, removePaymentMethod, saveRowMonth, setCellValue, updateRecurringItem, setCellItems, setItemStatus, setPaymentsOn, setRowAccount, setUsualPayment, starterMethods, updatePaymentMethod,
+  quickCreateHousehold, removeAccount, removeEntity, removePaymentMethod, saveRowMonth, setCellValue, updateRecurringItem, setCellItems, setItemStatus, setPaymentsOn, setRowAccount, setUsualPayment, starterMethods, updatePaymentMethod, updateRow,
 } from '@/store'
 
 const START = '2026-01'
@@ -178,12 +178,13 @@ describe('"Usually paid…": a row\'s day and method', () => {
     expect(figures(t)).toEqual(was)
   })
 
-  it('"Paid by card…" and the usual method are two things: neither changes the other', async () => {
+  it('an expense cannot be put on a card; one that still names a card from before schema 23 keeps its usual method when the card is taken off', async () => {
     const { store, card } = await fresh()
     const sepa = await addPaymentMethod(store, { name: 'SEPA', kind: 'direct-debit' })
     const groceries = rowNamed(await loadTables(store), 'Groceries')
-    await setRowAccount(store, groceries.id, card.id)
-    // a row on a card names no method by itself
+    await expect(setRowAccount(store, groceries.id, card.id)).rejects.toThrow(/an expense names no account/)
+    await updateRow(store, groceries.id, { accountId: card.id })
+    // a row that names a card names no method by itself
     let t = await loadTables(store)
     expect(usualMethod(rowNamed(t, 'Groceries'), payContext(t))).toBeNull()
     const onCard = figures(t)

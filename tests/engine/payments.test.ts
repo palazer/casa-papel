@@ -76,7 +76,7 @@ describe('where a payment stands, and what says its day and its method', () => {
   const main = account({ name: 'Main', type: 'checking', tracked: false, openingMonth: '2026-10' })
   const own = account({ name: "Sam's account", type: 'joint', openingMonth: '2026-10', openingBalance: 500_00, ownerEntityId: sam.id })
   const savings = account({ name: 'Savings', type: 'savings', openingMonth: '2026-10', openingBalance: 5000_00 })
-  const visa = account({ name: 'Visa', type: 'credit-card', openingMonth: '2026-10', card: { cardMode: 'itemized' } })
+  const visa = account({ name: 'Visa', type: 'credit-card', openingMonth: '2026-10', openingBalance: 300_00 })
   const travel = PoolSchema.parse({ id: newId(), createdAt: T0, updatedAt: T0, name: 'Travel', accountId: savings.id, openingBalance: 800_00 })
   const sepa = method('Direct debit', main, 'direct-debit')
   const byHand = method('Transfer', main, 'transfer', sam.id)
@@ -88,8 +88,8 @@ describe('where a payment stands, and what says its day and its method', () => {
   const groceries = row({ name: 'Groceries', section: 'expense', order: 'b3' })
   const insurance = row({ name: 'Insurance', section: 'expense', order: 'b4', payDay: 1, defaultFundedBy: accountRef(own.id) })
   const flights = row({ name: 'Flights', section: 'expense', order: 'b5', payDay: 31, defaultFundedBy: poolRef(travel.id) })
-  const subs = row({ name: 'Subscriptions', section: 'expense', order: 'b6', payDay: 3, accountId: visa.id })
-  const cardBill = row({ name: 'Visa – Payment', section: 'transfer', kind: 'card-payment', accountId: visa.id, order: 'c0', payDay: 28, payMethodId: sepa.id })
+  const subs = row({ name: 'Subscriptions', section: 'expense', order: 'b6', payDay: 3 })
+  const cardBill = row({ name: 'Visa – Payment', section: 'expense', kind: 'card-payment', accountId: visa.id, order: 'b9', payDay: 28, payMethodId: sepa.id })
   const toSavings = row({ name: 'To savings', section: 'transfer', kind: 'to-savings', accountId: savings.id, order: 'c1' })
   // a method and no day; and neither, ticked on the Statement
   const water = row({ name: 'Water', section: 'expense', order: 'b7', payMethodId: sepa.id })
@@ -172,9 +172,8 @@ describe('where a payment stands, and what says its day and its method', () => {
     expect(phoneOf(withItem(ended)).scheduleId).toBeUndefined()
   })
 
-  it('a tracked amount counts in "to pay" whatever its row is: what is bought on a card, and the payment of that card, both', () => {
-    // the card's payment is real money, though the Statement counts it in no sum
-    expect(named('Visa – Payment')).toMatchObject({ memo: true, day: 28, methodId: sepa.id, tracked: true })
+  it('a tracked amount counts in "to pay" whatever its row is: what is paid with a card, and the payment to that card, both', () => {
+    expect(named('Visa – Payment')).toMatchObject({ day: 28, methodId: sepa.id, tracked: true })
     const open = pay.payments.filter((p) => p.tracked && !p.done)
     expect(open.map((p) => p.label)).toEqual(expect.arrayContaining(['Films', 'Music', 'Visa – Payment']))
     expect(pay.toPay).toBe(sum(open))

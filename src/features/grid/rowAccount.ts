@@ -2,16 +2,18 @@ import { isOutsideNetWorth, ownBalance, type Account, type Row } from '@/model'
 import { accountTypeForRow } from '@/store'
 
 /**
- * An ordinary expense row names one thing: the credit card it is bought on. Which account its money comes out of is
- * "Comes out of", and a current account is the month's income itself, so no other account is offered here.
+ * An ordinary expense row names no account. Which account its money comes out of is "Comes out of", the main account
+ * is the month's income itself, and that it is paid with a card is a payment method's label ("Usually paid…"). One
+ * that still names an account (a card it was bought on before schema 23, or an account kept for the overview) can
+ * only have it taken off.
  */
-export function paysByCard(row: Pick<Row, 'kind' | 'section'>): boolean {
+export function namesNoAccount(row: Pick<Row, 'kind' | 'section'>): boolean {
   return row.section === 'expense' && accountTypeForRow(row) == null
 }
 
-/** Whether the row menu has anything to offer under a row's account: a row paid by card needs a card, or an account it still names. */
-export function hasAccountChoice(row: Row, accounts: Account[]): boolean {
-  return !paysByCard(row) || row.accountId != null || accounts.some((a) => !a.deletedAt && !a.archivedMonth && a.type === 'credit-card')
+/** Whether the row menu has anything to offer under a row's account: an ordinary expense only while it still names one. */
+export function hasAccountChoice(row: Row): boolean {
+  return !namesNoAccount(row) || row.accountId != null
 }
 
 /** A row that "moves money between your accounts": a typed transfer row. The account it names receives the money. */
@@ -34,7 +36,7 @@ export function accountVerb(row: Row): string {
     case 'pocket-money':
       return 'Lands in'
     default:
-      return movesMoney(row) ? 'Goes into' : row.section === 'income' ? 'Paid into' : paysByCard(row) ? 'Paid by card' : 'Paid from'
+      return movesMoney(row) ? 'Goes into' : row.section === 'income' ? 'Paid into' : 'Paid from'
   }
 }
 
@@ -49,17 +51,14 @@ export function accountHelp(row: Row): string {
     case 'from-savings':
       return 'The savings account the money is taken out of. Its balance under Balances falls by the amount.'
     case 'debt-payment':
-      return 'The loan this row pays down. What is still owed falls by the amount.'
     case 'card-payment':
-      return 'The card this row pays. What is owed falls by the amount. On a card that records only its payments the payment also counts as spending in its month, and stops at what is owed.'
+      return 'The loan or card this row pays down. What is still owed falls by the amount, and the payment stops at what is owed.'
     case 'pocket-money':
       return 'An account of this adult\'s own that net worth leaves out. The pocket money raises its balance each month; it still leaves the month, and "Per person" still counts it. With "Nowhere" the app does not follow it.'
     default:
       if (movesMoney(row)) return 'The account the money goes into: its balance rises by the amount, and net worth stays as it is. With no account the money leaves the plan, and net worth falls by it. The main account is not listed: the money comes out of it.'
       if (row.section === 'income') return 'Which of your accounts receives it. For your overview only; the sums do not change.'
-      return paysByCard(row)
-        ? 'The credit card this is bought on. On a card where everything you buy is recorded, the spending adds to what you owe on it until it is paid. An expense that comes straight out of a savings account, an investment account or another asset is set under "Comes out of…" in the row menu instead.'
-        : 'Which of your accounts the money leaves. For your overview only; the sums do not change.'
+      return 'An account this expense still names, for your overview only: the sums do not change, and it can only be taken off. Where the money comes out of is "Comes out of…", and that it is paid with a card is said under "Usually paid…".'
   }
 }
 

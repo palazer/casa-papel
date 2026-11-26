@@ -73,12 +73,13 @@ describe('golden: v2 template workbook', () => {
     })
   })
 
-  it('card: the real remaining debt pins the month and the gap is the implied spend (rows 6–8)', () => {
+  it('card: the real remaining debt pins the month, and what the plan did not have is the difference to what was owed before (row 7)', () => {
     const s = out.accounts[cardId]
     expect(s.liability).toBe(true)
-    expect(s.months[months[0]]).toMatchObject({ outflow: minor(sheet(6, 0)), balance: minor(sheet(7, 0)), adjustment: minor(sheet(8, 0)), projected: false })
+    // no row pays the card (the sheet keeps its payment outside the expenses, see the adapter): nothing is paid in the plan
+    expect(s.months[months[0]]).toMatchObject({ outflow: 0, balance: minor(sheet(7, 0)), adjustment: minor(sheet(7, 0)) - s.months[months[0]].start, projected: false })
     expect(s.months[months[3]].balance).toBe(minor(sheet(7, 0)))
-    // the card payment is not part of the plug (the sheet keeps it outside the expense range too); the vehicle loan instalment (row 36) is
+    // so the plug has only the vehicle loan instalment (row 36) as a payment
     expect(out.totals[months[0]].debt).toBe(minor(sheet(36, 0)))
   })
 

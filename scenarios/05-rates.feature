@@ -239,13 +239,14 @@ Feature: Amounts and accounts in another currency
     And "Dollar loan – Payment" is 96.00 in February 2026
     And "Dollar loan" ends February 2026 with 0.00
 
-  @X10
-  Scenario: A purchase on a card in another currency is owed as it was recorded
-    Given a credit card "Dollar card" in USD owing 0.00, whose purchases are expense rows
-    And an expense "Hotel" of 200.00 from January 2026
-    And "Hotel" is paid with "Dollar card"
-    When I record 200.00 EUR for "Hotel" in January 2026 as 228.00 USD
-    Then "Dollar card" ends January 2026 with 228.00
+  @X10 @X5 @C1
+  Scenario: A payment to a card in another currency brings it down by what was recorded
+    Given a credit card "Dollar card" in USD owing 330.00
+    And a payment "Dollar card – Payment" of 200.00 to "Dollar card" from January 2026
+    When I record 200.00 EUR for "Dollar card – Payment" in January 2026 as 210.00 USD
+    Then "Dollar card" ends January 2026 with 120.00
+    And "Dollar card – Payment" is 96.00 in February 2026
+    And "Dollar card" ends February 2026 with 0.00
 
   # A tax that takes a quarter of a salary takes a quarter of what the salary came to, as it was recorded.
   @X10

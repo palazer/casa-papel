@@ -103,7 +103,8 @@ export function mapV1(input: V1Input): ExportFile {
     if (existing) return existing
     const a = AccountSchema.parse({
       ...base(), name, type, currency: 'EUR', openingMonth: start, openingBalance: 0,
-      tracked: ['savings', 'investment', 'credit-card', 'loan'].includes(type),
+      // a card named as a way of paying has no debt to follow: what is owed on one is typed in its form when there is any
+      tracked: ['savings', 'investment', 'loan'].includes(type),
       ownerEntityId: owner ? adultByName.get(owner.toLowerCase())?.id ?? null : null, order: aOrders[ao++ % aOrders.length],
     })
     accounts.push(a)
@@ -152,7 +153,8 @@ export function mapV1(input: V1Input): ExportFile {
     const account = acc ? accByName.get((acc.owner ? `${acc.name} (${acc.owner})` : acc.name).toLowerCase()) : undefined
     addItem(row, l.name, amount, currency, {
       cadence: cad ? { intervalMonths: cad.intervalMonths, anchorMonth: cad.anchorMonth } : { intervalMonths: 1, anchorMonth: 1 },
-      accountId: account?.id ?? null, scope, notes: l.notes,
+      // "paid from" a card says how something is paid, which a payment method says in the app: no schedule names a card
+      accountId: account && account.type !== 'credit-card' ? account.id : null, scope, notes: l.notes,
     })
     if (tags.length && !row.entityTags.length) row.entityTags = [...new Set(tags)]
   }

@@ -9,9 +9,9 @@ import type { Account, CellItem, PaymentKind, PaymentMethod, RecurringItem, Row,
  * household's payment methods). Both are said in three places, and the nearest one counts: the item of a month, the
  * schedule that posted it, the row ("Usually paid…").
  *
- * None of it reaches a figure (rule W1). Whose money pays for an amount is "Comes out of" (`fundedBy`), and what is
- * bought on a card is the row's "Paid by card…" (`Row.accountId`, rule C2); a method is a label beside them, for the
- * Payments page alone.
+ * None of it reaches a figure (rule W1). Whose money pays for an amount is "Comes out of" (`fundedBy`); a method is a
+ * label beside it, for the Payments page alone. Paying with a credit card is such a label too: what is owed on a card
+ * is followed on the card's account, by its payment row and its statement (rule C2).
  */
 
 /** What a payment asks of the household: nothing (it goes by itself), an action, or it happens at the till. */
@@ -22,7 +22,7 @@ export const PAYMENT_KIND_INFO: ReadonlyArray<{ value: PaymentKind; label: strin
   { value: 'standing-order', label: 'Standing order', ask: 'itself', help: 'Sent by the bank on a fixed day. The money has to be there on the day.' },
   { value: 'transfer', label: 'Transfer by hand', ask: 'hand', help: 'A transfer you make yourself each time.' },
   { value: 'debit-card', label: 'Debit card', ask: 'buying', help: 'A card that takes the money from its account when you pay.' },
-  { value: 'credit-card', label: 'Credit card', ask: 'buying', help: 'Paying with a credit card. For the amount to count as owed on the card, put its row on the card with "Paid by card…".' },
+  { value: 'credit-card', label: 'Credit card', ask: 'buying', help: 'Paying with a credit card. A label like every method: what you owe on a card is followed on the card\'s account, by what you pay to it and what its statement says.' },
   { value: 'wallet', label: 'Wallet', ask: 'buying', help: 'PayPal, Apple Pay and the like.' },
   { value: 'cash', label: 'Cash', ask: 'hand', help: 'Notes and coins.' },
   { value: 'other', label: 'Other', ask: 'hand', help: 'Any other way of paying.' },
@@ -62,13 +62,6 @@ export function dayOfDate(date: string | null | undefined, month: MonthKey): num
 /** Whether a row's amounts leave: an expense, a deposit, pocket money, a payment to a loan or card, money moved. Not income, not money taken out of an account. */
 export const isPaymentRow = (row: Pick<Row, 'section' | 'kind'>): boolean =>
   row.section === 'expense' || (row.section === 'transfer' && !isTakenFromAccount(row))
-
-/**
- * Whether what a row spends can be bought on a card: an ordinary expense row. A payment to a loan or to a card names
- * the debt it pays, and a transfer moves money; neither is a purchase.
- */
-export const buysOnCard = (row: Pick<Row, 'section' | 'kind'>): boolean =>
-  row.section === 'expense' && row.kind !== 'debt-payment' && row.kind !== 'card-payment'
 
 // ---------- item → schedule → row ----------
 

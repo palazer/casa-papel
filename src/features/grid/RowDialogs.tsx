@@ -8,14 +8,14 @@ import { formatMonth } from '@/app/format'
 import { useStore } from '@/app/store'
 import { sortRows } from '@/engine'
 import { ENTITY_KIND_LABEL, holdsBalance, monthOfDate, payContext, usualMethod, type Account, type FundedBy, type Household, type Row, type Section, type Tables } from '@/model'
-import { accountTypeForRow, derivedRowReason, followRow, setRowAccount, setRowDeductedFrom, setRowFundedBy, setRowScope, setUsualPayment, thirdCurrencyReason, updateRow } from '@/store'
+import { accountTypeForRow, derivedRowReason, fitsRow, followRow, setRowAccount, setRowDeductedFrom, setRowFundedBy, setRowScope, setUsualPayment, thirdCurrencyReason, updateRow } from '@/store'
 import { NativeSelect } from '@/components/NativeSelect'
 import { UsualPaidFields } from '@/features/payments/PaidFields'
 import { fundingOptions } from './funding'
 import { currencyChoices, currencyLabel } from '@/app/currencies'
 import { HELP } from '@/app/help'
 import { TipLabel } from '@/components/InfoTip'
-import { accountHelp, accountVerb, landingAccounts, movesMoney, paysByCard } from './rowAccount'
+import { accountHelp, accountVerb, landingAccounts, movesMoney, namesNoAccount } from './rowAccount'
 import { saveError } from '@/app/saveError'
 
 interface Base {
@@ -116,17 +116,17 @@ export function RowSourceDialog({ row, tables, household, onClose }: Base) {
   )
 }
 
-/** Destination for transfers, the card or loan a payment row clears, or the paying account for everything else. */
+/** Destination for transfers, the card or loan a payment row clears; an ordinary expense can only take off the account it still names. */
 export function RowAccountDialog({ row, tables, onClose }: Base) {
   const store = useStore()
   const need = accountTypeForRow(row)
-  // an ordinary expense names the card it is bought on; an account of another kind stays listed only while the row still names it
-  const byCard = paysByCard(row)
+  // an ordinary expense names no account: the one it still names is listed so that it can be taken off
+  const named = namesNoAccount(row)
   // pocket money lands only in an account that net worth leaves out; any other account the row still names is not offered
   const pocket = row.kind === 'pocket-money'
   // a row that moves money sends it into the account it names: only one with a balance of its own can receive it
   const moves = movesMoney(row)
-  const fits = (a: Account) => (need ? a.type === need : moves ? holdsBalance(a) || a.id === row.accountId : !byCard || a.type === 'credit-card' || a.id === row.accountId)
+  const fits = (a: Account) => (need ? fitsRow(row, a) : moves ? holdsBalance(a) || a.id === row.accountId : !named || a.id === row.accountId)
   // archived accounts are offered only while the row still points at one
   const accounts = pocket ? landingAccounts(tables.accounts) : tables.accounts.filter((a) => !a.deletedAt && fits(a) && (!a.archivedMonth || a.id === row.accountId))
   const [accountId, setAccountId] = useState(() => (pocket && !accounts.some((a) => a.id === row.accountId) ? '' : row.accountId ?? ''))
@@ -143,14 +143,13 @@ export function RowAccountDialog({ row, tables, onClose }: Base) {
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="row-account">{byCard ? 'Card' : verb}</Label>
+            <Label htmlFor="row-account">{verb}</Label>
             <NativeSelect id="row-account" className="w-full" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-              {!need && <option value="">{byCard ? 'Not by card' : pocket ? 'Nowhere' : moves ? 'No account: the money leaves the plan' : '—'}</option>}
+              {!need && <option value="">{named ? 'No account' : pocket ? 'Nowhere' : moves ? 'No account: the money leaves the plan' : '—'}</option>}
               {need && !accountId && <option value="">Pick an account</option>}
-              {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}{need && !a.tracked ? ' (not tracked)' : ''}{byCard && a.type !== 'credit-card' ? ' (not a card)' : ''}{moves && !holdsBalance(a) ? ' (has no balance to go into)' : ''}</option>)}
+              {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}{need && !a.tracked ? ' (not tracked)' : ''}{moves && !holdsBalance(a) ? ' (has no balance to go into)' : ''}</option>)}
             </NativeSelect>
             <p className="text-xs text-muted-foreground">{accountHelp(row)}</p>
-            {byCard && !accounts.some((a) => a.type === 'credit-card') && <p className="text-xs text-muted-foreground">No credit card yet: add one on the Statement under "Debts and net worth".</p>}
             {need && accounts.length === 0 && <p className="text-xs text-muted-foreground">No account of the right kind yet. Add one under Household first.</p>}
             {pocket && accounts.length === 0 && <p className="text-xs text-muted-foreground" data-testid="no-landing">No account is left out of net worth yet. Open an account, or add one, and tick "Leave out of net worth" under "More options".</p>}
             <Refusal text={third} />
@@ -168,8 +167,7 @@ export function RowAccountDialog({ row, tables, onClose }: Base) {
 }
 
 /**
- * "Usually paid…": the day and the method of a row's amounts, for every month. It moves no figure: the row's card
- * stays "Paid by card…", beside it in the menu.
+ * "Usually paid…": the day and the method of a row's amounts, for every month. It moves no figure.
  */
 export function RowPaidDialog({ row, tables, onClose }: Base) {
   const store = useStore()

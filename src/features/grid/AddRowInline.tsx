@@ -3,8 +3,8 @@ import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useStore } from '@/app/store'
-import { cardIsItemized, type Account, type AccountType, type Category, type Household, type Money, type MonthKey, type Row, type Section, type Tables } from '@/model'
-import { addRow, addRowOfKind, payOffKind, rowNameFor, rowTargets, type AccountRowInput, type ExpenseRowKind, type TransferRowKind } from '@/store'
+import { type Account, type AccountType, type Category, type Household, type Money, type MonthKey, type Row, type Section, type Tables } from '@/model'
+import { addRow, addRowOfKind, rowNameFor, rowTargets, type AccountRowInput, type ExpenseRowKind, type TransferRowKind } from '@/store'
 import { NativeSelect } from '@/components/NativeSelect'
 import { cn } from '@/lib/utils'
 import { HouseholdAccountDialog } from '@/features/household/HouseholdAccountDialog'
@@ -63,13 +63,12 @@ const K = {
   pocket: { key: 'pocket-money', section: 'transfer', label: 'Pocket money for an adult', text: 'Money that adult spends freely each month: an amount you type, or a percentage through its rule.', targets: (t) => t.adults, targetLabel: 'Adult', field: 'adultId', empty: () => 'Add an adult under Household first.' },
   fromSavings: { key: 'from-savings', section: 'transfer', label: 'Taken from a savings account', text: 'Money you move out of that savings account into the month, to fill a gap or to top up a virtual account. Its balance falls by the amount, and the month has that much more. It comes out of what is not set aside there: a virtual account\'s money is used through an expense\'s "Comes out of".', targets: (t) => t.savings, targetLabel: 'Account', field: 'accountId', create: [NEW.savings], empty: () => '' },
   fromInvestment: { key: 'from-investment', section: 'transfer', label: 'Taken from an investment account', text: 'Money you take out of that investment account into the month. Its value falls by the amount, and the month has that much more.', targets: (t) => t.investments, targetLabel: 'Account', field: 'accountId', create: [NEW.investment], empty: () => '' },
-  cardPayment: { key: 'card-payment', section: 'transfer', label: 'Pays off a credit card', text: 'For a card whose purchases are expense rows: the payment only moves money, and what is owed on the card falls by it.', targets: (t) => t.cardsItemized, targetLabel: 'Account', field: 'accountId', empty: () => '', offered: (t) => t.cardsItemized.length > 0 },
   expense: { key: 'plain', section: 'expense', label: 'A normal expense', text: 'Spending you type each month, as one amount or a list of items.', targets: null, targetLabel: 'Account', field: 'accountId', empty: () => '' },
-  payOff: { key: 'pay-off', section: 'expense', label: 'Pays off a loan or card', text: 'A payment brings down what is owed on a loan, or on a card that records only its payments, and counts as an expense of its month. It stops at what is owed.', targets: (t) => t.payoff.map(withType), targetLabel: 'Account', field: 'accountId', create: [NEW.loan, NEW.card], empty: () => '' },
+  payOff: { key: 'pay-off', section: 'expense', label: 'Pays off a loan or card', text: 'A payment brings down what is owed on a loan or a card, and counts as an expense of its month. It stops at what is owed.', targets: (t) => t.payoff.map(withType), targetLabel: 'Account', field: 'accountId', create: [NEW.loan, NEW.card], empty: () => '' },
 } satisfies Record<string, Kind>
 
 /** Every choice of the Grid, by section, in the order the select shows them. The store applies the same lists and rules in `addRowOfKind`. */
-const KINDS: Kind[] = [K.moves, K.toSavings, K.toInvestment, K.pool, K.pocket, K.fromSavings, K.fromInvestment, K.cardPayment, K.expense, K.payOff]
+const KINDS: Kind[] = [K.moves, K.toSavings, K.toInvestment, K.pool, K.pocket, K.fromSavings, K.fromInvestment, K.expense, K.payOff]
 
 /**
  * The Statement's "From what is left": what such a row can be for, the places the rest of the month is shared out to.
@@ -83,9 +82,6 @@ const SET_ASIDE: Kind[] = [
   K.pocket,
   K.moves,
 ]
-
-/** On the Statement every loan and card is paid off from under Expenses, whichever section its row lives in. */
-const PAYS_ANY: Kind = { ...K.payOff, targets: (t) => [...t.payoff, ...t.cardsItemized].map(withType) }
 
 const newValue = (n: New) => `new:${n.type}`
 /** The entry of a target list that names no target (`Kind.none`). */
@@ -106,7 +102,7 @@ const NONE = 'none'
  * On the Statement the control stands on the rows' own columns: `lead` takes the place of the button's "+" (it carries
  * the columns a row has before its name), and `formClassName` starts the open form on the names' column.
  */
-export function AddRowInline({ section, categories, tables, household, onError, defaultCategoryId = '', label, onAdded, only, without, place, month, lead, leadClassName, formClassName, payOffNote, freeOf }: {
+export function AddRowInline({ section, categories, tables, household, onError, defaultCategoryId = '', label, onAdded, only, without, place, month, lead, leadClassName, formClassName, freeOf }: {
   section: Section; categories: Category[]; tables: Tables; household: Household; onError: (msg: string) => void
   defaultCategoryId?: string; label?: string; onAdded?: (row: Row) => void
   only?: Choice[]; without?: Choice[]
@@ -119,11 +115,6 @@ export function AddRowInline({ section, categories, tables, household, onError, 
   /** The button's classes when it carries a `lead`: its gap, and no padding of its own before the lead. */
   leadClassName?: string
   formClassName?: string
-  /**
-   * Under Expenses on the Statement, where every loan and card can be paid off: what is said when the row pays a card
-   * whose purchases are expense rows already, because that line shows elsewhere on the page.
-   */
-  payOffNote?: string
 }) {
   const store = useStore()
   const [open, setOpen] = useState(false)
@@ -137,7 +128,7 @@ export function AddRowInline({ section, categories, tables, household, onError, 
   // the lists and rules the store applies in addRowOfKind, so what is offered is what is accepted
   const t = rowTargets(tables, household)
   const list = place === 'set-aside' ? SET_ASIDE
-    : KINDS.filter((k) => k.section === section && (!only || only.includes(k.key)) && !without?.includes(k.key)).map((k) => (payOffNote && k.key === 'pay-off' ? PAYS_ANY : k))
+    : KINDS.filter((k) => k.section === section && (!only || only.includes(k.key)) && !without?.includes(k.key))
   const kinds = list.filter((k) => k.offered?.(t) ?? true)
   // a choice that is no longer offered (the plug got its row, the pool was filled elsewhere) falls back to the first one
   const kind: Kind | undefined = kinds.find((k) => k.key === choice) ?? kinds[0]
@@ -158,11 +149,8 @@ export function AddRowInline({ section, categories, tables, household, onError, 
   // a virtual account names its own row in its form
   const showName = creating?.type !== 'pool'
   const sameSection = !kind || kind.section === section
-  // the payment to a card whose purchases are expense rows shows elsewhere on the Statement: that is said in place of the usual sentence
-  const landsElsewhere = !!payOffNote && kind?.key === 'pay-off' && !!account && cardIsItemized(account)
   const text = !kind ? null : missing ?? (
-    landsElsewhere ? payOffNote
-    : creating?.type === 'pool' ? 'Add opens the form of the new virtual account. Saving it makes the virtual account and its row, "To <name>".'
+    creating?.type === 'pool' ? 'Add opens the form of the new virtual account. Saving it makes the virtual account and its row, "To <name>".'
     : creating ? `Add opens the form of the new ${creating.thing}. Saving it makes the ${creating.thing} and this row together.`
     : naming && kind.none ? kind.none.text
     : kind.text)
@@ -189,8 +177,7 @@ export function AddRowInline({ section, categories, tables, household, onError, 
       let row: Row
       if (kind) {
         const id = chosen?.id ?? null
-        // a payment row lives where its account says: under Transfers for a card whose purchases are rows already
-        const where = kind.key === 'pay-off' && account ? payOffKind(account) : { section: kind.section, kind: kind.key }
+        const where = { section: kind.section, kind: kind.key }
         row = await addRowOfKind(store, {
           ...where, name: n, categoryId: where.section === section ? categoryId || null : null,
           accountId: kind.field === 'accountId' ? id : null,

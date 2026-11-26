@@ -51,7 +51,7 @@ test.describe('the Statement', () => {
     const assets = (await total(page, 'assets').innerText()).replace(/^Total\s*/, '')
     const claims = (await total(page, 'claims').innerText()).replace(/^Total\s*/, '')
     expect(assets).toBe(claims)
-    await expect(total(page, 'assets')).toContainText('€23,060.00')
+    await expect(total(page, 'assets')).toContainText('€23,018.00')
     const position = page.getByRole('region', { name: 'Debts and net worth' })
     await expect(position.locator('[data-line="net-worth"]')).toContainText('€23,018.00')
     await expect(position.locator('[data-line="free"]')).toContainText('€21,968.00')
@@ -472,7 +472,7 @@ test.describe('working the month in the Statement', () => {
     await sidesAgree()
   })
 
-  test('a real balance is entered from its line; a card owing more than planned counts the difference as spending', async ({ page }) => {
+  test('a real balance is entered from its line; what a card owes beyond the plan is said on its line, and no spending is made up for it', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'November 2026')
     const moneyOut = page.getByRole('region', { name: 'Money out' })
@@ -484,26 +484,23 @@ test.describe('working the month in the Statement', () => {
     const amountOf = async (line: string) => euros((await claims.locator(`[data-line="${line}"]`).innerText()).split('\n').pop()!)
     const netWorthBefore = await amountOf('net-worth')
 
-    // the card: the statement says 478 is owed, the plan expected 78
+    // the card: the statement says 400 is owed, the plan had nothing
     await claims.getByRole('button', { name: /^Credit card balance:/ }).click()
     await expect(dlg.getByRole('heading', { name: 'Credit card · November 2026' })).toBeVisible()
+    await dlg.getByLabel('At the end of November 2026 (EUR)').fill('400')
+    // nothing offers to turn the difference into spending
     await expect(dlg.getByTestId('book-difference')).toHaveCount(0)
-    await dlg.getByLabel('At the end of November 2026 (EUR)').fill('478')
-    await expect(dlg.getByRole('checkbox', { name: 'Count the €400.00 difference as spending this month' })).toBeChecked()
-    await expect(dlg.getByTestId('book-difference')).toContainText('Credit card – Not recorded')
+    await expect(dlg.getByRole('checkbox')).toHaveCount(0)
     await expect(dlg).toHaveCSS('opacity', '1')
     await page.screenshot({ path: 'e2e/output/statement-card-balance.png' })
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
 
-    // the debt is 478, entered, and nothing is left unexplained: the 400 is a line of spending
-    await expect(claims.getByRole('button', { name: /^Credit card balance:/ })).toHaveAccessibleName('Credit card balance: €478.00, entered')
-    await expect(claims.getByText(/against the plan/)).toHaveCount(0)
-    expect(euros(await moneyOut.locator('[data-line="expenses"]').innerText())).toBe(expensesBefore + 400)
-    expect(euros(await moneyOut.locator('[data-line]').filter({ has: page.locator('[data-rule="rest"]') }).innerText())).toBe(restBefore - 400)
-    await moneyOut.getByRole('button', { name: 'No category', exact: true }).click()
-    await expect(moneyOut.getByRole('button', { name: /^Credit card – Not recorded:/ })).toHaveAccessibleName('Credit card – Not recorded: €400.00')
-    await expect(page.getByRole('checkbox', { name: 'Credit card – Not recorded done' })).toBeChecked()
+    // the debt is 400, entered, and the line says how far the plan was off; the month's spending is what it was
+    await expect(claims.getByRole('button', { name: /^Credit card balance:/ })).toHaveAccessibleName('Credit card balance: €400.00, entered')
+    await expect(claims.locator('[data-line^="acc:"]').filter({ hasText: 'Credit card' })).toContainText('entered, +€400.00 against the plan')
+    expect(euros(await moneyOut.locator('[data-line="expenses"]').innerText())).toBe(expensesBefore)
+    expect(euros(await moneyOut.locator('[data-line]').filter({ has: page.locator('[data-rule="rest"]') }).innerText())).toBe(restBefore)
     expect(await amountOf('net-worth')).toBe(netWorthBefore - 400)
     expect((await total(page, 'in').innerText()).replace(/^Total in\s*/, '')).toBe((await total(page, 'out').innerText()).replace(/^Total out\s*/, ''))
     expect((await total(page, 'assets').innerText()).replace(/^Total\s*/, '')).toBe((await total(page, 'claims').innerText()).replace(/^Total\s*/, ''))
@@ -570,7 +567,7 @@ test.describe('working the month in the Statement', () => {
     const dlg = page.getByRole('dialog')
     await expect(assets.locator('[data-line="other-assets"]')).toHaveCount(0)
     const current = assets.getByRole('button', { name: /^Main account balance:/ })
-    await expect(current).toHaveAccessibleName('Main account balance: €78.00')
+    await expect(current).toHaveAccessibleName('Main account balance: €0.00')
 
     await assets.getByRole('button', { name: 'Add account' }).click()
     await dlg.getByLabel('Type').selectOption('cash')
@@ -585,7 +582,7 @@ test.describe('working the month in the Statement', () => {
     await expect(assets.locator('[data-line="other-assets"]')).toContainText('€300.00')
     await expect(assets.getByRole('button', { name: 'Wallet balance: €300.00' })).toBeVisible()
     // the main account is what it was: the same name, the same figure, and nothing stands under it
-    await expect(current).toHaveAccessibleName('Main account balance: €78.00')
+    await expect(current).toHaveAccessibleName('Main account balance: €0.00')
     await expect(assets.locator('[data-line^="cur:"]')).toHaveCount(0)
 
     // an expense can come straight out of it
@@ -693,7 +690,7 @@ test.describe('working the month in the Statement', () => {
     const group = assets.locator('[data-line="savings-accounts"]')
     const netWorth = claims.locator('[data-line="net-worth"]')
     await expect(group).toContainText('€14,236.00')
-    await expect(total(page, 'assets')).toContainText('€28,043.16')
+    await expect(total(page, 'assets')).toContainText('€27,965.16')
     await expect(netWorth).toContainText('€27,965.16')
 
     // the box is with the account's other options, and says what it does before and after it is ticked
@@ -727,7 +724,7 @@ test.describe('working the month in the Statement', () => {
     await expect(line.getByRole('img', { name: 'Not in net worth' })).toBeVisible()
     await expect(assets.locator('[data-outside]')).toHaveCount(1)
     await expect(group).toContainText('€14,236.00')
-    await expect(total(page, 'assets')).toContainText('€28,043.16')
+    await expect(total(page, 'assets')).toContainText('€27,965.16')
     await expect(netWorth).toContainText('€27,965.16')
     // its figure is grey, as a figure in no sum is; the account above it is not
     const grey = await line.getByRole('button', { name: 'Pocket savings balance: €2,000.00' }).evaluate((el) => getComputedStyle(el).color)
@@ -820,12 +817,12 @@ test.describe('working the month in the Statement', () => {
 
     // worked out until someone says what the bank says
     await expect(line).toContainText('calculated')
-    await assets.getByRole('button', { name: 'Main account balance: €78.00' }).click()
+    await assets.getByRole('button', { name: 'Main account balance: €0.00' }).click()
     await expect(dlg.getByRole('heading', { name: 'Main account · November 2026' })).toBeVisible()
     // one account, one number: the plan's own figure stands in its field, in grey
     await expect(dlg.getByTestId('current-together')).toHaveCount(0)
     const mainEnd = dlg.getByLabel('At the end of November 2026 (EUR)')
-    await expect(mainEnd).toHaveAttribute('placeholder', '€78.00')
+    await expect(mainEnd).toHaveAttribute('placeholder', '€0.00')
     await mainEnd.fill('abc')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg.getByRole('alert')).toHaveText('That is not a number I can read.')
@@ -838,10 +835,10 @@ test.describe('working the month in the Statement', () => {
     // the line reads like any other entered balance, its parts add up, and both sides still agree
     const entered = assets.getByRole('button', { name: 'Main account balance: €1,150.00, entered' })
     await expect(entered).toBeVisible()
-    await expect(line).toContainText('entered, +€1,072.00 against the plan')
+    await expect(line).toContainText('entered, +€1,150.00 against the plan')
     await expect(line).not.toContainText('calculated')
     await line.getByRole('button', { name: 'What is under Main account' }).click()
-    await expect(assets.locator('[data-line="main:adjustment"]')).toHaveText('Not in the plan€1,072.00')
+    await expect(assets.locator('[data-line="main:adjustment"]')).toHaveText('Not in the plan€1,150.00')
     // no account stands under it
     await expect(assets.locator('[data-line^="cur:"]')).toHaveCount(0)
     await sameTotals()
@@ -861,7 +858,7 @@ test.describe('working the month in the Statement', () => {
     await mainEnd.fill('')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-    await expect(assets.getByRole('button', { name: 'Main account balance: €78.00' })).toBeVisible()
+    await expect(assets.getByRole('button', { name: 'Main account balance: €0.00' })).toBeVisible()
     await expect(line).toContainText('calculated')
     await page.getByRole('button', { name: 'Undo' }).click()
     await expect(entered).toBeVisible()
@@ -884,7 +881,7 @@ test.describe('working the month in the Statement', () => {
     for (const heading of ['Savings accounts', 'Investment accounts', 'Debts']) await expect(closing.getByText(heading, { exact: true })).toBeVisible()
     // the main account comes first, with the plan's own figure in its fields
     await expect(closing.getByTestId('current-together')).toHaveCount(0)
-    await expect(closing.getByLabel('Main account: at the end of November 2026 (EUR)')).toHaveAttribute('placeholder', '€78.00')
+    await expect(closing.getByLabel('Main account: at the end of November 2026 (EUR)')).toHaveAttribute('placeholder', '€0.00')
     const fundStart = closing.getByLabel('Index fund: at the start of November 2026 (EUR)')
     const fundEnd = closing.getByLabel('Index fund: at the end of November 2026 (EUR)')
     // nothing is typed: an empty field shows the calculated amount in grey and keeps it
@@ -1251,10 +1248,11 @@ test.describe('working the month in the Statement', () => {
     // under Debts: a card or a loan, and nothing else
     await claims.getByRole('button', { name: 'Add a card or loan' }).click()
     await expect(dlg.getByLabel('Type').locator('option')).toHaveText(['Credit card', 'Loan'])
-    await expect(dlg.getByRole('radio', { name: 'Everything I buy with it' })).toBeChecked()
+    // a card is asked nothing about what is recorded for it: it is a debt, and its type says when it needs no account
+    await expect(dlg.getByRole('radiogroup')).toHaveCount(0)
+    await expect(dlg.getByTestId('acc-type-help')).toContainText('A card you pay off in full every month needs no account')
     await dlg.getByLabel('Name', { exact: true }).fill('Car loan')
     await dlg.getByLabel('Type').selectOption('loan')
-    await expect(dlg.getByRole('radiogroup', { name: 'What do you record for this card?' })).toHaveCount(0)
     await dlg.getByLabel('Owed at the start of September 2026 (EUR)').fill('5000')
     // a loan comes with the row that pays it off, unless the box is unticked
     await expect(dlg.getByRole('checkbox', { name: 'Add the row that pays it off' })).toBeChecked()
@@ -1300,18 +1298,23 @@ test.describe('working the month in the Statement', () => {
     await dlg.getByLabel('Name', { exact: true }).fill('Visa')
     await dlg.getByRole('checkbox', { name: 'Add the row that pays it off' }).uncheck()
     await expect(dlg.getByTestId('acc-row')).toHaveText('No row yet. One can be added later from this form.')
+    // a card says what is owed on it, as a loan does: a payment stops at that amount
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg.getByRole('alert')).toContainText('Type what is still owed on the card')
+    await dlg.getByLabel('Owed at the start of September 2026 (EUR)').fill('300')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
     await expect(moneyOut.getByRole('button', { name: /^Visa – Payment/ })).toHaveCount(0)
     await editFrom(page, claims, 'Visa')
     await expect(dlg.getByTestId('acc-paid-by')).toContainText('No row pays this off yet.')
     await dlg.getByRole('button', { name: 'Add the row that pays it off' }).click()
-    // purchases on this card are expense rows, so its payment only moves money
+    // the payment stands with the expenses and brings the card down, as the loan's does
     await expect(dlg.getByRole('heading', { name: 'Visa – Payment · November 2026' })).toBeVisible()
     await dlg.getByLabel('Amount in EUR').fill('100')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-    await expect(moneyOut.locator('[data-line]').filter({ hasText: 'Visa – Payment' })).toContainText('counted when bought')
+    await expect(moneyOut.getByRole('button', { name: /^Visa – Payment: €100\.00/ })).toBeVisible()
+    await expect(claims.locator('[data-line^="acc:"]').filter({ hasText: 'Visa' })).toContainText('€200.00')
     const assetsTotal = (await total(page, 'assets').innerText()).replace(/^Total\s*/, '')
     expect(assetsTotal).toBe((await total(page, 'claims').innerText()).replace(/^Total\s*/, ''))
 
@@ -1345,11 +1348,10 @@ test.describe('working the month in the Statement', () => {
     const claims = page.getByRole('region', { name: 'Debts and net worth' })
     const dlg = page.getByRole('dialog')
 
-    // a card of which only the payments are recorded: the payment is the spending, and brings down what is owed
+    // a card that carries a debt: the payment is the spending, and brings down what is owed
     await claims.getByRole('button', { name: 'Add a card or loan' }).click()
     await dlg.getByLabel('Name', { exact: true }).fill('Store card')
     await dlg.getByLabel('Owed at the start of September 2026 (EUR)').fill('940')
-    await dlg.getByRole('radio', { name: 'Only what I pay to it' }).click()
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg.getByRole('heading', { name: 'Store card – Payment · November 2026' })).toBeVisible()
     await dlg.getByLabel('Amount in EUR').fill('50')
@@ -1360,12 +1362,11 @@ test.describe('working the month in the Statement', () => {
     const payment = moneyOut.getByRole('button', { name: /^Store card – Payment: €50\.00/ })
     await expect(payment).toBeVisible()
 
-    // as a loan: the form says what the row does then, before anything is saved
+    // as a loan: the row does what it did, so the form has nothing to say about it and nothing to refuse
     await editFrom(page, claims, 'Store card')
-    await expect(dlg.getByTestId('acc-follows')).toHaveCount(0)
     await dlg.getByLabel('Type').selectOption('loan')
     await expect(dlg.getByTestId('acc-paid-by')).toHaveText('Paid off by "Store card – Payment".')
-    await expect(dlg.getByTestId('acc-follows')).toHaveText('"Store card – Payment" follows: each payment brings down what is owed and counts as an expense of its month.')
+    await expect(dlg.getByTestId('acc-type-refusal')).toHaveCount(0)
     await settled(dlg)
     await dlg.screenshot({ path: 'e2e/output/account-becomes-loan.png' })
     await dlg.getByRole('button', { name: 'Save' }).click()
@@ -1382,15 +1383,14 @@ test.describe('working the month in the Statement', () => {
     await expect(dlg).toBeHidden()
     await expect(moneyOut.locator('[data-line^="cat:expense:"]').filter({ hasText: 'Transport' })).toContainText('€148.00')
 
-    // back to a card: what the row does depends on what is recorded for the card, and the form follows the choice
+    // back to a card: the same rule again, so no figure moves and the row keeps its category
     await editFrom(page, claims, 'Store card')
     await dlg.getByLabel('Type').selectOption('credit-card')
-    await expect(dlg.getByTestId('acc-follows')).toHaveText('"Store card – Payment" follows: each payment brings down what is owed and only moves money, so it is not counted as spending again. It moves out of Expenses and loses its category.')
-    await dlg.getByRole('radio', { name: 'Only what I pay to it' }).click()
-    await expect(dlg.getByTestId('acc-follows')).toHaveText('"Store card – Payment" follows: each payment brings down what is owed and counts as an expense of its month.')
-    await dlg.getByRole('button', { name: 'Cancel' }).click()
+    await expect(dlg.getByTestId('acc-type-refusal')).toHaveCount(0)
+    await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
     await expect(card).toContainText('€890.00')
+    await expect(moneyOut.locator('[data-line^="cat:expense:"]').filter({ hasText: 'Transport' })).toContainText('€148.00')
 
     // a savings account that rows and virtual accounts are tied to cannot become an investment account
     await editFrom(page, assets, 'Savings')
@@ -1744,25 +1744,26 @@ test.describe('working the month in the Statement', () => {
     // the form is closed again
     await expect(does).toHaveCount(0)
 
-    // the card the household has is paid off from there too. What was bought with it is under Expenses already, so
-    // its payment only moves money: the form says where the line will show, and the page goes there
+    // the card the household has is paid off from there too. Nothing is owed on it, so the payment counts as nothing
+    // and says so: "paid off", with what was planned beside it
     await moneyOut.getByRole('button', { name: 'Add expense row' }).click()
     await does.selectOption('pay-off')
     await expect(paid.locator('option')).toHaveText(['Car loan · Loan', 'Credit card · Credit card', 'New loan…', 'New credit card…'])
-    await expect(text).toHaveText('A payment brings down what is owed on a loan, or on a card that records only its payments, and counts as an expense of its month. It stops at what is owed.')
+    await expect(text).toHaveText('A payment brings down what is owed on a loan or a card, and counts as an expense of its month. It stops at what is owed.')
     await paid.selectOption({ label: 'Credit card · Credit card' })
-    await expect(text).toHaveText('It will show under "Moved elsewhere": what was bought with this card is under Expenses already, so the payment only moves money to the card.')
+    await expect(text).toHaveText('A payment brings down what is owed on a loan or a card, and counts as an expense of its month. It stops at what is owed.')
     await expect(moneyOut.getByLabel('New expense row name')).toHaveAttribute('placeholder', 'Credit card – Payment')
     await moneyOut.getByRole('button', { name: 'Add', exact: true }).click()
     await expect(dlg.getByRole('heading', { name: 'Credit card – Payment · November 2026' })).toBeVisible()
     await dlg.getByLabel('Amount in EUR').fill('60')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-    const cardPayment = part('moved').locator('[data-line]').filter({ hasText: 'Credit card – Payment' })
-    await expect(cardPayment).toContainText('counted when bought')
+    const cardPayment = part('expenses').locator('[data-line^="row:"], [data-line]').filter({ hasText: 'Credit card – Payment' }).last()
+    await expect(cardPayment).toContainText('paid off')
+    await expect(cardPayment).toContainText('€60.00 planned')
     await expect(cardPayment).toBeInViewport()
-    // listed, and in no sum: the heading over it counts nothing for it
-    await expect(moneyOut.locator('[data-line="moved"]')).toContainText('€0.00')
+    // no payment only "moves money" any more
+    await expect(moneyOut.locator('[data-line="moved"]')).toHaveCount(0)
 
     // a new investment account with its own name for the row; the row's dialog opens with how the amount is set
     await moneyOut.getByRole('button', { name: 'Add transfer row' }).click()
@@ -2567,12 +2568,13 @@ test.describe('working the month in the Statement', () => {
     await expect(paidFrom('Rainy day')).toHaveCount(0)
     await balanced()
 
-    // which account pays is "Comes out of…"; the row's other account choice is the card it is bought on, and nothing else
+    // which account pays is "Comes out of…". An expense names no account: the one this row still names, for the
+    // overview, can only be taken off, and nothing puts it on a card
     await moneyOut.getByRole('button', { name: 'Row menu for Health' }).click()
-    await expect(page.getByRole('menuitem', { name: 'Paid from…' })).toHaveCount(0)
-    await page.getByRole('menuitem', { name: 'Paid by card…' }).click()
-    await expect(dlg.getByLabel('Card', { exact: true }).locator('option')).toHaveText(['Not by card', 'Main account (not a card)', 'Credit card'])
-    await expect(dlg).toContainText('is set under "Comes out of…" in the row menu instead')
+    await expect(page.getByRole('menuitem', { name: 'Paid by card…' })).toHaveCount(0)
+    await page.getByRole('menuitem', { name: 'Paid from…' }).click()
+    await expect(dlg.getByLabel('Paid from', { exact: true }).locator('option')).toHaveText(['No account', 'Main account'])
+    await expect(dlg).toContainText('Where the money comes out of is "Comes out of…"')
     await dlg.getByRole('button', { name: 'Cancel' }).click()
     await expect(dlg).toBeHidden()
   })

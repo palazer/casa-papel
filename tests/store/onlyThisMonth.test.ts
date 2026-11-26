@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { cellKey, computeEngine } from '@/engine'
 import { monthRange, newId, type CellItem } from '@/model'
 import {
-  CasaDb, Store, addPool, clearCell, estimateRowOf, itemsFromCurrent, loadTables, quickCreateHousehold, saveRowMonth, setCardBalanceBooked, setCategoryEstimate, setCellDone,
-  setCellItems, setCellValue, topUpPool, unrecordedRowName,
+  CasaDb, Store, addPool, clearCell, estimateRowOf, itemsFromCurrent, loadTables, quickCreateHousehold, saveRowMonth, setCategoryEstimate, setCellDone,
+  setCellItems, setCellValue, topUpPool,
 } from '@/store'
 import { DEMO_IDS } from '@/demo/demoHousehold'
 import { loadDemo } from '@/demo/loadDemo'
@@ -203,16 +203,4 @@ describe('what the app writes for one month is that month\'s alone', () => {
     expect(estimateRowOf(await loadTables(store), DEMO_IDS.catLiving)?.id).toBe(living.id)
   })
 
-  it('a card\'s difference booked as spending', async () => {
-    const store = new Store(new CasaDb(`test-${newId()}`))
-    await loadDemo(store)
-    const before = computeEngine({ tables: await loadTables(store), months: monthRange('2026-09', '2026-12') })
-    const expected = before.accounts[DEMO_IDS.card].months['2026-10'].computed
-    await setCardBalanceBooked(store, DEMO_IDS.card, '2026-10', expected + 400_00)
-    const t = await loadTables(store)
-    const row = t.rows.find((r) => r.name === unrecordedRowName(t.accounts.find((a) => a.id === DEMO_IDS.card)!))!
-    expect(await storedOf(store, row.id)).toEqual(['10 [400]!'])
-    const out = computeEngine({ tables: t, months: monthRange('2026-09', '2026-12') })
-    expect(['2026-10', '2026-11', '2026-12'].map((m) => out.cells[cellKey(row.id, m)].value)).toEqual([400_00, 0, 0])
-  })
 })

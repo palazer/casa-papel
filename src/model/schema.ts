@@ -8,7 +8,7 @@ import { FUNDED_BY_PATTERN, type FundedBy } from './fundedBy'
 z.config({ jitless: true })
 
 /** Bump when the shape of stored data changes; add a migration in migrations.ts. */
-export const SCHEMA_VERSION = 22
+export const SCHEMA_VERSION = 23
 
 // ---------- primitives ----------
 export const IdSchema = z.string().regex(ID_PATTERN, 'expected ULID')
@@ -154,6 +154,11 @@ export const ArchiveMemoSchema = z.object({
   })).default([]),
 })
 
+/**
+ * What a card recorded before schema 23: every purchase as an expense row that named it (`itemized`), or only its
+ * payments (`lump`). No card has a mode any more: nothing writes this, and the only reader is the pass that puts older
+ * cards right (`planCards`), which also takes the field off the card.
+ */
 export const CardSettingsSchema = z.object({
   cardMode: z.enum(['itemized', 'lump']).default('itemized'),
 })
@@ -175,6 +180,7 @@ export const AccountSchema = BaseRecord.extend({
    */
   outsideNetWorth: z.boolean().default(false),
   investment: InvestmentSettingsSchema.optional(),
+  /** From before schema 23 only: see `CardSettingsSchema`. */
   card: CardSettingsSchema.optional(),
   archivedMonth: MonthKeySchema.nullable().default(null),
   /** While archived: what the archive changed with it. A record archived before schema 14 has none. */
@@ -202,8 +208,7 @@ export const PaymentKindSchema = z.enum(['direct-debit', 'standing-order', 'tran
 
 /**
  * A way of paying ("Paid with"): the household's own list. A method is a label: how an amount is paid, and by whom.
- * It is tied to no account and reaches no figure (rule W1); whose money pays for an amount stays "Comes out of", and
- * what is bought on a card stays "Paid by card…" on the row. A method that amounts were paid with is archived, never
+ * It is tied to no account and reaches no figure (rule W1); whose money pays for an amount stays "Comes out of". A method that amounts were paid with is archived, never
  * deleted, so they keep its name.
  */
 export const PaymentMethodSchema = BaseRecord.extend({
@@ -262,7 +267,11 @@ export const RowSchema = BaseRecord.extend({
   inShareBasis: z.boolean().default(false),
   /** null = household base currency. */
   currency: CurrencyCodeSchema.nullable().default(null),
-  /** Paying account (expenses) or destination account (transfers). */
+  /**
+   * The account the row is about: where a transfer goes, what a deposit fills, the loan or card a payment brings
+   * down, where pocket money lands. On an ordinary expense it is a note for the overview and moves no figure (before
+   * schema 23 it could name the card the expense was bought on; `planCards` takes that off).
+   */
   accountId: IdSchema.nullable().default(null),
   defaultFundedBy: FundedBySchema.default('cash'),
   defaultStatus: DefaultStatusSchema.default('projected'),
@@ -289,7 +298,7 @@ export const RowSchema = BaseRecord.extend({
   /**
    * "Usually paid…": the day of the month the row's amount goes out on, and the method it is paid with, in every
    * month where an item says nothing of its own. Rows from before schema 21 have neither: read both with `?? null`.
-   * Neither reaches a figure: the row's card stays `accountId` ("Paid by card…").
+   * Neither reaches a figure.
    */
   payDay: PayDaySchema.nullable().optional(),
   payMethodId: IdSchema.nullable().optional(),

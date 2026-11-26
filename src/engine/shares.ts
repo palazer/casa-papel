@@ -3,7 +3,6 @@
  * household. A row counts for an adult when it belongs to them ("Belongs to…"); everything else is the household's.
  */
 import type { Entity, Money, MonthKey, Row, Tables } from '@/model'
-import { cardIsItemized } from '@/model'
 import { cellKey, type EngineOutput } from './types'
 
 export interface PersonBudget {
@@ -23,9 +22,6 @@ function liveAdults(tables: Tables, month: MonthKey): Entity[] {
   return sortEntities(tables.entities.filter((e) => e.kind === 'adult' && !e.deletedAt && !(e.archivedMonth && e.archivedMonth <= month)))
 }
 
-/** Cards whose purchases are expense rows: their payment only moves money, so it is nobody's spending a second time. */
-const itemizedCards = (tables: Tables): Set<string> => new Set(tables.accounts.filter((a) => !a.deletedAt && cardIsItemized(a)).map((a) => a.id))
-
 /** Rows taken out of an income row that is live this month: already inside that row's net, so never own spending. */
 function deductionTest(rows: Row[]): (r: Row) => boolean {
   const incomeIds = new Set(rows.filter((r) => r.section === 'income').map((r) => r.id))
@@ -36,7 +32,6 @@ export function computePersonBudgets(tables: Tables, out: EngineOutput, month: M
   const adults = liveAdults(tables, month)
   const rows = out.rows.filter((r) => !(r.archivedMonth && r.archivedMonth <= month))
   const isDeduction = deductionTest(rows)
-  const itemized = itemizedCards(tables)
   return adults.map((a) => {
     let income = 0
     let ownSpend = 0
@@ -47,7 +42,6 @@ export function computePersonBudgets(tables: Tables, out: EngineOutput, month: M
       if (!c || c.source === 'archived') continue
       if (r.section === 'income') income += c.netBase
       else if (r.kind === 'pocket-money') pocket += c.valueBase
-      else if (r.kind === 'card-payment' && r.accountId && itemized.has(r.accountId)) continue // moves money; the purchases were the spending
       else if (r.section === 'expense' && !isDeduction(r)) ownSpend += c.valueBase
     }
     return { entityId: a.id, name: a.name, income, ownSpend, pocket, contribution: income - ownSpend - pocket }

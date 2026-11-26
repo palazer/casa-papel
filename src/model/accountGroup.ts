@@ -28,7 +28,7 @@ export function accountGroup(account: Pick<Account, 'type'>): AccountGroup {
 /**
  * Whether an expense can come straight out of this account ("Comes out of"): a savings account, an investment
  * account or an other asset, an other current account among them. The main account is the month's income itself, and
- * a card or a loan is named on the row ("Paid with").
+ * a card or a loan is a debt, which nothing is paid out of.
  */
 export function paysExpenses(account: Pick<Account, 'type'>): boolean {
   const group = accountGroup(account)

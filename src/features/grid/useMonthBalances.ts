@@ -18,19 +18,15 @@ export function useMonthBalances(tables: Tables, household: Household, month: Mo
   const locale = household.locale
   const [opened] = useState(() => {
     const texts: Record<string, string> = {}
-    const book: Record<string, boolean> = {}
     const accounts: Array<{ id: string; currency: string }> = []
     for (const l of previewMonthBalances(tables, household, month).lines.filter(shown)) {
       accounts.push({ id: l.account.id, currency: l.account.currency })
       texts[keyOf('start', l.account.id)] = asText(l.startStored, l.account.currency, locale)
       texts[keyOf('end', l.account.id)] = asText(l.endStored, l.account.currency, locale)
-      // ticked for a balance typed now; an old difference is only counted when someone asks for it
-      book[l.account.id] = l.endStored == null
     }
-    return { texts, book, accounts }
+    return { texts, accounts }
   })
   const [texts, setTexts] = useState(opened.texts)
-  const [book, setBook] = useState(opened.book)
   const [error, setError] = useState<string | null>(null)
 
   const textOf = (side: BalanceSide, id: string): string => texts[keyOf(side, id)] ?? ''
@@ -65,17 +61,12 @@ export function useMonthBalances(tables: Tables, household: Household, month: Mo
     const v = typed('end', line)
     return v != null && line.endCalculated != null ? v - line.endCalculated : null
   }
-  /** A card whose purchases are expense rows owes more than the plan expects: the difference can be counted as spending. */
-  const canBook = (line: BalanceLine): boolean => line.itemized && (difference(line) ?? 0) > 0
-
   /** What to save: the fields that changed. Says what cannot be read and returns null. */
   function entry(): BalanceEntry | null {
-    const out: Required<BalanceEntry> = { starts: {}, ends: {}, book: [] }
+    const out: Required<BalanceEntry> = { starts: {}, ends: {} }
     for (const line of lines) {
-      // a difference that is counted as spending is saved with its balance, also when the balance itself did not change
-      const booked = canBook(line) && (book[line.account.id] ?? false)
       for (const side of ['start', 'end'] as const) {
-        if (!changed(side, line.account.id) && !(side === 'end' && booked)) continue
+        if (!changed(side, line.account.id)) continue
         const v = typed(side, line)
         if (v === undefined) {
           const fallback = lines.length > 1 ? `${line.account.name}: that is not a number I can read.` : 'That is not a number I can read.'
@@ -84,15 +75,12 @@ export function useMonthBalances(tables: Tables, household: Household, month: Mo
         }
         out[side === 'start' ? 'starts' : 'ends'][line.account.id] = v
       }
-      if (booked) out.book.push(line.account.id)
     }
     return out
   }
 
   return {
-    locale, lines, main: preview.main, error, setError, textOf, setText, typed, difference, canBook, entry,
-    bookOf: (id: string) => book[id] ?? false,
-    setBook: (id: string, on: boolean) => setBook((b) => ({ ...b, [id]: on })),
+    locale, lines, main: preview.main, error, setError, textOf, setText, typed, difference, entry,
   }
 }
 

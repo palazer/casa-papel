@@ -232,11 +232,7 @@ export interface MainAccountMonth {
   start: Money
   /** What the month left in the account: the cash buffer or the leftover. Negative when the month overran. */
   kept: Money
-  /** Bought on an itemized card this month: spent on paper, the cash is still here. */
-  cardBought: Money
-  /** Paid to an itemized card this month. */
-  cardPaid: Money
-  /** What the plan works out for the end of the month: start + kept + bought on the card − paid to it. */
+  /** What the plan works out for the end of the month: start + kept. */
   computed: Money
   /** Every current account open this month has a real balance: `balance` is their sum, not `computed`. */
   entered: boolean

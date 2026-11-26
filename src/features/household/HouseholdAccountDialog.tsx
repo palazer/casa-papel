@@ -9,13 +9,12 @@ import { Check } from '@/components/Check'
 import { InfoTip, TipLabel } from '@/components/InfoTip'
 import { MonthField } from '@/components/MonthField'
 import { NativeSelect } from '@/components/NativeSelect'
-import { Segmented } from '@/components/Segmented'
 import { currencyChoices, currencyLabel } from '@/app/currencies'
 import { amountToInput, formatMonth, parseAmount, unreadableAmount } from '@/app/format'
 import { useStore } from '@/app/store'
 import { useTables } from '@/app/useEngine'
 import { ACCOUNT_TYPE_INFO, growthIn, monthOfDate, paysExpenses, type Account, type AccountType, type Entity, type Row } from '@/model'
-import { addAccount, addAccountWithRow, addPayOffRow, payOffRowsOf, planAccountChange, rowNameFor, updateAccount, type AccountChange, type AccountRowInput } from '@/store'
+import { addAccount, addAccountWithRow, addPayOffRow, payOffRowsOf, planAccountChange, rowNameFor, updateAccount, type AccountRowInput } from '@/store'
 import { cn } from '@/lib/utils'
 import { saveError } from '@/app/saveError'
 import { growthText } from './growthText'
@@ -45,40 +44,13 @@ interface Props {
   removeLabel?: string
 }
 
-type CardMode = 'itemized' | 'lump'
-const CARD_MODES: Array<{ value: CardMode; label: string }> = [
-  { value: 'itemized', label: 'Everything I buy with it' },
-  { value: 'lump', label: 'Only what I pay to it' },
-]
-const CARD_HELP: Record<CardMode, string> = {
-  itemized: 'Each purchase is an expense row that names this card. What you owe grows with them and shrinks with the payment, and the payment is not counted as spending again.',
-  lump: 'Only the payment is a row. It counts as that month\'s spending and brings down what you owe, and stops counting once nothing is owed. Press the amount on the card\'s line to type what the statement says.',
-}
 const TRACKABLE: AccountType[] = ['savings', 'investment', 'credit-card', 'loan', 'other-asset']
-const quoted = (rows: Row[]) => rows.map((r) => `"${r.name}"`).join(', ')
-
-/**
- * What the rows that pay the account off become when it is saved, said before saving: what a payment then does, and
- * where the row goes when it changes sides.
- */
-function followsText(change: AccountChange): string | null {
-  const { follows, place } = change
-  if (!follows.length || !place) return null
-  const does = place.section === 'transfer' ? 'each payment brings down what is owed and only moves money, so it is not counted as spending again'
-    : 'each payment brings down what is owed and counts as an expense of its month'
-  const moving = follows.filter((r) => r.section !== place.section)
-  const it = moving.length === 1 ? 'It' : 'They'
-  const moves = !moving.length ? ''
-    : place.section === 'transfer' ? ` ${moving.length === follows.length ? it : quoted(moving)} ${moving.length === 1 ? 'moves' : 'move'} out of Expenses and ${moving.length === 1 ? 'loses its category' : 'lose their categories'}.`
-    : ` ${moving.length === follows.length ? it : quoted(moving)} ${moving.length === 1 ? 'moves' : 'move'} under Expenses, into no category.`
-  return `${quoted(follows)} ${follows.length === 1 ? 'follows' : 'follow'}: ${does}.${moves}`
-}
 /** What the starting amount of an account is called: money held, money owed, or what a thing is worth. */
 const balanceWord = (type: AccountType) => (type === 'credit-card' || type === 'loan' ? 'Owed' : type === 'other-asset' ? 'Worth' : 'Holds')
 
 /**
  * An account (DESIGN.md §8). The short form asks what every account needs: its name, its type and what it holds, or
- * what is owed on it, when it starts; a card also asks what is recorded for it. The rest (currency, owner, opening
+ * what is owed on it, when it starts. The rest (currency, owner, opening
  * month, tracking, how an investment grows) keeps its usual default behind "More options", which is open when editing.
  */
 export function HouseholdAccountDialog({ account, entities, baseCurrency, locale, startMonth, preset, rows, withRow, onClose, onSaved, onRowAdded, onRemove, removeLabel = 'Archive or delete…' }: Props) {
@@ -105,7 +77,6 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
   const [timing, setTiming] = useState<'start' | 'end'>(inv0?.depositTiming ?? 'start')
   const [fxMode, setFxMode] = useState<'monthly-rate' | 'fixed'>(inv0?.depositFxMode ?? 'monthly-rate')
   const [fixedRate, setFixedRate] = useState(inv0?.fixedRate ? String(inv0.fixedRate) : '')
-  const [cardMode, setCardMode] = useState<CardMode>(account?.card?.cardMode ?? 'itemized')
   const [more, setMore] = useState(!!account)
   const [payOff, setPayOff] = useState(preset?.payOff ?? true)
   const [error, setError] = useState<string | null>(null)
@@ -122,18 +93,15 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
   const foreign = ccy !== baseCurrency && ccy.length === 3
   const info = ACCOUNT_TYPE_INFO.find((t) => t.value === type)
   const debt = type === 'loan' || type === 'credit-card'
-  // a card that records only its payments is paid down by them as a loan is
-  const onlyPayments = type === 'credit-card' && cardMode === 'lump'
   // a new loan or card comes with the row that pays it off unless the box is unticked; the row form brings its own row
   const offersRow = !account && !withRow && debt && preset?.payOff !== false
   const rowInput: AccountRowInput | null = account ? null : withRow ?? (offersRow && payOff ? { kind: 'pay-off' } : null)
   const rowName = rowInput ? rowInput.name?.trim() || (name.trim() ? rowNameFor(rowInput.kind, name.trim()) : null) : null
   // a saved loan or card says which row pays it off, and offers one while none does
   const paidBy = account && rows && debt ? payOffRowsOf(rows, account.id) : null
-  // what saving does beyond the account: the rows that pay it off follow, and a type that would leave something
-  // behind is refused. Asked of the same planner the store writes with, so the form says what will happen
-  const change = account && tables ? planAccountChange(tables, account, { type, card: type === 'credit-card' ? { cardMode } : undefined }) : null
-  const follows = change ? followsText(change) : null
+  // a type that would leave something behind is refused: asked of the same planner the store writes with, so the
+  // form says it before Save does. (A loan becomes a card, and a card a loan, with everything it has.)
+  const change = account && tables ? planAccountChange(tables, account, { type }) : null
   /** A type with a balance of its own, picked for an account that had none to track: the balance is tracked unless unticked. */
   const pickType = (t: AccountType) => {
     setType(t)
@@ -159,7 +127,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
     const openingBalance = opening.trim() ? parseAmount(opening, ccy, locale) : 0
     if (openingBalance == null) return setError(unreadableAmount(opening, `"${balanceWord(type)} at the start" is not a number I can read.`))
     // a payment stops at what is owed, so a loan or card that says nothing about it would take no payment at all
-    if ((type === 'loan' || onlyPayments) && trackable && tracked && !opening.trim()) {
+    if (debt && trackable && tracked && !opening.trim()) {
       return setError(`Type what is still owed on the ${type === 'loan' ? 'loan' : 'card'}, or untick "Track the balance month by month in the grid". A payment stops at what is owed, so with nothing owed the payments to this ${type === 'loan' ? 'loan' : 'card'} would count as nothing.`)
     }
     const annualRate = Number(annual.replace(',', '.')) / 100
@@ -172,7 +140,6 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
       investment: type === 'investment'
         ? { projectionMode: projection, annualRate, depositTiming: timing, depositFxMode: foreign ? fxMode : 'monthly-rate' as const, fixedRate: fxMode === 'fixed' && foreign ? fixed : null }
         : undefined,
-      card: type === 'credit-card' ? { cardMode } : undefined,
     }
     setBusy(true)
     setError(null)
@@ -209,18 +176,11 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
             <AmountHint text={opening} currency={ccy} locale={locale} />
             <p className="text-xs text-muted-foreground">
               {type === 'loan' ? 'What is still owed. A payment row that names this loan brings it down, and stops counting once nothing is owed.'
-                : type === 'credit-card' ? 'What you owed on the card when the month began.'
+                : type === 'credit-card' ? 'Everything you owe on the card: the whole debt, not the month\'s bill. A payment row that names this card brings it down, and stops counting once nothing is owed.'
                 : type === 'other-asset' ? 'What it is worth. Enter a real value from its line whenever that changes.'
                 : 'From then on every month starts with what the month before ended on. Press the account\'s amount in a month to type what it really held at the start and at the end.'}
             </p>
           </div>
-          {type === 'credit-card' && (
-            <fieldset className="space-y-1.5 sm:col-span-2">
-              <legend className="text-sm font-medium">What do you record for this card?</legend>
-              <Segmented label="What do you record for this card?" value={cardMode} onChange={(v) => setCardMode(v as CardMode)} options={CARD_MODES} />
-              <p className="text-xs text-muted-foreground">{CARD_HELP[cardMode]}</p>
-            </fieldset>
-          )}
           {offersRow && (
             <div className="space-y-1 sm:col-span-2">
               <Check label="Add the row that pays it off" checked={payOff} onChange={(e) => setPayOff(e.target.checked)} />
@@ -247,12 +207,6 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
                   </>
                 )}
             </div>
-          )}
-          {follows && <p className="text-xs text-muted-foreground sm:col-span-2" data-testid="acc-follows">{follows}</p>}
-          {change && change.unlinked.length > 0 && (
-            <p className="text-xs text-muted-foreground sm:col-span-2" data-testid="acc-unlinked">
-              {quoted(change.unlinked)} {change.unlinked.length === 1 ? 'is' : 'are'} no longer "Paid by card" on it{type === 'loan' ? ': nothing is bought on a loan' : ''}.
-            </p>
           )}
           <div className="sm:col-span-2">
             <button

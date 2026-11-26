@@ -47,7 +47,7 @@ describe('the figures of the Trends page', () => {
     expect(trends.parts.netWorth.map((p) => p.id)).toEqual(['main', 'savings-accounts', 'investment-accounts', 'debts'])
     // what is owed pulls net worth down
     const last = trends.points[trends.points.length - 1]
-    expect(last.parts.netWorth.debts).toBe(-last.totals.debts)
+    expect(last.parts.netWorth.debts + last.totals.debts).toBe(0)
   })
 
   it('a section without categories is broken down by its rows', () => {

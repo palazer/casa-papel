@@ -204,8 +204,8 @@ test.describe('grid: the main account', () => {
     // the row is named like the Statement's line and sits first under Balances
     await expect(page.getByRole('rowheader', { name: /^Main account/ })).toBeVisible()
     const nov = page.getByRole('button', { name: /^Main account Nov 2026:/ })
-    await expect(nov).toHaveText('€78.00')
-    // with it the rows add up: 78 + 14,236 savings + 13,729.16 investments − 78 on the card
+    await expect(nov).toHaveText('€0.00')
+    // with it the rows add up: 0 + 14,236 savings + 13,729.16 investments, and nothing is owed on the card
     const netWorth = page.getByRole('row', { name: /^Net worth/ }).getByRole('cell').first()
     await expect(netWorth).toHaveText('€27,965.16')
 
@@ -216,13 +216,12 @@ test.describe('grid: the main account', () => {
     await dlg.getByLabel('At the end of November 2026 (EUR)').fill('1150')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-    // the entered month is underlined, net worth follows, and December continues from the real number:
-    // 1,150 plus the 18 bought on the card that month and not yet paid
+    // the entered month is underlined, net worth follows, and December continues from the real number
     await expect(nov).toHaveText('€1,150.00')
     await expect(nov).toHaveClass(/underline/)
-    await expect(netWorth).toHaveText('€29,037.16')
+    await expect(netWorth).toHaveText('€29,115.16')
     const dec = page.getByRole('button', { name: /^Main account Dec 2026:/ })
-    await expect(dec).toHaveText('€1,168.00')
+    await expect(dec).toHaveText('€1,150.00')
     await expect(dec).not.toHaveClass(/underline/)
     await page.screenshot({ path: 'e2e/output/grid-main-account.png' })
 

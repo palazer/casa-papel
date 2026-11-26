@@ -2,13 +2,13 @@ import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing'
 import { buildDefaultCategoryMutations } from './categoryActions'
 import {
   AccountMonthSchema, AccountSchema, CellSchema, EntitySchema, HouseholdSchema, PoolSchema, RowSchema,
-  ACCOUNT_TYPE_INFO, ENTITY_TEMPLATES, HOUSEHOLD_TEMPLATES, accountRef, growthChangedFrom, growthIn, isOutsideNetWorth, monthOfDate, newId, pocketLandsIn, poolRef, poolRowName, templateTitle,
+  ACCOUNT_TYPE_INFO, ENTITY_TEMPLATES, HOUSEHOLD_TEMPLATES, accountRef, growthChangedFrom, growthIn, isPayOffRow, isOutsideNetWorth, monthOfDate, newId, pocketLandsIn, poolRef, poolRowName, templateTitle,
   type Account, type Entity, type EntityKind, type Household, type MonthKey, type Pool, type Row, type RowTemplate, type Tables,
 } from '@/model'
 import { NO_QUESTION, type Mutation, type Store } from './store'
 import { refuseThirdCurrency } from './currencies'
 import { assertMainAccount } from './mainAccount'
-import { accountTypeForRow, isPayOffRow, loadTables, payOffKind, payOffPatches, payOffPlace, rowOfKindMutations } from './actions'
+import { PAY_OFF, accountTypeForRow, fitsRow, loadTables, payOffKindOf, payOffPatches, rowOfKindMutations } from './actions'
 
 const now = () => Date.now()
 
@@ -64,7 +64,7 @@ export interface AccountRowInput {
 export async function addAccountWithRow(store: Store, input: AccountInput, rowInput: AccountRowInput): Promise<{ account: Account; row: Row }> {
   const tables = await loadTables(store)
   const account = newAccount(tables, input)
-  const place = rowInput.kind === 'pay-off' ? payOffKind(account) : { section: 'transfer' as const, kind: rowInput.kind }
+  const place = rowInput.kind === 'pay-off' ? PAY_OFF : { section: 'transfer' as const, kind: rowInput.kind }
   const category = rowInput.categoryId ? tables.categories.find((c) => c.id === rowInput.categoryId && !c.deletedAt) : undefined
   const { row, mutations } = rowOfKindMutations(
     { ...tables, accounts: [...tables.accounts, account] },
@@ -84,7 +84,7 @@ export async function addPayOffRow(store: Store, accountId: string): Promise<Row
   const tables = await loadTables(store)
   const account = tables.accounts.find((a) => a.id === accountId && !a.deletedAt)
   if (!account || (account.type !== 'loan' && account.type !== 'credit-card')) throw new Error('Only a loan or a card has a row that pays it off.')
-  const { row, mutations } = rowOfKindMutations(tables, { ...payOffKind(account), name: '', categoryId: null, accountId })
+  const { row, mutations } = rowOfKindMutations(tables, { ...PAY_OFF, name: '', categoryId: null, accountId })
   await store.commit(mutations, NO_QUESTION)
   return row
 }
@@ -139,12 +139,6 @@ const TYPED_ROW_VERB: Partial<Record<Row['kind'], string>> = {
 export interface AccountChange {
   /** Why the account cannot become that type, or null where it can. */
   refusal: string | null
-  /** The rows that pay it off and change with it, as they were. */
-  follows: Row[]
-  /** What those rows are afterwards (`payOffPlace`); null where the account is no loan and no card. */
-  place: ReturnType<typeof payOffPlace> | null
-  /** Expense rows that were "Paid by card" on it and are not any more: nothing is bought on a loan. */
-  unlinked: Row[]
   /** The rows to write with the account. */
   mutations: Mutation[]
 }
@@ -153,23 +147,22 @@ export interface AccountChange {
  * What an account's rows need when the account is saved as `next`. Pure: the form asks it before saving, and
  * `updateAccount` writes what it says.
  *
- * A loan and a card are paid off by a row whose kind and section follow the account (`payOffPlace`), so those rows
- * change with it: a card that becomes a loan, a loan that becomes a card, a card that records something else. Rows
- * that were left behind by an earlier save are put right the same way, whatever is changed now. Archived rows follow
- * too: they still count in the months before they were archived.
+ * A loan and a card are both a debt that its payment rows bring down (rule C1), so one can become the other with
+ * everything it has: no figure changes. The rows that pay it off are stored with the kind of what they pay, so they
+ * are written with the account (`payOffPatches`), archived ones too.
  *
  * Every other change of type is refused while something is tied to the account that the new type cannot hold: a row
  * made for the old type, a virtual account (only a savings account holds those), and, between an account that holds
  * money and a debt, anything at all. The engine reads those links by the account's type, so they would count as
  * nothing, or as something else, without saying so.
  */
-export function planAccountChange(tables: Tables, account: Account, next: Pick<Account, 'type' | 'card'>, ts: number = now()): AccountChange {
+export function planAccountChange(tables: Tables, account: Account, next: Pick<Account, 'type'>, ts: number = now()): AccountChange {
   const rows = tables.rows.filter((r) => !r.deletedAt && r.accountId === account.id)
   const label = ACCOUNT_TYPE_INFO.find((i) => i.value === next.type)?.label ?? next.type
   const between = isDebt(account.type) && isDebt(next.type)
   let refusal: string | null = null
   if (next.type !== account.type && !between) {
-    const held: string[] = rows.filter((r) => accountTypeForRow(r) && accountTypeForRow(r) !== next.type).map((r) => `"${r.name}" ${TYPED_ROW_VERB[r.kind] ?? 'uses it'}`)
+    const held: string[] = rows.filter((r) => accountTypeForRow(r) && !fitsRow(r, next)).map((r) => `"${r.name}" ${TYPED_ROW_VERB[r.kind] ?? 'uses it'}`)
     if (next.type !== 'savings') held.push(...tables.pools.filter((p) => !p.deletedAt && p.accountId === account.id).map((p) => `the virtual account "${p.name}" is held in it`))
     if (!held.length && isDebt(account.type) !== isDebt(next.type)) {
       // money that is held and money that is owed count the other way round: nothing can come along
@@ -187,19 +180,10 @@ export function planAccountChange(tables: Tables, account: Account, next: Pick<A
     }
     if (held.length) refusal = `"${account.name}" cannot become an account of type ${label}: ${held.join('; ')}. Change or remove ${held.length === 1 ? 'that' : 'those'} first.`
   }
-  if (refusal || !isDebt(next.type)) return { refusal, follows: [], place: null, unlinked: [], mutations: [] }
-  const patches = payOffPatches(tables, rows.filter(isPayOffRow), next)
-  // "Paid by card" is said of a card: a loan has no purchases, and a loan that becomes a card must not take rows that
-  // still name it for purchases
-  const unlinked = next.type === 'loan' || account.type === 'loan' ? rows.filter((r) => r.section === 'expense' && accountTypeForRow(r) == null) : []
+  if (refusal || !isDebt(next.type)) return { refusal, mutations: [] }
+  const patches = payOffPatches(tables, rows.filter(isPayOffRow), () => payOffKindOf(next))
   const put = (r: Row, patch: Partial<Row>): Mutation => ({ op: 'put', table: 'rows', record: RowSchema.parse({ ...r, ...patch, updatedAt: ts }) })
-  return {
-    refusal: null,
-    follows: rows.filter((r) => patches.has(r.id)),
-    place: payOffPlace(next),
-    unlinked,
-    mutations: [...rows.filter((r) => patches.has(r.id)).map((r) => put(r, patches.get(r.id)!)), ...unlinked.map((r) => put(r, { accountId: null }))],
-  }
+  return { refusal: null, mutations: rows.filter((r) => patches.has(r.id)).map((r) => put(r, patches.get(r.id)!)) }
 }
 
 /**
@@ -207,7 +191,7 @@ export function planAccountChange(tables: Tables, account: Account, next: Pick<A
  * account keeps its rate and the changes it has from a month on. Changed, it counts for every month (and the dated
  * changes go), and the save offers "Only from <Month> on" (rule T4): the months before keep the rate they had.
  *
- * The rows that pay a loan or a card off are written in the same step where they no longer fit the account, and a
+ * A loan can become a card and a card a loan, with the rows that pay it off written in the same step; any other
  * change of type that would leave something behind is refused (`planAccountChange`).
  */
 export async function updateAccount(store: Store, id: string, patch: Partial<Omit<Account, 'id' | 'createdAt'>>): Promise<void> {
@@ -227,7 +211,7 @@ export async function updateAccount(store: Store, id: string, patch: Partial<Omi
       patch = { ...patch, investment: { ...patch.investment, rateChanges: undefined } }
     }
   }
-  // what belongs to one type goes with it: an old card setting must not come back when the account is a card again
+  // what belongs to one type goes with it
   const type = patch.type ?? a.type
   const typed = { ...(type !== 'credit-card' ? { card: undefined } : {}), ...(type !== 'investment' ? { investment: undefined } : {}) }
   const next = AccountSchema.parse({ ...a, ...patch, ...typed, updatedAt: ts })

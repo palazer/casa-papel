@@ -290,13 +290,12 @@ test.describe('wave 1b', () => {
     await expect(number(6)).toHaveAttribute('data-done', 'true')
     await expect(part('expenses').locator('[data-line]').filter({ hasText: 'Car loan – Payment' })).toBeVisible()
     await expect(claims.locator('[data-line^="acc:"]').filter({ hasText: 'Car loan' })).toBeVisible()
-    // a card is asked in plain words what is recorded for it
+    // a card is a debt that is carried, and the form says when a card needs no account
     await claims.getByRole('button', { name: 'Add a card or loan' }).click()
     await dlg.getByLabel('Name', { exact: true }).fill('Visa')
     await expect(dlg.getByLabel('Type')).toHaveValue('credit-card')
-    await dlg.getByRole('radio', { name: 'Only what I pay to it' }).click()
-    await expect(dlg).toContainText('Only the payment is a row')
-    // such a card says what is owed on it: a payment stops at that amount
+    await expect(dlg).toContainText('A card you pay off in full every month needs no account')
+    // a card says what is owed on it: a payment stops at that amount
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg.getByRole('alert')).toContainText('Type what is still owed on the card')
     await dlg.getByLabel(/^Owed at the start of/).fill('200')

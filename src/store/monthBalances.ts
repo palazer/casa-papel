@@ -8,10 +8,10 @@
  */
 import { mainAccountsIn, type AccountMonthResult, type EngineOutput, type MainAccountMonth } from '@/engine'
 import {
-  AccountMonthSchema, AccountSchema, accountGroup, addMonths, cardIsItemized, compareMonths,
+  AccountMonthSchema, AccountSchema, accountGroup, addMonths, compareMonths,
   type Account, type AccountGroup, type Household, type Money, type MonthKey, type Tables,
 } from '@/model'
-import { cardBookingMutations, countDoneMutations, engineFor, loadTables } from './actions'
+import { countDoneMutations, engineFor, loadTables } from './actions'
 import { applyMutations } from './impact'
 import { NO_QUESTION, type Mutation, type Store } from './store'
 
@@ -24,8 +24,6 @@ export interface BalanceEntry {
   starts?: Record<string, Money | null>
   /** What it held when the month ended. */
   ends?: Record<string, Money | null>
-  /** Cards whose purchases are expense rows: a real end above the calculated one is counted as that month's spending. */
-  book?: string[]
 }
 
 /** One account in a month's list of balances. */
@@ -43,8 +41,6 @@ export interface BalanceLine {
   endStored: Money | null
   /** What the end comes to with nothing stored; null when the plan does not know it for this account alone. */
   endCalculated: Money | null
-  /** A card whose purchases are expense rows: what it owes beyond the plan can be counted as spending. */
-  itemized: boolean
   /** The engine's month for the account. The main account has none of its own: see `MonthBalances.main`. */
   result?: AccountMonthResult
 }
@@ -82,7 +78,7 @@ export function monthBalances(tables: Tables, engine: EngineOutput, month: Month
     // the plan knows the main account in the household currency, and two that were open together only together
     const alone = current.length === 1 && acc.currency === base ? main : undefined
     lines.push({
-      account: acc, group: 'current', opening, itemized: false,
+      account: acc, group: 'current', opening,
       startStored: opening ? acc.openingBalance : storedActual(tables, acc.id, prev), startCalculated: alone?.start ?? null,
       endStored: storedActual(tables, acc.id, month), endCalculated: alone?.computed ?? null,
     })
@@ -92,7 +88,7 @@ export function monthBalances(tables: Tables, engine: EngineOutput, month: Month
     if (!result) continue
     const opening = startsOnOpening(engine, acc, prev)
     lines.push({
-      account: acc, group: accountGroup(acc), opening, itemized: cardIsItemized(acc), result,
+      account: acc, group: accountGroup(acc), opening, result,
       startStored: opening ? acc.openingBalance : storedActual(tables, acc.id, prev), startCalculated: result.start,
       endStored: storedActual(tables, acc.id, month), endCalculated: result.computed,
     })
@@ -149,8 +145,7 @@ function assertAllOrNone(tables: Tables, month: MonthKey, listed: ReadonlySet<st
 }
 
 /**
- * Everything a month's typed balances write, in order: the starts first, because a start moves the calculated end
- * that a card's difference is measured against. Pure. A start is the end of the month before, so typing it corrects
+ * Everything a month's typed balances write, in order: the starts first. Pure. A start is the end of the month before, so typing it corrects
  * that month too: it says what the account really held and leaves that month's rows alone.
  */
 export function monthBalanceMutations(tables: Tables, household: Household, month: MonthKey, entry: BalanceEntry): Mutation[] {
@@ -171,12 +166,9 @@ export function monthBalanceMutations(tables: Tables, household: Household, mont
   let work = applyMutations(tables, first)
   if (Object.keys(starts).some((id) => isCurrent(id) && !lines.get(id)!.opening)) assertAllOrNone(work, prev, listed)
 
-  const after = first.length ? engineFor(work, household, month) : engine
   const second: Mutation[] = []
   for (const [id, value] of Object.entries(ends)) {
-    const made = value != null && entry.book?.includes(id)
-      ? cardBookingMutations(work, after, household, id, month, value).mutations
-      : actualMutations(work, id, month, value, ts)
+    const made = actualMutations(work, id, month, value, ts)
     second.push(...made)
     work = applyMutations(work, made)
   }

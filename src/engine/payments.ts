@@ -44,8 +44,6 @@ export interface Payment {
   tracked: boolean
   /** Who pays: the method's owner; null = the household, and every payment without a method. */
   ownerId: string | null
-  /** Shown on the Statement for the record and in none of its sums: the payment of a card whose purchases are recorded. Real money all the same. */
-  memo: boolean
   status: CellStatus
   done: boolean
   /** Worked out by the app (a share, the rest of the month): it can still move while the month runs. */
@@ -139,7 +137,7 @@ export function buildPayments(tables: Tables, engine: EngineOutput, month: Month
       day, dayFrom: payDayFrom(item, row, month, ctx),
       methodId: method?.id ?? null, methodFrom: methodFrom(item, row, ctx), ask: method ? paymentKindInfo(method.kind).ask : null,
       tracked, ownerId: method?.ownerEntityId ?? null, scheduleId: runningSchedule(item),
-      memo: !!line.memo, status: line.status ?? 'projected', done, automatic: !!line.automatic, estimate: !!line.estimate,
+      status: line.status ?? 'projected', done, automatic: !!line.automatic, estimate: !!line.estimate,
       state: stateOf(tracked, done, day), ...over,
     })
   }

@@ -1,7 +1,7 @@
 import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing'
 import { computeEngine, cellKey, sortRows, typedAmount, type EngineOutput } from '@/engine'
 import {
-  ACCOUNT_TYPE_INFO, AccountMonthSchema, AccountSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RecurringItemSchema, RowSchema, accountIdOf, addMonths, canCarryRule, canTakeRest, cardIsItemized, compareMonths, currencyExponent, fromMinor, holdsBalance, isOldPocketShare, isOutsideNetWorth, isShareRule, monthKey, monthOfDate, monthRange, newId, ownBalance, parseMonth, paysExpenses, poolIdOf, resolveRules, sharePercent, toMinor,
+  ACCOUNT_TYPE_INFO, AccountSchema, HouseholdSchema, MonthStateSchema, PoolSchema, RecurringItemSchema, RowSchema, accountIdOf, addMonths, canCarryRule, canTakeRest, compareMonths, currencyExponent, fromMinor, holdsBalance, isOldPocketShare, isOutsideNetWorth, isPayOffRow, isShareRule, monthKey, monthOfDate, monthRange, newId, ownBalance, parseMonth, paysExpenses, poolIdOf, resolveRules, sharePercent, toMinor,
   type Account, type Category, type Cell, type CellItem, type FundedBy, type Household, type ItemStatus, type Money, type MonthKey, type Pool, type Row, type RowKind, type Tables,
 } from '@/model'
 import { NO_QUESTION, type Mutation, type Store } from './store'
@@ -403,10 +403,10 @@ export async function addRow(store: Store, input: Partial<Row> & { name: string;
 }
 
 /**
- * What a new row under Transfers does; `plain` just moves money between your accounts, `card-payment` pays a card whose
- * purchases are already expense rows, `from-savings` and `from-investment` take money out of an account into the month.
+ * What a new row under Transfers does; `plain` just moves money between your accounts, `from-savings` and
+ * `from-investment` take money out of an account into the month.
  */
-export type TransferRowKind = 'plain' | 'to-savings' | 'to-investment' | 'pool-allocation' | 'pocket-money' | 'card-payment' | 'from-savings' | 'from-investment'
+export type TransferRowKind = 'plain' | 'to-savings' | 'to-investment' | 'pool-allocation' | 'pocket-money' | 'from-savings' | 'from-investment'
 /** What a new row under Expenses does: a normal expense, or a payment that brings a loan or card down. */
 export type ExpenseRowKind = 'plain' | 'pay-off'
 
@@ -423,10 +423,8 @@ export function rowTargets(tables: Tables, household: Household | undefined) {
     investments: accounts.filter((a) => a.type === 'investment'),
     /** where a row that moves money can send it: the accounts with a balance of their own (savings, investments, cash, other assets) */
     balances: accounts.filter(holdsBalance),
-    /** what a payment row under Expenses brings down: loans, and cards whose payment is the recorded spending */
-    payoff: accounts.filter((a) => a.type === 'loan' || (a.type === 'credit-card' && !cardIsItemized(a))),
-    /** cards whose purchases are expense rows: their payment is a transfer, so it is offered under Transfers */
-    cardsItemized: accounts.filter(cardIsItemized),
+    /** what a payment row brings down: loans and cards */
+    payoff: accounts.filter((a) => a.type === 'loan' || a.type === 'credit-card'),
     /** virtual accounts whose row was deleted, so they can be filled again */
     orphanPools: live(tables.pools).filter((p) => !p.allocationRowId || !rows.some((r) => r.id === p.allocationRowId)),
     adults: live(tables.entities).filter((e) => e.kind === 'adult'),
@@ -448,47 +446,34 @@ export interface RowOfKindInput {
 /** What a row is called when no name was typed: after the account it fills, takes from or pays off. */
 export function rowNameFor(kind: RowOfKindInput['kind'], target: string): string {
   if (kind === 'from-savings' || kind === 'from-investment') return `From ${target}`
-  if (kind === 'pay-off' || kind === 'card-payment') return `${target} – Payment`
+  if (kind === 'pay-off') return `${target} – Payment`
   return `To ${target}`
 }
 
-/**
- * Where the row that pays an account off lives: under Expenses for a loan and for a card that records only its payment,
- * under Transfers for a card whose purchases are expense rows already.
- */
-export function payOffKind(account: Account): Pick<RowOfKindInput, 'section' | 'kind'> {
-  return cardIsItemized(account) ? { section: 'transfer', kind: 'card-payment' } : { section: 'expense', kind: 'pay-off' }
-}
-
-/** A row that pays a loan or a card off, whichever of the two it was made for. */
-export const isPayOffRow = (row: Pick<Row, 'kind'>): boolean => row.kind === 'debt-payment' || row.kind === 'card-payment'
+/** The row that pays a loan or a card off is a row under Expenses: what `addRowOfKind` is asked for. */
+export const PAY_OFF: Pick<RowOfKindInput, 'section' | 'kind'> = { section: 'expense', kind: 'pay-off' }
 
 /**
- * What the row that pays an account off is, as it is stored: a loan's payment and a card's are two kinds, and the
- * payment of a card whose purchases are expense rows stands under Transfers, every other one under Expenses. The one
- * reading of it, for a new row (`rowOfKindMutations`) and for a row whose account changed (`payOffPatches`).
+ * The kind a row that pays `account` off is stored with: a loan's payment and a card's are two kinds, which the
+ * engine reads alike (`isPayOffRow`). The one reading of it, for a new row and for a row whose account changed.
  */
-export function payOffPlace(account: Pick<Account, 'type' | 'card'>): { section: 'expense' | 'transfer'; kind: 'debt-payment' | 'card-payment' } {
-  if (account.type === 'loan') return { section: 'expense', kind: 'debt-payment' }
-  return { section: cardIsItemized(account) ? 'transfer' : 'expense', kind: 'card-payment' }
-}
+export const payOffKindOf = (account: Pick<Account, 'type'>): 'debt-payment' | 'card-payment' => (account.type === 'loan' ? 'debt-payment' : 'card-payment')
 
 /**
- * What has to change on the rows that pay `account` off so that they fit it (`payOffPlace`): the account became a
- * loan or a card, a card records something else now, or a row was pointed at it. A row that fits already is not in
- * the result, so nothing is written for it. A row that changes section joins the end of the rows without a category
- * there, the rows that move together in the order they had; it loses its category, which belongs to the section it
- * leaves, and under Transfers also what it was deducted from, which only an expense can be. Pure.
+ * What has to change on rows that pay a loan or a card off so that they stand where such a row belongs: under
+ * Expenses, with the kind of the account each of them pays (`kindOf`; a row whose account is gone keeps its kind).
+ * A row that fits already is not in the result, so nothing is written for it. A row that stood under Transfers (the
+ * payment of a card from before schema 23) joins the end of the expense rows without a category, the rows that move
+ * together in the order they had; it loses its category, which belongs to the section it leaves. Pure.
  */
-export function payOffPatches(tables: Tables, rows: Row[], account: Pick<Account, 'type' | 'card'>): Map<string, Partial<Row>> {
-  const place = payOffPlace(account)
+export function payOffPatches(tables: Tables, rows: Row[], kindOf: (row: Row) => Row['kind']): Map<string, Partial<Row>> {
   const out = new Map<string, Partial<Row>>()
-  const moving = sortRows(rows.filter((r) => r.section !== place.section), tables.categories)
+  const moving = sortRows(rows.filter((r) => r.section !== 'expense'), tables.categories)
   const ids = new Set(moving.map((r) => r.id))
-  const last = groupRows(tables, { section: place.section, categoryId: null }).filter((r) => !ids.has(r.id)).at(-1)?.order ?? null
+  const last = groupRows(tables, { section: 'expense', categoryId: null }).filter((r) => !ids.has(r.id)).at(-1)?.order ?? null
   const orders = generateNKeysBetween(last, null, moving.length)
-  moving.forEach((r, i) => out.set(r.id, { section: place.section, kind: place.kind, categoryId: null, order: orders[i], ...(place.section === 'transfer' ? { deductedFromRowId: null } : {}) }))
-  for (const r of rows) if (!out.has(r.id) && r.kind !== place.kind) out.set(r.id, { kind: place.kind })
+  moving.forEach((r, i) => out.set(r.id, { section: 'expense', kind: kindOf(r), categoryId: null, order: orders[i] }))
+  for (const r of rows) if (!out.has(r.id) && r.kind !== kindOf(r)) out.set(r.id, { kind: kindOf(r) })
   return out
 }
 
@@ -501,7 +486,7 @@ export function payOffPatches(tables: Tables, rows: Row[], account: Pick<Account
  */
 export function rowOfKindMutations(tables: Tables, input: RowOfKindInput): { row: Row; mutations: Mutation[] } {
   const targets = rowTargets(tables, tables.household.find((h) => !h.deletedAt))
-  const transferOnly: string[] = ['to-savings', 'to-investment', 'pool-allocation', 'pocket-money', 'card-payment', 'from-savings', 'from-investment']
+  const transferOnly: string[] = ['to-savings', 'to-investment', 'pool-allocation', 'pocket-money', 'from-savings', 'from-investment']
   if ((input.section === 'expense' && transferOnly.includes(input.kind)) || (input.section === 'transfer' && input.kind === 'pay-off')) {
     throw new Error('That kind of row does not belong in this section.')
   }
@@ -513,16 +498,8 @@ export function rowOfKindMutations(tables: Tables, input: RowOfKindInput): { row
     const acc = tables.accounts.find((a) => a.id === input.accountId && !a.deletedAt)
     if (!acc) throw new Error('Pick the loan or card this row pays off.')
     if (acc.archivedMonth) throw new Error(`"${acc.name}" is archived.`)
-    if (cardIsItemized(acc)) throw new Error(`Purchases on "${acc.name}" are recorded as expense rows, so its payment is a transfer: add it under Transfers with "Pays off a credit card".`)
     if (!targets.payoff.some((a) => a.id === acc.id)) throw new Error(`"${acc.name}" is not a loan or a credit card.`)
-    base.kind = payOffPlace(acc).kind
-    base.accountId = acc.id
-    nameAfter(acc.name)
-  } else if (input.kind === 'card-payment') {
-    const acc = tables.accounts.find((a) => a.id === input.accountId && !a.deletedAt)
-    if (!acc) throw new Error('Pick the card this row pays off.')
-    if (acc.archivedMonth) throw new Error(`"${acc.name}" is archived.`)
-    if (!targets.cardsItemized.some((a) => a.id === acc.id)) throw new Error(`"${acc.name}" records only its payment, as spending: add it under Expenses with "Pays off a loan or card".`)
+    base.kind = payOffKindOf(acc)
     base.accountId = acc.id
     nameAfter(acc.name)
   } else if (input.kind === 'to-savings' || input.kind === 'to-investment' || input.kind === 'from-savings' || input.kind === 'from-investment') {
@@ -622,55 +599,6 @@ export async function setCategoryEstimate(store: Store, categoryId: string, mont
   const { row, mutations } = categoryEstimateMutations(tables, category, month, amount, scope, engine)
   await store.commit(mutations)
   return row
-}
-
-/** The row a card's unrecorded spending is booked on: named after the card and paid from it. */
-export const unrecordedRowName = (card: Pick<Account, 'name'>): string => `${card.name} – Not recorded`
-
-/**
- * Pin what is really owed on a card and, when that is more than the plan expects, book the difference as that month's
- * spending on the card, so the month's expenses and the debt agree. Only for a card whose purchases are expense rows:
- * on any other card the payment is the recorded spending, and booking purchases as well would count them twice.
- * The difference lands as a done item "Not recorded" on the card's own "<card> – Not recorded" row (made on first use),
- * as that month's alone, so it does not carry forward. One commit, so one undo takes it all back.
- * Returns what was booked, 0 when the real balance is not above the expected one.
- */
-export async function setCardBalanceBooked(store: Store, accountId: string, month: MonthKey, actualBalance: Money): Promise<Money> {
-  const { tables, engine, household } = await engineUpTo(store, month)
-  const { mutations, booked } = cardBookingMutations(tables, engine, household, accountId, month, actualBalance)
-  await store.commit(mutations)
-  return booked
-}
-
-/** What `setCardBalanceBooked` writes, and how much of it is booked as spending. Pure, so closing a month can carry it in the same step. */
-export function cardBookingMutations(tables: Tables, engine: EngineOutput, household: Household, accountId: string, month: MonthKey, actualBalance: Money): { mutations: Mutation[]; booked: Money } {
-  const card = tables.accounts.find((a) => a.id === accountId && !a.deletedAt)
-  if (!card || !cardIsItemized(card)) throw new Error('Only a card whose purchases are expense rows can count a difference as spending.')
-  const expected = engine.accounts[card.id]?.months[month]?.computed
-  if (expected == null) throw new Error(`"${card.name}" has no balance in ${month}.`)
-  const extra = actualBalance - expected
-  const mutations: Mutation[] = []
-  if (extra > 0) {
-    const name = unrecordedRowName(card)
-    let row = tables.rows.find((r) => !r.deletedAt && !r.archivedMonth && r.section === 'expense' && r.kind === 'plain' && r.accountId === card.id && r.name === name)
-    if (!row) {
-      const made = newRowMutation(tables, { name, section: 'expense', categoryId: null, accountId: card.id, currency: card.currency === household.baseCurrency ? null : card.currency, defaultStatus: 'committed' })
-      row = made.row
-      mutations.push(made.mutation)
-    }
-    const existing = cellOf(tables, row.id, month)
-    const kept: CellItem[] = existing?.mode === 'items' ? [...existing.items]
-      : existing?.mode === 'value' && existing.value ? [{ id: newId(), label: '', amount: existing.value, status: row.defaultStatus, fundedBy: row.defaultFundedBy, date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }]
-      : []
-    const booked: CellItem = { id: newId(), label: 'Not recorded', amount: extra, status: 'done', fundedBy: 'cash', date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false }
-    // what was spent and not recorded is this month's alone: the months after go on with what the row had before
-    const ts = now()
-    mutations.push(...standingMoves(tables, engine, row.id, month, ts))
-    mutations.push(cellPut(existing, { rowId: row.id, month, mode: 'items', value: null, items: [...kept, booked], markedDone: false, once: true }, ts))
-  }
-  const known = tables.accountMonths.find((a) => a.accountId === accountId && a.month === month)
-  mutations.push({ op: 'put', table: 'accountMonths', record: AccountMonthSchema.parse({ ...known, accountId, month, actualBalance, updatedAt: now() }) })
-  return { mutations, booked: Math.max(0, extra) }
 }
 
 export async function updateRow(store: Store, rowId: string, patch: Partial<Omit<Row, 'id' | 'createdAt'>>): Promise<void> {
@@ -998,19 +926,35 @@ const ACCOUNT_TYPE_FOR_KIND: Partial<Record<RowKind, Account['type']>> = {
   'to-savings': 'savings', 'to-investment': 'investment', 'from-investment': 'investment', 'from-savings': 'savings', 'debt-payment': 'loan', 'card-payment': 'credit-card',
 }
 
-/** The account type a row of this kind must point at, or null when any account (or none) will do. */
+/**
+ * The account type a row of this kind was made for, or null when any account (or none) will do. A row that pays a
+ * debt off was made for a loan or for a card and can pay either (`fitsRow`).
+ */
 export function accountTypeForRow(row: Pick<Row, 'kind'>): Account['type'] | null {
   return ACCOUNT_TYPE_FOR_KIND[row.kind] ?? null
 }
 
-/** Point a row at an account: destination for transfers, the card or loan it pays, the paying account otherwise. */
+/** Whether a row of this kind can name the account: the type it was made for, and for a payment row any loan or card. */
+export function fitsRow(row: Pick<Row, 'kind'>, account: Pick<Account, 'type'>): boolean {
+  const need = accountTypeForRow(row)
+  return !need || account.type === need || (isPayOffRow(row) && (account.type === 'loan' || account.type === 'credit-card'))
+}
+
+/**
+ * Point a row at an account: destination for transfers, the card or loan it pays. An ordinary expense names none:
+ * what is bought with a card is not said by the row (a payment method can say it), so the only thing left to do with
+ * an account such a row still names, from an older version or for the overview, is to take it off.
+ */
 export async function setRowAccount(store: Store, rowId: string, accountId: string | null): Promise<void> {
   const tables = await loadTables(store)
   const row = tables.rows.find((r) => r.id === rowId && !r.deletedAt)
   if (!row) throw new Error('Row not found')
   const acc = checkAccountForRow(tables, row, accountId)
-  // a payment row stands where the account it pays puts it: another card can record something else
-  const fit = acc && isPayOffRow(row) ? payOffPatches(tables, [row], acc).get(row.id) : undefined
+  if (acc && row.section === 'expense' && accountTypeForRow(row) == null && acc.id !== row.accountId) {
+    throw new Error(`"${row.name}" is an expense, and an expense names no account. To say it comes out of "${acc.name}", use "Comes out of…"; that it is paid with a card is said under "Usually paid…".`)
+  }
+  // a payment row is stored with the kind of the account it pays: a loan's or a card's
+  const fit = acc && isPayOffRow(row) ? payOffPatches(tables, [row], () => payOffKindOf(acc)).get(row.id) : undefined
   await updateRow(store, rowId, { accountId, ...fit })
 }
 
@@ -1025,7 +969,7 @@ function checkAccountForRow(tables: Tables, row: Pick<Row, 'kind' | 'name'> & { 
   const acc = tables.accounts.find((a) => a.id === accountId && !a.deletedAt)
   if (!acc) throw new Error('That account no longer exists.')
   if (acc.archivedMonth) throw new Error(`"${acc.name}" is archived.`)
-  if (need && acc.type !== need) throw new Error(`"${row.name}" needs an account of type ${label(need)}, and "${acc.name}" is of type ${label(acc.type)}.`)
+  if (need && !fitsRow(row, acc)) throw new Error(`"${row.name}" needs ${isPayOffRow(row) ? 'a loan or a credit card' : `an account of type ${label(need)}`}, and "${acc.name}" is of type ${label(acc.type)}.`)
   // a row that moves money sends it into the account it names, so only an account with a balance of its own can be named
   if (row.kind === 'plain' && row.section === 'transfer' && !holdsBalance(acc)) {
     throw new Error(`"${acc.name}" has no balance of its own for the money to go into. Pick a savings account, an investment account, an other current account, cash or another asset, or no account: the money then leaves the plan.`)

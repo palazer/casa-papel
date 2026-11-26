@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildStatement, computeEngine } from '@/engine'
-import { DEFAULT_CATEGORIES, monthRange, newId, paysAsExpense } from '@/model'
+import { DEFAULT_CATEGORIES, monthRange, newId, isPayOffRow } from '@/model'
 import {
   CasaDb, Store, addAccountWithRow, addCategory, addRow, buildSetupMutations, deleteCategory, loadTables, moveCategory, moveRow, quickCreateHousehold, renameCategory,
   seedDefaultCategories, setCellValue, setRowCategory,
@@ -79,15 +79,11 @@ describe('categories', () => {
     expect((await loadTables(store)).rows.find((r) => r.id === row.id)?.categoryId).toBeNull()
   })
 
-  it('says which payments count as spending: a loan\'s, and a card\'s unless its purchases are expense rows', () => {
-    const card = (cardMode: 'itemized' | 'lump') => ({ type: 'credit-card' as const, card: { cardMode } })
-    expect(paysAsExpense({ kind: 'debt-payment' }, { type: 'loan', card: null })).toBe(true)
-    expect(paysAsExpense({ kind: 'debt-payment' }, undefined)).toBe(true)
-    expect(paysAsExpense({ kind: 'card-payment' }, card('lump'))).toBe(true)
-    expect(paysAsExpense({ kind: 'card-payment' }, card('itemized'))).toBe(false)
-    expect(paysAsExpense({ kind: 'card-payment' }, undefined)).toBe(true)
-    expect(paysAsExpense({ kind: 'plain' }, undefined)).toBe(false)
-    expect(paysAsExpense({ kind: 'to-savings' }, undefined)).toBe(false)
+  it('says which rows pay a debt off, and so stand with the expenses in a category: a loan\'s payment and a card\'s', () => {
+    expect(isPayOffRow({ kind: 'debt-payment' })).toBe(true)
+    expect(isPayOffRow({ kind: 'card-payment' })).toBe(true)
+    expect(isPayOffRow({ kind: 'plain' })).toBe(false)
+    expect(isPayOffRow({ kind: 'to-savings' })).toBe(false)
   })
 
   it('a row added after another inherits its category; moving stays inside the group', async () => {

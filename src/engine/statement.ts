@@ -14,11 +14,11 @@
  * Rows are sorted into the same buckets the engine's totals use (compute.ts, pass 2), which is what keeps the cents.
  *
  * Money out follows the order in which a month is decided: first what it costs, then what happens with the rest.
- * "Expenses" is everything that has to be paid, a loan's payment among it (in the category its row has, as in the
+ * "Expenses" is everything that has to be paid, a payment to a loan or a card among it (in the category its row has, as in the
  * Grid): that it brings a debt down shows in the lower half. "From what is left" is how the rest is shared out:
  * pocket money, savings, investments, virtual accounts, and the figure that closes the month.
  */
-import { accountGroup, addMonths, canCarryRule, describeCadence, isPaymentRow, isTakenFromAccount, movesInto, nextDue, payContext, payDayOf, paysAsExpense, pocketLandsIn, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
+import { accountGroup, addMonths, canCarryRule, describeCadence, isPaymentRow, isTakenFromAccount, movesInto, nextDue, payContext, payDayOf, pocketLandsIn, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
 import { computeGoals, type GoalProgress } from './goals'
 import { mainAccountsIn, mainAccountLabel } from './mainAccount'
 import { cellKey, fundingTotal, type AccountSeries, type CellResult, type CellStatus, type EngineOutput } from './types'
@@ -181,7 +181,7 @@ export function notSetAside(tables: Tables, engine: EngineOutput, accountId: str
   return balance - inPools
 }
 
-type Bucket = 'income' | 'from-account' | 'expense' | 'pocket' | 'moved' | 'set-aside' | 'pay-off' | 'to-savings' | 'memo'
+type Bucket = 'income' | 'from-account' | 'expense' | 'pocket' | 'moved' | 'set-aside' | 'pay-off' | 'to-savings'
 
 /** The engine's pass-2 switch, named. */
 function bucketOf(row: Row, accountsById: Map<string, Account>): Bucket {
@@ -194,7 +194,7 @@ function bucketOf(row: Row, accountsById: Map<string, Account>): Bucket {
     case 'pool-allocation': return 'set-aside'
     case 'pocket-money': return 'pocket'
     case 'debt-payment':
-    case 'card-payment': return paysAsExpense(row, row.accountId ? accountsById.get(row.accountId) : undefined) ? 'pay-off' : 'memo'
+    case 'card-payment': return 'pay-off'
     // a row that moves money into another of the household's accounts stands with what is set aside; one that names
     // none moves its money out of the plan
     default: return row.section === 'expense' ? 'expense' : movesInto(row, row.accountId ? accountsById.get(row.accountId) : undefined) ? 'set-aside' : 'moved'
@@ -423,10 +423,6 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
         // a payment that has to be made is part of what the month costs: it stands with the expenses, in its row's category
         expense.push({ row, line: rowLine(row, c, v) })
         break
-      case 'memo':
-        // paying an itemized card moves no new money: its purchases were counted when they were made
-        moved.push(rowLine(row, c, v, { memo: true, chip: 'counted when bought' }))
-        break
       case 'to-savings': {
         const state = rules.byRow.get(row.id)
         // a row that gets nothing because another takes the rest has nothing to show
@@ -517,8 +513,6 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
     const mm = main.months[month]
     const parts: StatementLine[] = [{ id: 'main:start', kind: 'note', label: 'At the start of the month', amount: mm.start, children: [] }]
     if (mm.kept !== 0) parts.push({ id: 'main:kept', kind: 'note', label: mm.kept < 0 ? 'Short this month' : 'Kept this month', amount: mm.kept, children: [] })
-    if (mm.cardBought !== 0) parts.push({ id: 'main:bought', kind: 'note', label: 'Bought on the card, not yet paid', amount: mm.cardBought, children: [] })
-    if (mm.cardPaid !== 0) parts.push({ id: 'main:paid', kind: 'note', label: 'Paid to the card', amount: -mm.cardPaid, children: [] })
     // what the bank says beyond what the plan explains, so the parts still add up to the balance
     if (mm.adjustment !== 0) parts.push({ id: 'main:adjustment', kind: 'note', label: 'Not in the plan', amount: mm.adjustment, children: [] })
     const openAccounts = mainAccountsIn(accounts, month)

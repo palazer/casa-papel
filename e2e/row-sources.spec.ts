@@ -102,10 +102,18 @@ test.describe('row sources, accounts and followers', () => {
     await expect(dlg).toBeHidden()
 
     await page.getByRole('button', { name: 'Row menu for Groceries' }).click()
-    // an ordinary expense names the card it is bought on; the account it names today stays listed until it is changed
-    await page.getByRole('menuitem', { name: 'Paid by card…' }).click()
-    await expect(dlg.getByLabel('Card', { exact: true })).toHaveValue(/./)
-    await expect(dlg.getByLabel('Card', { exact: true }).locator('option')).toHaveText(['Not by card', 'Main account (not a card)', 'Credit card'])
-    await dlg.getByRole('button', { name: 'Cancel' }).click()
+    // an ordinary expense names no account: the one it still names, for the overview, can only be taken off
+    await expect(page.getByRole('menuitem', { name: 'Paid by card…' })).toHaveCount(0)
+    await page.getByRole('menuitem', { name: 'Paid from…' }).click()
+    await expect(dlg.getByLabel('Paid from', { exact: true })).toHaveValue(/./)
+    await expect(dlg.getByLabel('Paid from', { exact: true }).locator('option')).toHaveText(['No account', 'Main account'])
+    await dlg.getByLabel('Paid from', { exact: true }).selectOption({ label: 'No account' })
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+    // taken off, the menu has nothing left to offer under the row's account
+    await page.getByRole('button', { name: 'Row menu for Groceries' }).click()
+    await expect(page.getByRole('menuitem', { name: 'Usually paid…' })).toHaveCount(0)
+    await expect(page.getByRole('menuitem', { name: 'Paid from…' })).toHaveCount(0)
+    await page.keyboard.press('Escape')
   })
 })

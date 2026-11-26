@@ -87,8 +87,8 @@ step('the conversion of {string} in {month} is {money} {ccy} = {money} {ccy} at 
   if (said !== expected) throw new Error(`the conversion of "${rowName}" in ${monthName(month)}: expected ${expected}, it is ${said}`)
 })
 
-// "What do you record for this card?": "Everything I buy with it", for a card kept in another currency
-step('a credit card {string} in {ccy} owing {money}, whose purchases are expense rows', async (world: World, name: string, currency: string, owed: number) => {
+// a card kept in another currency
+step('a credit card {string} in {ccy} owing {money}', async (world: World, name: string, currency: string, owed: number) => {
   const { household } = await world.view()
-  await addAccount(world.store, { name, type: 'credit-card', currency, openingMonth: household.startMonth, openingBalance: owed, card: { cardMode: 'itemized' } })
+  await addAccount(world.store, { name, type: 'credit-card', currency, openingMonth: household.startMonth, openingBalance: owed })
 })

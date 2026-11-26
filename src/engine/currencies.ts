@@ -82,8 +82,6 @@ function ownEnd(v: View, row: Row): AmountEnd | null {
       return pocketLandsIn(row, acc) ? { account: acc, way: 'into' } : null
   }
   if (movesInto(row, acc)) return { account: acc, way: 'into' }
-  // a purchase on a card
-  if (row.section === 'expense' && acc.type === 'credit-card') return { account: acc, way: 'out-of' }
   return null
 }
 
@@ -134,8 +132,8 @@ export function conversionCurrency(tables: Tables, row: Row, source: FundedBy = 
   const from = spends ? sourceEnd(v, source) : null
   const ends = [own, from].filter((e): e is AmountEnd => e != null)
   // the current accounts are in the household's currency: every amount goes through them, except an expense paid
-  // out of an account or bought on a card
-  const viaCurrent = !(spends && (from != null || own?.way === 'out-of'))
+  // out of an account
+  const viaCurrent = !(spends && from != null)
   const on = new Set([currency ?? currencyOf(v, row), ...ends.map((e) => e.account.currency), ...(viaCurrent ? [v.home] : [])])
   if (on.size !== 2 || !on.has(v.home)) return null
   return [...on].find((c) => c !== v.home) ?? null

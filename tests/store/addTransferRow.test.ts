@@ -131,16 +131,12 @@ describe('addRowOfKind under Expenses', () => {
   it('a payment row takes its kind from the account: loans and cards only, never archived, never under Transfers', async () => {
     const { store, savings } = await fresh()
     const loan = await addAccount(store, { name: 'Car loan', type: 'loan', currency: 'EUR', openingMonth: '2026-01', openingBalance: 500000 })
-    const card = await addAccount(store, { name: 'Visa', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01', card: { cardMode: 'lump' } })
-    const itemized = await addAccount(store, { name: 'Amex', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01' })
+    const card = await addAccount(store, { name: 'Visa', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01' })
     const old = await addAccount(store, { name: 'Old loan', type: 'loan', currency: 'EUR', openingMonth: '2026-01' })
     let t = await loadTables(store)
-    // a card whose purchases are expense rows (the default) belongs under Transfers: its payment is not spending
+    // every loan and every card is paid off from under Expenses
     expect(rowTargets(t, t.household[0]).payoff.map((a) => a.name)).toEqual(['Car loan', 'Visa', 'Old loan'])
-    expect(rowTargets(t, t.household[0]).cardsItemized.map((a) => a.name)).toEqual(['Amex'])
-    await expect(addRowOfKind(store, { section: 'expense', name: 'Amex', categoryId: null, kind: 'pay-off', accountId: itemized.id })).rejects.toThrow(/add it under Transfers/)
-    await expect(addRowOfKind(store, { section: 'transfer', name: 'Visa', categoryId: null, kind: 'card-payment', accountId: card.id })).rejects.toThrow(/add it under Expenses/)
-    expect(await addRowOfKind(store, { section: 'transfer', name: 'Amex payment', categoryId: null, kind: 'card-payment', accountId: itemized.id })).toMatchObject({ section: 'transfer', kind: 'card-payment', accountId: itemized.id, defaultStatus: 'committed' })
+    await expect(addRowOfKind(store, { section: 'transfer', name: 'Visa', categoryId: null, kind: 'pay-off', accountId: card.id })).rejects.toThrow(/does not belong/)
     await expect(addRowOfKind(store, { section: 'expense', name: 'Loan', categoryId: null, kind: 'pay-off', accountId: savings.id })).rejects.toThrow(/not a loan or a credit card/)
     await expect(addRowOfKind(store, { section: 'expense', name: 'Loan', categoryId: null, kind: 'pay-off', accountId: null })).rejects.toThrow(/Pick the loan or card/)
     await expect(addRowOfKind(store, { section: 'transfer', name: 'Loan', categoryId: null, kind: 'pay-off', accountId: loan.id })).rejects.toThrow(/does not belong/)

@@ -68,8 +68,7 @@ An exception is an amount of its month like any other for A3: "this and followin
 replaces it, unless it is ticked as done.
 
 The same holds for whatever the app writes for one month: an item added for one month (A6), a top-up of a virtual
-account, a category's estimate for one month, a card's difference booked as spending, and the tick on a month that
-only carried its amount: the month is written down as that month's alone.
+account, a category's estimate for one month, and the tick on a month that only carried its amount: the month is written down as that month's alone.
 
 One case writes a later month. An exception in the month an amount *began* leaves that amount to the months after:
 it is written into the first later month that has nothing of its own.
@@ -174,7 +173,7 @@ Each at the end of the month, in the household's currency; the other current acc
 | money without an account | a transfer that names no account with a balance: the money is counted as gone | − |
 
 A transfer between two accounts that are both counted is in none of these parts: one falls, the other rises.
-Paying a loan down is in none of them either: the main account and the debt fall by the same amount.
+Paying a loan or a card down is in none of them either: the main account and the debt fall by the same amount.
 
 > Income 3,000.00, rent 1,200.00, 500.00 a month to savings: net worth rises by 1,800.00 a month. Income 3,000.00,
 > spending −1,200.00; the 500.00 only moved.
@@ -266,8 +265,8 @@ recorded conversion, and an amount the app works out (a percentage, the rest) ha
 > 3,520.00 USD it counts 3,200.00.
 
 The conversion holds for every account the amount moves: euros moved into a dollar account arrive as the dollars that
-were recorded, an expense paid from it takes the recorded dollars, a payment to a dollar loan brings it down by them,
-a purchase on a dollar card is owed as recorded. At the month's rate those dollars are worth a little more or less
+were recorded, an expense paid from it takes the recorded dollars, a payment to a dollar loan or a dollar card
+brings it down by them. At the month's rate those dollars are worth a little more or less
 than the euros the rows count; that difference is part of "rates" in N2. A row that follows the amount takes the same
 share of the recorded figures. A category's estimate counts what its rows leave at the month's rate.
 
@@ -369,7 +368,7 @@ merging it and what replacing everything with it would change here, over every m
 **M1. What comes in is what goes out plus what is left.**
 
     what is left = income − expenses paid from the month − what goes to savings, investments, virtual accounts,
-                   pocket money and loans − what a row moves to another account, or out of the plan
+                   pocket money, loans and cards − what a row moves to another account, or out of the plan
 
 Both sides of the Statement's upper half show the same total. "Leftover" is what stays in the main account.
 
@@ -430,7 +429,7 @@ The order within a month: percentages of the income, what is kept, percentages o
 
 ## C. Loans and credit cards
 
-**C1. A payment brings a loan down, and counts as an expense of the month.**
+**C1. A payment brings a loan or a credit card down, and counts as an expense of the month.**
 
     owed at the end = owed at the start − paid
 
@@ -442,34 +441,43 @@ in the month's expenses, not in what is left, not in the main account. What was 
 payments count again when a real balance says more is owed (finding F4, closed).
 
     owes 600.00, 250.00 planned a month: 250.00, 250.00, 100.00 count, then nothing
-    several rows to one loan take what is owed in the Grid's order
-    a loan in another currency is counted in that currency, so it ends on exactly nothing
+    several rows to one debt take what is owed in the Grid's order
+    a debt in another currency is counted in that currency, so it ends on exactly nothing
 
-Not cut: a loan whose balance is not tracked, a payment row that names no loan, the months before the loan starts,
-and an amount below zero, which is money drawn again and raises what is owed.
+Not cut: a loan or card whose balance is not tracked, a payment row that names no debt, the months before the debt
+starts, and an amount below zero, which is money drawn again and raises what is owed.
 
-**C2. A card whose purchases are expense rows.** A purchase is an expense of its month and raises what is owed. The
-cash stays in the main account until the card is paid. The payment moves money and is no expense: the current
-accounts and what is owed fall by it.
+A row that pays a debt off is stored as a loan's payment or as a card's, and counts the same either way.
 
-What is bought on a card is said by the row ("Paid by card…"): every amount of the row, in every month, whatever
-its items are paid with. A payment method says nothing about it (W1), a method that is named for the card neither.
+**C2. A credit card is a debt, followed by its payment and its statement.** A card account is for a debt that is
+carried from month to month. Its payment row brings it down (C1). Nothing is bought "on" a card: what is paid with
+one is an expense like any other, comes out of the main account in its month, and raises nothing that is owed. No
+expense row names a card; that something was paid with a card is said by a payment method, which moves no figure
+(W1). The payment row therefore holds what is paid on top of the purchases that are rows already.
 
-**C3. A card that records only its payments** is brought down by them like a loan (C1): the payment is an expense
-of its month, lowers what is owed and stops at it. No row says what was bought on the card, so what the statement
-says is typed as a real balance (rule B5): the difference is what the plan did not have, and the payments count
-again when more is owed. (Decided on 26 November 2026; it reversed finding F5, by which such a payment did not move
-what was owed.)
+What the rows do not say (what was bought and not paid off in the month, interest, fees) comes in with the
+statement: what it says is owed is typed as a real balance (B5, B7), at the start of a month for the end of the
+month before. The difference to the calculated amount is what the plan did not have; it is part of "real balances"
+in N2, and the months after continue from the real figure.
 
-    owes 500.00, 300.00 paid every month: 300.00 counts, then 200.00, then nothing
-    a real balance of 450.00 in March: 450.00 owed, 150.00 after April's payment, and net worth is 450.00 lower in March
+    owes 94,000.00, pays 5,000.00 in December: 89,000.00 calculated for the end of December
+    96,300.00 typed for the start of January: December ends on it, 7,300.00 that the plan did not have
+    January starts with 96,300.00 and ends, after 5,000.00, on 91,300.00
 
-**What a payment row does follows the account it pays.** A card whose purchases are expense rows (C2) reads its
-payment row differently from a loan (C1) and a card that records only its payments (C3), so the row is written with
-the account when the account becomes another of the three, and a change that moves a month that is over asks first
-(T4). Between a loan and a card that records only its payments no figure changes.
-The payment of a C2 card stands under Transfers and every other one under Expenses; a row that changes sides loses
-its category, and expense rows that were "Paid by card" on an account that becomes a loan lose that link.
+A card that is paid off in full every month carries no debt and needs no account. One that has an account and no
+tracked balance is not followed: its payment is an ordinary expense and is never cut.
+
+(Decided on 26 November 2026. Until schema 22 a card had a mode: its purchases were expense rows that named it
+and raised what was owed, with a payment that only moved money; or only its payments were rows, and by finding F5
+they did not move what was owed. Both are gone. The app puts cards from before right when it meets them,
+`planCards`: a payment row under Transfers moves under Expenses and loses its category; expense rows and schedules
+lose the card they named; a card that recorded only its payments, opened owing nothing and never had a real
+balance typed stops being tracked, so its payment keeps counting; every card loses its mode. This is done without
+the question of T4, and it changes months that are over: a card that recorded purchases and owed something now
+counts its past payments as expenses on top of the purchases.)
+
+**A loan can become a card and a card a loan**, with everything it has: both are read by C1, so no figure changes,
+and the rows that pay it off are written with the account in the same step, with the kind of what they pay.
 
 Any other change of an account's type is refused while something is tied to it that the new type cannot hold: a
 row made for the old type ("To savings", a payment), a virtual account (only a savings account holds those), and,
@@ -486,16 +494,15 @@ from a month on leaves the months before as they were, and what was paid keeps h
 exception: the month in which that change is made from the Payments page ("Payment", "This and following months")
 shows what was saved there, ticked or not, because that line is the one being set.
 
-What the sums count with stays where it was: "Comes out of" (M6) says whose money pays, and "Paid by card…" (C2)
-says what is owed on a card. The rent can be paid by standing order and be covered from savings; a personal expense
+What the sums count with stays where it was: "Comes out of" (M6) says whose money pays, and what is owed on a card
+is followed on the card's account (C2). The rent can be paid by standing order and be covered from savings; a personal expense
 can come out of pocket money and be paid with PayPal.
 
-    "Groceries" 400.00, usually paid with the method "Visa card": nothing is owed on the card "Visa"
-    "Groceries" 400.00, "Paid by card…" on "Visa": 400.00 is owed there, whatever method it names
+    "Groceries" 400.00, usually paid with the method "Visa card": what is owed on the card "Visa" stays what it was
 
 An amount with a day or a method is tracked on the Payments page; one with neither is listed there as untracked,
 outside that page's sums. "To pay" and "done" there, and the sums by method and by person, are over what is
-tracked, whatever the row is: a card's purchases and the payment of that card count both when both are tracked.
+tracked, whatever the row is: what is paid with a card and the payment to that card count both when both are tracked.
 This sorts a list, and no figure of the Statement follows from it.
 
 ## V. Virtual accounts

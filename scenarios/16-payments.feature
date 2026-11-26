@@ -23,25 +23,13 @@ Feature: Payments by day and method
 
   @W1 @C2
   Scenario: A method named for a credit card does not put the amount on the card
-    Given a credit card "Visa" owing 0.00, whose purchases are expense rows
+    Given a credit card "Visa" owing 300.00
     And a payment method "Visa card" with the note "Visa"
     And an expense "Groceries" of 400.00 from January 2026
     When "Groceries" is usually paid with the method "Visa card"
     Then nothing has changed
-    And "Visa" ends January 2026 with 0.00
+    And "Visa" ends January 2026 with 300.00
     And "Current account" ends January 2026 with 2,400.00
-
-  @W1 @C2
-  Scenario: A row that is paid with a card is on the card as a whole, whatever its items are paid with
-    Given a credit card "Visa" owing 0.00, whose purchases are expense rows
-    And a payment method "PayPal"
-    And an expense "Subscriptions" with no amount yet
-    And "Subscriptions" is paid with "Visa"
-    When I add the item "Films" of 14.00 to "Subscriptions" in January 2026, only this month
-    And I add the item "Music" of 11.00 to "Subscriptions" in January 2026, paid with "PayPal"
-    Then "Subscriptions" is 25.00 in January 2026
-    And "Visa" ends January 2026 with 25.00
-    And "Current account" ends January 2026 with 2,800.00
 
   @W1 @M6
   Scenario: A method whose note names another account leaves where the expense comes out of as it is
@@ -65,7 +53,7 @@ Feature: Payments by day and method
 
   @W1 @H1
   Scenario: Something that repeats is paid with its own method, and counts as it would without one
-    Given a credit card "Visa" owing 0.00, whose purchases are expense rows
+    Given a credit card "Visa" owing 0.00
     And a payment method "Visa card" with the note "Visa"
     And an expense "Subscriptions" with no amount yet
     And "Subscriptions" gets the item "Films" of 14.00 every month from January 2026, paid with "Visa card"

@@ -311,8 +311,8 @@ test.describe('Trends: one subject as its parts', () => {
     await page.keyboard.press('ArrowRight')
     const tip = page.getByTestId('chart-tip')
     await expect(tip).toContainText('Net worth')
-    // what is owed is a negative part
-    await expect(tip).toContainText(/-€\d+\.\d\d Debts/)
+    // what is owed is a negative part; nothing is owed on the demo's card, so the month names no debt
+    await expect(tip).not.toContainText('Debts')
     await page.keyboard.press('Escape')
     await page.screenshot({ path: 'e2e/output/trends-breakdown-net-worth.png', fullPage: true })
 

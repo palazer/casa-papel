@@ -147,7 +147,7 @@ export function RecurringDialog({ tables, household, item, defaultMonth, onClose
             </>
           ) : (
             <>
-              <div className="space-y-1.5"><Label htmlFor="rc-account">{accountLabel}</Label><NativeSelect id="rc-account" className="w-full" value={accountId} onChange={(e) => setAccountId(e.target.value)}><option value="">—</option>{tables.accounts.filter((a) => !a.deletedAt && (!a.archivedMonth || a.id === accountId)).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</NativeSelect></div>
+              <div className="space-y-1.5"><Label htmlFor="rc-account">{accountLabel}</Label><NativeSelect id="rc-account" className="w-full" value={accountId} onChange={(e) => setAccountId(e.target.value)}><option value="">—</option>{tables.accounts.filter((a) => !a.deletedAt && (a.id === accountId || (!a.archivedMonth && a.type !== 'credit-card' && a.type !== 'loan'))).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</NativeSelect></div>
               <p className="-mt-2 text-xs text-muted-foreground sm:col-span-2">{accountHelp}</p>
             </>
           )}

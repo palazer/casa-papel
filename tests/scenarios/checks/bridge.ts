@@ -1,5 +1,5 @@
 import { cellKey, convertMoney, householdFx, type CellResult, type RecordedPart } from '@/engine'
-import { accountRef, addMonths, cardIsItemized, isTakenFromAccount, movesInto, pocketLandsIn, poolRef, type Money, type MonthKey } from '@/model'
+import { accountRef, addMonths, isTakenFromAccount, movesInto, pocketLandsIn, poolRef, type Money, type MonthKey } from '@/model'
 import { moneyText, monthName } from '../registry'
 import type { View } from '../world'
 
@@ -127,11 +127,6 @@ export function bridgeOf(view: View, m: MonthKey): Bridge {
       owe(row.accountId, v)
       recorded(row.accountId, c, -1)
     } else if (row.section === 'expense') {
-      // bought on a card whose purchases are expense rows: the money is still in the current account, and owed on the card
-      if (account && cardIsItemized(account)) {
-        owe(account.id, -v)
-        recorded(account.id, c, 1)
-      }
       route(engine.primarySavingsId, -c.funding.savings)
       recorded(engine.primarySavingsId, c, -1, (p) => p.source === 'savings')
       for (const [pid, amount] of Object.entries(c.funding.pools)) {
@@ -167,8 +162,8 @@ export function bridgeOf(view: View, m: MonthKey): Bridge {
       if (before) count('accounts starting or ending', -before.balanceBase)
       continue
     }
-    // rule C1: a payment stops at what is owed, so the rows never take a loan below nothing, nor a card that records only its payments
-    if (acc && (acc.type === 'loan' || (acc.type === 'credit-card' && !cardIsItemized(acc))) && r.start >= 0 && r.computed < 0) {
+    // rule C1: a payment stops at what is owed, so the rows never take a loan or a card below nothing
+    if (acc && (acc.type === 'loan' || acc.type === 'credit-card') && r.start >= 0 && r.computed < 0) {
       problems.push(`"${acc.name}" was paid down to ${moneyText(r.computed)} in ${monthName(m)}: a payment stops at what is owed.`)
     }
     const foreign = series.currency !== base

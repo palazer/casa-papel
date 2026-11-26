@@ -65,9 +65,9 @@ test.describe('wave 1d', () => {
     await page.getByRole('button', { name: 'Add account' }).click()
     await dlg.getByLabel('Name', { exact: true }).fill('Visa')
     await dlg.getByLabel('Type').selectOption('credit-card')
-    // the card question in plain words; everything bought with it is the usual answer
-    await expect(dlg.getByRole('radiogroup', { name: 'What do you record for this card?' }).getByRole('radio')).toHaveText(['Everything I buy with it', 'Only what I pay to it'])
-    await expect(dlg.getByRole('radio', { name: 'Everything I buy with it' })).toBeChecked()
+    // a card is asked nothing more than a loan is: what is owed on it
+    await expect(dlg.getByRole('radiogroup')).toHaveCount(0)
+    await expect(dlg.getByText('Everything you owe on the card: the whole debt, not the month\'s bill.', { exact: false })).toBeVisible()
     await dlg.getByLabel(/^Owed at the start of/).fill('300')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()

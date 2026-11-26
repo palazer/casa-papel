@@ -5,6 +5,7 @@ import { canonical, previewMerge } from './exportImport'
 import { primaryKeyOf } from './keys'
 import { defaultMonths } from './months'
 import { applyMutations } from './impact'
+import { planCards } from './cards'
 import { planMainAccount } from './mainAccount'
 import { changesBetween, type Changes } from './past'
 import type { Store } from './store'
@@ -66,8 +67,12 @@ function planMonths(before: Tables, after: Tables): MonthKey[] {
  */
 export async function checkFile(store: Store, file: ExportFile): Promise<FileCheck> {
   const here = await loadTables(store)
-  // read as the app leaves it once it has it: a household from before rule B9 is put right (`planMainAccount`)
-  const settled = (t: Tables) => applyMutations(t, planMainAccount(t))
+  // read as the app leaves it once it has it: a household from before rule B9 is put right (`planMainAccount`), and
+  // so are its cards from before schema 23 (`planCards`)
+  const settled = (t: Tables) => {
+    const main = applyMutations(t, planMainAccount(t))
+    return applyMutations(main, planCards(main))
+  }
   const merged = settled(await previewMerge(store, file))
   const replaced = settled(file.tables)
   const household = here.household.find((h) => !h.deletedAt) ?? replaced.household.find((h) => !h.deletedAt)

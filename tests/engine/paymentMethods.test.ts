@@ -20,7 +20,7 @@ function setting() {
   const h = household()
   const main = account({ name: 'Main', type: 'checking', tracked: false, openingBalance: 1000_00 })
   const own = account({ name: "Sam's account", type: 'joint', openingBalance: 500_00 })
-  const visa = account({ name: 'Visa', type: 'credit-card', card: { cardMode: 'itemized' } })
+  const visa = account({ name: 'Visa', type: 'credit-card', openingBalance: 300_00 })
   const salary = row({ name: 'Salary', section: 'income', order: 'a0' })
   const subs = row({ name: 'Subscriptions', section: 'expense', order: 'b0' })
   const rent = row({ name: 'Rent', section: 'expense', order: 'b1' })
@@ -52,13 +52,12 @@ describe('a day and a method move no figure', () => {
     }
     expect(figures(paid)).toEqual(figures(plain))
     const out = computeEngine({ tables: paid, months })
-    // nothing is owed on the card, and Sam's account holds what it held
-    expect(out.accounts[s.visa.id].months['2026-01'].balance).toBe(0)
+    // what is owed on the card is what was owed, and Sam's account holds what it held
+    expect(out.accounts[s.visa.id].months['2026-01'].balance).toBe(300_00)
     expect(out.accounts[s.own.id].months['2026-01'].balance).toBe(500_00)
-    expect(out.main!.months['2026-01'].cardBought).toBe(0)
   })
 
-  it('a row that is "Paid by card" is on the card as a whole, whatever its items are paid with', () => {
+  it('a row that still names a card, as "Paid by card" did before schema 23, puts nothing on it, whatever its items are paid with', () => {
     const s = setting()
     const onCard = { ...s.subs, accountId: s.visa.id }
     const t = tables({
@@ -68,8 +67,8 @@ describe('a day and a method move no figure', () => {
       ])],
     })
     const out = computeEngine({ tables: t, months })
-    expect(out.accounts[s.visa.id].months['2026-01'].balance).toBe(34_00)
-    expect(out.main!.months['2026-01'].cardBought).toBe(34_00)
+    expect(out.accounts[s.visa.id].months['2026-01'].balance).toBe(300_00)
+    expect(out.totals['2026-01'].expensesTotal).toBe(34_00)
     expect(out.accounts[s.own.id].months['2026-01'].balance).toBe(500_00)
     // the same row without a single method: the same figures
     const bare: Tables = { ...t, paymentMethods: [], cells: t.cells.map((c) => ({ ...c, items: c.items.map((i) => ({ ...i, methodId: null })) })) }

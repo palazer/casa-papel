@@ -193,31 +193,28 @@ describe('the Statement, the month', () => {
     expectSound(t, months)
   })
 
-  it('keeps an itemized card\'s payment out of the sum and counts a lump card\'s', () => {
-    const visa = account({ name: 'Visa', type: 'credit-card', openingBalance: 200_00, card: { cardMode: 'itemized' } })
-    const amex = account({ name: 'Amex', type: 'credit-card', openingBalance: 500_00, card: { cardMode: 'lump' }, order: 'a1' })
+  it('counts a card\'s payment with the expenses, as a loan\'s, and links it to the card it brings down', () => {
+    const visa = account({ name: 'Visa', type: 'credit-card', openingBalance: 200_00 })
+    const amex = account({ name: 'Amex', type: 'credit-card', openingBalance: 500_00, order: 'a1' })
     const salary = row({ name: 'Salary', section: 'income' })
-    const shopping = row({ name: 'Shopping', section: 'expense', accountId: visa.id, order: 'b0' })
-    const payVisa = row({ name: 'Pay Visa', section: 'transfer', kind: 'card-payment', accountId: visa.id, order: 'c0' })
-    const payAmex = row({ name: 'Pay Amex', section: 'transfer', kind: 'card-payment', accountId: amex.id, order: 'c1' })
+    const shopping = row({ name: 'Shopping', section: 'expense', order: 'b0' })
+    const payVisa = row({ name: 'Pay Visa', section: 'expense', kind: 'card-payment', accountId: visa.id, order: 'c0' })
+    const payAmex = row({ name: 'Pay Amex', section: 'expense', kind: 'card-payment', accountId: amex.id, order: 'c1' })
     const t = tables({ household: [household()], accounts: [visa, amex], rows: [salary, shopping, payVisa, payAmex], cells: [cellValue(salary.id, '2026-01', 2000_00), cellValue(shopping.id, '2026-01', 150_00), cellValue(payVisa.id, '2026-01', 200_00), cellValue(payAmex.id, '2026-01', 300_00)] })
     const { s } = statementFor(t, '2026-01')
-    // the lump card's payment is the spending: it stands with the expenses. The itemized card's only moves money to
-    // the card for what was counted when it was bought, so it is listed under "Moved elsewhere" and is in no sum
-    expect(topLine(s, 'out', 'expenses')!.children.map((c) => [c.label, c.amount, !!c.memo])).toEqual([['Shopping', 150_00, false], ['Pay Amex', 300_00, false]])
-    expect(topLine(s, 'out', 'expenses')!.amount).toBe(450_00)
-    expect(topLine(s, 'out', 'moved')).toMatchObject({ amount: 0 })
-    expect(topLine(s, 'out', 'moved')!.children.map((c) => [c.label, c.amount, !!c.memo, c.chip])).toEqual([['Pay Visa', 200_00, true, 'counted when bought']])
-    expect(topLine(s, 'out', 'set-aside')!.children.map((c) => [c.label, c.amount])).toEqual([['To savings', 1550_00]])
-    // each payment is linked to its card, wherever its line stands, and brings down what is owed on it
+    expect(topLine(s, 'out', 'expenses')!.children.map((c) => [c.label, c.amount, !!c.memo])).toEqual([['Shopping', 150_00, false], ['Pay Visa', 200_00, false], ['Pay Amex', 300_00, false]])
+    expect(topLine(s, 'out', 'expenses')!.amount).toBe(650_00)
+    // no payment only "moves money" any more: nothing stands under "Moved elsewhere"
+    expect(topLine(s, 'out', 'moved')).toBeUndefined()
+    expect(topLine(s, 'out', 'set-aside')!.children.map((c) => [c.label, c.amount])).toEqual([['To savings', 1350_00]])
     expect(all(s).find((l) => l.label === 'Pay Amex')!.link).toMatchObject({ text: 'Pays off Amex' })
     expect(all(s).find((l) => l.label === 'Pay Visa')!.link).toMatchObject({ text: 'Pays off Visa' })
     expect(topLine(s, 'claims', 'debts')!.children.map((c) => [c.label, c.amount, c.change, c.link?.text, c.note])).toEqual([
-      ['Visa', 150_00, -50_00, 'Paid off by Pay Visa', undefined], ['Amex', 200_00, -300_00, 'Paid off by Pay Amex', undefined],
+      ['Visa', 0, -200_00, 'Paid off by Pay Visa', undefined], ['Amex', 200_00, -300_00, 'Paid off by Pay Amex', undefined],
     ])
-    // the main account holds the 150 still to pay and gave 200 for what was owed before
-    expect(find(s, 'main')).toMatchObject({ label: 'Main account', amount: -50_00, change: -50_00 })
-    expect(find(s, 'main')!.children.map((c) => [c.label, c.amount])).toEqual([['At the start of the month', 0], ['Bought on the card, not yet paid', 150_00], ['Paid to the card', -200_00]])
+    // the main account holds nothing back for a card
+    expect(find(s, 'main')).toMatchObject({ label: 'Main account', amount: 0, change: 0 })
+    expect(find(s, 'main')!.children.map((c) => [c.label, c.amount])).toEqual([['At the start of the month', 0]])
     expectSound(t, months)
   })
 

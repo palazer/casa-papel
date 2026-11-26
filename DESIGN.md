@@ -237,10 +237,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   be left without a name: the field's placeholder shows what it will be called (`To Savings`, `Car loan – Payment`,
   `Named after the loan`). Only pocket money without an adult still says what to add first, with Add disabled.
   Under Expenses the same select offers "A normal expense" or
-  "Pays off a loan or card" with the loans and the cards whose payment is the recorded spending as targets (the
-  account's type picks the row kind). A card whose purchases are expense rows gets "Pays off a credit card" under
-  Transfers instead, because its payment only moves money (`cardIsItemized` in `src/model/cards.ts` is the one reading
-  of that setting for the engine, the split, the store and the grid). The store checks the same rules (`addRowOfKind`,
+  "Pays off a loan or card" with every loan and card as targets (the account's type picks the row kind; the two
+  kinds are read alike, `isPayOffRow` in `src/model/cards.ts`). No payment stands under Transfers. The store checks the same rules (`addRowOfKind`,
   `rowTargets`); a choice the lists no longer offer falls back to the first one, and Cancel forgets the choice.
   On the Statement the foot of the second group of Money out, `From what is left`, uses the same
   form with `place="set-aside"`: the question comes
@@ -322,8 +320,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   when there is no room: a zinc chip with the currency code and the original amount in muted `text-[11px]` for a
   line in another currency (the amount column is always the household currency), a rose `no rate` chip, `net €…`
   on an income with deductions, and a zinc chip for what the line is (`automatic`, `calculated`,
-  `counted when bought` on a card payment that is shown muted and left out of the sum, `paid off` on a payment to
-  a loan that owes less than the payment or nothing, followed by what was planned as a muted `€250.00 planned`; the
+  `paid off` on a payment to
+  a loan or a card that owes less than the payment or nothing, followed by what was planned as a muted `€250.00 planned`; the
   amount column shows what counts). Virtual accounts sit by name
   under the savings account that holds them, with `Not set aside` for the rest of it; the right side sums them in
   one `Set aside` line. Below zero, `Not set aside` says why beside its red figure, in the muted note every line
@@ -441,8 +439,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   lines whose amount can follow a rule. A row that moves money into another of the household's accounts stands here
   too, linked to that account (`Goes into Wallet`): the money is still the household's. `Moved elsewhere` holds what
   no account of the household receives: a move that names no account, with the zinc chip `leaves the plan` (net
-  worth falls by it), and the payment to a card whose purchases are expense rows, which moves no new money and
-  carries the `counted when bought` chip and is in no sum. The group was `To savings,
+  worth falls by it). The group was `To savings,
   investments and debts` while the page was cut by what becomes of the money (gone, or still the household's); its
   code name stays `set-aside`. Both headings carry an (i) that says which question they answer. The Grid's `Expenses
   total` is the same figure as the `Expenses` heading (`expensesTotal`: payments in, pocket money and plain
@@ -466,7 +463,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   with two ends, and both ends say so: two chain rings (`Link2`, 14 px, muted, in a 20 px slot like the rule symbol,
   before it) on a row that fills, takes from or pays off an account, and on that account's or virtual account's
   line. It is a button named after the other end (`Pays off Car loan: go there`, `Paid off by Car loan – Payment: go
-  there`, `Filled by To savings; Money taken by Car repair: go there`). A card that records only its payments is
+  there`, `Filled by To savings; Money taken by Car repair: go there`). A card is
   paid off by its row as a loan is, and says so with the same words. Pressing it opens whatever hides the other
   end, scrolls it to the middle of the window, moves the keyboard to it and marks the line for two seconds with
   `bg-muted ring-2 ring-inset ring-ring` (`data-marked`), never with the lime. A loan or a card that never had a
@@ -510,7 +507,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   The line for what stays in the main account (its name, else `Main account`) is worked out and says so with the
   `calculated` chip; its amount is the same kind of button and opens `CurrentBalanceDialog` (§8). Once the real
   balance is typed for a month the chip goes, the amount is underlined like any entered balance, the line says
-  `entered, -€120.00 against the plan`, and its parts (At the start of the month, Kept this month, the card lines)
+  `entered, -€120.00 against the plan`, and its parts (At the start of the month, Kept this month)
   gain `Not in the plan`, so they still add up. The month after is `calculated` again, from the real number. The line
   is that account: no account stands under it. **Only where two main accounts were open in one month** (an archived
   one and the one that replaced it, or data from before rule B9 until the upgrade has run) each stands under the
@@ -645,8 +642,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   the same step; once it differs a muted right-aligned sentence says `Once saved, this row is under Fun, in every
   month.` Saved from the Statement, the page then shows where the row went, as for a new row: its new category opens
   and its line is marked for two seconds. Only rows the Statement lists under categories have it (plain income and
-  expense rows, and a payment that counts as spending, `paysAsExpense`: a loan's, and a card's that records only its
-  payment; in a section that has categories). A loan made with its row has no category, so the dialog that opens for
+  expense rows, and a payment to a loan or a card, `isPayOffRow`; in a section that has categories). A loan made with its row has no category, so the dialog that opens for
   the amount is where it gets one. "Category…" in the row menu stays, with `New category…`. A currency
   without any rate is fetched as soon as it is picked, so the rate line can answer before the save.
   **"Comes out of" names an account, never a kind of money.** The list (`fundingOptions` in
@@ -728,10 +724,11 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   income once set), the account verb, Follow another row…, then Archive or delete… or Restore. The account verb says
   what the row's account is for (`Goes into…`, `Comes from…`, `Pays off…`, `Paid into…`; a row that moves money
   says `Goes into…` too, and its dialog lists the accounts with a balance and `No account: the money leaves the
-  plan`); on an ordinary expense
-  row it is `Paid by card…`, lists the credit cards after `Not by card` and nothing else (which account the money
-  comes out of is "Comes out of…", so the two cannot be mistaken for each other), and is left out while the
-  household has no card. Belongs to offers the
+  plan`); an ordinary expense
+  row names no account and has no such item (which account the money comes out of is "Comes out of…", and that it
+  is paid with a card is said under "Usually paid…"). One that still names an account, from before schema 23 or kept
+  for the overview, shows `Paid from…` with that account and `No account`, so the link can be taken off and nothing
+  else; the store refuses a new one. `Pays off…` lists loans and cards alike. Belongs to offers the
   household, an Adults group and an Other people & things group (`name · kind`), and nothing else: who a row is for
   is what "Per person" under the Statement counts and what a pocket money rule's "percentage of <Adult>'s income" is taken of.
   There is one way of sharing money (each adult's income lines are what they put in), so no screen asks for a mode,
@@ -780,13 +777,6 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
     the muted line `Ticks every line of the month. No amount changes.`; it is set when the dialog opens for a month
     that is over (`isPastMonth`) and not for the current month or a later one. Footer: Cancel, `Save`. What was
     typed and the ticks are one step, so one Undo takes both back (`setMonthBalances` with `done`).
-- A card whose purchases are expense rows gets, wherever its end is typed above the calculated one, a `rounded-md
-  border` block (`data-testid="book-difference"`) under its pair with a `Check` "Count the €400.00 difference as
-  spending this month" and one muted sentence saying where it goes (a done item "Not recorded" on the row `<card> –
-  Not recorded`, paid from the card) or, unticked, that the debt rises with no line to explain it. Ticked for a
-  balance typed now, unticked when the dialog opens on an older difference. Other accounts never see it: for a card
-  that records only its payments it would count the money twice (`cardBookingMutations` in `src/store/actions.ts`).
-  A corrected start is never booked: the month before keeps its rows.
 - The estimate dialog (`src/features/statement/EstimateDialog.tsx`), titled `Estimate for <category> · <month>`: one
   amount in the household currency with an (i) (`row.categoryEstimate`), then two read-only lines that follow what
   is typed (`Rows this month`, `Not broken down yet`; a muted sentence when the rows already add up to more), then
@@ -925,8 +915,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
 - The account dialog (`src/features/household/HouseholdAccountDialog.tsx`), one for the Household screen and the
   Statement. The short form asks what every account needs: `Name`, `Type` with the type's sentence under it, and
   one amount whose label says what it is and when: `Holds at the start of <Month> (<CCY>)`, `Owed at the start of
-  …` for a card or loan, `Worth at the start of …` for another asset. A card adds "What do you record for this
-  card?" as a `Segmented` (`Everything I buy with it` / `Only what I pay to it`) with the chosen answer's sentence.
+  …` for a card or loan, `Worth at the start of …` for another asset. A card asks nothing more: it has no mode.
   Everything that has a usual default sits behind a `More options` disclosure (a chevron button that names what it
   holds while closed): currency (a `NativeSelect`), opening month, owner, tracking, net worth, and for investments growth, projection and when
   deposits count. **One main account** (rule B9): `Main account` is in the type list only while the household has
@@ -956,16 +945,13 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   payment brings down what is owed.`); one Save makes both in one step, one Undo takes both away, and on the
   Statement the row's dialog opens next for the amount. Unticked, the form of the saved account says `No row pays
   this off yet.` with an outline `xs` button `Add the row that pays it off`; once a row does, the same line reads
-  `Paid off by "<row>".` A tracked loan, and a tracked card that records only its payments, needs an amount owed:
+  `Paid off by "<row>".` A tracked loan or card needs an amount owed:
   without one Save is refused with the reason (a payment stops at what is owed, so it would count as nothing).
   Opened from the row form, the dialog says `Saving also adds the row "<name>", linked to
   this account.` in place of the box.
-  An account that changes says before saving what its rows do, asked of the planner the store writes with
-  (`planAccountChange`), so the form and the save never disagree. Under the "paid off by" line, in the same muted
-  `text-xs`: the rows that follow (`"Car loan – Payment" follows: each payment brings down what is owed and counts
-  as an expense of its month.`, with where the row goes when it changes sides: `It moves out of Expenses and loses
-  its category.`, `It moves under Expenses, into no category.`), and the rows that lose their card (`"Groceries" is
-  no longer "Paid by card" on it: nothing is bought on a loan.`). A type the account cannot take is said on the
+  A loan becomes a card and a card a loan with everything it has, and nothing is said about it: no figure changes.
+  Any other type the account cannot take is asked of the planner the store writes with (`planAccountChange`), so the
+  form and the save never disagree, and is said on the
   spot, right under the name and the type and above the type's help, as a `role="alert"` line in `text-destructive`
   that names what holds it; the select
   is `aria-invalid` and Save is disabled while it shows. The button that adds a missing payment row shows only while
@@ -1246,9 +1232,10 @@ feature switch; a second one follows the same form.
   saved with the amount` once it differs from what is stored), and that a day past the 28th is the last day of a
   shorter month. Nothing is said about what follows from the method, because nothing does. It is saved with the
   amount, as one step. The row menu has the same fields as `Usually paid…`, in a dialog of that name (`sm:max-w-md`,
-  the legend for a screen reader only), beside `Paid by card…`, which is the only thing that puts a row on a card.
-- **A day and a method touch no other field.** "Comes out of" and `Paid by card…` are never set, locked or explained
-  by a method; a screen that shows a method beside one of them shows two separate choices.
+  the legend for a screen reader only). Nothing puts a row on a card: a credit card as a way of paying is a method
+  like any other.
+- **A day and a method touch no other field.** "Comes out of" is never set, locked or explained
+  by a method; a screen that shows a method beside it shows two separate choices.
 - **An item's own day and method** stand on a line of their own inside the item's box, above "Repeats": muted `Paid
   on`, a `h-7 w-36 text-xs` day select, muted `with`, a `h-7 w-52 text-xs` method select; the line wraps on a phone.
   The selects are named for a screen reader after their item (`Paid on, Streaming`). On an item that repeats, a

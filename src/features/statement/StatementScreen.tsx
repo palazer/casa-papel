@@ -98,8 +98,6 @@ const STEP_PART: Record<SetupStepKey, string> = {
 }
 /** The type "Add account" starts on in a step of the guided setup that asks for one kind of account. */
 const STEP_ACCOUNT: Partial<Record<SetupStepKey, AccountType>> = { savings: 'savings', investments: 'investment' }
-/** Said under "Add row" in an expense place when the row pays a card whose purchases are expense rows: its line shows in another group. */
-const PAY_OFF_NOTE = 'It will show under "Moved elsewhere": what was bought with this card is under Expenses already, so the payment only moves money to the card.'
 /** What "Add account" offers under Assets, and "Add a card or loan" under Debts. */
 const ASSET_TYPES: AccountType[] = ['checking', 'joint', 'savings', 'investment', 'other-asset', 'cash']
 const DEBT_TYPES: AccountType[] = ['credit-card', 'loan']
@@ -409,14 +407,13 @@ export function StatementScreen() {
     else if (line.accountId) askRule({ accountId: line.accountId })
   }
   const categoriesOf = (section: Section) => tables!.categories.filter((c) => !c.deletedAt && c.section === section)
-  // a loan payment belongs with the expenses (the car loan under Transport) and is added there; only the payment to a
-  // card whose purchases are expense rows shows elsewhere: the form says so, and the page goes there once it is added
+  // a payment to a loan or a card belongs with the expenses (the car loan under Transport) and is added there
   /** What a savings account holds this month that no virtual account has set aside: said in the form of a new one. */
   const freeOf = (accountId: string): Money | null => notSetAside(tables!, engine!, accountId, m)
   const addRow = (line: StatementLine, section: Section, over: Pick<ComponentProps<typeof AddRowInline>, 'label' | 'defaultCategoryId' | 'only' | 'place'> = {}) => (
     <AddRowInline
       section={section} categories={categoriesOf(section)} tables={tables!} household={household!} onError={setError} onAdded={onAdded}
-      month={m} payOffNote={PAY_OFF_NOTE} freeOf={freeOf}
+      month={m} freeOf={freeOf}
       // on the columns of the lines above it: the "+" where their tick is (or their arrow), the words where their names are
       lead={<AddLead ticks={tickedUnder(line)} />} leadClassName={LEAD_BUTTON} formClassName={cn('min-w-0 basis-full', LEAD_PAD[tickedUnder(line) ? 'ticks' : 'plain'])} {...over}
     />

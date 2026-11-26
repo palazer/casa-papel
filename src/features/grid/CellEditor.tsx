@@ -14,7 +14,7 @@ import { useStore } from '@/app/store'
 import { cellKey, conversionCurrency, householdFx, rateInfo, typedAmount, type EngineOutput } from '@/engine'
 import { RepeatField } from '@/features/recurring/RepeatField'
 import {
-  addMonths, cadenceOf, canCarryRule, compareMonths, dateOn, dayOfDate, fromMinor, isDue, isPaymentRow, isTakenFromAccount, isoDateOfToday, lastDayOfMonth, newId, nextDue, parseMonth, payContext, paysAsExpense, repeatOf, runningSchedules, sameRepeat, toMinor, usualMethod,
+  addMonths, cadenceOf, canCarryRule, compareMonths, dateOn, dayOfDate, fromMinor, isDue, isPaymentRow, isTakenFromAccount, isoDateOfToday, lastDayOfMonth, newId, nextDue, parseMonth, payContext, isPayOffRow, repeatOf, runningSchedules, sameRepeat, toMinor, usualMethod,
   type CellItem, type Conversion, type Household, type ItemStatus, type MonthKey, type RepeatChoice, type Repeating, type Row, type Tables,
 } from '@/model'
 import {
@@ -101,8 +101,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   const rowCategory = row.categoryId && categories.some((c) => c.id === row.categoryId) ? row.categoryId : ''
   /** The category chosen here ('' for none), until it is saved with the amount. */
   const [category, setCategory] = useState(rowCategory)
-  const paid = row.accountId ? tables.accounts.find((a) => a.id === row.accountId && !a.deletedAt) : undefined
-  const canPickCategory = categories.length > 0 && row.section !== 'transfer' && (row.kind === 'plain' || row.kind === 'salary' || paysAsExpense(row, paid))
+  const canPickCategory = categories.length > 0 && row.section !== 'transfer' && (row.kind === 'plain' || row.kind === 'salary' || isPayOffRow(row))
   const newCategory = category !== rowCategory ? category || null : undefined
   // ----- "Usually paid": the row's day and method of payment, while the household plans its payments -----
   const payments = !!household.payments && isPaymentRow(row)
@@ -125,10 +124,10 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   // "How sure" on a single amount is stored as one unlabelled item; keep showing it as a single amount
   const soloItem = cell?.source === 'items' && cell.items.length === 1 && cell.items[0].kind === 'normal' && !cell.items[0].label && !cell.items[0].recurringItemId && !cell.items[0].skipped ? cell.items[0] : null
   const [mode, setMode] = useState<Mode>(isRecurringRow || (cell?.source === 'items' && !soloItem) ? 'items' : 'value')
-  // A payment to a loan that owed less than the payment counts for less (`asked` is then what was planned). The form
-  // edits what is planned: that is what is stored, and what counts again once more is owed.
+  // A payment to a loan or a card that owed less than the payment counts for less (`asked` is then what was planned).
+  // The form edits what is planned: that is what is stored, and what counts again once more is owed.
   const [text, setText] = useState(() => amountToInput(cell ? cell.asked ?? cell.value : 0, stored, locale))
-  const paidOffLoan = cell?.asked != null ? tables.accounts.find((a) => a.id === row.accountId)?.name ?? 'The loan' : null
+  const paidOffLoan = cell?.asked != null ? tables.accounts.find((a) => a.id === row.accountId)?.name ?? 'The loan or card' : null
   // The choice starts from what the month holds, so that saving without touching it keeps what the month is: an
   // amount that is this month's alone opens on "Only this month", an amount of its own that runs on opens on the
   // other choice. A month that only carries (or is empty) has neither: money taken out of an account is a one-off

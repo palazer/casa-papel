@@ -1,11 +1,10 @@
 import { Fragment, type ReactNode } from 'react'
 import { AmountHint } from '@/components/AmountHint'
-import { Check } from '@/components/Check'
 import { Input } from '@/components/ui/input'
 import { formatAmount, formatMonth } from '@/app/format'
 import { cn } from '@/lib/utils'
 import type { MonthKey } from '@/model'
-import { unrecordedRowName, type BalanceLine } from '@/store'
+import type { BalanceLine } from '@/store'
 import type { BalanceSide, MonthBalancesForm } from './useMonthBalances'
 
 /** Accounts that stand together in the list, under a heading when they have one. */
@@ -78,19 +77,6 @@ export function BalanceFields({ form, groups, month, base, named, onEnter }: {
               )}
               {field('start', line)}
               {field('end', line)}
-              {form.canBook(line) && (
-                <div className="col-span-full space-y-1 rounded-md border p-2.5" data-testid="book-difference">
-                  <Check
-                    label={`Count the ${formatAmount(form.difference(line) ?? 0, line.account.currency, locale)} difference as spending this month`}
-                    checked={form.bookOf(line.account.id)} onChange={(e) => form.setBook(line.account.id, e.target.checked)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {form.bookOf(line.account.id)
-                      ? `It is added as "Not recorded" on the row "${unrecordedRowName(line.account)}", paid from this card, so the month's expenses and what is owed agree. Rename it or split it into items any time.`
-                      : 'Only the balance changes. What is owed rises without a line of spending to explain it.'}
-                  </p>
-                </div>
-              )}
             </Fragment>
           ))}
         </Fragment>

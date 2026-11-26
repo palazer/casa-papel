@@ -1,5 +1,5 @@
 import {
-  accountIdOf, accountRef, cardIsItemized, compareMonths, conversionOf, fromMinor, growthIn, isOldPocketShare, isOutsideNetWorth, isShareRule, isTakenFromAccount, movesInto, monthRange, ownBalance, paysAsExpense, paysExpenses, pocketLandsIn, poolIdOf, poolRef, resolveRules, scaleMoney, toMinor,
+  accountIdOf, accountRef, compareMonths, conversionOf, fromMinor, growthIn, isOldPocketShare, isOutsideNetWorth, isShareRule, isTakenFromAccount, movesInto, monthRange, ownBalance, isPayOffRow, paysExpenses, pocketLandsIn, poolIdOf, poolRef, resolveRules, scaleMoney, toMinor,
   type Account, type Category, type Cell, type FundedBy, type Money, type MonthKey, type Row, type RuleState, type Section, type Tables,
 } from '@/model'
 import { convertMoney, householdFx } from './fx'
@@ -369,16 +369,16 @@ export function computeEngine(input: EngineInput): EngineOutput {
     return conv.value
   }
 
-  // ---------- loans: a payment stops at what is owed ----------
-  // Before the month's sums, because they, the estimates and the rest of the month all read the payment. A loan's
+  // ---------- loans and cards: a payment stops at what is owed ----------
+  // Before the month's sums, because they, the estimates and the rest of the month all read the payment. A debt's
   // balance needs nothing from the sums: what was owed, its payments, and the real balances typed for it. Month by
   // month the payments take what is still owed, in the Grid's order; what does not fit is cut from the cell, which
   // keeps what was planned in `asked`. The stored amounts stay as they are, so when a real balance raises what is
   // owed, the payments count again by themselves.
   const loanSeries: Record<string, AccountSeries> = {}
   {
-    // a card that records only its payments is brought down by them like a loan (rule C1)
-    const loans = accounts.filter((a) => a.tracked && (a.type === 'loan' || (a.type === 'credit-card' && !cardIsItemized(a))))
+    // a card is a debt like a loan: its payment brings it down, and what its statement says is a real balance (rule C1)
+    const loans = accounts.filter((a) => a.tracked && (a.type === 'loan' || a.type === 'credit-card'))
     /** Put another amount into a cell, with everything that follows from it scaled the same way. */
     const setAmount = (c: CellResult, value: Money): void => {
       const f = c.value !== 0 ? value / c.value : 0
@@ -466,8 +466,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
   for (const row of rows) {
     if (row.kind !== 'category-estimate') continue
     const cat = row.section === 'expense' ? categoryOf(row, liveCats) : null
-    // a loan's payment (and a card's, where the payment is the spending) stands in its category like any expense, so it explains its part
-    const paysOff = (r: Row): boolean => paysAsExpense(r, r.accountId ? accountsById.get(r.accountId) : undefined)
+    // a payment to a loan or a card stands in its category like any expense, so it explains its part
+    const paysOff = isPayOffRow
     const siblings = cat ? rows.filter((r) => r.id !== row.id && r.section === 'expense' && (r.kind === 'plain' || r.kind === 'salary' || paysOff(r)) && categoryOf(r, liveCats)?.id === cat.id) : []
     for (const m of months) {
       const c = cells[cellKey(row.id, m)]
@@ -560,13 +560,9 @@ export function computeEngine(input: EngineInput): EngineOutput {
           break
         }
         case 'debt-payment':
+        case 'card-payment':
           t.debt += v
           break
-        case 'card-payment': {
-          const acc = row.accountId ? accountsById.get(row.accountId) : undefined
-          if (!acc || !cardIsItemized(acc)) t.debt += v
-          break
-        }
         default: {
           if (row.section === 'expense') {
             t.cashExpense += c.funding.cash
@@ -859,20 +855,18 @@ export function computeEngine(input: EngineInput): EngineOutput {
     accountSeries[acc.id] = series
   }
 
-  // ---------- cards, loans, other assets, cash, other current accounts ----------
+  // ---------- loans and cards, other assets, cash, other current accounts ----------
   for (const acc of accounts) {
-    const liability = acc.type === 'credit-card' || acc.type === 'loan'
-    if (!liability && acc.type !== 'other-asset' && acc.type !== 'cash' && acc.type !== 'joint') continue
+    // a loan's months and a card's were worked out before the month's sums, with the payments cut at what was owed
+    if (acc.type === 'credit-card' || acc.type === 'loan') {
+      if (loanSeries[acc.id]) accountSeries[acc.id] = loanSeries[acc.id]
+      continue
+    }
+    if (acc.type !== 'other-asset' && acc.type !== 'cash' && acc.type !== 'joint') continue
     // Cash and an other current account always have a balance: while they counted with the current accounts they
     // were stored as untracked, with no say in it, so their flag says nothing (`ownBalance`).
     if (!ownBalance(acc)) continue
-    // a loan's months, and those of a card that records only its payments, were worked out before the month's sums,
-    // with the payments cut at what was owed
-    if (loanSeries[acc.id]) {
-      accountSeries[acc.id] = loanSeries[acc.id]
-      continue
-    }
-    const series: AccountSeries = { accountId: acc.id, currency: acc.currency, liability, ...outsideOf(acc), months: {} }
+    const series: AccountSeries = { accountId: acc.id, currency: acc.currency, liability: false, ...outsideOf(acc), months: {} }
     let prevBalance: Money | null = null
     for (const m of months) {
       if (compareMonths(m, acc.openingMonth) < 0) continue
@@ -880,30 +874,15 @@ export function computeEngine(input: EngineInput): EngineOutput {
       const prev: Money = prevBalance ?? acc.openingBalance
       let inflow: Money = 0
       let outflow: Money = 0
-      if (acc.type === 'credit-card') {
-        const itemized = cardIsItemized(acc)
-        for (const row of rows) {
-          if (row.accountId !== acc.id) continue
-          const c = cells[cellKey(row.id, m)]
-          if (!c || c.value === 0 || c.source === 'archived') continue
-          // A card whose purchases are expense rows grows with them and shrinks with its payment. (A card that
-          // records only its payments never comes here: it has its months from the loans' pass.)
-          if (!itemized) continue
-          if (row.kind === 'card-payment') outflow += inAccountCurrency(acc, c, m)
-          else if (row.section === 'expense') inflow += inAccountCurrency(acc, c, m)
-        }
-      }
       // an other asset (an other current account among them) falls by what expenses took straight out of it, and
       // rises by pocket money that lands in it and by money a row moves into it
-      if (!liability) {
-        outflow += paidFrom(acc, m)
-        for (const row of rows) {
-          if (!pocketLandsIn(row, acc) && !movesInto(row, acc)) continue
-          const c = cells[cellKey(row.id, m)]
-          if (c && c.source !== 'archived') inflow += inAccountCurrency(acc, c, m)
-        }
+      outflow += paidFrom(acc, m)
+      for (const row of rows) {
+        if (!pocketLandsIn(row, acc) && !movesInto(row, acc)) continue
+        const c = cells[cellKey(row.id, m)]
+        if (c && c.source !== 'archived') inflow += inAccountCurrency(acc, c, m)
       }
-      // owed grows with spending and shrinks with payments; an asset carries, plus what landed in it and less what was paid from it, until a real value is entered
+      // an asset carries, plus what landed in it and less what was paid from it, until a real value is entered
       const computed: Money = prev + inflow - outflow
       const actual = actuals.get(`${acc.id}|${m}`)?.actualBalance ?? null
       const balance: Money = actual ?? computed
@@ -916,7 +895,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
   // ---------- the main account, and net worth ----------
   // What stays in the main account is money the household has, so it counts: the Statement's lower half would
   // not balance without it, and every other screen shows the same figure.
-  const main = mainAccountSeries({ months, rows, cells, totals, accounts, actuals, fx, base })
+  const main = mainAccountSeries({ months, totals, accounts, actuals, fx, base })
   const netWorth: Record<MonthKey, Money> = {}
   for (const m of months) {
     let nw = main.months[m]?.balance ?? 0
