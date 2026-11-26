@@ -10,6 +10,9 @@ import { addCategory, seedDefaultCategories, setRowCategory } from '@/store'
 import { NativeSelect } from '@/components/NativeSelect'
 import { useSave } from './RowDialogs'
 import { saveError } from '@/app/saveError'
+import { txt } from '@/i18n'
+
+const T = txt.grid.rowCategory
 
 const NEW = '__new__'
 
@@ -31,28 +34,28 @@ export function RowCategoryDialog({ row, tables, onClose }: { row: Row; tables: 
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Category</DialogTitle>
-          <DialogDescription>Row "{row.name}"</DialogDescription>
+          <DialogTitle>{txt.common.category}</DialogTitle>
+          <DialogDescription>{T.row(row.name)}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <TipLabel htmlFor="row-category" help="row.category">Category</TipLabel>
+            <TipLabel htmlFor="row-category" help="row.category">{txt.common.category}</TipLabel>
             <NativeSelect id="row-category" className="w-full" value={choice} onChange={(e) => setChoice(e.target.value)}>
-              <option value="">No category</option>
+              <option value="">{txt.common.noCategory}</option>
               {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              <option value={NEW}>New category…</option>
+              <option value={NEW}>{T.newCategory}</option>
             </NativeSelect>
           </div>
           {choice === NEW && (
             <div className="space-y-1.5">
-              <Label htmlFor="row-category-new">Name of the new category</Label>
+              <Label htmlFor="row-category-new">{T.nameOfTheNew}</Label>
               <Input id="row-category-new" autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} />
             </div>
           )}
           {row.section === 'expense' && categories.length === 0 && (
             <div className="flex items-center gap-1">
-              <Button size="xs" variant="outline" disabled={busy} onClick={() => { setSeedError(null); seedDefaultCategories(store).catch((e) => setSeedError(saveError(e, 'Could not add them.'))) }}>
-                Add the usual categories
+              <Button size="xs" variant="outline" disabled={busy} onClick={() => { setSeedError(null); seedDefaultCategories(store).catch((e) => setSeedError(saveError(e, T.couldNotAddThem))) }}>
+                {T.addTheUsualCategories}
               </Button>
               <InfoTip help="household.usualCategories" />
             </div>
@@ -60,8 +63,8 @@ export function RowCategoryDialog({ row, tables, onClose }: { row: Row; tables: 
           {(error || seedError) && <p className="text-sm text-destructive" role="alert">{error ?? seedError}</p>}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button onClick={submit} disabled={busy || (choice === NEW && !newName.trim())}>Save</Button>
+          <Button variant="outline" onClick={onClose} disabled={busy}>{txt.common.cancel}</Button>
+          <Button onClick={submit} disabled={busy || (choice === NEW && !newName.trim())}>{txt.common.save}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

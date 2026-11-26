@@ -8,6 +8,9 @@ import { setMonthBalances } from '@/store'
 import { BalanceFields } from './BalanceFields'
 import { useMonthBalances, type MonthBalancesForm } from './useMonthBalances'
 import { saveError } from '@/app/saveError'
+import { txt } from '@/i18n'
+
+const T = txt.grid.currentBalance
 
 interface Props {
   /** The line's name: the main account's. */
@@ -26,7 +29,7 @@ interface Props {
 export function CurrentTogether({ form, base }: { form: MonthBalancesForm; base: string }) {
   const { main, locale } = form
   if (!main) return null
-  return <>Calculated, together: {formatAmount(main.start, base, locale)} at the start, {formatAmount(main.computed, base, locale)} at the end.</>
+  return <>{T.calculatedTogetherAtThe(formatAmount(main.start, base, locale), formatAmount(main.computed, base, locale))}</>
 }
 
 /**
@@ -56,7 +59,7 @@ export function CurrentBalanceDialog({ title, month, tables, household, onClose 
       await setMonthBalances(store, month, entry)
       onClose()
     } catch (e) {
-      form.setError(saveError(e, 'Could not save.'))
+      form.setError(saveError(e, txt.common.couldNotSave))
     } finally {
       setBusy(false)
     }
@@ -68,25 +71,22 @@ export function CurrentBalanceDialog({ title, month, tables, household, onClose 
         <DialogHeader>
           <DialogTitle>{title} · {formatMonth(month, locale, 'long')}</DialogTitle>
           <DialogDescription>
-            {several
-              ? 'Both were open in this month, the one archived and the one that replaced it. What they really held when the month began and when it ended, from your bank. The plan only knows them together, so fill in both or neither.'
-              : 'What the account really held when the month began and when it ended, from your bank.'}
-            {' '}An empty field keeps the calculated amount. The start is the end of the month before: changing it corrects that month too.
+            {T.whatTheyHeld(several)}
           </DialogDescription>
         </DialogHeader>
         {!alone && main && <p className="text-sm text-muted-foreground" data-testid="current-together"><CurrentTogether form={form} base={base} /></p>}
         <BalanceFields form={form} groups={[{ lines }]} month={month} base={base} named={several} onEnter={() => void submit()} />
-        {lines.some((l) => l.account.currency !== base) && <p className="text-xs text-muted-foreground">An account in another currency is counted in {base} at this month's rate.</p>}
+        {lines.some((l) => l.account.currency !== base) && <p className="text-xs text-muted-foreground">{T.anAccountInAnother(base)}</p>}
         {together != null && main && several && (
           <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm" data-testid="current-balance-sum">
-            <dt className="text-muted-foreground">Together at the end</dt><dd className="text-right tabular-nums">{formatAmount(together, base, locale)}</dd>
-            <dt className="text-muted-foreground">Difference</dt><dd className="text-right tabular-nums">{formatAmount(together - main.computed, base, locale, { sign: 'exceptZero' })}</dd>
+            <dt className="text-muted-foreground">{T.togetherAtTheEnd}</dt><dd className="text-right tabular-nums">{formatAmount(together, base, locale)}</dd>
+            <dt className="text-muted-foreground">{T.difference}</dt><dd className="text-right tabular-nums">{formatAmount(together - main.computed, base, locale, { sign: 'exceptZero' })}</dd>
           </dl>
         )}
         {form.error && <p className="text-sm text-destructive" role="alert">{form.error}</p>}
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button onClick={() => void submit()} disabled={busy}>Save</Button>
+          <Button variant="outline" onClick={onClose} disabled={busy}>{txt.common.cancel}</Button>
+          <Button onClick={() => void submit()} disabled={busy}>{txt.common.save}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

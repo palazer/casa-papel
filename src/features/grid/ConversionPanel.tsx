@@ -9,6 +9,9 @@ import { conversionFor, conversionFrom, type Conversion, type ConversionFigures,
 import { fetchDayRate } from '@/store'
 import { formatDay, formatRate, readableRate, toStored } from '@/features/household/fxDisplay'
 import { errorText } from '@/app/saveError'
+import { txt } from '@/i18n'
+
+const T = txt.grid.conversion
 
 /** The three figures of a conversion, as the panel names them. */
 type Field = 'amount' | 'other' | 'rate'
@@ -143,7 +146,7 @@ export function ConversionPanel({ amount, currency, home, foreign, value, monthR
       setRateDay(got.date)
       typed('rate')
     } catch (e) {
-      setError(errorText(e, 'Could not fetch the rate.'))
+      setError(errorText(e, T.couldNotFetchThe))
     } finally {
       setBusy(false)
     }
@@ -160,59 +163,59 @@ export function ConversionPanel({ amount, currency, home, foreign, value, monthR
           <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 tabular-nums">
             <span className="text-foreground">= {formatAmount(typedHome ? shown.foreignAmount : shown.homeAmount, otherCurrency, locale)}</span>
             <span aria-hidden>·</span><span>{rateLine(shown)}</span><span aria-hidden>·</span>
-            <Chip tone="sky">recorded</Chip>
+            <Chip tone="sky">{T.recorded}</Chip>
             {shown.date && <span>{formatDay(shown.date, locale)}</span>}
             <InfoTip help="cell.conversion" />
-            <Button size="xs" variant="ghost" onClick={() => start(value)}>Change…</Button>
-            <Button size="xs" variant="ghost" onClick={remove}>Remove</Button>
+            <Button size="xs" variant="ghost" onClick={() => start(value)}>{T.change}</Button>
+            <Button size="xs" variant="ghost" onClick={remove}>{T.remove}</Button>
           </p>
         ) : (
           <p className="flex flex-wrap items-center gap-1.5">
-            <Button size="xs" variant="outline" onClick={() => start(null)} aria-label={`Record the conversion${of ? ` ${of}` : ''}…`}>Record the conversion…</Button>
+            <Button size="xs" variant="outline" onClick={() => start(null)} aria-label={T.recordTheConversion(of)}>{T.recordTheConversion2}</Button>
             <InfoTip help="cell.conversion" />
           </p>
         )}
-        {shown && !done && <p data-testid="conversion-not-done">Counts once the amount is Done; until then the month's rate does.</p>}
-        {shown && conversionFor(value!, amount ?? 0, currency, home) == null && <p role="alert" className="text-destructive">The amount is in neither {foreign} nor {home} now: remove the conversion.</p>}
+        {shown && !done && <p data-testid="conversion-not-done">{T.countsOnceTheAmount}</p>}
+        {shown && conversionFor(value!, amount ?? 0, currency, home) == null && <p role="alert" className="text-destructive">{T.theAmountIsIn(foreign, home)}</p>}
       </div>
     )
   }
 
   return (
     <div className="space-y-2 rounded-md border p-2 text-xs" data-testid="conversion-panel">
-      <p className="font-medium text-foreground">What the amount came to</p>
+      <p className="font-medium text-foreground">{T.whatTheAmountCame}</p>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <span className="flex items-center gap-1.5">
-          <Label className="text-xs" htmlFor={`${id}-other`}>In {otherCurrency}</Label>
+          <Label className="text-xs" htmlFor={`${id}-other`}>{T.inCurrency(otherCurrency)}</Label>
           <Input
-            id={`${id}-other`} aria-label={`In ${otherCurrency}${of ? ` ${of}` : ''}`} className="h-7 w-32 text-right tabular-nums" inputMode="decimal"
+            id={`${id}-other`} aria-label={T.inCurrencyOf(otherCurrency, of)} className="h-7 w-32 text-right tabular-nums" inputMode="decimal"
             value={otherShown} onChange={(e) => { setOtherText(e.target.value); typed('other') }}
           />
         </span>
         <span className="flex items-center gap-1.5">
           <Label className="text-xs" htmlFor={`${id}-rate`}>1 {way.from} =</Label>
           <Input
-            id={`${id}-rate`} aria-label={`Rate, ${way.to} for 1 ${way.from}${of ? ` ${of}` : ''}`} className="h-7 w-24 text-right tabular-nums" inputMode="decimal"
+            id={`${id}-rate`} aria-label={T.rateFor1(way.to, way.from, of)} className="h-7 w-24 text-right tabular-nums" inputMode="decimal"
             value={rateShown} onChange={(e) => { setRateText(e.target.value); setRateDay(null); typed('rate') }}
           />
           <span>{way.to}</span>
         </span>
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
-        <Label className="text-xs" htmlFor={`${id}-day`}>Official rate of</Label>
+        <Label className="text-xs" htmlFor={`${id}-day`}>{T.officialRateOf}</Label>
         <Input id={`${id}-day`} type="date" className="h-7 w-36" value={day} onChange={(e) => setDay(e.target.value)} />
-        <Button size="xs" variant="outline" disabled={busy || !day} onClick={() => void takeOfficial()}>Use</Button>
-        {rateDay && <span className="text-muted-foreground">ECB rate of {formatDay(rateDay, locale)}</span>}
+        <Button size="xs" variant="outline" disabled={busy || !day} onClick={() => void takeOfficial()}>{T.use}</Button>
+        {rateDay && <span className="text-muted-foreground">{T.ecbRateOf(formatDay(rateDay, locale))}</span>}
       </div>
       <p className="text-muted-foreground">
         {draft
-          ? `${formatAmount(draft.foreignAmount, foreign, locale)} = ${formatAmount(draft.homeAmount, home, locale)}. Saved with the amount, which is then Done; a new rate for the month does not change it.`
-          : 'Type the amount in the other currency or the rate: two of the three figures give the third.'}
+          ? T.savedWithTheAmount(formatAmount(draft.foreignAmount, foreign, locale), formatAmount(draft.homeAmount, home, locale))
+          : T.typeTheAmountIn}
       </p>
       {error && <p role="alert" className="text-destructive">{error}</p>}
       <div className="flex flex-wrap gap-1.5">
-        <Button size="xs" variant="outline" disabled={!draft} onClick={() => setOpen(false)}>Done</Button>
-        <Button size="xs" variant="ghost" onClick={cancel}>Cancel</Button>
+        <Button size="xs" variant="outline" disabled={!draft} onClick={() => setOpen(false)}>{txt.common.done}</Button>
+        <Button size="xs" variant="ghost" onClick={cancel}>{txt.common.cancel}</Button>
       </div>
     </div>
   )

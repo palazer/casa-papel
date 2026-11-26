@@ -5,6 +5,9 @@ import type { Household, MonthKey, Tables } from '@/model'
 import { restoreEcbRate, setManualRate } from '@/store'
 import { rateTag, readableRate, toStored } from '@/features/household/fxDisplay'
 import { saveError } from '@/app/saveError'
+import { txt } from '@/i18n'
+
+const T = txt.grid.rateLine
 
 /**
  * One currency's rate in one month, and the two things that can be done to it: type your own, and go back to the
@@ -32,7 +35,7 @@ export function useMonthRate(tables: Tables, household: Household, month: MonthK
       await fn()
       done?.()
     } catch (e) {
-      setError(saveError(e, 'Could not change the rate.'))
+      setError(saveError(e, T.couldNotChangeThe))
     } finally {
       setBusy(false)
     }
@@ -40,7 +43,7 @@ export function useMonthRate(tables: Tables, household: Household, month: MonthK
   /** A rate typed the way it is read ("1 EUR = 1.08 USD"), for this month alone. */
   const save = (text: string, done?: () => void) => {
     const v = Number(text.replace(',', '.'))
-    if (!(v > 0)) return setError('A rate must be a positive number.')
+    if (!(v > 0)) return setError(T.aRateMustBe)
     void run(() => setManualRate(store, pair, month, toStored(readable, base, v)), done)
   }
   /** Drop what is stored for the month and fetch the ECB's rate afresh. */

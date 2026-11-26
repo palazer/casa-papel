@@ -10,6 +10,9 @@ import { cn } from '@/lib/utils'
 import { HouseholdAccountDialog } from '@/features/household/HouseholdAccountDialog'
 import { PoolDialog } from '@/features/household/PoolsCard'
 import { showSaveError } from '@/app/saveError'
+import { txt } from '@/i18n'
+
+const T = txt.grid.addRow
 
 type Choice = TransferRowKind | ExpenseRowKind
 type Targets = ReturnType<typeof rowTargets>
@@ -30,7 +33,7 @@ interface Kind {
    * starts on, and the sentence shown while it is picked. The entry and the sentence say what naming none means.
    */
   none?: { label: string; text: string }
-  targetLabel: 'Account' | 'Virtual account' | 'Adult'
+  targetLabel: string
   /** Which field of the store's input the target fills. */
   field: 'accountId' | 'poolId' | 'adultId'
   /** What can be made from the form, with the row, when nothing fits or another one is wanted. */
@@ -41,30 +44,30 @@ interface Kind {
   offered?: (t: Targets) => boolean
 }
 
-const withType = (a: Account): Target => ({ id: a.id, name: `${a.name} · ${a.type === 'loan' ? 'Loan' : 'Credit card'}` })
+const withType = (a: Account): Target => ({ id: a.id, name: T.debtChoice(a.name, a.type) })
 const NEW = {
-  savings: { type: 'savings', label: 'New savings account…', thing: 'savings account' },
-  investment: { type: 'investment', label: 'New investment account…', thing: 'investment account' },
-  loan: { type: 'loan', label: 'New loan…', thing: 'loan' },
-  card: { type: 'credit-card', label: 'New credit card…', thing: 'credit card' },
-  pool: { type: 'pool', label: 'New virtual account…', thing: 'virtual account' },
+  savings: { type: 'savings', label: T.newSavingsAccount, thing: T.savingsAccount },
+  investment: { type: 'investment', label: T.newInvestmentAccount, thing: T.investmentAccount },
+  loan: { type: 'loan', label: T.newLoan, thing: 'loan' },
+  card: { type: 'credit-card', label: T.newCreditCard, thing: T.creditCard },
+  pool: { type: 'pool', label: T.newVirtualAccount, thing: T.virtualAccount },
 } satisfies Record<string, New>
 
 const K = {
   moves: {
-    key: 'plain', section: 'transfer', label: 'Moves money between your accounts',
-    text: 'An amount you type each month goes from the main account into the account you pick. Its balance rises by it, and net worth stays as it is. It is not spending.',
-    targets: (t) => t.balances, targetLabel: 'Account', field: 'accountId', empty: () => '',
-    none: { label: 'No account: the money leaves the plan', text: 'An amount you type each month that no account of yours receives, like money sent to family. It is not counted as spending, and net worth falls by it.' },
+    key: 'plain', section: 'transfer', label: T.movesMoneyBetweenYour,
+    text: T.anAmountYouType,
+    targets: (t) => t.balances, targetLabel: txt.common.account, field: 'accountId', empty: () => '',
+    none: { label: T.noAccountTheMoney, text: T.anAmountYouType2 },
   },
-  toSavings: { key: 'to-savings', section: 'transfer', label: 'Goes into a savings account', text: 'An amount you type; that savings balance under Balances rises with it. Its rule can make it a percentage instead.', targets: (t) => t.savings, targetLabel: 'Account', field: 'accountId', create: [NEW.savings], empty: () => '' },
-  toInvestment: { key: 'to-investment', section: 'transfer', label: 'Deposits into an investment account', text: 'The account\'s value, deposited total and return under Balances follow this row.', targets: (t) => t.investments, targetLabel: 'Account', field: 'accountId', create: [NEW.investment], empty: () => '' },
-  pool: { key: 'pool-allocation', section: 'transfer', label: 'Fills a virtual account', text: 'For a virtual account that lost its row: the amount lands in the virtual account every month.', targets: (t) => t.orphanPools, targetLabel: 'Virtual account', field: 'poolId', empty: () => '', offered: (t) => t.orphanPools.length > 0 },
-  pocket: { key: 'pocket-money', section: 'transfer', label: 'Pocket money for an adult', text: 'Money that adult spends freely each month: an amount you type, or a percentage through its rule.', targets: (t) => t.adults, targetLabel: 'Adult', field: 'adultId', empty: () => 'Add an adult under Household first.' },
-  fromSavings: { key: 'from-savings', section: 'transfer', label: 'Taken from a savings account', text: 'Money you move out of that savings account into the month, to fill a gap or to top up a virtual account. Its balance falls by the amount, and the month has that much more. It comes out of what is not set aside there: a virtual account\'s money is used through an expense\'s "Comes out of".', targets: (t) => t.savings, targetLabel: 'Account', field: 'accountId', create: [NEW.savings], empty: () => '' },
-  fromInvestment: { key: 'from-investment', section: 'transfer', label: 'Taken from an investment account', text: 'Money you take out of that investment account into the month. Its value falls by the amount, and the month has that much more.', targets: (t) => t.investments, targetLabel: 'Account', field: 'accountId', create: [NEW.investment], empty: () => '' },
-  expense: { key: 'plain', section: 'expense', label: 'A normal expense', text: 'Spending you type each month, as one amount or a list of items.', targets: null, targetLabel: 'Account', field: 'accountId', empty: () => '' },
-  payOff: { key: 'pay-off', section: 'expense', label: 'Pays off a loan or card', text: 'A payment brings down what is owed on a loan or a card, and counts as an expense of its month. It stops at what is owed.', targets: (t) => t.payoff.map(withType), targetLabel: 'Account', field: 'accountId', create: [NEW.loan, NEW.card], empty: () => '' },
+  toSavings: { key: 'to-savings', section: 'transfer', label: T.goesIntoASavings, text: T.anAmountYouType3, targets: (t) => t.savings, targetLabel: txt.common.account, field: 'accountId', create: [NEW.savings], empty: () => '' },
+  toInvestment: { key: 'to-investment', section: 'transfer', label: T.depositsIntoAnInvestment, text: T.theAccountsValueDeposited, targets: (t) => t.investments, targetLabel: txt.common.account, field: 'accountId', create: [NEW.investment], empty: () => '' },
+  pool: { key: 'pool-allocation', section: 'transfer', label: T.fillsAVirtualAccount, text: T.forAVirtualAccount, targets: (t) => t.orphanPools, targetLabel: T.virtualAccount2, field: 'poolId', empty: () => '', offered: (t) => t.orphanPools.length > 0 },
+  pocket: { key: 'pocket-money', section: 'transfer', label: T.pocketMoneyForAn, text: T.moneyThatAdultSpends, targets: (t) => t.adults, targetLabel: T.adult, field: 'adultId', empty: () => T.addAnAdultUnder },
+  fromSavings: { key: 'from-savings', section: 'transfer', label: T.takenFromASavings, text: T.moneyYouMoveOut, targets: (t) => t.savings, targetLabel: txt.common.account, field: 'accountId', create: [NEW.savings], empty: () => '' },
+  fromInvestment: { key: 'from-investment', section: 'transfer', label: T.takenFromAnInvestment, text: T.moneyYouTakeOut, targets: (t) => t.investments, targetLabel: txt.common.account, field: 'accountId', create: [NEW.investment], empty: () => '' },
+  expense: { key: 'plain', section: 'expense', label: T.aNormalExpense, text: T.spendingYouTypeEach, targets: null, targetLabel: txt.common.account, field: 'accountId', empty: () => '' },
+  payOff: { key: 'pay-off', section: 'expense', label: T.paysOffALoan, text: T.aPaymentBringsDown, targets: (t) => t.payoff.map(withType), targetLabel: txt.common.account, field: 'accountId', create: [NEW.loan, NEW.card], empty: () => '' },
 } satisfies Record<string, Kind>
 
 /** Every choice of the Grid, by section, in the order the select shows them. The store applies the same lists and rules in `addRowOfKind`. */
@@ -78,7 +81,7 @@ const KINDS: Kind[] = [K.moves, K.toSavings, K.toInvestment, K.pool, K.pocket, K
 const SET_ASIDE: Kind[] = [
   K.toSavings,
   K.toInvestment,
-  { ...K.pool, text: 'Money set aside inside a savings account for one purpose. A new virtual account comes with its own row.', create: [NEW.pool], offered: (t) => t.savings.length > 0 || t.orphanPools.length > 0 },
+  { ...K.pool, text: T.moneySetAsideInside, create: [NEW.pool], offered: (t) => t.savings.length > 0 || t.orphanPools.length > 0 },
   K.pocket,
   K.moves,
 ]
@@ -143,15 +146,15 @@ export function AddRowInline({ section, categories, tables, household, onError, 
   const named = !!kind && !!targets && kind.field !== 'adultId'
   const account = chosen && kind?.field === 'accountId' ? tables.accounts.find((a) => a.id === chosen.id) : undefined
   const fallbackName = !kind || !named ? null
-    : creating ? `Named after the ${creating.thing}`
+    : creating ? T.namedAfterThe(creating.thing)
     : kind.field === 'poolId' && chosen ? rowNameFor(kind.key, chosen.name)
     : account ? rowNameFor(kind.key, account.name) : null
   // a virtual account names its own row in its form
   const showName = creating?.type !== 'pool'
   const sameSection = !kind || kind.section === section
   const text = !kind ? null : missing ?? (
-    creating?.type === 'pool' ? 'Add opens the form of the new virtual account. Saving it makes the virtual account and its row, "To <name>".'
-    : creating ? `Add opens the form of the new ${creating.thing}. Saving it makes the ${creating.thing} and this row together.`
+    creating?.type === 'pool' ? T.addOpensTheForm
+    : creating ? T.addOpensTheForm2(creating.thing)
     : naming && kind.none ? kind.none.text
     : kind.text)
 
@@ -190,33 +193,33 @@ export function AddRowInline({ section, categories, tables, household, onError, 
       reset()
       onAdded?.(row)
     } catch (e) {
-      showSaveError(onError, 'Could not add row')(e)
+      showSaveError(onError, T.couldNotAddRow)(e)
     }
   }
 
   if (!open) {
     return (
-      <Button variant="ghost" size="sm" className={cn('text-muted-foreground', lead && leadClassName)} onClick={() => setOpen(true)} aria-label={label ?? `Add ${section} row`}>
-        {lead ?? <Plus />} <span data-lead={lead ? 'text' : undefined}>{label ?? 'Add row'}</span>
+      <Button variant="ghost" size="sm" className={cn('text-muted-foreground', lead && leadClassName)} onClick={() => setOpen(true)} aria-label={label ?? T.addRowIn(section)}>
+        {lead ?? <Plus />} <span data-lead={lead ? 'text' : undefined}>{label ?? T.addRow}</span>
       </Button>
     )
   }
   const keys = (e: KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') void save(); if (e.key === 'Escape') reset() }
   const nameField = showName && (
     <Input
-      autoFocus={place !== 'set-aside'} className="h-7 w-44" placeholder={fallbackName ?? 'Row name'} value={name} aria-label={`New ${section} row name`}
+      autoFocus={place !== 'set-aside'} className="h-7 w-44" placeholder={fallbackName ?? T.rowName} value={name} aria-label={T.newRowName(section)}
       onChange={(e) => setName(e.target.value)} onKeyDown={keys}
     />
   )
   const categoryField = categories.length > 0 && sameSection && showName && (
-    <NativeSelect aria-label={`Category for the new ${section} row`} className="h-7" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-      <option value="">No category</option>
+    <NativeSelect aria-label={T.categoryForTheNew(section)} className="h-7" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+      <option value="">{txt.common.noCategory}</option>
       {[...categories].sort((a, b) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0)).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
     </NativeSelect>
   )
   const whatSelect = kind && kinds.length > 1 && (
     <NativeSelect
-      autoFocus={place === 'set-aside'} aria-label={place === 'set-aside' ? undefined : `What the new ${section} row does`} className="h-7 min-w-0" value={kind.key}
+      autoFocus={place === 'set-aside'} aria-label={place === 'set-aside' ? undefined : T.whatTheNewRow(section)} className="h-7 min-w-0" value={kind.key}
       onChange={(e) => { setChoice(e.target.value as Choice); setTargetId('') }}
     >
       {kinds.map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
@@ -224,7 +227,7 @@ export function AddRowInline({ section, categories, tables, household, onError, 
   )
   const targetField = kind && targets && (targets.length > 0 || creates.length > 0 || !!kind.none) && (
     <NativeSelect
-      aria-label={place === 'set-aside' ? 'Which one' : `${kind.targetLabel} for the new ${section} row`} className="h-7"
+      aria-label={place === 'set-aside' ? T.whichOne : T.forTheNewRow(kind.targetLabel, section)} className="h-7"
       value={creating ? newValue(creating) : chosen?.id ?? (kind.none ? NONE : '')} onChange={(e) => setTargetId(e.target.value)}
     >
       {kind.none && <option value={NONE}>{kind.none.label}</option>}
@@ -237,7 +240,7 @@ export function AddRowInline({ section, categories, tables, household, onError, 
       {place === 'set-aside' ? (
         <>
           {/* the question comes first here: the answer decides which account the row is linked to */}
-          <label className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"><span className="shrink-0">What is it for?</span>{whatSelect}</label>
+          <label className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"><span className="shrink-0">{T.whatIsItFor}</span>{whatSelect}</label>
           {targetField}
           {nameField}
           {categoryField}
@@ -250,8 +253,8 @@ export function AddRowInline({ section, categories, tables, household, onError, 
           {targetField}
         </>
       )}
-      <Button size="sm" onClick={() => void save()} disabled={!!missing}>Add</Button>
-      <Button size="sm" variant="ghost" onClick={reset}>Cancel</Button>
+      <Button size="sm" onClick={() => void save()} disabled={!!missing}>{txt.common.add}</Button>
+      <Button size="sm" variant="ghost" onClick={reset}>{txt.common.cancel}</Button>
       {kind && kinds.length > 1 && <p className="basis-full text-xs text-muted-foreground" data-testid="add-row-text">{text}</p>}
       {making && making !== 'pool' && (
         <HouseholdAccountDialog

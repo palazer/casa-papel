@@ -8,6 +8,9 @@ import { setMonthBalances } from '@/store'
 import { BalanceFields } from './BalanceFields'
 import { useMonthBalances } from './useMonthBalances'
 import { saveError } from '@/app/saveError'
+import { txt } from '@/i18n'
+
+const T = txt.grid.balance
 
 interface Props {
   account: Account
@@ -42,7 +45,7 @@ export function BalanceDialog({ account, month, tables, household, onClose }: Pr
       await setMonthBalances(store, month, entry)
       onClose()
     } catch (e) {
-      form.setError(saveError(e, 'Could not save.'))
+      form.setError(saveError(e, txt.common.couldNotSave))
     } finally {
       setBusy(false)
     }
@@ -54,22 +57,19 @@ export function BalanceDialog({ account, month, tables, household, onClose }: Pr
         <DialogHeader>
           <DialogTitle>{account.name} · {formatMonth(month, locale, 'long')}</DialogTitle>
           <DialogDescription>
-            {isInvestment ? 'What the account was worth when the month began and when it ended, from your broker.'
-              : owed ? 'What the statement says is owed: when the month began, before this month\'s payment, and when it ended, after it.'
-              : 'What the account really held when the month began and when it ended, from your bank.'}
-            {' '}An empty field keeps the calculated amount. The start is the end of the month before: changing it corrects that month too.
+            {T.whatItHeld(isInvestment, owed)}
           </DialogDescription>
         </DialogHeader>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-          <dt className="text-muted-foreground">Calculated for the end</dt><dd className="text-right tabular-nums">{formatAmount(line.endCalculated ?? 0, ccy, locale)}</dd>
-          {isInvestment && <><dt className="text-muted-foreground">Deposited so far</dt><dd className="text-right tabular-nums">{formatAmount(line.result?.capital ?? 0, ccy, locale)}</dd></>}
-          {isInvestment && <><dt className="text-muted-foreground">Return so far</dt><dd className="text-right tabular-nums">{formatPercent(line.result?.totalReturn ?? 0, locale)}</dd></>}
+          <dt className="text-muted-foreground">{T.calculatedForTheEnd}</dt><dd className="text-right tabular-nums">{formatAmount(line.endCalculated ?? 0, ccy, locale)}</dd>
+          {isInvestment && <><dt className="text-muted-foreground">{T.depositedSoFar}</dt><dd className="text-right tabular-nums">{formatAmount(line.result?.capital ?? 0, ccy, locale)}</dd></>}
+          {isInvestment && <><dt className="text-muted-foreground">{T.returnSoFar}</dt><dd className="text-right tabular-nums">{formatPercent(line.result?.totalReturn ?? 0, locale)}</dd></>}
         </dl>
         <BalanceFields form={form} groups={[{ lines: [line] }]} month={month} base={household.baseCurrency} named={false} onEnter={() => void submit()} />
         {form.error && <p className="text-sm text-destructive" role="alert">{form.error}</p>}
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button onClick={() => void submit()} disabled={busy}>Save</Button>
+          <Button variant="outline" onClick={onClose} disabled={busy}>{txt.common.cancel}</Button>
+          <Button onClick={() => void submit()} disabled={busy}>{txt.common.save}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -1,5 +1,8 @@
 import { isOutsideNetWorth, ownBalance, type Account, type Row } from '@/model'
 import { accountTypeForRow } from '@/store'
+import { txt } from '@/i18n'
+
+const T = txt.grid.rowAccount
 
 /**
  * An ordinary expense row names no account. Which account its money comes out of is "Comes out of", the main account
@@ -26,39 +29,39 @@ export function accountVerb(row: Row): string {
   switch (row.kind) {
     case 'to-savings':
     case 'to-investment':
-      return 'Goes into'
+      return T.goesInto
     case 'from-investment':
     case 'from-savings':
-      return 'Comes from'
+      return T.comesFrom
     case 'debt-payment':
     case 'card-payment':
-      return 'Pays off'
+      return T.paysOff
     case 'pocket-money':
-      return 'Lands in'
+      return T.landsIn
     default:
-      return movesMoney(row) ? 'Goes into' : row.section === 'income' ? 'Paid into' : 'Paid from'
+      return movesMoney(row) ? T.goesInto : row.section === 'income' ? T.paidInto : T.paidFrom
   }
 }
 
 export function accountHelp(row: Row): string {
   switch (row.kind) {
     case 'to-savings':
-      return 'The savings account this amount lands in. Its balance under Balances moves with this row.'
+      return T.theSavingsAccountThis
     case 'to-investment':
-      return 'The investment account the deposits go to. Its value, deposited total and return follow this row.'
+      return T.theInvestmentAccountThe
     case 'from-investment':
-      return 'The investment account the money is taken out of.'
+      return T.theInvestmentAccountThe2
     case 'from-savings':
-      return 'The savings account the money is taken out of. Its balance under Balances falls by the amount.'
+      return T.theSavingsAccountThe
     case 'debt-payment':
     case 'card-payment':
-      return 'The loan or card this row pays down. What is still owed falls by the amount, and the payment stops at what is owed.'
+      return T.theLoanOrCard
     case 'pocket-money':
-      return 'An account of this adult\'s own that net worth leaves out. The pocket money raises its balance each month; it still leaves the month, and "Per person" still counts it. With "Nowhere" the app does not follow it.'
+      return T.anAccountOfThis
     default:
-      if (movesMoney(row)) return 'The account the money goes into: its balance rises by the amount, and net worth stays as it is. With no account the money leaves the plan, and net worth falls by it. The main account is not listed: the money comes out of it.'
-      if (row.section === 'income') return 'Which of your accounts receives it. For your overview only; the sums do not change.'
-      return 'An account this expense still names, for your overview only: the sums do not change, and it can only be taken off. Where the money comes out of is "Comes out of…", and that it is paid with a card is said under "Usually paid…".'
+      if (movesMoney(row)) return T.theAccountTheMoney
+      if (row.section === 'income') return T.whichOfYourAccounts
+      return T.anAccountThisExpense
   }
 }
 

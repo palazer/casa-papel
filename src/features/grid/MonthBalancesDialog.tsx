@@ -12,10 +12,13 @@ import { BalanceFields, type BalanceGroup } from './BalanceFields'
 import { CurrentTogether } from './CurrentBalanceDialog'
 import { useMonthBalances } from './useMonthBalances'
 import { saveError } from '@/app/saveError'
+import { txt } from '@/i18n'
+
+const T = txt.grid.monthBalances
 
 /** The headings of the list, as on the Statement's lower half. */
 const HEADINGS: Array<[AccountGroup, string]> = [
-  ['savings', 'Savings accounts'], ['investment', 'Investment accounts'], ['other', 'Other assets'], ['debt', 'Debts'],
+  ['savings', T.savingsAccounts], ['investment', T.investmentAccounts], ['other', T.otherAssets], ['debt', T.debts],
 ]
 
 /**
@@ -41,8 +44,8 @@ export function MonthBalancesDialog({ month, tables, engine, household, onClose 
   // the one that replaced it) share it
   const together = current.length > 0 && !(current.length === 1 && current[0].endCalculated != null)
   const groups: BalanceGroup[] = [
-    { heading: current.length > 1 ? 'Main accounts' : undefined, note: together ? <span data-testid="current-together"><CurrentTogether form={form} base={base} /> Fill in both or neither.</span> : undefined, lines: current },
-    ...HEADINGS.map(([group, heading]) => ({ heading, note: group === 'debt' ? 'What the statement says is owed: the start is before this month\'s payment, the end after it.' : undefined, lines: lines.filter((l) => l.group === group) })),
+    { heading: current.length > 1 ? T.mainAccounts : undefined, note: together ? <span data-testid="current-together"><CurrentTogether form={form} base={base} /> {T.fillInBothOr}</span> : undefined, lines: current },
+    ...HEADINGS.map(([group, heading]) => ({ heading, note: group === 'debt' ? T.whatTheStatementSays : undefined, lines: lines.filter((l) => l.group === group) })),
   ]
 
   async function submit() {
@@ -53,7 +56,7 @@ export function MonthBalancesDialog({ month, tables, engine, household, onClose 
       await setMonthBalances(store, month, entry, { done: open > 0 && countDone })
       onClose()
     } catch (e) {
-      form.setError(saveError(e, 'Could not save the balances.'))
+      form.setError(saveError(e, T.couldNotSaveThe))
     } finally {
       setBusy(false)
     }
@@ -63,25 +66,25 @@ export function MonthBalancesDialog({ month, tables, engine, household, onClose 
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-xl" aria-describedby={undefined} data-testid="month-balances-dialog">
         <DialogHeader>
-          <DialogTitle>Balances for {long}</DialogTitle>
+          <DialogTitle>{T.balancesFor(long)}</DialogTitle>
           <DialogDescription>
-            What every account really held, from your bank or broker. An empty field keeps the calculated amount. The start is the end of the month before: changing it corrects that month too.
+            {T.whatEveryAccountReally}
           </DialogDescription>
         </DialogHeader>
         {lines.length > 0
           ? <BalanceFields form={form} groups={groups} month={month} base={base} named onEnter={() => void submit()} />
-          : <p className="text-sm text-muted-foreground">No account keeps a balance yet.</p>}
-        {lines.some((l) => l.account.currency !== base) && <p className="text-xs text-muted-foreground">An account in another currency is typed in its own currency and counted in {base} at this month's rate.</p>}
+          : <p className="text-sm text-muted-foreground">{T.noAccountKeepsA}</p>}
+        {lines.some((l) => l.account.currency !== base) && <p className="text-xs text-muted-foreground">{T.anAccountInAnother(base)}</p>}
         {open > 0 && (
           <div className="space-y-0.5">
-            <Check label={`Count everything in ${name} as done`} checked={countDone} onChange={(e) => setCountDone(e.target.checked)} />
-            <p className="pl-6 text-xs text-muted-foreground">Ticks every line of the month. No amount changes.</p>
+            <Check label={T.countEverythingInAs(name)} checked={countDone} onChange={(e) => setCountDone(e.target.checked)} />
+            <p className="pl-6 text-xs text-muted-foreground">{T.ticksEveryLineOf}</p>
           </div>
         )}
         {form.error && <p className="text-sm text-destructive" role="alert">{form.error}</p>}
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button onClick={() => void submit()} disabled={busy}>Save</Button>
+          <Button variant="outline" onClick={onClose} disabled={busy}>{txt.common.cancel}</Button>
+          <Button onClick={() => void submit()} disabled={busy}>{txt.common.save}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

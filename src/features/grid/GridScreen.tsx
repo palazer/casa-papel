@@ -27,11 +27,14 @@ import { RowMenu } from './RowMenu'
 import { amountDisplay, doneLabel, doneness, flowOf, ruleText, statusClass, toneClass, type Flow } from '@/app/display'
 import { DoneDot } from '@/components/DoneDot'
 import { saveError } from '@/app/saveError'
+import { txt } from '@/i18n'
+
+const T = txt.grid.page
 
 const SECTIONS: Array<{ key: Section; title: string }> = [
-  { key: 'income', title: 'Income' },
-  { key: 'expense', title: 'Expenses' },
-  { key: 'transfer', title: 'Transfers' },
+  { key: 'income', title: txt.common.income },
+  { key: 'expense', title: txt.common.expenses },
+  { key: 'transfer', title: txt.common.transfers },
 ]
 
 export function GridScreen() {
@@ -103,7 +106,7 @@ export function GridScreen() {
     }
   }
 
-  const act = (fn: () => Promise<unknown>) => void fn().catch((err) => setError(saveError(err, 'Action failed')))
+  const act = (fn: () => Promise<unknown>) => void fn().catch((err) => setError(saveError(err, txt.common.actionFailed)))
 
   /** Balance series that still reach into the shown months; an account archived before them has nothing to show. */
   const accountSeries = Object.values(engine.accounts).filter((s) => Object.keys(s.months).length > 0)
@@ -152,25 +155,25 @@ export function GridScreen() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Grid" subline={`${household.name} · ${formatMonth(months[0], locale)} – ${formatMonth(months[months.length - 1], locale)}`}
+        title={T.grid} subline={`${household.name} · ${formatMonth(months[0], locale)} – ${formatMonth(months[months.length - 1], locale)}`}
         tools={<MarksLegend neg={neg} />}
         notes={<>
           {engine.warnings.length > 0 && <p role="alert" className="text-amber-700 dark:text-amber-400">{engine.warnings.join(' · ')}</p>}
           {error && (
             <p role="alert" className="flex items-center gap-2 text-destructive">
               <span>{error}</span>
-              <Button size="xs" variant="outline" onClick={() => setError(null)}>Dismiss</Button>
+              <Button size="xs" variant="outline" onClick={() => setError(null)}>{txt.common.dismiss}</Button>
             </p>
           )}
         </>}
       >
         {earlier > 0 && (
-          <Button size="xs" variant={showEarlier ? 'default' : 'outline'} aria-pressed={showEarlier} title={showEarlier ? 'Start at the current month again' : 'Show the months before the current one'} onClick={toggleEarlier}>
-            Earlier months ({earlier})
+          <Button size="xs" variant={showEarlier ? 'default' : 'outline'} aria-pressed={showEarlier} title={showEarlier ? T.startAtTheCurrent : T.showTheMonthsBefore} onClick={toggleEarlier}>
+            {T.earlierMonths(earlier)}
           </Button>
         )}
-        <Button size="xs" variant="outline" onClick={() => act(() => addPlanYear(store))}>Add {parseMonth(months[months.length - 1]).year + 1}</Button>
-        <span className="text-muted-foreground">Click a cell to edit · arrows move · Enter opens · click a month name to open it in the Statement or to type its balances</span>
+        <Button size="xs" variant="outline" onClick={() => act(() => addPlanYear(store))}>{T.addYear(parseMonth(months[months.length - 1]).year)}</Button>
+        <span className="text-muted-foreground">{T.clickACellTo}</span>
       </PageHeader>
 
       <div className="relative isolate max-h-[calc(100dvh-var(--page-chrome))] overflow-auto rounded-lg border bg-card">
@@ -187,19 +190,19 @@ export function GridScreen() {
                   <th key={m} className={cn('sticky top-0 z-20 min-w-24 border-b px-1 py-1 text-right font-medium', isToday ? 'bg-muted' : 'bg-card')}>
                     <DropdownMenu>
                       <DropdownMenuTrigger
-                        render={<button className="inline-flex w-full items-center justify-end gap-1 rounded px-1 py-0.5 hover:bg-muted" aria-label={`${formatMonth(m, locale)}${isPastMonth(m, today) ? ', past' : ''}`} />}
+                        render={<button className="inline-flex w-full items-center justify-end gap-1 rounded px-1 py-0.5 hover:bg-muted" aria-label={T.monthSaid(formatMonth(m, locale), isPastMonth(m, today))} />}
                       >
                         <span className={cn(isToday ? 'font-semibold text-foreground' : 'text-muted-foreground')}>{formatMonth(m, locale)}</span>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuGroup>
                           <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-                            Income {formatAmount(t?.income ?? 0, ccy, locale, { compact: true })} · Expenses {formatAmount(t?.expensesTotal ?? 0, ccy, locale, { compact: true })}
+                            {T.incomeExpenses(formatAmount(t?.income ?? 0, ccy, locale, { compact: true }), formatAmount(t?.expensesTotal ?? 0, ccy, locale, { compact: true }))}
                           </DropdownMenuLabel>
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => { handMonth(m); go('statement') }}>Open in the Statement</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setBalancesFor(m)}>Balances for {formatMonth(m, locale)}…</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { handMonth(m); go('statement') }}>{T.openInTheStatement}</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setBalancesFor(m)}>{T.balancesFor(formatMonth(m, locale))}</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </th>
@@ -228,7 +231,7 @@ export function GridScreen() {
                 ...(isCollapsed ? [] : groups.flatMap((g) => [
                   sectionCategories.length > 0 && (
                     <tr key={`${key}-label-${g.category?.id ?? 'none'}`} className={bandOf(g.band)}>
-                      <td className={cn('sticky left-0 z-10 px-2 pb-0 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground', bandOf(g.band) ?? 'bg-card')}>{g.category?.name ?? 'No category'}</td>
+                      <td className={cn('sticky left-0 z-10 px-2 pb-0 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground', bandOf(g.band) ?? 'bg-card')}>{g.category?.name ?? txt.common.noCategory}</td>
                       <td colSpan={months.length} />
                     </tr>
                   ),
@@ -240,16 +243,16 @@ export function GridScreen() {
                     <td colSpan={months.length} />
                   </tr>
                 ),
-                key === 'income' && derivedRow('Income total', 'in', (m) => engine.totals[m].income, { strong: true, hue: HUES.income, band: true, help: 'derived.incomeTotal' }),
-                key === 'expense' && derivedRow('Expenses total', 'out', (m) => engine.totals[m].expensesTotal, { strong: true, hue: HUES.expense, band: true, help: 'derived.expensesTotal' }),
-                key === 'expense' && months.some((m) => engine.totals[m].fromSavingsDerived !== 0) && derivedRow('of which paid from accounts', 'in', (m) => engine.totals[m].fromSavingsDerived, { muted: true, hue: HUES.pool, help: 'derived.fromSavings' }),
-                key === 'transfer' && derivedRow(household.closingRule === 'savings-plug' ? 'Kept in account' : 'Leftover', 'in', (m) => engine.totals[m].leftover, { strong: true, hue: HUES.transfer, band: true, help: household.closingRule === 'savings-plug' ? 'derived.keptInAccount' : 'derived.leftover' }),
+                key === 'income' && derivedRow(T.incomeTotal, 'in', (m) => engine.totals[m].income, { strong: true, hue: HUES.income, band: true, help: 'derived.incomeTotal' }),
+                key === 'expense' && derivedRow(T.expensesTotal, 'out', (m) => engine.totals[m].expensesTotal, { strong: true, hue: HUES.expense, band: true, help: 'derived.expensesTotal' }),
+                key === 'expense' && months.some((m) => engine.totals[m].fromSavingsDerived !== 0) && derivedRow(T.ofWhichPaidFrom, 'in', (m) => engine.totals[m].fromSavingsDerived, { muted: true, hue: HUES.pool, help: 'derived.fromSavings' }),
+                key === 'transfer' && derivedRow(household.closingRule === 'savings-plug' ? T.keptInAccount : T.leftover, 'in', (m) => engine.totals[m].leftover, { strong: true, hue: HUES.transfer, band: true, help: household.closingRule === 'savings-plug' ? 'derived.keptInAccount' : 'derived.leftover' }),
               ]
             })}
 
             {(mainShown || accountSeries.length > 0 || poolSeries.length > 0) && (
               <tr>
-                <th scope="row" className={cn('sticky left-0 z-10 border-t bg-card px-2 py-1.5 text-left text-xs font-semibold', HUES.worth.text)}>Balances</th>
+                <th scope="row" className={cn('sticky left-0 z-10 border-t bg-card px-2 py-1.5 text-left text-xs font-semibold', HUES.worth.text)}>{T.balances}</th>
                 <td colSpan={months.length} className="border-t" />
               </tr>
             )}
@@ -264,33 +267,32 @@ export function GridScreen() {
               const open = (m: MonthKey) => { if (s.months[m]) setBalanceSel({ accountId: acc.id, month: m }) }
               const marked = (m: MonthKey) => s.months[m]?.entered ?? false
               // an account left out of net worth says so after its name: the "Net worth" row does not count its balance
-              const apart = s.outside ? ' · not in net worth' : ''
               if (acc.type === 'investment') {
                 return [
-                  derivedRow(`${acc.name} · value${apart}`, 'in', (m) => s.months[m]?.balance ?? null, { strong: true, currency: s.currency, onClick: open, mark: marked, hue: HUES.worth, help: 'balance.investmentValue' }),
-                  ...(s.currency !== ccy ? [derivedRow(`in ${ccy}`, 'in', (m) => s.months[m]?.balanceBase ?? null, { muted: true, sub: acc.name, help: 'balance.inBase' })] : []),
-                  derivedRow('Deposited', 'in', (m) => s.months[m]?.capital ?? null, { muted: true, sub: acc.name, currency: s.currency, help: 'balance.deposited' }),
-                  derivedRow('Return', 'in', (m) => (s.months[m] ? Math.round((s.months[m].totalReturn ?? 0) * 10000) : null), { muted: true, sub: acc.name, format: (v) => (v === 0 ? '' : formatPercent(v / 10000, locale)), help: 'balance.return' }),
+                  derivedRow(T.valueLine(acc.name, !!s.outside), 'in', (m) => s.months[m]?.balance ?? null, { strong: true, currency: s.currency, onClick: open, mark: marked, hue: HUES.worth, help: 'balance.investmentValue' }),
+                  ...(s.currency !== ccy ? [derivedRow(T.inCurrency(ccy), 'in', (m) => s.months[m]?.balanceBase ?? null, { muted: true, sub: acc.name, help: 'balance.inBase' })] : []),
+                  derivedRow(T.deposited, 'in', (m) => s.months[m]?.capital ?? null, { muted: true, sub: acc.name, currency: s.currency, help: 'balance.deposited' }),
+                  derivedRow(T.return, 'in', (m) => (s.months[m] ? Math.round((s.months[m].totalReturn ?? 0) * 10000) : null), { muted: true, sub: acc.name, format: (v) => (v === 0 ? '' : formatPercent(v / 10000, locale)), help: 'balance.return' }),
                 ]
               }
-              const label = acc.type === 'credit-card' ? `${acc.name} · owed` : acc.type === 'loan' ? `${acc.name} · outstanding` : `${acc.name}${apart}`
+              const label = acc.type === 'credit-card' ? T.owed(acc.name) : acc.type === 'loan' ? T.outstanding(acc.name) : T.accountLine(acc.name, !!s.outside)
               return [
                 derivedRow(label, s.liability ? 'out' : 'in', (m) => s.months[m]?.balance ?? null, { strong: true, currency: s.currency, onClick: open, mark: marked, hue: HUES.worth, help: balanceHelp(acc.type) }),
-                ...(s.currency !== ccy ? [derivedRow(`in ${ccy}`, s.liability ? 'out' : 'in', (m) => s.months[m]?.balanceBase ?? null, { muted: true, sub: acc.name, help: 'balance.inBase' })] : []),
+                ...(s.currency !== ccy ? [derivedRow(T.inCurrency(ccy), s.liability ? 'out' : 'in', (m) => s.months[m]?.balanceBase ?? null, { muted: true, sub: acc.name, help: 'balance.inBase' })] : []),
               ]
             })}
             {poolSeries.flatMap((p) => {
               const pool = tables.pools.find((x) => x.id === p.poolId)
               // kept in the currency of the savings account that holds it (rule X14), with its worth in the household's beneath
               return [
-                derivedRow(`Virtual account · ${pool?.name ?? ''}`, 'in', (m) => p.months[m]?.balance ?? null, {
+                derivedRow(T.virtualAccount(pool?.name), 'in', (m) => p.months[m]?.balance ?? null, {
                   hue: HUES.pool, help: 'balance.pool', currency: p.currency,
-                  warn: (m) => (p.months[m]?.short ? `Short by ${formatAmount(p.months[m].short, p.currency, locale)}: more came out of it than it held. Top it up on the Statement.` : null),
+                  warn: (m) => (p.months[m]?.short ? T.shortByMoreCame(formatAmount(p.months[m].short, p.currency, locale)) : null),
                 }),
-                ...(p.currency !== ccy ? [derivedRow(`in ${ccy}`, 'in', (m) => p.months[m]?.balanceBase ?? null, { muted: true, sub: `Virtual account · ${pool?.name ?? ''}`, help: 'balance.inBase' })] : []),
+                ...(p.currency !== ccy ? [derivedRow(T.inCurrency(ccy), 'in', (m) => p.months[m]?.balanceBase ?? null, { muted: true, sub: T.virtualAccount(pool?.name), help: 'balance.inBase' })] : []),
               ]
             })}
-            {(accountSeries.length > 0 || mainShown) && derivedRow('Net worth', 'in', (m) => (engine.netWorth[m] != null && (engine.main?.months[m] || accountSeries.some((s) => s.months[m])) ? engine.netWorth[m] : null), { strong: true, hue: HUES.worth, band: true, help: 'derived.netWorth' })}
+            {(accountSeries.length > 0 || mainShown) && derivedRow(txt.common.netWorth, 'in', (m) => (engine.netWorth[m] != null && (engine.main?.months[m] || accountSeries.some((s) => s.months[m])) ? engine.netWorth[m] : null), { strong: true, hue: HUES.worth, band: true, help: 'derived.netWorth' })}
           </tbody>
         </table>
       </div>
@@ -342,7 +344,7 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
   /** The code after the name: this row's own currency, or the followed row's (a follower takes its target's). */
   const tagCcy = row.currency ?? followed?.currency ?? null
   const deductedFrom = row.deductedFromRowId ? tables.rows.find((r) => r.id === row.deductedFromRowId) : undefined
-  const shareTag = row.followShare != null && row.followShare !== 1 ? `${formatPercent(row.followShare, locale)} of ` : ''
+  const followShare = row.followShare != null && row.followShare !== 1 ? formatPercent(row.followShare, locale) : null
   const automatic = derivedRowReason(row, household.closingRule) !== null
   // "Rule…" opens the row's dialog in this month when it is shown, else in the shown month nearest to it
   const thisMonth = monthOfDate()
@@ -351,7 +353,7 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
   const ruleTag = rule && rule.kind !== 'idle' ? ruleText({ ...rule, of: rule.ofRowId ? tables.rows.find((r) => r.id === rule.ofRowId && !r.deletedAt)?.name : undefined }, locale) : null
   /** On a schedule that has not ended: the Statement's repeat symbol, beside the name. */
   const running = runningSchedules(tables.recurringItems, row.id, thisMonth)
-  const repeats = running.length ? `Repeats: ${repeatsText(running, locale)}` : null
+  const repeats = running.length ? T.repeats(repeatsText(running, locale)) : null
   return (
     <tr className={cn('group', band)}>
       <th scope="row" className={cn('sticky left-0 z-10 px-2 py-0.5 text-left font-normal', band ?? 'bg-card')}>
@@ -360,18 +362,18 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
             <div className="truncate text-xs font-medium">
               {row.name}{tagCcy && tagCcy !== ccy ? <span className="ml-1 text-[10px] font-normal text-muted-foreground">{tagCcy}</span> : null}
               {repeats ? <span role="img" aria-label={repeats} title={repeats} className="ml-1 inline-flex align-[-1px]" data-repeats><Repeat className="size-3 text-muted-foreground" aria-hidden /></span> : null}
-              {followed ? <span className="ml-1 text-[10px] font-normal text-muted-foreground" title={`${shareTag ? `${shareTag}the amount of` : 'Same amount as'} ${followed.name}`}>= {shareTag}{followed.name}</span> : null}
-              {deductedFrom ? <span className="ml-1 text-[10px] font-normal text-muted-foreground" title={`Deducted from ${deductedFrom.name}`}>out of {deductedFrom.name}</span> : null}
-              {ruleTag ? <span className="ml-1 text-[10px] font-normal text-muted-foreground" title={`Rule: ${ruleTag}`}>= {ruleTag}</span> : null}
+              {followed ? <span className="ml-1 text-[10px] font-normal text-muted-foreground" title={T.followsTitle(followShare, followed.name)}>{T.followsTag(followShare, followed.name)}</span> : null}
+              {deductedFrom ? <span className="ml-1 text-[10px] font-normal text-muted-foreground" title={T.deductedFrom(deductedFrom.name)}>{T.outOf(deductedFrom.name)}</span> : null}
+              {ruleTag ? <span className="ml-1 text-[10px] font-normal text-muted-foreground" title={T.rule(ruleTag)}>= {ruleTag}</span> : null}
             </div>
             <div className="truncate text-[10px] leading-3 text-muted-foreground tabular-nums">
-              Σ {formatAmount(totals?.total ?? 0, ccy, locale, { compact: true })}{row.section !== 'income' && totals?.shareOfIncome ? ` · ${formatPercent(totals.shareOfIncome, locale)} of income` : ''}
+              {T.rowSum(formatAmount(totals?.total ?? 0, ccy, locale, { compact: true }), row.section !== 'income' && totals?.shareOfIncome ? formatPercent(totals.shareOfIncome, locale) : null)}
             </div>
           </div>
-          {followed && <InfoTip help="row.follows" text={`${shareTag ? `${shareTag}the amount of` : 'Same amount as'} "${followed.name}" every month. Edit that row; this one has no amount of its own.`} />}
+          {followed && <InfoTip help="row.follows" text={T.followsHelp(followShare, followed.name)} />}
           {deductedFrom && <InfoTip help="row.deductedFrom" />}
           {automatic && (isOldPocketShare(row)
-            ? <InfoTip help="row.rule" text={'A share of the pocket money total the household had before. Give it an amount or a rule of its own: row menu, "Rule…".'} />
+            ? <InfoTip help="row.rule" text={T.aShareOfThe} />
             : <InfoTip help={row.kind === 'category-estimate' ? 'row.categoryEstimate' : row.kind === 'to-savings' && !isShareRule(rule?.kind) ? 'row.toSavingsPlug' : 'row.rule'} />)}
           <RowMenu row={row} tables={tables} household={household} onError={onError} onRestored={onRestored} onRule={() => onSelect(ruleMonth)} />
         </div>
@@ -389,7 +391,7 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
         const net = row.section === 'income' && cell.deductionsBase > 0 ? formatAmount(cell.netBase, ccy, locale, { compact: true }) : null
         // all of it recorded as converted (rule X10): what it came to, not what it is about
         const recorded = cell.recorded != null && cell.recorded.reduce((sum, p) => sum + p.amount, 0) === cell.value
-        const sub = net ? { text: `net ${net}`, label: `net ${net}` } : about ? (recorded ? { text: `= ${about}`, label: `recorded as ${about}` } : { text: `≈ ${about}`, label: `about ${about}` }) : null
+        const sub = net ? { text: T.net(net), label: T.net(net) } : about ? (recorded ? { text: `= ${about}`, label: T.recordedAs(about) } : { text: `≈ ${about}`, label: T.about(about) }) : null
         // One mark only: a green dot for done in any month; the current month also shows red (nothing yet) and amber (partly).
         const dot = !isEmpty && (!isDerived || cell.value !== 0) && (m === thisMonth || cell.status === 'done') ? doneness(cell) : null
         return (
@@ -405,7 +407,7 @@ function GridRow({ row, band, rIndex, months, engine, tables, household, ccy, lo
                 type="button"
                 data-cell={`${rIndex},${c}`}
                 tabIndex={rIndex === 0 && c === 0 ? 0 : -1}
-                aria-label={`${row.name} ${formatMonth(m, locale)}: ${isEmpty ? 'empty' : d.text}${sub ? `, ${sub.label}` : ''}${dot ? `, ${doneLabel(dot)}` : ''}`}
+                aria-label={T.cellSaid(row.name, formatMonth(m, locale), isEmpty ? null : d.text, sub ? sub.label : null, dot ? doneLabel(dot) : null)}
                 onClick={() => onSelect(m)}
                 className={cn(
                   'relative flex w-full justify-end px-1.5 py-0.5 text-right tabular-nums outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',

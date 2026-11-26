@@ -14,6 +14,9 @@ import { RowAccountDialog, RowCurrencyDialog, RowDeductionDialog, RowFollowDialo
 import { RowCategoryDialog } from './RowCategoryDialog'
 import { accountVerb, hasAccountChoice } from './rowAccount'
 import { showSaveError } from '@/app/saveError'
+import { txt } from '@/i18n'
+
+const T = txt.grid.rowMenu
 
 type Open = 'rename' | 'category' | 'scope' | 'currency' | 'source' | 'deduction' | 'account' | 'paid' | 'follow' | 'remove' | null
 
@@ -44,7 +47,7 @@ export function RowMenu({ row, tables, household, onError, onDeleted, onRestored
   /** Rows the app works out itself have no amount of their own to follow with. */
   const canFollow = !derivedRowReason(row, household.closingRule)
 
-  const act = (fn: () => Promise<unknown>) => () => void fn().catch(showSaveError(onError, 'Action failed'))
+  const act = (fn: () => Promise<unknown>) => () => void fn().catch(showSaveError(onError, txt.common.actionFailed))
   const close = () => setOpen(null)
   // While a household is being set up, deleting is cheap: one click, and undo is the way back. When more than the row
   // would change, the dialog still opens and says what.
@@ -58,44 +61,44 @@ export function RowMenu({ row, tables, household, onError, onDeleted, onRestored
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className={triggerClassName} aria-label={`Row menu for ${row.name}`} />}>
+        <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className={triggerClassName} aria-label={T.rowMenuFor(row.name)} />}>
           <MoreHorizontal />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-max">
-          <DropdownMenuItem onClick={() => { setName(row.name); setOpen('rename') }}>Rename…</DropdownMenuItem>
-          <DropdownMenuItem onClick={act(() => moveRow(store, row.id, 'up'))}>Move up</DropdownMenuItem>
-          <DropdownMenuItem onClick={act(() => moveRow(store, row.id, 'down'))}>Move down</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setOpen('category')}>Category…</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setOpen('scope')}>Belongs to…</DropdownMenuItem>
-          {canFollow && !followed && <DropdownMenuItem onClick={() => setOpen('currency')}>Currency…</DropdownMenuItem>}
+          <DropdownMenuItem onClick={() => { setName(row.name); setOpen('rename') }}>{txt.common.renameMore}</DropdownMenuItem>
+          <DropdownMenuItem onClick={act(() => moveRow(store, row.id, 'up'))}>{txt.common.moveUp}</DropdownMenuItem>
+          <DropdownMenuItem onClick={act(() => moveRow(store, row.id, 'down'))}>{txt.common.moveDown}</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setOpen('category')}>{T.category2}</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setOpen('scope')}>{T.belongsTo}</DropdownMenuItem>
+          {canFollow && !followed && <DropdownMenuItem onClick={() => setOpen('currency')}>{T.currency2}</DropdownMenuItem>}
           <DropdownMenuSeparator />
           {!followed && (
             <DropdownMenuItem onClick={act(() => updateRow(store, row.id, { defaultStatus: row.defaultStatus === 'committed' ? 'projected' : 'committed' }))}>
-              {row.defaultStatus === 'committed' ? 'Treat new values as estimates' : 'Treat new values as certain'}
+              {row.defaultStatus === 'committed' ? T.treatNewValuesAs : T.treatNewValuesAs2}
             </DropdownMenuItem>
           )}
-          {row.section === 'expense' && <DropdownMenuItem onClick={() => setOpen('source')}>Comes out of…</DropdownMenuItem>}
-          {row.section === 'expense' && <DropdownMenuItem onClick={() => setOpen('deduction')}>{deductedFrom ? `Deducted from ${deductedFrom.name}…` : 'Deducted from an income…'}</DropdownMenuItem>}
+          {row.section === 'expense' && <DropdownMenuItem onClick={() => setOpen('source')}>{T.comesOutOf}</DropdownMenuItem>}
+          {row.section === 'expense' && <DropdownMenuItem onClick={() => setOpen('deduction')}>{deductedFrom ? T.deductedFrom(deductedFrom.name) : T.deductedFromAnIncome}</DropdownMenuItem>}
           {row.kind !== 'pool-allocation' && hasAccountChoice(row) && <DropdownMenuItem onClick={() => setOpen('account')}>{accountVerb(row)}…</DropdownMenuItem>}
-          {paid && <DropdownMenuItem onClick={() => setOpen('paid')}>Usually paid…</DropdownMenuItem>}
-          {onRule && canCarryRule(row) && !row.archivedMonth && <DropdownMenuItem onClick={onRule}>Rule…</DropdownMenuItem>}
-          {canFollow && <DropdownMenuItem onClick={() => setOpen('follow')}>{followed ? `Follows ${followed.name}…` : 'Follow another row…'}</DropdownMenuItem>}
+          {paid && <DropdownMenuItem onClick={() => setOpen('paid')}>{T.usuallyPaid}</DropdownMenuItem>}
+          {onRule && canCarryRule(row) && !row.archivedMonth && <DropdownMenuItem onClick={onRule}>{T.rule}</DropdownMenuItem>}
+          {canFollow && <DropdownMenuItem onClick={() => setOpen('follow')}>{followed ? T.follows(followed.name) : T.followAnotherRow}</DropdownMenuItem>}
           <DropdownMenuSeparator />
           {row.archivedMonth ? (
-            <DropdownMenuItem onClick={act(async () => onRestored?.(restoredText(await restoreRow(store, row.id))))}>Restore</DropdownMenuItem>
+            <DropdownMenuItem onClick={act(async () => onRestored?.(restoredText(await restoreRow(store, row.id))))}>{txt.common.restore}</DropdownMenuItem>
           ) : (
-            <DropdownMenuItem onClick={cheap ? act(removeNow) : () => setOpen('remove')}>{cheap ? 'Delete' : 'Archive or delete…'}</DropdownMenuItem>
+            <DropdownMenuItem onClick={cheap ? act(removeNow) : () => setOpen('remove')}>{cheap ? txt.common.delete : txt.common.archiveOrDelete}</DropdownMenuItem>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
 
       <Dialog open={open === 'rename'} onOpenChange={(o) => { if (!o) close() }}>
         <DialogContent className="sm:max-w-sm" aria-describedby={undefined}>
-          <DialogHeader><DialogTitle>Rename row</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{T.renameRow}</DialogTitle></DialogHeader>
           <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) { act(() => renameRow(store, row.id, name.trim()))(); close() } }} />
           <DialogFooter>
-            <Button variant="outline" onClick={close}>Cancel</Button>
-            <Button disabled={!name.trim()} onClick={() => { act(() => renameRow(store, row.id, name.trim()))(); close() }}>Save</Button>
+            <Button variant="outline" onClick={close}>{txt.common.cancel}</Button>
+            <Button disabled={!name.trim()} onClick={() => { act(() => renameRow(store, row.id, name.trim()))(); close() }}>{txt.common.save}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

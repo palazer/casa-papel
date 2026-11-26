@@ -9,6 +9,9 @@ import { convertMoney } from '@/engine'
 import type { Household, Money, MonthKey, Tables } from '@/model'
 import { TAG_TONE, formatDay, formatRate } from '@/features/household/fxDisplay'
 import { useMonthRate } from './useMonthRate'
+import { txt } from '@/i18n'
+
+const T = txt.grid.rateLine
 
 /**
  * Under an amount typed in another currency (DESIGN.md §8): what it is in the household currency, at which rate and from
@@ -31,21 +34,21 @@ export function RateLine({ tables, household, month, currency, amount, recorded 
       <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 tabular-nums">
         {info && inBase != null
           ? <>{!recorded && <><span>≈ {formatAmount(inBase, base, locale)}</span><span aria-hidden>·</span></>}<span>{readable.text}</span><span aria-hidden>·</span></>
-          : <span>No {currency} rate for {formatMonth(month, locale)} yet.</span>}
+          : <span>{T.noRateForYet(currency, formatMonth(month, locale))}</span>}
         <Chip tone={TAG_TONE[tag]}>{tag}</Chip>
         {rec?.date && <span>{formatDay(rec.date, locale)}</span>}
         <InfoTip help="cell.rate" />
-        {!editing && <Button size="xs" variant="ghost" onClick={() => { setText(info ? formatRate(readable.rate, locale) : ''); setError(null); setEditing(true) }}>Change this month's rate…</Button>}
-        {!editing && tag === 'manual' && <Button size="xs" variant="ghost" disabled={busy} onClick={() => restore(done)}>Use the ECB rate again</Button>}
+        {!editing && <Button size="xs" variant="ghost" onClick={() => { setText(info ? formatRate(readable.rate, locale) : ''); setError(null); setEditing(true) }}>{T.changeThisMonthsRate}</Button>}
+        {!editing && tag === 'manual' && <Button size="xs" variant="ghost" disabled={busy} onClick={() => restore(done)}>{T.useTheEcbRate}</Button>}
       </p>
       {editing && (
         <div className="flex flex-wrap items-center gap-2">
           <Label htmlFor={inputId}>1 {readable.from} =</Label>
           <Input id={inputId} className="h-7 w-28 text-right tabular-nums" inputMode="decimal" autoFocus value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveRate() } }} />
           <span>{readable.to}</span>
-          <Button size="xs" variant="outline" disabled={busy} onClick={saveRate}>Save rate</Button>
-          <Button size="xs" variant="ghost" disabled={busy} onClick={() => setEditing(false)}>Cancel</Button>
-          <span className="basis-full">One rate per currency per month: every {currency} row and balance in {formatMonth(month, locale)} uses it.</span>
+          <Button size="xs" variant="outline" disabled={busy} onClick={saveRate}>{T.saveRate}</Button>
+          <Button size="xs" variant="ghost" disabled={busy} onClick={() => setEditing(false)}>{txt.common.cancel}</Button>
+          <span className="basis-full">{T.oneRatePerCurrency(currency, formatMonth(month, locale))}</span>
         </div>
       )}
       {error && <p role="alert" className="text-destructive">{error}</p>}

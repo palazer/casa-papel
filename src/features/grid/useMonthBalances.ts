@@ -2,6 +2,9 @@ import { useMemo, useState } from 'react'
 import { amountToInput, parseAmount, unreadableAmount } from '@/app/format'
 import type { Household, Money, MonthKey, Tables } from '@/model'
 import { previewMonthBalances, type BalanceEntry, type BalanceLine } from '@/store'
+import { txt } from '@/i18n'
+
+const T = txt.grid.balanceFields
 
 export type BalanceSide = 'start' | 'end'
 const keyOf = (side: BalanceSide, id: string) => `${side}:${id}`
@@ -69,7 +72,7 @@ export function useMonthBalances(tables: Tables, household: Household, month: Mo
         if (!changed(side, line.account.id)) continue
         const v = typed(side, line)
         if (v === undefined) {
-          const fallback = lines.length > 1 ? `${line.account.name}: that is not a number I can read.` : 'That is not a number I can read.'
+          const fallback = lines.length > 1 ? T.thatIsNotA(line.account.name) : txt.app.notANumber
           setError(unreadableAmount(textOf(side, line.account.id), fallback))
           return null
         }

@@ -17,6 +17,9 @@ import { HELP } from '@/app/help'
 import { TipLabel } from '@/components/InfoTip'
 import { accountHelp, accountVerb, landingAccounts, movesMoney, namesNoAccount } from './rowAccount'
 import { saveError } from '@/app/saveError'
+import { lower, txt } from '@/i18n'
+
+const T = txt.grid.rowDialogs
 
 interface Base {
   row: Row
@@ -26,9 +29,9 @@ interface Base {
 }
 
 const SECTIONS: Array<{ key: Section; title: string }> = [
-  { key: 'income', title: 'Income' },
-  { key: 'expense', title: 'Expenses' },
-  { key: 'transfer', title: 'Transfers' },
+  { key: 'income', title: txt.common.income },
+  { key: 'expense', title: txt.common.expenses },
+  { key: 'transfer', title: txt.common.transfers },
 ]
 
 /** Busy and error state for a dialog that saves once and closes. */
@@ -47,7 +50,7 @@ export function useSave(onClose: () => void) {
       await fn()
       onClose()
     } catch (e) {
-      setError(saveError(e, 'Could not save.'))
+      setError(saveError(e, txt.common.couldNotSave))
     } finally {
       running.current = false
       setBusy(false)
@@ -73,43 +76,43 @@ export function RowSourceDialog({ row, tables, household, onClose }: Base) {
   const [scope, setScope] = useState<'from-month' | 'all-months'>('from-month')
   const { error, busy, save } = useSave(onClose)
   const month = monthOfDate()
-  const oldLabel = options.find((o) => o.value === row.defaultFundedBy)?.label ?? 'the old source'
+  const oldLabel = options.find((o) => o.value === row.defaultFundedBy)?.label ?? T.theOldSource
   const third = thirdCurrencyOf(tables, row, { defaultFundedBy: fundedBy })
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Comes out of</DialogTitle>
-          <DialogDescription>Row "{row.name}"</DialogDescription>
+          <DialogTitle>{txt.common.comesOutOf}</DialogTitle>
+          <DialogDescription>{T.row(row.name)}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="row-source">Single amounts in this row come out of</Label>
+            <Label htmlFor="row-source">{T.singleAmountsInThis}</Label>
             <NativeSelect id="row-source" className="w-full" value={fundedBy} onChange={(e) => setFundedBy(e.target.value as FundedBy)}>
               {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </NativeSelect>
-            <p className="text-xs text-muted-foreground">{HELP['cell.comesOutOf'].text} Items that have their own choice keep it.</p>
+            <p className="text-xs text-muted-foreground">{T.itemsThatHaveTheir(HELP['cell.comesOutOf'].text)}</p>
             <Refusal text={third} />
           </div>
           <fieldset className="space-y-1.5">
-            <legend className="text-sm font-medium">Applies to</legend>
+            <legend className="text-sm font-medium">{T.appliesTo}</legend>
             <Segmented
               value={scope}
               onChange={(v) => setScope(v as 'from-month' | 'all-months')}
-              options={[{ value: 'from-month', label: `From ${formatMonth(month, household.locale)} on` }, { value: 'all-months', label: 'All months, past included' }]}
+              options={[{ value: 'from-month', label: T.fromOn(formatMonth(month, household.locale)) }, { value: 'all-months', label: T.allMonthsPastIncluded }]}
             />
             <p className="text-xs text-muted-foreground">
               {scope === 'from-month'
-                ? `Earlier months stay as they are (${oldLabel}), so the past balances of your accounts and virtual accounts do not move.`
-                : 'Earlier months change too: the balances of the accounts and virtual accounts involved are worked out again from the start.'}
+                ? T.earlierMonthsStayAs(oldLabel)
+                : T.earlierMonthsChangeToo}
             </p>
           </fieldset>
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button onClick={() => void save(() => setRowFundedBy(store, row.id, fundedBy, scope === 'all-months' ? 'all-months' : { from: month }))} disabled={busy || third != null}>Save</Button>
+          <Button variant="outline" onClick={onClose} disabled={busy}>{txt.common.cancel}</Button>
+          <Button onClick={() => void save(() => setRowFundedBy(store, row.id, fundedBy, scope === 'all-months' ? 'all-months' : { from: month }))} disabled={busy || third != null}>{txt.common.save}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -139,27 +142,27 @@ export function RowAccountDialog({ row, tables, onClose }: Base) {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{verb}</DialogTitle>
-          <DialogDescription>Row "{row.name}"</DialogDescription>
+          <DialogDescription>{T.row(row.name)}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="row-account">{verb}</Label>
             <NativeSelect id="row-account" className="w-full" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-              {!need && <option value="">{named ? 'No account' : pocket ? 'Nowhere' : moves ? 'No account: the money leaves the plan' : '—'}</option>}
-              {need && !accountId && <option value="">Pick an account</option>}
-              {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}{need && !a.tracked ? ' (not tracked)' : ''}{moves && !holdsBalance(a) ? ' (has no balance to go into)' : ''}</option>)}
+              {!need && <option value="">{named ? T.noAccount : pocket ? T.nowhere : moves ? T.noAccountTheMoney : '—'}</option>}
+              {need && !accountId && <option value="">{T.pickAnAccount}</option>}
+              {accounts.map((a) => <option key={a.id} value={a.id}>{T.accountChoice(a.name, need, a.tracked, moves, holdsBalance(a))}</option>)}
             </NativeSelect>
             <p className="text-xs text-muted-foreground">{accountHelp(row)}</p>
-            {need && accounts.length === 0 && <p className="text-xs text-muted-foreground">No account of the right kind yet. Add one under Household first.</p>}
-            {pocket && accounts.length === 0 && <p className="text-xs text-muted-foreground" data-testid="no-landing">No account is left out of net worth yet. Open an account, or add one, and tick "Leave out of net worth" under "More options".</p>}
+            {need && accounts.length === 0 && <p className="text-xs text-muted-foreground">{T.noAccountOfThe}</p>}
+            {pocket && accounts.length === 0 && <p className="text-xs text-muted-foreground" data-testid="no-landing">{T.noAccountIsLeft}</p>}
             <Refusal text={third} />
           </div>
-          <p className="text-xs text-muted-foreground">Applies to every month, past ones included. To switch from a month on, archive this row and add a new one.</p>
+          <p className="text-xs text-muted-foreground">{T.appliesToEveryMonth}</p>
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button onClick={() => void save(() => setRowAccount(store, row.id, accountId || null))} disabled={busy || third != null}>Save</Button>
+          <Button variant="outline" onClick={onClose} disabled={busy}>{txt.common.cancel}</Button>
+          <Button onClick={() => void save(() => setRowAccount(store, row.id, accountId || null))} disabled={busy || third != null}>{txt.common.save}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -179,16 +182,16 @@ export function RowPaidDialog({ row, tables, onClose }: Base) {
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Usually paid</DialogTitle>
-          <DialogDescription>Row "{row.name}"</DialogDescription>
+          <DialogTitle>{T.usuallyPaid}</DialogTitle>
+          <DialogDescription>{T.row(row.name)}</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          <UsualPaidFields titled tables={tables} day={day} methodId={methodId} onDay={setDay} onMethod={setMethodId} idPrefix="row-usual" says="For every month of this row, past ones included. An item of a month can name a day and a method of its own." />
+          <UsualPaidFields titled tables={tables} day={day} methodId={methodId} onDay={setDay} onMethod={setMethodId} idPrefix="row-usual" says={T.forEveryMonthOf} />
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button onClick={() => void save(() => setUsualPayment(store, row.id, { payDay: day, payMethodId: methodId }))} disabled={busy}>Save</Button>
+          <Button variant="outline" onClick={onClose} disabled={busy}>{txt.common.cancel}</Button>
+          <Button onClick={() => void save(() => setUsualPayment(store, row.id, { payDay: day, payMethodId: methodId }))} disabled={busy}>{txt.common.save}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -211,14 +214,14 @@ export function RowFollowDialog({ row, tables, household, onClose }: Base) {
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Follow another row</DialogTitle>
-          <DialogDescription>Row "{row.name}"</DialogDescription>
+          <DialogTitle>{T.followAnotherRow}</DialogTitle>
+          <DialogDescription>{T.row(row.name)}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="row-follows">Same amount as</Label>
+            <Label htmlFor="row-follows">{T.sameAmountAs}</Label>
             <NativeSelect id="row-follows" className="w-full" value={targetId} onChange={(e) => setTargetId(e.target.value)}>
-              <option value="">Nothing: its own amounts</option>
+              <option value="">{T.nothingItsOwnAmounts}</option>
               {SECTIONS.map((s) => {
                 const list = candidates.filter((r) => r.section === s.key)
                 return list.length ? (
@@ -229,32 +232,30 @@ export function RowFollowDialog({ row, tables, household, onClose }: Base) {
               })}
             </NativeSelect>
             <p className="text-xs text-muted-foreground">
-              Month by month this row shows the same amount as the row you pick, or a share of it, and its cells cannot be edited while it follows.
-              Handy for a transfer that moves exactly what came in, like a child's long-term savings following the child benefit, or a tax that takes a quarter of a salary.
-              Choose "Nothing" to go back to its own amounts; they were kept.
+              {T.monthByMonthThis}
             </p>
             <Refusal text={third} />
           </div>
           {targetId && (
             <div className="space-y-1.5">
-              <TipLabel htmlFor="row-follow-share" help="row.followShare">Share (%)</TipLabel>
+              <TipLabel htmlFor="row-follow-share" help="row.followShare">{T.share}</TipLabel>
               <Input id="row-follow-share" className="w-28" inputMode="decimal" value={share} onChange={(e) => setShare(e.target.value)} />
-              <p className="text-xs text-muted-foreground">100 mirrors the row exactly; 25 puts a quarter of it here.</p>
+              <p className="text-xs text-muted-foreground">{T.n100MirrorsTheRow}</p>
             </div>
           )}
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button variant="outline" onClick={onClose} disabled={busy}>{txt.common.cancel}</Button>
           <Button
             onClick={() => void save(async () => {
               const pct = Number(share.replace(',', '.'))
-              if (targetId && !(pct > 0)) throw new Error('The share must be a number above 0.')
+              if (targetId && !(pct > 0)) throw new Error(T.theShareMustBe)
               const fraction = share === seeded ? row.followShare : pct / 100
               await followRow(store, row.id, targetId || null, targetId ? fraction : null)
             })}
             disabled={busy || third != null}
-          >Save</Button>
+          >{txt.common.save}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -274,12 +275,12 @@ export function RowCurrencyDialog({ row, tables, household, onClose }: Base) {
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Currency</DialogTitle>
-          <DialogDescription>Row "{row.name}"</DialogDescription>
+          <DialogTitle>{txt.common.currency}</DialogTitle>
+          <DialogDescription>{T.row(row.name)}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <TipLabel htmlFor="row-currency" help="row.currency">Amounts in this row are in</TipLabel>
+            <TipLabel htmlFor="row-currency" help="row.currency">{T.amountsInThisRow}</TipLabel>
             <NativeSelect id="row-currency" className="w-full" value={ccy} onChange={(e) => setCcy(e.target.value)}>
               {codes.map((c) => <option key={c} value={c}>{currencyLabel(c, base)}</option>)}
             </NativeSelect>
@@ -289,8 +290,8 @@ export function RowCurrencyDialog({ row, tables, household, onClose }: Base) {
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button onClick={() => void save(() => updateRow(store, row.id, { currency: ccy === base ? null : ccy }))} disabled={busy || third != null}>Save</Button>
+          <Button variant="outline" onClick={onClose} disabled={busy}>{txt.common.cancel}</Button>
+          <Button onClick={() => void save(() => updateRow(store, row.id, { currency: ccy === base ? null : ccy }))} disabled={busy || third != null}>{txt.common.save}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -310,23 +311,23 @@ export function RowDeductionDialog({ row, tables, household, onClose }: Base) {
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Deducted from an income</DialogTitle>
-          <DialogDescription>Row "{row.name}"</DialogDescription>
+          <DialogTitle>{T.deductedFromAnIncome}</DialogTitle>
+          <DialogDescription>{T.row(row.name)}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <TipLabel htmlFor="row-deducted-from" help="row.deductedFrom">This expense is taken off</TipLabel>
+            <TipLabel htmlFor="row-deducted-from" help="row.deductedFrom">{T.thisExpenseIsTaken}</TipLabel>
             <NativeSelect id="row-deducted-from" className="w-full" value={targetId} onChange={(e) => setTargetId(e.target.value)}>
-              <option value="">Nothing: a normal expense</option>
-              {incomes.map((r) => <option key={r.id} value={r.id}>{r.name}{r.archivedMonth ? ' (archived)' : ''}</option>)}
+              <option value="">{T.nothingANormalExpense}</option>
+              {incomes.map((r) => <option key={r.id} value={r.id}>{T.rowChoice(r.name, r.archivedMonth)}</option>)}
             </NativeSelect>
-            <p className="text-xs text-muted-foreground">{HELP['row.deductedFrom'].text} The row then belongs to whoever that income belongs to.</p>
+            <p className="text-xs text-muted-foreground">{T.theRowThenBelongs(HELP['row.deductedFrom'].text)}</p>
           </div>
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button onClick={() => void save(async () => { if (targetId !== (row.deductedFromRowId ?? '')) await setRowDeductedFrom(store, row.id, targetId || null) })} disabled={busy}>Save</Button>
+          <Button variant="outline" onClick={onClose} disabled={busy}>{txt.common.cancel}</Button>
+          <Button onClick={() => void save(async () => { if (targetId !== (row.deductedFromRowId ?? '')) await setRowDeductedFrom(store, row.id, targetId || null) })} disabled={busy}>{txt.common.save}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -346,24 +347,24 @@ export function RowScopeDialog({ row, tables, onClose }: Base) {
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Belongs to</DialogTitle>
-          <DialogDescription>Row "{row.name}"</DialogDescription>
+          <DialogTitle>{T.belongsTo}</DialogTitle>
+          <DialogDescription>{T.row(row.name)}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <TipLabel htmlFor="row-belongs-to" help="row.belongsTo">This row is for</TipLabel>
+            <TipLabel htmlFor="row-belongs-to" help="row.belongsTo">{T.thisRowIsFor}</TipLabel>
             <NativeSelect id="row-belongs-to" className="w-full" value={scope} onChange={(e) => setScope(e.target.value)}>
-              <option value="shared">The household (shared)</option>
-              {adults.length > 0 && <optgroup label="Adults">{adults.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</optgroup>}
-              {others.length > 0 && <optgroup label="Other people & things">{others.map((e) => <option key={e.id} value={e.id}>{e.name} · {ENTITY_KIND_LABEL[e.kind].toLowerCase()}</option>)}</optgroup>}
+              <option value="shared">{T.theHouseholdShared}</option>
+              {adults.length > 0 && <optgroup label={T.adults}>{adults.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</optgroup>}
+              {others.length > 0 && <optgroup label={T.otherPeopleThings}>{others.map((e) => <option key={e.id} value={e.id}>{e.name} · {lower(ENTITY_KIND_LABEL[e.kind])}</option>)}</optgroup>}
             </NativeSelect>
             <p className="text-xs text-muted-foreground">{HELP['row.belongsTo'].text}</p>
           </div>
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button onClick={() => void save(() => setRowScope(store, row.id, scope))} disabled={busy}>Save</Button>
+          <Button variant="outline" onClick={onClose} disabled={busy}>{txt.common.cancel}</Button>
+          <Button onClick={() => void save(() => setRowScope(store, row.id, scope))} disabled={busy}>{txt.common.save}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

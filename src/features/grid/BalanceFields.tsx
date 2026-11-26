@@ -6,6 +6,9 @@ import { cn } from '@/lib/utils'
 import { monthOfDate, type MonthKey } from '@/model'
 import type { BalanceLine } from '@/store'
 import type { BalanceSide, MonthBalancesForm } from './useMonthBalances'
+import { txt } from '@/i18n'
+
+const T = txt.grid.balanceFields
 
 /** Accounts that stand together in the list, under a heading when they have one. */
 export interface BalanceGroup {
@@ -48,10 +51,10 @@ export function BalanceFields({ form, groups, month, base, named, onEnter }: {
     const opening = side === 'start' && line.opening
     const difference = side === 'end' ? form.difference(line) : null
     const empty = text.trim() === ''
-    const note = opening ? 'opening amount'
-      : empty ? (calculated != null ? 'calculated' : null)
-      : difference ? `Difference ${formatAmount(difference, ccy, locale, { sign: 'exceptZero' })}` : null
-    const label = `${named ? `${account.name}: at` : 'At'} the ${side} of ${long} (${ccy})`
+    const note = opening ? T.openingAmount
+      : empty ? (calculated != null ? T.calculated : null)
+      : difference ? T.difference(formatAmount(difference, ccy, locale, { sign: 'exceptZero' })) : null
+    const label = T.fieldLabel(named, account.name, side, long, ccy)
     return (
       <div className="min-w-0 space-y-0.5" data-testid={`balance-${side}`}>
         <Input
@@ -68,8 +71,8 @@ export function BalanceFields({ form, groups, month, base, named, onEnter }: {
   return (
     <div className={cn('grid items-start gap-x-3 gap-y-1.5', named ? 'grid-cols-2 sm:grid-cols-[minmax(0,1fr)_9.5rem_9.5rem]' : 'grid-cols-2')} data-testid="balance-fields">
       {named && <span className="hidden sm:block" />}
-      <span className="text-xs text-muted-foreground">At the start{named ? '' : ` of ${long}`}{owed && <span className="block" data-testid="balance-when">before this month's payment</span>}</span>
-      <span className="text-xs text-muted-foreground">At the end{named ? '' : ` of ${long}`}{owed && <span className="block" data-testid="balance-when">after it</span>}</span>
+      <span className="text-xs text-muted-foreground">{T.atTheStart(named, long)}{owed && <span className="block" data-testid="balance-when">{T.beforeThisMonthsPayment}</span>}</span>
+      <span className="text-xs text-muted-foreground">{T.atTheEnd(named, long)}{owed && <span className="block" data-testid="balance-when">{T.afterIt}</span>}</span>
       {groups.filter((g) => g.lines.length > 0).map((g, i) => (
         <Fragment key={g.heading ?? i}>
           {g.heading && <p className="col-span-full mt-1.5 text-xs font-medium">{g.heading}</p>}

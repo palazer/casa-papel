@@ -34,6 +34,9 @@ import { fundingOptions as buildFundingOptions } from './funding'
 import { HELP } from '@/app/help'
 import { InfoTip, TipLabel } from '@/components/InfoTip'
 import { saveError } from '@/app/saveError'
+import { txt } from '@/i18n'
+
+const T = txt.grid.cell
 
 interface Props {
   tables: Tables
@@ -50,7 +53,7 @@ interface Props {
 
 type Mode = 'value' | 'items'
 type StatusChoice = 'default' | ItemStatus
-const STATUS_LABEL: Record<ItemStatus, string> = { projected: 'Estimate', committed: 'Certain', done: 'Done' }
+const STATUS_LABEL: Record<ItemStatus, string> = { projected: txt.common.estimate, committed: T.certain, done: txt.common.done }
 
 /** A new unnamed item: what a single amount is stored as once it has a certainty, a source or a conversion of its own. */
 const blankItem = (): Omit<CellItem, 'amount' | 'status' | 'fundedBy'> => ({ id: newId(), label: '', date: null, note: null, recurringItemId: null, kind: 'normal', skipped: false })
@@ -127,7 +130,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   // A payment to a loan or a card that owed less than the payment counts for less (`asked` is then what was planned).
   // The form edits what is planned: that is what is stored, and what counts again once more is owed.
   const [text, setText] = useState(() => amountToInput(cell ? cell.asked ?? cell.value : 0, stored, locale))
-  const paidOffLoan = cell?.asked != null ? tables.accounts.find((a) => a.id === row.accountId)?.name ?? 'The loan or card' : null
+  const paidOffLoan = cell?.asked != null ? tables.accounts.find((a) => a.id === row.accountId)?.name ?? T.theLoanOrCard : null
   // The choice starts from what the month holds, so that saving without touching it keeps what the month is: an
   // amount that is this month's alone opens on "Only this month", an amount of its own that runs on opens on the
   // other choice. A month that only carries (or is empty) has neither: money taken out of an account is a one-off
@@ -273,7 +276,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
       await fn()
       if (close) onClose()
     } catch (e) {
-      setError(saveError(e, 'Could not save.'))
+      setError(saveError(e, txt.common.couldNotSave))
     } finally {
       running.current = false
       setBusy(false)
@@ -292,8 +295,8 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
     const { conversion: _was, ...kept } = soloItem ? storedItem(soloItem) : blankItem()
     const single: CellItem = { ...kept, amount: minor, status: status === 'default' ? row.defaultStatus : status, fundedBy, ...(conversion && !onSchedule ? { conversion } : {}) }
     if (onSchedule && !ruleRuns) {
-      if (minor === 0) return setError('Type the amount that repeats.')
-      if (rhythm.kind === 'months' && rhythm.months.length === 0) return setError('Pick at least one month.')
+      if (minor === 0) return setError(T.typeTheAmountThat)
+      if (rhythm.kind === 'months' && rhythm.months.length === 0) return setError(txt.common.pickAMonth)
       // the amount becomes the row's schedule, named after the row; it lands this month only if its rhythm does
       return void run(saving(() => saveRowMonth(store, row.id, month, { items: [single], repeats: { [single.id]: rhythm }, scope: 'from-now-on', row: rowChange })))
     }
@@ -312,7 +315,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   const usualFields = payments && (
     <UsualPaidFields
       tables={tables} day={payDay} methodId={payMethodId} onDay={setPayDay} onMethod={setPayMethodId} idPrefix="cell-usual"
-      says={`${mode === 'value' ? 'For this row, in every month' : 'For every amount of this row that names no day or method of its own, in every month'}${newPay ? '; saved with the amount.' : '.'}`}
+      says={T.usualSays(mode === 'value', !!newPay)}
     />
   )
 
@@ -320,17 +323,17 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   function saveItems() {
     for (const it of items) {
       const named = it.label.trim() ? `"${it.label.trim()}"` : null
-      if (it.kind === 'normal' && !Number.isFinite(it.amount)) return setError(unreadableAmount(typedAmounts[it.id] ?? '', `${named ?? 'An item'} has an amount that is not a number I can read.`))
+      if (it.kind === 'normal' && !Number.isFinite(it.amount)) return setError(unreadableAmount(typedAmounts[it.id] ?? '', T.hasAnAmountThat(named)))
       const choice = repeatFor(it)
-      if (choice.kind === 'months' && choice.months.length === 0) return setError(`Pick at least one month for ${named ?? 'the item that repeats'}.`)
+      if (choice.kind === 'months' && choice.months.length === 0) return setError(T.pickAtLeastOne2(named))
     }
     const changes: Record<string, { amount?: number; repeat?: Repeating; name?: string }> = {}
     for (const s of elsewhere) {
       const draft = others[s.id]
       if (!draft) continue
       const amount = otherAmount(s.id)
-      if (amount != null && !Number.isFinite(amount)) return setError(unreadableAmount(draft.text ?? '', `"${s.name}" has an amount that is not a number I can read.`))
-      if (draft.repeat?.kind === 'months' && draft.repeat.months.length === 0) return setError(`Pick at least one month for "${s.name}".`)
+      if (amount != null && !Number.isFinite(amount)) return setError(unreadableAmount(draft.text ?? '', T.hasAnAmountThat2(s.name)))
+      if (draft.repeat?.kind === 'months' && draft.repeat.months.length === 0) return setError(T.pickAtLeastOne3(s.name))
       changes[s.id] = { amount, repeat: draft.repeat, name: draft.name }
     }
     void run(saving(() => saveRowMonth(store, row.id, month, { items, repeats, applyTo, others: changes, scope: isRecurringRow ? 'this-month' : saveScope, row: rowChange })))
@@ -366,7 +369,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
   function dropSchedule(scheduleId: string, said: string) {
     const last = !tables.recurringItems.some((r) => !r.deletedAt && r.rowId === row.id && r.id !== scheduleId)
     setItems((list) => list.filter((x) => x.recurringItemId !== scheduleId).map((x) => (last && x.kind === 'carry' ? { ...x, kind: 'normal' as const, amount: prevValue() } : x)))
-    setNotice(`${said} What you typed here is still unsaved.`)
+    setNotice(T.whatYouTypedHere(said))
   }
 
   /**
@@ -386,7 +389,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
     } else {
       void run(async () => {
         await endRecurringFrom(store, scheduleId, month)
-        dropSchedule(scheduleId, `"${it.label}" is removed from ${formatMonth(month, locale, 'long')} on.`)
+        dropSchedule(scheduleId, T.isRemovedFromOn(it.label, formatMonth(month, locale, 'long')))
       }, false)
     }
   }
@@ -396,7 +399,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
     setStopping(null)
     void run(async () => {
       await endRecurringFrom(store, scheduleId, month)
-      dropSchedule(scheduleId, `"${name}" is stopped from ${formatMonth(month, locale, 'long')} on.`)
+      dropSchedule(scheduleId, T.isStoppedFromOn(name, formatMonth(month, locale, 'long')))
     }, false)
   }
 
@@ -409,21 +412,21 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
 
   const title = `${row.name} · ${formatMonth(month, locale, 'long')}`
   const sourceText =
-    cell?.source === 'derived' ? 'Worked out by the app' :
-    cell?.source === 'inherit' ? 'Carried from the previous month' :
-    cell?.source === 'value' ? 'Set in this month' :
-    cell?.source === 'items' ? (soloItem ? 'Set in this month' : isRecurringRow ? 'On a schedule' : `${cell.items.length} item${cell.items.length === 1 ? '' : 's'}`) :
-    cell?.source === 'empty' ? (isRecurringRow ? 'Nothing lands this month' : 'Nothing yet') : ''
+    cell?.source === 'derived' ? T.workedOutByThe :
+    cell?.source === 'inherit' ? T.carriedFromThePrevious :
+    cell?.source === 'value' ? T.setInThisMonth :
+    cell?.source === 'items' ? (soloItem ? T.setInThisMonth : isRecurringRow ? T.onASchedule : T.itemCount(cell.items.length)) :
+    cell?.source === 'empty' ? (isRecurringRow ? T.nothingLandsThisMonth : T.nothingYet) : ''
 
   // the codes alone: the field is narrow, and the household's own comes first
   const currencySelect = (
-    <NativeSelect aria-label={`Currency of ${row.name}`} title="The currency this row is typed in" className="w-24 shrink-0" value={currency} onChange={(e) => pickCurrency(e.target.value)}>
+    <NativeSelect aria-label={T.currencyOf(row.name)} title={T.theCurrencyThisRow} className="w-24 shrink-0" value={currency} onChange={(e) => pickCurrency(e.target.value)}>
       {currencyChoices(base, rowCurrency).map((c) => <option key={c} value={c}>{c}</option>)}
     </NativeSelect>
   )
   const currencyNote = newCurrency !== undefined && (
     <p className="text-xs text-muted-foreground" data-testid="currency-note">
-      Every month of this row is in {currency} once saved; numbers already typed keep their digits.
+      {T.everyMonthOfThis(currency)}
     </p>
   )
 
@@ -433,15 +436,12 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            {sourceText}{cell ? ` · currently ${formatAmount(cell.value, stored, locale)}` : ''}
+            {T.sourceLine(sourceText, cell ? formatAmount(cell.value, stored, locale) : null)}
           </DialogDescription>
         </DialogHeader>
         {cell?.asked != null && paidOffLoan && (
           <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground" data-testid="paid-off-note">
-            {cell.value > 0
-              ? `${formatAmount(cell.asked, stored, locale)} is planned. ${formatAmount(cell.value, stored, locale)} was still owed on "${paidOffLoan}", so ${formatAmount(cell.value, stored, locale)} counts this month.`
-              : `"${paidOffLoan}" is paid off: nothing counts this month.`}
-            {' '}What is planned stays as it is, and counts again if a real balance raises what is owed.
+            {T.isPlannedWasStill(cell.value, formatAmount(cell.asked, stored, locale), formatAmount(cell.value, stored, locale), paidOffLoan)}
           </p>
         )}
 
@@ -459,23 +459,23 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   {!isRecurringRow ? (
                     <div className="inline-flex rounded-md border p-0.5 text-sm" role="tablist">
-                      <button role="tab" aria-selected={mode === 'value'} className={cn('rounded px-3 py-1', mode === 'value' && 'bg-muted font-medium')} onClick={() => setMode('value')}>Single amount</button>
-                      <button role="tab" aria-selected={mode === 'items'} className={cn('rounded px-3 py-1', mode === 'items' && 'bg-muted font-medium')} onClick={() => setMode('items')}>Itemized</button>
+                      <button role="tab" aria-selected={mode === 'value'} className={cn('rounded px-3 py-1', mode === 'value' && 'bg-muted font-medium')} onClick={() => setMode('value')}>{T.singleAmount}</button>
+                      <button role="tab" aria-selected={mode === 'items'} className={cn('rounded px-3 py-1', mode === 'items' && 'bg-muted font-medium')} onClick={() => setMode('items')}>{T.itemized}</button>
                     </div>
                   ) : <span />}
                   {canPickCategory && (
                     <span className="flex items-center gap-2 text-sm">
-                      <span className="text-muted-foreground">Category</span>
-                      <NativeSelect aria-label={`Category of ${row.name}`} className="w-40" value={category} onChange={(e) => setCategory(e.target.value)}>
+                      <span className="text-muted-foreground">{txt.common.category}</span>
+                      <NativeSelect aria-label={T.categoryOf(row.name)} className="w-40" value={category} onChange={(e) => setCategory(e.target.value)}>
                         {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        <option value="">No category</option>
+                        <option value="">{txt.common.noCategory}</option>
                       </NativeSelect>
                     </span>
                   )}
                 </div>
                 {newCategory !== undefined && (
                   <p className="text-right text-xs text-muted-foreground" data-testid="category-note">
-                    Once saved, this row is {category ? `under ${categories.find((c) => c.id === category)?.name}` : 'in no category'}, in every month.
+                    {T.onceSavedThisRow(category, categories.find((c) => c.id === category)?.name)}
                   </p>
                 )}
               </div>
@@ -484,7 +484,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
             {mode === 'value' ? (
               <div className="space-y-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="cell-amount">Amount in {currency}</Label>
+                  <Label htmlFor="cell-amount">{T.amountIn(currency)}</Label>
                   <div className="flex gap-2">
                     <Input id="cell-amount" className="min-w-0 flex-1" autoFocus inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') saveValue() }} placeholder="0" />
                     {canPickCurrency && currencySelect}
@@ -508,48 +508,48 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                   )}
                 </div>
                 {ruleRuns ? (
-                  <p className="text-xs text-muted-foreground" data-testid="rule-runs">This amount is for {formatMonth(month, locale, 'long')} alone. A rule works this row out in every month without a typed amount; to change the rule, open a month it works out.</p>
+                  <p className="text-xs text-muted-foreground" data-testid="rule-runs">{T.thisAmountIsFor(formatMonth(month, locale, 'long'))}</p>
                 ) : (
                   <fieldset className="space-y-1.5">
-                    <legend className="text-sm font-medium"><span className="inline-flex items-center gap-1">Repeats <InfoTip help="cell.repeats" /></span></legend>
+                    <legend className="text-sm font-medium"><span className="inline-flex items-center gap-1">{txt.common.repeats} <InfoTip help="cell.repeats" /></span></legend>
                     <Segmented
-                      label="Repeats" value={onSchedule ? 'schedule' : scope}
+                      label={txt.common.repeats} value={onSchedule ? 'schedule' : scope}
                       onChange={(v) => {
                         setOnSchedule(v === 'schedule')
                         if (v !== 'schedule') pickScope(v as EditScope)
                       }}
-                      options={[{ value: 'from-now-on', label: 'This and following months' }, ...(canSchedule ? [{ value: 'schedule', label: 'On a schedule' }] : []), { value: 'this-month', label: 'Only this month' }]}
+                      options={[{ value: 'from-now-on', label: txt.common.thisAndFollowing }, ...(canSchedule ? [{ value: 'schedule', label: T.onASchedule }] : []), { value: 'this-month', label: txt.common.onlyThisMonth }]}
                     />
                     {onSchedule ? (
                       <>
-                        <RepeatField value={rhythm} onChange={(c) => { if (c.kind !== 'none') setRhythm(c) }} month={month} locale={locale} name={row.name} label="How often" monthly={false} />
-                        <p className="text-xs text-muted-foreground">On a schedule the amount lands only in its months; the months between stay empty.</p>
+                        <RepeatField value={rhythm} onChange={(c) => { if (c.kind !== 'none') setRhythm(c) }} month={month} locale={locale} name={row.name} label={T.howOften} monthly={false} />
+                        <p className="text-xs text-muted-foreground">{T.onAScheduleThe}</p>
                       </>
                     ) : (
                       <p className="text-xs text-muted-foreground" data-testid="scope-says">
-                        {scope === 'from-now-on' ? followingText(month, following, locale, 'The amount stays in every later month until you change it.') : onlyThisMonthText(month, goesOn, currency, locale)}
+                        {scope === 'from-now-on' ? followingText(month, following, locale, T.theAmountStaysIn) : onlyThisMonthText(month, goesOn, currency, locale)}
                       </p>
                     )}
                   </fieldset>
                 )}
                 <fieldset className="space-y-1.5">
-                  <legend className="text-sm font-medium"><span className="inline-flex items-center gap-1">How sure <InfoTip help="cell.howSure" /></span></legend>
+                  <legend className="text-sm font-medium"><span className="inline-flex items-center gap-1">{T.howSure} <InfoTip help="cell.howSure" /></span></legend>
                   <Segmented
                     value={status}
                     onChange={(v) => setStatus(v as StatusChoice)}
                     options={[
-                      { value: 'default', label: `Row default (${STATUS_LABEL[row.defaultStatus]})` },
-                      { value: 'projected', label: 'Estimate' },
-                      { value: 'committed', label: 'Certain' },
-                      { value: 'done', label: 'Done' },
+                      { value: 'default', label: T.rowDefault(STATUS_LABEL[row.defaultStatus]) },
+                      { value: 'projected', label: txt.common.estimate },
+                      { value: 'committed', label: T.certain },
+                      { value: 'done', label: txt.common.done },
                     ]}
                   />
                 </fieldset>
                 {row.section === 'expense' && (
                   <div className="space-y-1.5">
-                    <TipLabel htmlFor="cell-source" help="cell.comesOutOf">Comes out of</TipLabel>
+                    <TipLabel htmlFor="cell-source" help="cell.comesOutOf">{txt.common.comesOutOf}</TipLabel>
                     <NativeSelect id="cell-source" className="w-full" value={fundedBy} onChange={(e) => setFundedBy(e.target.value as CellItem['fundedBy'])}>
-                      {fundingOptions.map((o) => <option key={o.value} value={o.value}>{o.label}{o.value === row.defaultFundedBy ? ' (row default)' : ''}</option>)}
+                      {fundingOptions.map((o) => <option key={o.value} value={o.value}>{T.sourceChoice(o.label, o.value, row.defaultFundedBy)}</option>)}
                     </NativeSelect>
                   </div>
                 )}
@@ -559,18 +559,18 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
               <div className="space-y-2">
                 {canPickCurrency && (
                   <div className="space-y-1.5">
-                    <div className="flex items-center gap-2 text-sm"><span className="font-medium">Amounts in</span>{currencySelect}</div>
+                    <div className="flex items-center gap-2 text-sm"><span className="font-medium">{T.amountsIn}</span>{currencySelect}</div>
                     {currencyNote}
                   </div>
                 )}
-                {items.length === 0 && elsewhere.length === 0 && <p className="text-sm text-muted-foreground">No items yet.</p>}
+                {items.length === 0 && elsewhere.length === 0 && <p className="text-sm text-muted-foreground">{T.noItemsYet}</p>}
                 {items.map((it) => {
                   if (it.kind === 'carry') {
                     return (
                       <div key={it.id} className="flex items-center gap-2 rounded-md border border-dashed px-2 py-1.5 text-sm">
-                        <span className="flex-1 text-muted-foreground">Carried from previous month</span>
+                        <span className="flex-1 text-muted-foreground">{T.carriedFromPreviousMonth}</span>
                         <span className="tabular-nums">{formatAmount(prevValue(), currency, locale)}</span>
-                        <Button size="icon" variant="ghost" aria-label="Remove carried amount" onClick={() => removePlain(it.id)}><Trash2 /></Button>
+                        <Button size="icon" variant="ghost" aria-label={T.removeCarriedAmount} onClick={() => removePlain(it.id)}><Trash2 /></Button>
                       </div>
                     )
                   }
@@ -579,8 +579,8 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                     return (
                       <div key={it.id} className="flex items-center gap-2 rounded-md border border-dashed px-2 py-1.5 text-sm text-muted-foreground">
                         <Repeat className="size-3.5" aria-hidden />
-                        <span className="flex-1"><s>{it.label}</s> · Skipped this month</span>
-                        <Button size="xs" variant="outline" onClick={() => restoreScheduled(it)} disabled={busy}>Restore</Button>
+                        <span className="flex-1"><s>{it.label}</s> · {T.skippedThisMonth}</span>
+                        <Button size="xs" variant="outline" onClick={() => restoreScheduled(it)} disabled={busy}>{txt.common.restore}</Button>
                       </div>
                     )
                   }
@@ -594,10 +594,10 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                   /** The other currency of a conversion of this item; none for one a schedule lands, which the schedule keeps writing. */
                   const itemForeign = !schedule ? conversionIn(it.fundedBy) ?? it.conversion?.foreign ?? null : null
                   // "Paid on" and "Paid with": the item's own, or the first choice, which says what it follows
-                  const itemName = it.label.trim() || schedule?.name || 'this item'
-                  const followsDay = schedule?.payDay != null ? `As scheduled: ${ordinalDay(schedule.payDay)}` : payDay != null ? `Usual: ${ordinalDay(payDay)}` : 'No day'
+                  const itemName = it.label.trim() || schedule?.name || T.thisItem
+                  const followsDay = schedule?.payDay != null ? T.asScheduledDay(ordinalDay(schedule.payDay)) : payDay != null ? T.usual(ordinalDay(payDay)) : txt.common.noDay
                   const scheduleMethod = schedule?.methodId ? payCtx.methods.get(schedule.methodId) : undefined
-                  const followsMethod = scheduleMethod ? `As scheduled: ${scheduleMethod.name}` : payMethodId ? `Usual: ${payCtx.methods.get(payMethodId)?.name ?? ''}` : 'No method'
+                  const followsMethod = scheduleMethod ? T.asScheduledMethod(scheduleMethod.name) : payMethodId ? T.usual2(payCtx.methods.get(payMethodId)?.name) : txt.common.noMethod
                   return (
                     <div key={it.id} className={cn('space-y-2 rounded-md border p-2', schedule && 'border-transfer/40')}>
                       {/* the name takes what the other fields leave: they are as narrow as their content allows */}
@@ -605,12 +605,12 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                         {/* a name can always be typed over; for something that repeats it is the schedule's name, in every month */}
                         <div className="flex min-w-0 items-center gap-1.5">
                           {schedule && <Repeat className="size-3.5 shrink-0 text-transfer" aria-hidden />}
-                          <Input aria-label="Item label" placeholder={schedule?.name ?? 'What'} value={it.label} onChange={(e) => updateItem(it.id, { label: e.target.value })} />
+                          <Input aria-label={T.itemLabel} placeholder={schedule?.name ?? T.what} value={it.label} onChange={(e) => updateItem(it.id, { label: e.target.value })} />
                         </div>
                         <div className="space-y-0.5">
                           <Input
                             key={amountDrawn[it.id] ?? 0}
-                            aria-label="Item amount" inputMode="decimal" placeholder="0"
+                            aria-label={T.itemAmount} inputMode="decimal" placeholder="0"
                             defaultValue={Number.isFinite(it.amount) ? amountToInput(it.amount, currency, locale) : typedAmounts[it.id] ?? ''}
                             // an empty field is zero; anything else that cannot be read is kept as such, so saving says so instead of storing zero
                             onChange={(e) => {
@@ -622,18 +622,18 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                           />
                           <AmountHint text={typedAmounts[it.id] ?? ''} currency={currency} locale={locale} />
                         </div>
-                        <NativeSelect aria-label="Item status" value={it.status} onChange={(e) => updateItem(it.id, { status: e.target.value as ItemStatus })}>
+                        <NativeSelect aria-label={T.itemStatus} value={it.status} onChange={(e) => updateItem(it.id, { status: e.target.value as ItemStatus })}>
                           {(['projected', 'committed', 'done'] as ItemStatus[]).map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
                         </NativeSelect>
-                        <NativeSelect aria-label="Comes out of" value={it.fundedBy} onChange={(e) => updateItem(it.id, { fundedBy: e.target.value as CellItem['fundedBy'] })} disabled={row.section !== 'expense'}>
+                        <NativeSelect aria-label={txt.common.comesOutOf} value={it.fundedBy} onChange={(e) => updateItem(it.id, { fundedBy: e.target.value as CellItem['fundedBy'] })} disabled={row.section !== 'expense'}>
                           {fundingOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                         </NativeSelect>
-                        <Button size="icon" variant="ghost" aria-label="Remove item" onClick={() => (schedule ? setRemoving(removing === it.id ? null : it.id) : removePlain(it.id))}><Trash2 /></Button>
+                        <Button size="icon" variant="ghost" aria-label={T.removeItem} onClick={() => (schedule ? setRemoving(removing === it.id ? null : it.id) : removePlain(it.id))}><Trash2 /></Button>
                       </div>
                       {itemForeign && (
                         <ConversionPanel
                           amount={Number.isFinite(it.amount) ? it.amount : null} currency={currency} home={base} foreign={itemForeign} value={it.conversion ?? null}
-                          monthRate={monthRateOf(itemForeign)} day={rateDay} locale={locale} done={it.status === 'done'} of={`of ${it.label.trim() || 'this item'}`}
+                          monthRate={monthRateOf(itemForeign)} day={rateDay} locale={locale} done={it.status === 'done'} of={T.ofItem(it.label.trim())}
                           onChange={(c) => updateItem(it.id, c ? { conversion: c, status: 'done' } : { conversion: undefined })}
                           onAmount={(m) => {
                             updateItem(it.id, { amount: m })
@@ -643,42 +643,42 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                         />
                       )}
                       {schedule && it.label.trim() !== '' && it.label.trim() !== schedule.name && (
-                        <p className="text-xs text-muted-foreground" data-testid="rename-note">Renamed from "{schedule.name}" in every month.</p>
+                        <p className="text-xs text-muted-foreground" data-testid="rename-note">{T.renamedFromInEvery(schedule.name)}</p>
                       )}
                       {payments && (
                         <div className="flex flex-wrap items-center gap-2 text-xs" data-testid="item-paid">
-                          <span className="text-muted-foreground">Paid on</span>
-                          <DaySelect className="h-7 w-36 text-xs" label={`Paid on, ${itemName}`} none={followsDay} value={dayOfDate(it.date, month)} onChange={(d) => updateItem(it.id, { date: d == null ? null : dateOn(month, d) })} />
-                          <span className="text-muted-foreground">with</span>
-                          <MethodSelect className="h-7 w-52 text-xs" label={`Paid with, ${itemName}`} none={followsMethod} tables={tables} value={it.methodId ?? null} onChange={(m) => updateItem(it.id, { methodId: m })} />
+                          <span className="text-muted-foreground">{txt.common.paidOn}</span>
+                          <DaySelect className="h-7 w-36 text-xs" label={T.paidOn2(itemName)} none={followsDay} value={dayOfDate(it.date, month)} onChange={(d) => updateItem(it.id, { date: d == null ? null : dateOn(month, d) })} />
+                          <span className="text-muted-foreground">{T.with}</span>
+                          <MethodSelect className="h-7 w-52 text-xs" label={T.paidWith(itemName)} none={followsMethod} tables={tables} value={it.methodId ?? null} onChange={(m) => updateItem(it.id, { methodId: m })} />
                         </div>
                       )}
                       {(schedule || canSchedule) && (
-                        <RepeatField value={choice} onChange={(c) => setRepeats((r) => ({ ...r, [it.id]: c }))} month={month} locale={locale} name={it.label.trim() || schedule?.name || row.name} none="Only this month" />
+                        <RepeatField value={choice} onChange={(c) => setRepeats((r) => ({ ...r, [it.id]: c }))} month={month} locale={locale} name={it.label.trim() || schedule?.name || row.name} none={txt.common.onlyThisMonth} />
                       )}
                       {moved && (
                         <p className="text-xs text-muted-foreground">
-                          {choice.kind === 'none' ? `Ends after ${formatMonth(month, locale, 'long')}.` : `Counts from ${formatMonth(month, locale, 'long')}; earlier months keep what they show.`}
+                          {choice.kind === 'none' ? T.endsAfter(formatMonth(month, locale, 'long')) : T.countsFromEarlierMonths(formatMonth(month, locale, 'long'))}
                         </p>
                       )}
                       {schedule && edited && !moved && (
                         <div className="flex flex-wrap items-center gap-2 text-xs">
-                          <span className="text-muted-foreground">Apply the change to</span>
+                          <span className="text-muted-foreground">{T.applyTheChangeTo}</span>
                           <Segmented
                             value={applyTo[it.id] ?? 'this-month'}
                             onChange={(v) => setApplyTo((a) => ({ ...a, [it.id]: v as EditScope }))}
-                            options={[{ value: 'this-month', label: 'Only this month' }, { value: 'from-now-on', label: 'This and following months' }]}
+                            options={[{ value: 'this-month', label: txt.common.onlyThisMonth }, { value: 'from-now-on', label: txt.common.thisAndFollowing }]}
                           />
                         </div>
                       )}
                       {replaces && <p className="text-xs text-muted-foreground" data-testid="schedule-replaces">{replaces}</p>}
                       {schedule && removing === it.id && (
                         <div className="flex flex-wrap items-center gap-2 text-xs">
-                          <span className="text-muted-foreground">Remove "{it.label}":</span>
-                          <Button size="xs" variant="outline" onClick={() => removeScheduled(it, 'this-month')} disabled={busy}>Only this month</Button>
-                          <Button size="xs" variant="outline" onClick={() => removeScheduled(it, 'from-now-on')} disabled={busy}>This and following months</Button>
-                          <Button size="xs" variant="outline" onClick={() => removeScheduled(it, 'all')} disabled={busy}>All occurrences</Button>
-                          <Button size="xs" variant="ghost" onClick={() => setRemoving(null)}>Cancel</Button>
+                          <span className="text-muted-foreground">{T.remove(it.label)}</span>
+                          <Button size="xs" variant="outline" onClick={() => removeScheduled(it, 'this-month')} disabled={busy}>{txt.common.onlyThisMonth}</Button>
+                          <Button size="xs" variant="outline" onClick={() => removeScheduled(it, 'from-now-on')} disabled={busy}>{txt.common.thisAndFollowing}</Button>
+                          <Button size="xs" variant="outline" onClick={() => removeScheduled(it, 'all')} disabled={busy}>{T.allOccurrences}</Button>
+                          <Button size="xs" variant="ghost" onClick={() => setRemoving(null)}>{txt.common.cancel}</Button>
                         </div>
                       )}
                     </div>
@@ -693,16 +693,16 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                       <div className="grid grid-cols-[minmax(0,1fr)_6.5rem_2rem] items-start gap-2">
                         <div className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
                           <Repeat className="size-3.5 shrink-0" aria-hidden />
-                          <Input aria-label={`Name of ${s.name}`} placeholder={s.name} value={draft?.name ?? s.name} onChange={(e) => setOthers((o) => ({ ...o, [s.id]: { ...o[s.id], name: e.target.value } }))} />
+                          <Input aria-label={T.nameOf(s.name)} placeholder={s.name} value={draft?.name ?? s.name} onChange={(e) => setOthers((o) => ({ ...o, [s.id]: { ...o[s.id], name: e.target.value } }))} />
                         </div>
                         <div className="space-y-0.5">
                           <Input
-                            aria-label={`Amount of ${s.name}`} inputMode="decimal" placeholder="0" defaultValue={amountToInput(s.amount, currency, locale)}
+                            aria-label={T.amountOf(s.name)} inputMode="decimal" placeholder="0" defaultValue={amountToInput(s.amount, currency, locale)}
                             onChange={(e) => { setError(null); setOthers((o) => ({ ...o, [s.id]: { ...o[s.id], text: e.target.value } })) }}
                           />
                           <AmountHint text={draft?.text ?? ''} currency={currency} locale={locale} />
                         </div>
-                        <Button size="icon" variant="ghost" aria-label={`Stop ${s.name}`} onClick={() => setStopping(stopping === s.id ? null : s.id)}><Trash2 /></Button>
+                        <Button size="icon" variant="ghost" aria-label={T.stop(s.name)} onClick={() => setStopping(stopping === s.id ? null : s.id)}><Trash2 /></Button>
                       </div>
                       <RepeatField
                         value={draft?.repeat ?? repeatOf(s)} month={month} locale={locale} name={s.name}
@@ -710,15 +710,15 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                       />
                       {touched && (
                         <p className="text-xs text-muted-foreground">
-                          {[`Counts from ${formatMonth(month, locale, 'long')}; earlier months keep what they show.`, followingEffects({ replaced: oneMonthValuesReplaced(tables, s, month, { amount: Number.isFinite(otherAmount(s.id)) ? otherAmount(s.id) : undefined }), kept: [] }, locale)].filter(Boolean).join(' ')}
+                          {[T.countsFromEarlierMonths(formatMonth(month, locale, 'long')), followingEffects({ replaced: oneMonthValuesReplaced(tables, s, month, { amount: Number.isFinite(otherAmount(s.id)) ? otherAmount(s.id) : undefined }), kept: [] }, locale)].filter(Boolean).join(' ')}
                         </p>
                       )}
                       {stopping === s.id && (
                         <div className="flex flex-wrap items-center gap-2 text-xs">
-                          <span className="text-muted-foreground">Stop "{s.name}":</span>
-                          <Button size="xs" variant="outline" onClick={() => stopElsewhere(s.id, s.name)} disabled={busy}>From {formatMonth(month, locale, 'long')} on</Button>
-                          <Button size="xs" variant="outline" onClick={() => { setStopping(null); setRemovingSchedule(s.id) }} disabled={busy}>All occurrences</Button>
-                          <Button size="xs" variant="ghost" onClick={() => setStopping(null)}>Cancel</Button>
+                          <span className="text-muted-foreground">{T.stop2(s.name)}</span>
+                          <Button size="xs" variant="outline" onClick={() => stopElsewhere(s.id, s.name)} disabled={busy}>{T.fromOn(formatMonth(month, locale, 'long'))}</Button>
+                          <Button size="xs" variant="outline" onClick={() => { setStopping(null); setRemovingSchedule(s.id) }} disabled={busy}>{T.allOccurrences}</Button>
+                          <Button size="xs" variant="ghost" onClick={() => setStopping(null)}>{txt.common.cancel}</Button>
                         </div>
                       )}
                     </div>
@@ -726,35 +726,34 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
                 })}
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button size="sm" variant="outline" onClick={addItem}>Add item</Button>
-                    {liveItems.length > 0 && doneCount < liveItems.length && <Button size="sm" variant="outline" onClick={markAllDone}>Mark all done</Button>}
-                    {liveItems.length > 0 && doneCount === liveItems.length && <span className="inline-flex items-center gap-1.5 text-sm text-done"><DoneDot done={1} total={1} state="all" /><span>All done</span></span>}
-                    {doneCount > 0 && doneCount < liveItems.length && <span className="text-xs text-muted-foreground">{doneCount} of {liveItems.length} done</span>}
+                    <Button size="sm" variant="outline" onClick={addItem}>{T.addItem}</Button>
+                    {liveItems.length > 0 && doneCount < liveItems.length && <Button size="sm" variant="outline" onClick={markAllDone}>{T.markAllDone}</Button>}
+                    {liveItems.length > 0 && doneCount === liveItems.length && <span className="inline-flex items-center gap-1.5 text-sm text-done"><DoneDot done={1} total={1} state="all" /><span>{T.allDone}</span></span>}
+                    {doneCount > 0 && doneCount < liveItems.length && <span className="text-xs text-muted-foreground">{T.ofDone(doneCount, liveItems.length)}</span>}
                   </div>
                   <div className="flex flex-col items-end gap-1">
-                    <span className="text-sm tabular-nums">Total {formatAmount(itemsTotal, currency, locale)}</span>
+                    <span className="text-sm tabular-nums">{T.total(formatAmount(itemsTotal, currency, locale))}</span>
                     {currency !== household.baseCurrency && <RateLine tables={tables} household={household} month={month} currency={currency} amount={itemsTotal} />}
                   </div>
                 </div>
                 {willRepeat ? (plain.length > 0 || !isRecurringRow) && (
                   // said before saving: a row on a schedule does not carry its other items, or its total, into the next month
                   <p className="text-xs" data-testid="repeat-next">
-                    From {formatMonth(nextMonth, locale, 'long')} this row shows only what repeats
-                    {landsNext.length ? `: ${landsNext.map((l) => `${l.name} ${formatAmount(l.amount, currency, locale)}`).join(', ')}.` : `. Nothing lands in ${formatMonth(nextMonth, locale, 'long')}.`}
+                    {T.fromThisRowShows(formatMonth(nextMonth, locale, 'long'), landsNext.length, landsNext.map((l) => `${l.name} ${formatAmount(l.amount, currency, locale)}`).join(', '))}
                   </p>
                 ) : !isRecurringRow && !ruleRuns && (
                   <fieldset className="space-y-1.5">
-                    <legend className="text-sm font-medium">The total</legend>
-                    <Segmented label="The total" value={scope} onChange={(v) => pickScope(v as EditScope)} options={[{ value: 'from-now-on', label: 'This and following months' }, { value: 'this-month', label: 'Only this month' }]} />
+                    <legend className="text-sm font-medium">{T.theTotal}</legend>
+                    <Segmented label={T.theTotal} value={scope} onChange={(v) => pickScope(v as EditScope)} options={[{ value: 'from-now-on', label: txt.common.thisAndFollowing }, { value: 'this-month', label: txt.common.onlyThisMonth }]} />
                     <p className="text-xs text-muted-foreground" data-testid="scope-says">
                       {scope === 'from-now-on'
-                        ? [`Nothing here repeats by itself: later months show the total, ${formatAmount(itemsTotal, currency, locale)}, as one amount.`, followingEffects(following, locale)].filter(Boolean).join(' ')
+                        ? [T.nothingHereRepeatsBy(formatAmount(itemsTotal, currency, locale)), followingEffects(following, locale)].filter(Boolean).join(' ')
                         : onlyThisMonthText(month, goesOn, currency, locale)}
                     </p>
                   </fieldset>
                 )}
                 {usualFields}
-                <p className="text-xs text-muted-foreground">Set an item to Done when it is paid or received. A done cell shows a green dot; in the current month the dot also shows red for nothing done yet and amber for partly done.</p>
+                <p className="text-xs text-muted-foreground">{T.setAnItemTo}</p>
                 {row.section === 'expense' && (
                   <p className="text-xs text-muted-foreground">{HELP['cell.comesOutOf'].text}</p>
                 )}
@@ -762,11 +761,11 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
             )}
             {deductions.length > 0 && cell && (
               <div className="space-y-1 rounded-md border px-2 py-1.5 text-xs" data-testid="deductions">
-                <p className="flex items-center gap-1 font-medium">Deducted from this income <InfoTip help="cell.deductions" /></p>
+                <p className="flex items-center gap-1 font-medium">{T.deductedFromThisIncome} <InfoTip help="cell.deductions" /></p>
                 <ul className="divide-y divide-border/60">
                   {deductions.map((d) => <li key={d.id} className="flex justify-between gap-2 py-0.5"><span className="truncate">{d.name}</span><span className="tabular-nums">−{formatAmount(d.valueBase, household.baseCurrency, locale)}</span></li>)}
                 </ul>
-                <p className="flex justify-between border-t pt-1 font-medium"><span>Net</span><span className="tabular-nums">{formatAmount(cell.netBase, household.baseCurrency, locale)}</span></p>
+                <p className="flex justify-between border-t pt-1 font-medium"><span>{T.net}</span><span className="tabular-nums">{formatAmount(cell.netBase, household.baseCurrency, locale)}</span></p>
               </div>
             )}
             {notice && <p className="text-xs text-muted-foreground" role="status">{notice}</p>}
@@ -778,11 +777,11 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
         {!showRuleFields && (
           <DialogFooter className="flex-row flex-wrap gap-2 sm:justify-between">
             <div className="flex gap-2">
-              {!isRecurringRow && <Button variant="ghost" onClick={() => void run(() => clearCell(store, row.id, month))} disabled={busy || !cell?.cell}>{ruleRuns ? 'Clear (back to the rule)' : 'Clear (inherit)'}</Button>}
+              {!isRecurringRow && <Button variant="ghost" onClick={() => void run(() => clearCell(store, row.id, month))} disabled={busy || !cell?.cell}>{ruleRuns ? T.clearBackToThe : T.clearInherit}</Button>}
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-              <Button onClick={mode === 'value' ? saveValue : saveItems} disabled={busy || thirdCurrency != null}>Save</Button>
+              <Button variant="outline" onClick={onClose} disabled={busy}>{txt.common.cancel}</Button>
+              <Button onClick={mode === 'value' ? saveValue : saveItems} disabled={busy || thirdCurrency != null}>{txt.common.save}</Button>
             </div>
           </DialogFooter>
         )}
@@ -790,7 +789,7 @@ export function CellEditor({ tables, engine, household, row, month, startRule, o
       {removingSchedule && (
         <RemoveDialog
           target={{ kind: 'schedule', id: removingSchedule }} tables={tables} household={household} onClose={() => setRemovingSchedule(null)}
-          onDone={() => dropSchedule(removingSchedule, `"${schedules.get(removingSchedule)?.name ?? 'It'}" is removed.`)}
+          onDone={() => dropSchedule(removingSchedule, T.isRemoved(schedules.get(removingSchedule)?.name))}
         />
       )}
     </Dialog>
