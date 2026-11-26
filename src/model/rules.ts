@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 import type { Account, Household, Row } from './schema'
 
 /**
@@ -79,7 +80,7 @@ export function resolveRules(rows: Row[], closingRule: Household['closingRule'])
     // any transfer that feeds an account can be chosen for the rest; the first one chosen takes it
     if (plug && canTakeRest(row) && rule === 'rest') {
       if (!rest) rest = row
-      else warnings.push(`"${rest.name}" and "${row.name}" are both set to take the rest; "${rest.name}" takes it.`)
+      else warnings.push(txt.model.rules.bothTakeRest(rest.name, row.name))
       continue
     }
     if (plug && row.kind === 'to-savings' && rule === null) {
@@ -99,7 +100,7 @@ export function resolveRules(rows: Row[], closingRule: Household['closingRule'])
     rest = unruled[0]
     byRow.set(rest.id, { kind: 'rest', share: 0, typedCounts: false })
     for (const r of unruled.slice(1)) byRow.set(r.id, idle)
-    if (unruled.length > 1) warnings.push('More than one "to savings" row: the plug goes to the first one.')
+    if (unruled.length > 1) warnings.push(txt.model.rules.severalToSavings)
   }
   return { byRow, restRowId: rest?.id ?? null, warnings }
 }

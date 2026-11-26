@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 import { parseMonth, type MonthKey } from './month'
 import { isTakenFromAccount } from './rules'
 import type { Account, CellItem, PaymentKind, PaymentMethod, RecurringItem, Row, Tables } from './schema'
@@ -17,16 +18,13 @@ import type { Account, CellItem, PaymentKind, PaymentMethod, RecurringItem, Row,
 /** What a payment asks of the household: nothing (it goes by itself), an action, or it happens at the till. */
 export type PaymentAsk = 'itself' | 'hand' | 'buying'
 
-export const PAYMENT_KIND_INFO: ReadonlyArray<{ value: PaymentKind; label: string; ask: PaymentAsk; help: string }> = [
-  { value: 'direct-debit', label: 'Direct debit', ask: 'itself', help: 'Collected from the account by whoever is paid (SEPA). The money has to be there on the day.' },
-  { value: 'standing-order', label: 'Standing order', ask: 'itself', help: 'Sent by the bank on a fixed day. The money has to be there on the day.' },
-  { value: 'transfer', label: 'Transfer by hand', ask: 'hand', help: 'A transfer you make yourself each time.' },
-  { value: 'debit-card', label: 'Debit card', ask: 'buying', help: 'A card that takes the money from its account when you pay.' },
-  { value: 'credit-card', label: 'Credit card', ask: 'buying', help: 'Paying with a credit card. A label like every method: what you owe on a card is followed on the card\'s account, by what you pay to it and what its statement says.' },
-  { value: 'wallet', label: 'Wallet', ask: 'buying', help: 'PayPal, Apple Pay and the like.' },
-  { value: 'cash', label: 'Cash', ask: 'hand', help: 'Notes and coins.' },
-  { value: 'other', label: 'Other', ask: 'hand', help: 'Any other way of paying.' },
-]
+/** What each kind of method asks; its words are in the catalogue (`txt.model.paymentKind`), in this order. */
+const ASKS: Record<PaymentKind, PaymentAsk> = {
+  'direct-debit': 'itself', 'standing-order': 'itself', transfer: 'hand', 'debit-card': 'buying', 'credit-card': 'buying', wallet: 'buying', cash: 'hand', other: 'hand',
+}
+
+export const PAYMENT_KIND_INFO: ReadonlyArray<{ value: PaymentKind; label: string; ask: PaymentAsk; help: string }> =
+  (Object.keys(txt.model.paymentKind) as PaymentKind[]).map((value) => ({ value, label: txt.model.paymentKind[value].label, ask: ASKS[value], help: txt.model.paymentKind[value].help }))
 
 export const paymentKindInfo = (kind: PaymentKind) => PAYMENT_KIND_INFO.find((k) => k.value === kind) ?? PAYMENT_KIND_INFO[PAYMENT_KIND_INFO.length - 1]
 

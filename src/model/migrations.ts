@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 import { SCHEMA_VERSION } from './schema'
 
 /**
@@ -104,7 +105,7 @@ export function migrateExport(raw: unknown): unknown {
   const obj = raw as { schemaVersion?: unknown }
   let version = typeof obj?.schemaVersion === 'number' ? obj.schemaVersion : 1
   if (version > SCHEMA_VERSION) {
-    throw new Error(`This file was made by a newer Casa Papel (schema ${version}). Update the app to import it.`)
+    throw new Error(txt.model.newerFile(version))
   }
   let data = raw
   while (version < SCHEMA_VERSION) {

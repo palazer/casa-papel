@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 import { addMonths, compareMonths, parseMonth, type MonthKey } from './month'
 import type { RecurringItem } from './schema'
 
@@ -48,17 +49,17 @@ export function runningSchedules(items: RecurringItem[], rowId: string, month: M
 
 /** How a row repeats, in a few words: its one schedule's rhythm, or how many of its items repeat. */
 export function repeatsText(items: CadenceLike[], locale = 'en'): string {
-  return items.length === 1 ? describeCadence(items[0], locale) : `${items.length} items repeat`
+  return items.length === 1 ? describeCadence(items[0], locale) : txt.model.cadence.itemsRepeat(items.length)
 }
 
 /** How a schedule repeats, in the words the app uses for it everywhere: "Every month", "Every year (Jan)", "In Mar, Sep". */
 export function describeCadence(item: CadenceLike, locale = 'en'): string {
   const fmt = new Intl.DateTimeFormat(locale, { month: 'short' })
   const names = (ms: number[]) => ms.map((m) => fmt.format(new Date(2026, m - 1, 1))).join(', ')
-  if (item.dueMonths && item.dueMonths.length > 0) return `In ${names(dueMonthNumbers(item))}`
-  if (!item.cadence || item.cadence.intervalMonths === 1) return 'Every month'
-  if (item.cadence.intervalMonths === 12) return `Every year (${names([item.cadence.anchorMonth])})`
-  return `Every ${item.cadence.intervalMonths} months (${names(dueMonthNumbers(item))})`
+  if (item.dueMonths && item.dueMonths.length > 0) return txt.model.cadence.inMonths(names(dueMonthNumbers(item)))
+  if (!item.cadence || item.cadence.intervalMonths === 1) return txt.model.cadence.everyMonth
+  if (item.cadence.intervalMonths === 12) return txt.model.cadence.everyYear(names([item.cadence.anchorMonth]))
+  return txt.model.cadence.everyMonths(item.cadence.intervalMonths, names(dueMonthNumbers(item)))
 }
 
 /**

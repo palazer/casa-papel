@@ -11,6 +11,8 @@ export default defineConfig({
   reporter: [['list']],
   use: {
     baseURL: BASE,
+    // the tests name things in English; the app takes its language from the browser, so the browser's is fixed
+    locale: 'en-US',
     trace: 'retain-on-failure',
     acceptDownloads: true,
   },

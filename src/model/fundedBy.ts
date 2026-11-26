@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 import type { Id } from './ids'
 
 /**
@@ -28,7 +29,7 @@ export function accountIdOf(f: FundedBy): Id | null {
 }
 
 /** What the row that fills a virtual account is called when the app makes it: "To Travel", beside "To savings". */
-export const poolRowName = (poolName: string): string => `To ${poolName}`
+export const poolRowName = (poolName: string): string => txt.names.poolRow(poolName)
 
 export function poolIdOf(f: FundedBy): Id | null {
   return f.startsWith('pool:') ? f.slice(5) : null

@@ -1324,3 +1324,32 @@ feature switch; a second one follows the same form.
   (for a row with several items: all of them), which is marked for two and a half seconds the way the Statement
   marks a line it jumped to: `bg-muted ring-2 ring-inset ring-ring`, never the lime. A marked payment that is done
   unfolds "Done". The next visit opens on the current month again.
+
+## 13. Languages
+
+Every text the app shows comes from a catalogue in `src/i18n/`, read through one handle: `txt.statement.parts.paid`,
+`txt.errors.archived(name)`. There is no translation library.
+
+- **One catalogue per language, in parts.** `src/i18n/en/` is the source: one file per area (`model`, `names`,
+  `statement`, `engine`, `errors`, `store`, `impact`, `app`, `help`, `guide`, and one per feature folder). Another
+  language's catalogue is typed against the English one, so a text that is missing there is a type error and never
+  a blank on the screen.
+- **A text is a plain string, or a small function** where a name, a number or a month goes in. A sentence is never
+  put together from fragments outside the catalogue: the function gets the names (as a list where there can be
+  several), the counts and the formatted amounts, and words the whole sentence, so each language can order it its
+  own way. What a language needs for that (a plural, a list of quoted names) lives in its catalogue file.
+- **No text is written where it is used**: not in a component, not in a thrown error, not in a table. An error stays
+  a sentence, made where it is thrown: `throw new Error(txt.errors.rowNotFound)`.
+- **Tables keep their names.** `HELP`, `GUIDE`, `SCREENS`, `SECTION_INFO`, `ACCOUNT_TYPE_INFO` and the like are built
+  from the catalogue when the app starts, so the code that reads them does not know about languages.
+- **One language per page load.** It is read once (`lang` in `src/i18n/index.ts`), before any of those tables is
+  built; the calculation and the store read the same catalogue as the screens, so no function takes a language.
+- **A label in lower case** goes through `lower()`, which uses the language's own rule. Where a lower-cased label
+  would stand inside a sentence, the catalogue holds the whole sentence instead.
+- **Names the household typed are never translated or changed**, and nothing is glued to them: a name stands in
+  quotes or at the start of a phrase ("Sam – Salary").
+- **Numbers, amounts and date order** follow the household's "Number format", not the language.
+- **The tests run in English**: the unit tests have no browser to ask, and the browser tests pin `en-US`
+  (`playwright.config.ts`).
+
+English is the only language so far.
