@@ -455,17 +455,19 @@ accounts and what is owed fall by it.
 What is bought on a card is said by the row ("Paid by card…"): every amount of the row, in every month, whatever
 its items are paid with. A payment method says nothing about it (W1), a method that is named for the card neither.
 
-**C3. A card that records only its payments.** The payment is the month's expense, and nothing else: no row says
-what was bought on the card, so no row moves what is owed on it. That stays as it is until a real balance is typed
-for the card (rule B5), and net worth falls by each payment (finding F5, closed).
+**C3. A card that records only its payments** is brought down by them like a loan (C1): the payment is an expense
+of its month, lowers what is owed and stops at it. No row says what was bought on the card, so what the statement
+says is typed as a real balance (rule B5): the difference is what the plan did not have, and the payments count
+again when more is owed. (Decided on 26 November 2026; it reversed finding F5, by which such a payment did not move
+what was owed.)
 
-    owes 500.00, 300.00 paid every month: still 500.00 owed in every month
-    a real balance of 200.00 in March: 200.00 from March on, and net worth is 300.00 higher that month
+    owes 500.00, 300.00 paid every month: 300.00 counts, then 200.00, then nothing
+    a real balance of 450.00 in March: 450.00 owed, 150.00 after April's payment, and net worth is 450.00 lower in March
 
-**What a payment row does follows the account it pays.** A loan (C1), a card whose purchases are expense rows (C2)
-and a card that records only its payments (C3) each read their payment row differently, so the row is written with
-the account when the account becomes another of the three: a card that becomes a loan is brought down by the
-payments that were recorded for it, in every month, and a change that moves a month that is over asks first (T4).
+**What a payment row does follows the account it pays.** A card whose purchases are expense rows (C2) reads its
+payment row differently from a loan (C1) and a card that records only its payments (C3), so the row is written with
+the account when the account becomes another of the three, and a change that moves a month that is over asks first
+(T4). Between a loan and a card that records only its payments no figure changes.
 The payment of a C2 card stands under Transfers and every other one under Expenses; a row that changes sides loses
 its category, and expense rows that were "Paid by card" on an account that becomes a loan lose that link.
 

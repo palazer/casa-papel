@@ -1345,7 +1345,7 @@ test.describe('working the month in the Statement', () => {
     const claims = page.getByRole('region', { name: 'Debts and net worth' })
     const dlg = page.getByRole('dialog')
 
-    // a card of which only the payments are recorded: the payment is the spending, and what is owed stays
+    // a card of which only the payments are recorded: the payment is the spending, and brings down what is owed
     await claims.getByRole('button', { name: 'Add a card or loan' }).click()
     await dlg.getByLabel('Name', { exact: true }).fill('Store card')
     await dlg.getByLabel('Owed at the start of September 2026 (EUR)').fill('940')
@@ -1356,8 +1356,7 @@ test.describe('working the month in the Statement', () => {
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
     const card = claims.locator('[data-line^="acc:"]').filter({ hasText: 'Store card' })
-    await expect(card).toContainText('changes with real balances only')
-    await expect(card).toContainText('€940.00')
+    await expect(card).toContainText('€890.00')
     const payment = moneyOut.getByRole('button', { name: /^Store card – Payment: €50\.00/ })
     await expect(payment).toBeVisible()
 
@@ -1371,9 +1370,8 @@ test.describe('working the month in the Statement', () => {
     await dlg.screenshot({ path: 'e2e/output/account-becomes-loan.png' })
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(dlg).toBeHidden()
-    // the payment brings it down, and is still an expense of the month
+    // the payment brings it down as before, and is still an expense of the month
     await expect(card).toContainText('€890.00')
-    await expect(card).not.toContainText('changes with real balances only')
     await expect(payment).toBeVisible()
 
     // the row takes a category of the expenses
@@ -1389,7 +1387,7 @@ test.describe('working the month in the Statement', () => {
     await dlg.getByLabel('Type').selectOption('credit-card')
     await expect(dlg.getByTestId('acc-follows')).toHaveText('"Store card – Payment" follows: each payment brings down what is owed and only moves money, so it is not counted as spending again. It moves out of Expenses and loses its category.')
     await dlg.getByRole('radio', { name: 'Only what I pay to it' }).click()
-    await expect(dlg.getByTestId('acc-follows')).toHaveText('"Store card – Payment" follows: each payment counts as that month\'s spending; what is owed changes only with a real balance.')
+    await expect(dlg.getByTestId('acc-follows')).toHaveText('"Store card – Payment" follows: each payment brings down what is owed and counts as an expense of its month.')
     await dlg.getByRole('button', { name: 'Cancel' }).click()
     await expect(dlg).toBeHidden()
     await expect(card).toContainText('€890.00')
@@ -1751,7 +1749,7 @@ test.describe('working the month in the Statement', () => {
     await moneyOut.getByRole('button', { name: 'Add expense row' }).click()
     await does.selectOption('pay-off')
     await expect(paid.locator('option')).toHaveText(['Car loan · Loan', 'Credit card · Credit card', 'New loan…', 'New credit card…'])
-    await expect(text).toHaveText('A payment brings down what is owed on a loan. To a card that records only its payments it is that month\'s spending, and what is owed changes only with a real balance.')
+    await expect(text).toHaveText('A payment brings down what is owed on a loan, or on a card that records only its payments, and counts as an expense of its month. It stops at what is owed.')
     await paid.selectOption({ label: 'Credit card · Credit card' })
     await expect(text).toHaveText('It will show under "Moved elsewhere": what was bought with this card is under Expenses already, so the payment only moves money to the card.')
     await expect(moneyOut.getByLabel('New expense row name')).toHaveAttribute('placeholder', 'Credit card – Payment')

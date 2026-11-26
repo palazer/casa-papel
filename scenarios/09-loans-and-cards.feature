@@ -105,42 +105,50 @@ Feature: Loans and credit cards
     And the Statement of February 2026 shows "Expenses" at 1,600.00
     And net worth changes by 1,400.00 in February 2026
 
-  @C3
-  Scenario: A card that records only its payments: the payment is the month's expense
+  # A card that records only its payments comes down with them, as a loan does (the owner's decision of 26 November
+  # 2026, which reversed finding F5). What the statement says is typed as a real balance.
+  @C1 @C3
+  Scenario: A card that records only its payments: the payment is the month's expense and brings down what is owed
     Given a credit card "Amex" owing 500.00, of which only the payments are recorded
     And a payment "Amex – Payment" of 300.00 to "Amex" from January 2026
     Then the Statement of January 2026 shows "Expenses" at 1,500.00
     And "Current account" ends January 2026 with 2,500.00
+    And "Amex" ends January 2026 with 200.00
 
-  @C3 @F5
-  Scenario: What is spent through a card that records only its payments lowers net worth
+  @C1 @C3 @N2
+  Scenario: Paying such a card down does not change net worth
+    Given a credit card "Amex" owing 5,000.00, of which only the payments are recorded
+    And a payment "Amex – Payment" of 300.00 to "Amex" from January 2026
+    Then net worth changes by 1,800.00 in February 2026
+    And of that, -1,200.00 is "spending"
+
+  @C1 @C3 @F4
+  Scenario: The last payment to such a card is what is still owed, and after it the payment counts as nothing
     Given a credit card "Amex" owing 500.00, of which only the payments are recorded
     And a payment "Amex – Payment" of 300.00 to "Amex" from January 2026
-    Then net worth changes by 1,500.00 in February 2026
-    And of that, -1,500.00 is "spending"
+    Then "Amex – Payment" is 300.00 in January 2026
+    And "Amex – Payment" is 200.00 in February 2026
+    And "Amex – Payment" is 0.00 in March 2026
+    And "Amex" ends February 2026 with 0.00
+    And "Amex" ends December 2026 with 0.00
+    And the Statement of March 2026 shows "Expenses" at 1,200.00
 
-  @C3 @F5
-  Scenario: What is owed on a card that records only its payments stays until a real balance says otherwise
+  @C1 @C3 @B5
+  Scenario: The statement says more is owed on such a card than the plan worked out, and the payments count again
     Given a credit card "Amex" owing 500.00, of which only the payments are recorded
     And a payment "Amex – Payment" of 300.00 to "Amex" from January 2026
-    Then "Amex" ends January 2026 with 500.00
-    And "Amex" ends December 2026 with 500.00
-
-  @C3 @F5 @B5
-  Scenario: A real balance says what is owed on a card that records only its payments
-    Given a credit card "Amex" owing 500.00, of which only the payments are recorded
-    And a payment "Amex – Payment" of 300.00 to "Amex" from January 2026
-    When "Amex" really held 200.00 at the end of March 2026
-    Then "Amex" ends February 2026 with 500.00
-    And "Amex" ends March 2026 with 200.00
-    And "Amex" ends December 2026 with 200.00
-    And net worth changes by 1,800.00 in March 2026
-    And of that, 300.00 is "real balances"
+    When "Amex" really held 450.00 at the end of March 2026
+    Then "Amex" ends February 2026 with 0.00
+    And "Amex" ends March 2026 with 450.00
+    And "Amex" ends April 2026 with 150.00
+    And "Amex" ends May 2026 with 0.00
+    And net worth changes by 1,350.00 in March 2026
+    And of that, -450.00 is "real balances"
 
   # What a payment row does follows the account it pays. The account's form writes the row with the account, so a
   # card that is really a loan can be made one without adding everything again.
   @C1 @C3
-  Scenario: A card that becomes a loan is brought down by the payments recorded for it
+  Scenario: A card that becomes a loan keeps coming down by the payments recorded for it
     Given a credit card "Amex" owing 500.00, of which only the payments are recorded
     And a payment "Amex – Payment" of 100.00 to "Amex" from January 2026
     When "Amex" becomes a loan
@@ -158,10 +166,10 @@ Feature: Loans and credit cards
     And "Current account" ends January 2026 with 2,550.00
 
   @C1 @C3
-  Scenario: A loan that becomes a card of which only the payments are recorded stays owed as it is
+  Scenario: A loan that becomes a card of which only the payments are recorded keeps coming down
     Given a loan "Car loan" of 6,000.00, paid off with 250.00 a month from January 2026
     When "Car loan" becomes a credit card of which only the payments are recorded
-    Then "Car loan" ends March 2026 with 6,000.00
+    Then "Car loan" ends March 2026 with 5,250.00
     And the Statement of January 2026 shows "Expenses" at 1,450.00
 
   @C1

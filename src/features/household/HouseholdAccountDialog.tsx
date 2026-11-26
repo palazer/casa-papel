@@ -52,7 +52,7 @@ const CARD_MODES: Array<{ value: CardMode; label: string }> = [
 ]
 const CARD_HELP: Record<CardMode, string> = {
   itemized: 'Each purchase is an expense row that names this card. What you owe grows with them and shrinks with the payment, and the payment is not counted as spending again.',
-  lump: 'Only the payment is a row, and it counts as that month\'s spending. What you owe comes from the real balances you enter.',
+  lump: 'Only the payment is a row. It counts as that month\'s spending and brings down what you owe, and stops counting once nothing is owed. Press the amount on the card\'s line to type what the statement says.',
 }
 const TRACKABLE: AccountType[] = ['savings', 'investment', 'credit-card', 'loan', 'other-asset']
 const quoted = (rows: Row[]) => rows.map((r) => `"${r.name}"`).join(', ')
@@ -64,9 +64,8 @@ const quoted = (rows: Row[]) => rows.map((r) => `"${r.name}"`).join(', ')
 function followsText(change: AccountChange): string | null {
   const { follows, place } = change
   if (!follows.length || !place) return null
-  const does = place.kind === 'debt-payment' ? 'each payment brings down what is owed and counts as an expense of its month'
-    : place.section === 'transfer' ? 'each payment brings down what is owed and only moves money, so it is not counted as spending again'
-    : 'each payment counts as that month\'s spending; what is owed changes only with a real balance'
+  const does = place.section === 'transfer' ? 'each payment brings down what is owed and only moves money, so it is not counted as spending again'
+    : 'each payment brings down what is owed and counts as an expense of its month'
   const moving = follows.filter((r) => r.section !== place.section)
   const it = moving.length === 1 ? 'It' : 'They'
   const moves = !moving.length ? ''
@@ -123,7 +122,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
   const foreign = ccy !== baseCurrency && ccy.length === 3
   const info = ACCOUNT_TYPE_INFO.find((t) => t.value === type)
   const debt = type === 'loan' || type === 'credit-card'
-  // a card that records only its payments is not paid down by them: the payment is the spending
+  // a card that records only its payments is paid down by them as a loan is
   const onlyPayments = type === 'credit-card' && cardMode === 'lump'
   // a new loan or card comes with the row that pays it off unless the box is unticked; the row form brings its own row
   const offersRow = !account && !withRow && debt && preset?.payOff !== false
@@ -159,9 +158,9 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
   async function save() {
     const openingBalance = opening.trim() ? parseAmount(opening, ccy, locale) : 0
     if (openingBalance == null) return setError(unreadableAmount(opening, `"${balanceWord(type)} at the start" is not a number I can read.`))
-    // a payment to a loan stops at what is owed, so a loan that says nothing about it would take no payment at all
-    if (type === 'loan' && trackable && tracked && !opening.trim()) {
-      return setError('Type what is still owed on the loan, or untick "Track the balance month by month in the grid". A payment stops at what is owed, so with nothing owed the payments to this loan would count as nothing.')
+    // a payment stops at what is owed, so a loan or card that says nothing about it would take no payment at all
+    if ((type === 'loan' || onlyPayments) && trackable && tracked && !opening.trim()) {
+      return setError(`Type what is still owed on the ${type === 'loan' ? 'loan' : 'card'}, or untick "Track the balance month by month in the grid". A payment stops at what is owed, so with nothing owed the payments to this ${type === 'loan' ? 'loan' : 'card'} would count as nothing.`)
     }
     const annualRate = Number(annual.replace(',', '.')) / 100
     if (type === 'investment' && !Number.isFinite(annualRate)) return setError('Growth per year is not a number.')
@@ -227,7 +226,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
               <Check label="Add the row that pays it off" checked={payOff} onChange={(e) => setPayOff(e.target.checked)} />
               <p className="pl-6 text-xs text-muted-foreground" data-testid="acc-row">
                 {payOff
-                  ? <>{rowName ? `"${rowName}"` : 'Named after the account'}. {onlyPayments ? 'Each payment counts as that month\'s spending; what is owed changes only with a real balance.' : 'Each payment brings down what is owed.'}</>
+                  ? <>{rowName ? `"${rowName}"` : 'Named after the account'}. Each payment brings down what is owed.</>
                   : 'No row yet. One can be added later from this form.'}
               </p>
             </div>
@@ -240,7 +239,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
           {paidBy && (
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:col-span-2" data-testid="acc-paid-by">
               {paidBy.length > 0
-                ? <p>{onlyPayments ? 'Payments:' : 'Paid off by'} {paidBy.map((r) => `"${r.name}"`).join(', ')}.</p>
+                ? <p>Paid off by {paidBy.map((r) => `"${r.name}"`).join(', ')}.</p>
                 : type === account?.type && (
                   <>
                     <p>No row pays this off yet.</p>

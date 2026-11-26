@@ -96,8 +96,6 @@ export function bridgeOf(view: View, m: MonthKey): Bridge {
   }
 
   let toSavingsRows: Money = 0
-  /** Paid to a card that records only its payments: spending, and nothing that changes what is owed. */
-  let paidToLumpCards: Money = 0
   for (const row of engine.rows) {
     const c = engine.cells[cellKey(row.id, m)]
     if (!c || c.source === 'archived') continue
@@ -125,9 +123,6 @@ export function bridgeOf(view: View, m: MonthKey): Bridge {
       // "moved elsewhere", and no account receives it.
       route(row.accountId, v)
       recorded(row.accountId, c, 1)
-    } else if (row.kind === 'card-payment' && account?.type === 'credit-card' && !cardIsItemized(account)) {
-      // nothing says what was bought on such a card, so its payment is what was spent; what is owed moves only with a real balance
-      paidToLumpCards += v
     } else if (row.kind === 'debt-payment' || row.kind === 'card-payment') {
       owe(row.accountId, v)
       recorded(row.accountId, c, -1)
@@ -154,8 +149,8 @@ export function bridgeOf(view: View, m: MonthKey): Bridge {
 
   // ---------- the month's own sums ----------
   terms.income = t.income - t.fromAccounts
-  // payments that bring a debt down are no spending; a payment to a card that records only its payments is
-  terms.spending = -(t.expensesTotal - t.debt + paidToLumpCards)
+  // payments that bring a debt down are no spending
+  terms.spending = -(t.expensesTotal - t.debt)
   terms['pocket money'] = -t.pocket
   terms['moved elsewhere'] = -t.moved
 
@@ -172,9 +167,9 @@ export function bridgeOf(view: View, m: MonthKey): Bridge {
       if (before) count('accounts starting or ending', -before.balanceBase)
       continue
     }
-    // rule C1: a payment stops at what is owed, so the rows never take a loan below nothing
-    if (acc?.type === 'loan' && r.start >= 0 && r.computed < 0) {
-      problems.push(`"${acc.name}" was paid down to ${moneyText(r.computed)} in ${monthName(m)}: a payment to a loan stops at what is owed.`)
+    // rule C1: a payment stops at what is owed, so the rows never take a loan below nothing, nor a card that records only its payments
+    if (acc && (acc.type === 'loan' || (acc.type === 'credit-card' && !cardIsItemized(acc))) && r.start >= 0 && r.computed < 0) {
+      problems.push(`"${acc.name}" was paid down to ${moneyText(r.computed)} in ${monthName(m)}: a payment stops at what is owed.`)
     }
     const foreign = series.currency !== base
     const opening = before ? 0 : inBase(series.currency, r.start)

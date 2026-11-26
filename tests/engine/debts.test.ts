@@ -24,7 +24,7 @@ describe('cards, loans, other assets and net worth', () => {
     expect(out.main!.months['2026-01'].balance).toBe(-50_00)
     expect(out.netWorth['2026-01']).toBe(-150_00 - 50_00)
   })
-  it('lump card: the payment is the expense; what is owed only comes from real balances', () => {
+  it('lump card: the payment is the expense and brings down what is owed; a real balance says what the statement says', () => {
     const card = account({ name: 'Amex', type: 'credit-card', openingBalance: 500_00, card: { cardMode: 'lump' } })
     const salary = row({ name: 'Salary', section: 'income' })
     const pay = row({ name: 'Pay Amex', section: 'transfer', kind: 'card-payment', accountId: card.id, order: 'c0' })
@@ -32,13 +32,15 @@ describe('cards, loans, other assets and net worth', () => {
     const out = computeEngine({ tables: t, months })
     expect(out.totals['2026-01'].debt).toBe(300_00)
     expect(out.totals['2026-01'].toSavings).toBe(1700_00)
-    // the payment does not bring down what is owed: nothing says what was bought, so only a real balance can say it
+    // the payment brings down what is owed, as a loan's does (rule C1)
     const s = out.accounts[card.id]
-    expect(s.months['2026-01']).toMatchObject({ balance: 500_00, inflow: 0, outflow: 0 })
-    expect(s.months['2026-02']).toMatchObject({ balance: 420_00, projected: false })
-    expect(s.months['2026-03'].balance).toBe(420_00) // the carried payment of 300 is March's spending, and 420 is still owed
-    // so the payment costs net worth what it is: with the 500 paid down as before, January would end 300 higher
-    expect(out.netWorth['2026-01']).toBe(-500_00)
+    expect(s.months['2026-01']).toMatchObject({ start: 500_00, balance: 200_00, inflow: 0, outflow: 300_00 })
+    // February's payment stops at the 200 still owed; the statement says 420, which is 420 the plan did not have
+    expect(out.totals['2026-02'].debt).toBe(200_00)
+    expect(s.months['2026-02']).toMatchObject({ computed: 0, balance: 420_00, adjustment: 420_00, projected: false })
+    expect(s.months['2026-03'].balance).toBe(120_00)
+    // no account takes what the month leaves here, so net worth is what is still owed
+    expect(out.netWorth['2026-01']).toBe(-200_00)
   })
   it('loan: debt payments bring the outstanding amount down; other assets carry until pinned; net worth converts currencies', () => {
     const loan = account({ name: 'Car loan', type: 'loan', openingBalance: 5000_00 })

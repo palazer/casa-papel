@@ -128,9 +128,24 @@ describe('a card that becomes a loan, with payments in months that are over', ()
   beforeEach(() => setToday('2026-06-15'))
   afterEach(restoreToday)
 
-  it('asks with the account and its row as one change; Cancel writes neither, "Save anyway" both', async () => {
+  it('a card that records only its payments reads like a loan already: the change moves no figure, asks nothing, and writes account and row', async () => {
     const { store } = await fresh()
     const { account, row } = await addAccountWithRow(store, { name: 'Card', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01', openingBalance: 5000_00, card: { cardMode: 'lump' } }, { kind: 'pay-off' })
+    await setCellValue(store, row.id, '2026-01', 100_00, 'from-now-on')
+    const { asked } = answering(store, 'cancel')
+    const stored = async () => {
+      const t = await loadTables(store)
+      return [t.accounts.find((a) => a.id === account.id)!.type, t.rows.find((r) => r.id === row.id)!.kind]
+    }
+
+    await updateAccount(store, account.id, { type: 'loan', card: undefined })
+    expect(asked).toHaveLength(0)
+    expect(await stored()).toEqual(['loan', 'debt-payment'])
+  })
+
+  it('a card whose purchases are expense rows: the payment becomes an expense of months that are over, so the change asks; Cancel writes neither record', async () => {
+    const { store } = await fresh()
+    const { account, row } = await addAccountWithRow(store, { name: 'Card', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01', openingBalance: 5000_00, card: { cardMode: 'itemized' } }, { kind: 'pay-off' })
     await setCellValue(store, row.id, '2026-01', 100_00, 'from-now-on')
     const { asked, say } = answering(store, 'cancel')
     const stored = async () => {
@@ -140,8 +155,6 @@ describe('a card that becomes a loan, with payments in months that are over', ()
 
     await expect(updateAccount(store, account.id, { type: 'loan', card: undefined })).rejects.toBeInstanceOf(PastChangeCancelled)
     expect(asked).toHaveLength(1)
-    // what is owed falls with every payment that is over: the question says so before anything is written
-    expect(asked[0].changes.lines.map((l) => changeLineText(l, asked[0].locale))).toContain('"Card" at the end of May 2026: €5,000.00 → €4,500.00')
     expect(await stored()).toEqual(['credit-card', 'card-payment'])
 
     say.answer = 'save'

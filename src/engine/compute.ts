@@ -377,7 +377,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
   // owed, the payments count again by themselves.
   const loanSeries: Record<string, AccountSeries> = {}
   {
-    const loans = accounts.filter((a) => a.type === 'loan' && a.tracked)
+    // a card that records only its payments is brought down by them like a loan (rule C1)
+    const loans = accounts.filter((a) => a.tracked && (a.type === 'loan' || (a.type === 'credit-card' && !cardIsItemized(a))))
     /** Put another amount into a cell, with everything that follows from it scaled the same way. */
     const setAmount = (c: CellResult, value: Money): void => {
       const f = c.value !== 0 ? value / c.value : 0
@@ -402,7 +403,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
       })
       c.value = value
     }
-    const paymentsOf = new Map(loans.map((a) => [a.id, rows.filter((r) => r.kind === 'debt-payment' && r.accountId === a.id)]))
+    // any row that pays a debt off and names this one: the kind it was made with (for a loan, for a card) decides nothing
+    const paymentsOf = new Map(loans.map((a) => [a.id, rows.filter((r) => (r.kind === 'debt-payment' || r.kind === 'card-payment') && r.accountId === a.id)]))
     const followersOf = (rowId: string) => rows.filter((r) => r.followsRowId === rowId && !rules.byRow.get(r.id))
     const owed = new Map<string, Money>()
     for (const acc of loans) loanSeries[acc.id] = { accountId: acc.id, currency: acc.currency, liability: true, ...(isOutsideNetWorth(acc) ? { outside: true as const } : {}), months: {} }
@@ -864,8 +866,9 @@ export function computeEngine(input: EngineInput): EngineOutput {
     // Cash and an other current account always have a balance: while they counted with the current accounts they
     // were stored as untracked, with no say in it, so their flag says nothing (`ownBalance`).
     if (!ownBalance(acc)) continue
-    // a loan's months were worked out before the month's sums, with its payments cut at what was owed
-    if (acc.type === 'loan') {
+    // a loan's months, and those of a card that records only its payments, were worked out before the month's sums,
+    // with the payments cut at what was owed
+    if (loanSeries[acc.id]) {
       accountSeries[acc.id] = loanSeries[acc.id]
       continue
     }
@@ -883,9 +886,8 @@ export function computeEngine(input: EngineInput): EngineOutput {
           if (row.accountId !== acc.id) continue
           const c = cells[cellKey(row.id, m)]
           if (!c || c.value === 0 || c.source === 'archived') continue
-          // A card whose purchases are expense rows grows with them and shrinks with its payment. On a card that
-          // records only its payments the payment is the spending itself: nothing says what was bought, so nothing
-          // here can say what is owed. It stays as it is until a real balance is entered.
+          // A card whose purchases are expense rows grows with them and shrinks with its payment. (A card that
+          // records only its payments never comes here: it has its months from the loans' pass.)
           if (!itemized) continue
           if (row.kind === 'card-payment') outflow += inAccountCurrency(acc, c, m)
           else if (row.section === 'expense') inflow += inAccountCurrency(acc, c, m)

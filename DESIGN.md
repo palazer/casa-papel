@@ -466,9 +466,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   with two ends, and both ends say so: two chain rings (`Link2`, 14 px, muted, in a 20 px slot like the rule symbol,
   before it) on a row that fills, takes from or pays off an account, and on that account's or virtual account's
   line. It is a button named after the other end (`Pays off Car loan: go there`, `Paid off by Car loan – Payment: go
-  there`, `Filled by To savings; Money taken by Car repair: go there`). A card that records only its payments is not
-  paid off by its row, so both ends say what is true there: `Paid to Amex` on the row, `Payments: Amex – Payment` on
-  the card, whose line also carries the grey note `changes with real balances only`. Pressing it opens whatever hides the other
+  there`, `Filled by To savings; Money taken by Car repair: go there`). A card that records only its payments is
+  paid off by its row as a loan is, and says so with the same words. Pressing it opens whatever hides the other
   end, scrolls it to the middle of the window, moves the keyboard to it and marks the line for two seconds with
   `bg-muted ring-2 ring-inset ring-ring` (`data-marked`), never with the lime. A loan or a card that never had a
   payment row shows `Link2Off` at half strength (`No row pays off <name> yet: add the row that pays it off`):
@@ -957,8 +956,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   payment brings down what is owed.`); one Save makes both in one step, one Undo takes both away, and on the
   Statement the row's dialog opens next for the amount. Unticked, the form of the saved account says `No row pays
   this off yet.` with an outline `xs` button `Add the row that pays it off`; once a row does, the same line reads
-  `Paid off by "<row>".` (`Payments: "<row>".` for a card that records only its payments, where the sentence under
-  the box reads `Each payment counts as that month's spending; what is owed changes only with a real balance.`).
+  `Paid off by "<row>".` A tracked loan, and a tracked card that records only its payments, needs an amount owed:
+  without one Save is refused with the reason (a payment stops at what is owed, so it would count as nothing).
   Opened from the row form, the dialog says `Saving also adds the row "<name>", linked to
   this account.` in place of the box.
   An account that changes says before saving what its rows do, asked of the planner the store writes with

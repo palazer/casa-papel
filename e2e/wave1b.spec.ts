@@ -296,6 +296,10 @@ test.describe('wave 1b', () => {
     await expect(dlg.getByLabel('Type')).toHaveValue('credit-card')
     await dlg.getByRole('radio', { name: 'Only what I pay to it' }).click()
     await expect(dlg).toContainText('Only the payment is a row')
+    // such a card says what is owed on it: a payment stops at that amount
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg.getByRole('alert')).toContainText('Type what is still owed on the card')
+    await dlg.getByLabel(/^Owed at the start of/).fill('200')
     // the row that pays it off is offered with the card; this household adds it later
     await dlg.getByRole('checkbox', { name: 'Add the row that pays it off' }).uncheck()
     await dlg.getByRole('button', { name: 'Save' }).click()

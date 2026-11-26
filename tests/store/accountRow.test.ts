@@ -92,12 +92,12 @@ describe('a loan or a card that changes: the row that pays it off follows', () =
   const accountOf = async (store: Store, id: string) => (await loadTables(store)).accounts.find((a) => a.id === id)!
   const engineOf = async (store: Store) => computeEngine({ tables: await loadTables(store), months })
 
-  it('a card that becomes a loan is brought down by its payment, which stays an expense', async () => {
+  it('a card that becomes a loan is brought down by its payment as before, and the payment stays an expense', async () => {
     const store = await fresh()
     const { account, row } = await addAccountWithRow(store, { name: 'Card', type: 'credit-card', currency: 'EUR', openingMonth: '2026-01', openingBalance: 94000_00, card: { cardMode: 'lump' } }, { kind: 'pay-off' })
     await setCellValue(store, row.id, '2026-01', 5000_00, 'from-now-on')
-    // only the payments are recorded: what is owed stays
-    expect((await engineOf(store)).accounts[account.id].months['2026-02'].balance).toBe(94000_00)
+    // a card that records only its payments comes down with them, as a loan does
+    expect((await engineOf(store)).accounts[account.id].months['2026-02'].balance).toBe(84000_00)
     const expenses = (await engineOf(store)).totals['2026-01'].expensesTotal
 
     await updateAccount(store, account.id, { type: 'loan', card: undefined })
@@ -150,10 +150,10 @@ describe('a loan or a card that changes: the row that pays it off follows', () =
     // the payment brings the card down and is no purchase on it
     expect(out.accounts[account.id].months['2026-01'].balance).toBe(4750_00)
 
-    // "Only what I pay to it": back under Expenses, where the payment is the spending
+    // "Only what I pay to it": back under Expenses, where the payment is the spending and still brings the card down
     await updateAccount(store, account.id, { card: { cardMode: 'lump' } })
     expect(await rowOf(store, row.id)).toMatchObject({ kind: 'card-payment', section: 'expense', categoryId: null })
-    expect((await engineOf(store)).accounts[account.id].months['2026-02'].balance).toBe(5000_00)
+    expect((await engineOf(store)).accounts[account.id].months['2026-02'].balance).toBe(4500_00)
   })
 
   it('several rows move together in the order they had, an archived one too, and a row that fits is not written', async () => {

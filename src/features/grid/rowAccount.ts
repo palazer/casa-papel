@@ -51,7 +51,7 @@ export function accountHelp(row: Row): string {
     case 'debt-payment':
       return 'The loan this row pays down. What is still owed falls by the amount.'
     case 'card-payment':
-      return 'The card this row pays. On a card whose purchases are expense rows, what is owed falls by the amount. On a card that records only its payments, the payment is the spending, and what is owed changes only with a real balance.'
+      return 'The card this row pays. What is owed falls by the amount. On a card that records only its payments the payment also counts as spending in its month, and stops at what is owed.'
     case 'pocket-money':
       return 'An account of this adult\'s own that net worth leaves out. The pocket money raises its balance each month; it still leaves the month, and "Per person" still counts it. With "Nowhere" the app does not follow it.'
     default:

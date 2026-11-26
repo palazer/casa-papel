@@ -56,7 +56,7 @@ describe('per person: what each adult brings, spends on themselves and takes', (
   it('a payment to a card whose purchases are expense rows is nobody\'s spending a second time; a lump card\'s payment is', () => {
     const a = ent('adult', 'A', 'a0')
     const itemized = account({ name: 'Visa', type: 'credit-card', card: { cardMode: 'itemized' } })
-    const lump = account({ name: 'Amex', type: 'credit-card', card: { cardMode: 'lump' } })
+    const lump = account({ name: 'Amex', type: 'credit-card', openingBalance: 500_00, card: { cardMode: 'lump' } })
     const salaryA = row({ name: 'A salary', section: 'income', kind: 'salary', scope: a.id })
     const shoes = row({ name: 'A shoes', section: 'expense', scope: a.id, accountId: itemized.id, order: 'b0' })
     const visaPay = row({ name: 'Visa payment', section: 'expense', kind: 'card-payment', scope: a.id, accountId: itemized.id, order: 'b1' })

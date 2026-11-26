@@ -14,7 +14,7 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
 | F2 | Money "moved between your accounts" lowers net worth | net worth is wrong | the row names the account that receives it | closed |
 | F3 | The month after an exception holds an amount nobody typed | amounts can change by surprise | with step 3 | closed |
 | F4 | A loan that is paid off keeps taking payments | net worth is right, the debt reads below zero | the payment stops at what is owed | closed |
-| F5 | A card that records only its payments never lowers net worth | net worth is wrong | payments do not move what is owed | closed |
+| F5 | A card that records only its payments never lowers net worth | net worth is wrong | payments do not move what is owed | closed; the decision was reversed on 26 November 2026 |
 | F6 | The Statement's change for a virtual account that ran short | one figure on the Statement | show the change of the balance | closed |
 | F7 | Restoring does not bring back what archiving changed with it | amounts stay changed | restore puts it back | closed |
 | F8 | Undo of a schedule added from the list empties the row's months | amounts are lost | save the schedule and its months as one step | closed |
@@ -152,6 +152,17 @@ text and its scenario keeps the finding's number: the scenario is what stops it 
   stays as it is until a real balance is typed for the card, and net worth falls by the payment. On the Statement
   the payment's link reads "Paid to Amex", the card's line links back with "Payments: …" and carries the note
   "changes with real balances only". The forms say the same.
+- **Reversed** (26 November 2026). The owner's decision in the redesign of credit cards: a card is a debt that is
+  followed by its payment and its statement, so a payment to such a card brings down what is owed, as a loan's does
+  (rule C1), and counts as an expense of its month. It stops at what is owed (finding F4), so the card no longer
+  reads below zero, which was this finding's first fault. Its second, spending that never reaches net worth, does
+  not arise where what is bought with the card are rows of their own and the payment is what is paid on top; what
+  the rows do not say comes in with the statement's figure, typed as a real balance, and lowers net worth as
+  "real balances". The scenarios were rewritten: "A card that records only its payments: the payment is the month's
+  expense and brings down what is owed", "Paying such a card down does not change net worth", "The last payment to
+  such a card is what is still owed, and after it the payment counts as nothing", "The statement says more is owed
+  on such a card than the plan worked out, and the payments count again". "Paid to …", "Payments: …" and the note
+  "changes with real balances only" are gone.
 
 ### F6. The Statement's change for a virtual account that ran short
 
