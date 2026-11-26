@@ -3,6 +3,9 @@
   "plugins": ["react", "typescript", "oxc"],
   "rules": {
     "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
+    "react/only-export-components": ["warn", { "allowConstantExport": true }],
+    "react/jsx-no-literals": ["error", {
+      "allowedStrings": ["·", "=", "≈", "—", ".", ":", "…", "+", "−", "\"", "(", ")", "1", "= ?", "€210.00", "-€210.00", "+€120.00", "-€80.00", "€8,000.00"]
+    }]
   }
 }

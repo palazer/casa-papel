@@ -1330,22 +1330,30 @@ feature switch; a second one follows the same form.
 Every text the app shows comes from a catalogue in `src/i18n/`, read through one handle: `txt.statement.parts.paid`,
 `txt.errors.archived(name)`. There is no translation library.
 
-- **One catalogue per language, in parts.** `src/i18n/en/` is the source: one file per area (`model`, `names`,
-  `statement`, `engine`, `errors`, `store`, `impact`, `app`, `help`, `guide`, and one per feature folder). Another
-  language's catalogue is typed against the English one, so a text that is missing there is a type error and never
-  a blank on the screen.
+- **One catalogue per language, in parts.** `src/i18n/en/` is the source, one file per area: the words many screens
+  share (`common`), the model's tables (`model`), names the app writes into a household (`names`), what the
+  calculation and the store say (`statement`, `engine`, `errors`, `store`, `impact`), the app's own tables (`app`,
+  `help`, `guide`), and one part per folder of `src/features` and for `src/components`. Inside a part the texts of
+  one file stand together (`txt.grid.cell`, `txt.household.pools`); a component reads its own through
+  `const T = txt.<part>.<file>`. Another language's catalogue is typed against the English one, so a text that is
+  missing there is a type error and never a blank on the screen.
 - **A text is a plain string, or a small function** where a name, a number or a month goes in. A sentence is never
-  put together from fragments outside the catalogue: the function gets the names (as a list where there can be
-  several), the counts and the formatted amounts, and words the whole sentence, so each language can order it its
-  own way. What a language needs for that (a plural, a list of quoted names) lives in its catalogue file.
+  put together from fragments outside the catalogue: the function gets the names, the counts and the formatted
+  amounts and months, and words the whole sentence, so each language can order it its own way. What decides the
+  wording (one or many, with or without a target month) is handed in as it is, and the catalogue decides.
+- **A sentence with something set apart in it** (a name in bold) is a function that returns its parts in order;
+  `sentence()` from `src/lib/sentence.ts` makes one node of them: `sentence(T.signedInAs(<strong>{email}</strong>))`.
 - **No text is written where it is used**: not in a component, not in a thrown error, not in a table. An error stays
-  a sentence, made where it is thrown: `throw new Error(txt.errors.rowNotFound)`.
+  a sentence, made where it is thrown: `throw new Error(txt.errors.rowNotFound)`. Two guards keep it so: the lint
+  rule `react/jsx-no-literals` (signs such as "·" and "=" are allowed, words are not) and
+  `tests/i18n/guard.test.ts`, which fails on an error thrown with a sentence of its own.
 - **Tables keep their names.** `HELP`, `GUIDE`, `SCREENS`, `SECTION_INFO`, `ACCOUNT_TYPE_INFO` and the like are built
   from the catalogue when the app starts, so the code that reads them does not know about languages.
 - **One language per page load.** It is read once (`lang` in `src/i18n/index.ts`), before any of those tables is
   built; the calculation and the store read the same catalogue as the screens, so no function takes a language.
-- **A label in lower case** goes through `lower()`, which uses the language's own rule. Where a lower-cased label
-  would stand inside a sentence, the catalogue holds the whole sentence instead.
+- **A label in lower case** goes through `lower()`, which uses the language's own rule.
+- **Nothing finds an element by its words.** Code that has to tell one control from another uses an attribute
+  (`data-info` on every (i)), never the text of a label.
 - **Names the household typed are never translated or changed**, and nothing is glued to them: a name stands in
   quotes or at the start of a phrase ("Sam – Salary").
 - **Numbers, amounts and date order** follow the household's "Number format", not the language.
