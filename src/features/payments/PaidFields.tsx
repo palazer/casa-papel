@@ -5,6 +5,9 @@ import { cn } from '@/lib/utils'
 import { ordinalDay } from '@/app/format'
 import type { Tables } from '@/model'
 import { methodChoices, methodOption } from './methods'
+import { txt } from '@/i18n'
+
+const T = txt.payments.fields
 
 const DAYS = Array.from({ length: 31 }, (_, i) => i + 1)
 
@@ -13,7 +16,7 @@ const DAYS = Array.from({ length: 31 }, (_, i) => i + 1)
  * `No day` where nothing stands behind it, `Usual: 1st` on an item that then follows its row, `As scheduled: 5th`
  * on one that follows its schedule.
  */
-export function DaySelect({ value, onChange, none = 'No day', label = 'Paid on', id, className }: {
+export function DaySelect({ value, onChange, none = txt.common.noDay, label = txt.common.paidOn, id, className }: {
   value: number | null; onChange: (day: number | null) => void; none?: string; label?: string; id?: string; className?: string
 }) {
   return (
@@ -25,7 +28,7 @@ export function DaySelect({ value, onChange, none = 'No day', label = 'Paid on',
 }
 
 /** "Paid with": one of the household's payment methods, by name with its note, or the first choice, which names none (see `DaySelect`). */
-export function MethodSelect({ tables, value, onChange, none = 'No method', label = 'Paid with', id, className }: {
+export function MethodSelect({ tables, value, onChange, none = txt.common.noMethod, label = txt.common.paidWith, id, className }: {
   tables: Pick<Tables, 'paymentMethods' | 'accounts'>; value: string | null; onChange: (methodId: string | null) => void; none?: string; label?: string; id?: string; className?: string
 }) {
   return (
@@ -50,13 +53,13 @@ export function UsualPaidFields({ tables, day, methodId, onDay, onMethod, says, 
   const none = tables.paymentMethods.every((m) => m.deletedAt || m.archived)
   return (
     <fieldset className="space-y-1.5" data-testid="usually-paid">
-      <legend className={cn('text-sm font-medium', titled && 'sr-only')}><span className="inline-flex items-center gap-1">Usually paid {!titled && <InfoTip help="payments.usual" />}</span></legend>
+      <legend className={cn('text-sm font-medium', titled && 'sr-only')}><span className="inline-flex items-center gap-1">{T.usuallyPaid} {!titled && <InfoTip help="payments.usual" />}</span></legend>
       <div className="grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)]">
-        <div className="space-y-1"><Label htmlFor={`${idPrefix}-day`} className="text-xs text-muted-foreground">Paid on</Label><DaySelect id={`${idPrefix}-day`} className="w-full" value={day} onChange={onDay} /></div>
-        <div className="space-y-1"><Label htmlFor={`${idPrefix}-method`} className="text-xs text-muted-foreground">Paid with</Label><MethodSelect id={`${idPrefix}-method`} className="w-full" tables={tables} value={methodId} onChange={onMethod} /></div>
+        <div className="space-y-1"><Label htmlFor={`${idPrefix}-day`} className="text-xs text-muted-foreground">{txt.common.paidOn}</Label><DaySelect id={`${idPrefix}-day`} className="w-full" value={day} onChange={onDay} /></div>
+        <div className="space-y-1"><Label htmlFor={`${idPrefix}-method`} className="text-xs text-muted-foreground">{txt.common.paidWith}</Label><MethodSelect id={`${idPrefix}-method`} className="w-full" tables={tables} value={methodId} onChange={onMethod} /></div>
       </div>
-      <p className="text-xs text-muted-foreground">{says}{day != null && day > 28 ? ` In a shorter month the ${ordinalDay(day)} is its last day.` : ''}</p>
-      {none && <p className="text-xs text-muted-foreground">No payment methods yet: add them under Household → "Payment methods".</p>}
+      <p className="text-xs text-muted-foreground">{T.withShortMonth(says, day != null && day > 28 ? ordinalDay(day) : null)}</p>
+      {none && <p className="text-xs text-muted-foreground">{T.noPaymentMethodsYet}</p>}
     </fieldset>
   )
 }

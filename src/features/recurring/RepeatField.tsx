@@ -2,11 +2,14 @@ import { Check } from '@/components/Check'
 import { NativeSelect } from '@/components/NativeSelect'
 import { cadenceOf, dueMonthNumbers, parseMonth, type MonthKey, type RepeatChoice } from '@/model'
 import { landsText, monthName } from './repeatText'
+import { txt } from '@/i18n'
+
+const T = txt.recurring.field
 
 type Option = 'none' | '1' | '2' | '3' | '6' | '12' | 'months'
 const RHYTHMS: Array<{ value: Exclude<Option, 'none'>; label: string }> = [
-  { value: '1', label: 'Every month' }, { value: '2', label: 'Every 2 months' }, { value: '3', label: 'Every 3 months' },
-  { value: '6', label: 'Every 6 months' }, { value: '12', label: 'Every year' }, { value: 'months', label: 'In chosen months' },
+  { value: '1', label: T.everyMonth }, { value: '2', label: T.every2Months }, { value: '3', label: T.every3Months },
+  { value: '6', label: T.every6Months }, { value: '12', label: T.everyYear }, { value: 'months', label: T.inChosenMonths },
 ]
 const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 const optionOf = (c: RepeatChoice): Option => (c.kind === 'none' ? 'none' : c.kind === 'months' ? 'months' : (String(c.interval) as Option))
@@ -16,7 +19,7 @@ const optionOf = (c: RepeatChoice): Option => (c.kind === 'none' ? 'none' : c.ki
  * one, twelve boxes for chosen months, and a sentence that says where it lands. A rhythm picked here lands in the
  * month the dialog is on unless another month is picked; the sentence then says that it does not.
  */
-export function RepeatField({ value, onChange, month, locale, name, label = 'Repeats', none, monthly = true }: {
+export function RepeatField({ value, onChange, month, locale, name, label = txt.common.repeats, none, monthly = true }: {
   value: RepeatChoice
   onChange: (choice: RepeatChoice) => void
   /** The month the dialog is on. */
@@ -51,7 +54,7 @@ export function RepeatField({ value, onChange, month, locale, name, label = 'Rep
           <>
             <span className="text-muted-foreground">{value.interval === 12 ? 'in' : 'from'}</span>
             <NativeSelect
-              aria-label={`${value.interval === 12 ? 'In which month' : 'From which month'}, ${name}`} className="h-7 text-xs"
+              aria-label={T.whichMonthOf(value.interval, name)} className="h-7 text-xs"
               value={value.anchor} onChange={(e) => onChange({ ...value, anchor: Number(e.target.value) })}
             >
               {MONTHS.map((m) => <option key={m} value={m}>{monthName(m, locale)}</option>)}
@@ -60,7 +63,7 @@ export function RepeatField({ value, onChange, month, locale, name, label = 'Rep
         )}
       </div>
       {value.kind === 'months' && (
-        <fieldset className="grid grid-cols-4 gap-x-2 gap-y-1 sm:grid-cols-6" aria-label={`Months, ${name}`}>
+        <fieldset className="grid grid-cols-4 gap-x-2 gap-y-1 sm:grid-cols-6" aria-label={T.monthsOf(name)}>
           {MONTHS.map((m) => (
             <Check
               key={m} className="text-xs" label={monthName(m, locale, 'short')} checked={value.months.includes(m)}

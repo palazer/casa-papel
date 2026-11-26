@@ -9,6 +9,9 @@ import { HELP } from '@/app/help'
 import { screenDef, useScreen } from '@/app/screens'
 import { isDemoMode, openDemoSandbox } from '@/app/store'
 import { highlightRanges, queryWords, searchGuide } from './search'
+import { txt } from '@/i18n'
+
+const T = txt.guide.screen
 
 /** A text with the query's words wrapped in `<mark>`; the plain text when nothing is searched. */
 function Highlight({ text, words }: { text: string; words: string[] }) {
@@ -50,11 +53,11 @@ function Topic({ topic, words, go }: { topic: GuideTopic; words: string[]; go: (
         <ol className="list-decimal space-y-1 pl-5">
           {topic.steps.map((s) => <li key={s.slice(0, 32)}><Highlight text={s} words={words} /></li>)}
         </ol>
-        {topic.facts && <Pairs title={topic.factsTitle ?? 'The choices'} items={topic.facts} words={words} />}
-        {topic.tips.length > 0 && <Pairs title="Related tips" items={topic.tips.map((k) => ({ label: HELP[k].title, text: HELP[k].text }))} words={words} />}
+        {topic.facts && <Pairs title={topic.factsTitle ?? T.theChoices} items={topic.facts} words={words} />}
+        {topic.tips.length > 0 && <Pairs title={T.relatedTips} items={topic.tips.map((k) => ({ label: HELP[k].title, text: HELP[k].text }))} words={words} />}
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <Button size="xs" variant="outline" onClick={() => go(topic.open)}>Open {screenDef(topic.open).label}</Button>
-          <a href="#guide-topics" className={buttonVariants({ size: 'xs', variant: 'ghost' })}>Topics</a>
+          <Button size="xs" variant="outline" onClick={() => go(topic.open)}>{T.open(screenDef(topic.open).label)}</Button>
+          <a href="#guide-topics" className={buttonVariants({ size: 'xs', variant: 'ghost' })}>{T.topics}</a>
         </div>
       </div>
     </Island>
@@ -90,14 +93,14 @@ export function GuideScreen() {
 
   const shown = query.trim()
   const status = !searching ? null
-    : topics.length === 0 ? `Nothing matches "${shown}". Try another word.`
-      : `${topics.length} ${topics.length === 1 ? 'topic matches' : 'topics match'} "${shown}"`
+    : topics.length === 0 ? T.nothingMatchesTryAnother(shown)
+      : T.topicsMatch(topics.length, shown)
   const keys = (e: KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Escape') setQuery('') }
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Guide" subline="How Casa Papel works, topic by topic" controls={false}>
-        <Input type="search" aria-label="Search the guide" placeholder="Search the guide" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={keys} className="h-7 w-64 max-md:w-full" />
+      <PageHeader title={T.guide} subline={T.howCasaPapelWorks} controls={false}>
+        <Input type="search" aria-label={T.searchTheGuide} placeholder={T.searchTheGuide} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={keys} className="h-7 w-64 max-md:w-full" />
         {status && <p role="status" className="basis-full text-muted-foreground">{status}</p>}
       </PageHeader>
       <GroupTabs />
@@ -108,14 +111,14 @@ export function GuideScreen() {
               {GUIDE_LEAD.paragraphs.map((p) => <p key={p.slice(0, 24)}>{p}</p>)}
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              {!isDemoMode() && <Button size="xs" variant="outline" onClick={openDemoSandbox}>Try the demo</Button>}
-              <a href={REPO_URL} target="_blank" rel="noreferrer" className={buttonVariants({ size: 'xs', variant: 'ghost' })}>Open on GitHub</a>
+              {!isDemoMode() && <Button size="xs" variant="outline" onClick={openDemoSandbox}>{T.tryTheDemo}</Button>}
+              <a href={REPO_URL} target="_blank" rel="noreferrer" className={buttonVariants({ size: 'xs', variant: 'ghost' })}>{T.openOnGithub}</a>
             </div>
           </Island>
         )}
         {!searching && (
-          <Island air as="div" title="Topics">
-            <nav id="guide-topics" aria-label="Topics" className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+          <Island air as="div" title={T.topics}>
+            <nav id="guide-topics" aria-label={T.topics} className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
               {GUIDE.map((t) => (
                 <a key={t.key} href={`#guide-${t.key}`} className="group rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <span className="text-sm font-medium text-foreground group-hover:underline">{t.title}</span>
@@ -126,7 +129,7 @@ export function GuideScreen() {
           </Island>
         )}
         {searching && hits.length > 0 && (
-          <nav aria-label="Results" className="rounded-lg border bg-card">
+          <nav aria-label={T.results} className="rounded-lg border bg-card">
             <ul className="divide-y divide-border/60">
               {hits.map((h) => (
                 <li key={h.topic.key}>

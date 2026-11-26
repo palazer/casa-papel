@@ -15,6 +15,9 @@ import { endRecurringItem, reactivateRecurringItem, recurringStatus, rowCurrency
 import { RemoveDialog } from '@/features/remove/RemoveDialog'
 import { RecurringDialog } from './RecurringDialog'
 import { saveError } from '@/app/saveError'
+import { txt } from '@/i18n'
+
+const T = txt.recurring.list
 
 const TH = 'px-1.5 py-1 font-semibold text-muted-foreground'
 const TD = 'px-1.5 py-0.5'
@@ -37,22 +40,22 @@ export function RecurringList({ engine }: {
   const items = tables.recurringItems.filter((r) => !r.deletedAt).sort((a, b) => a.name.localeCompare(b.name))
   const rowName = (id: string) => tables.rows.find((r) => r.id === id)?.name ?? '?'
   const accountName = (id: string | null) => (id ? tables.accounts.find((a) => a.id === id)?.name ?? '' : '')
-  const act = (fn: () => Promise<unknown>) => void fn().catch((e) => setError(saveError(e, 'Action failed')))
+  const act = (fn: () => Promise<unknown>) => void fn().catch((e) => setError(saveError(e, txt.common.actionFailed)))
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <MonthPicker months={months} month={m} onChange={setMonth} locale={locale} />
         <span className="text-muted-foreground">
-          What repeats is set where its amount is typed: open a row's month on the Statement or in the Grid and use "Repeats" under the amount or under an item. This is the full list, with the rest of each schedule behind "Edit…".
+          {T.whatRepeatsIsSet}
         </span>
-        <Button size="xs" className="ml-auto" onClick={() => setEditing('new')}>Add schedule</Button>
+        <Button size="xs" className="ml-auto" onClick={() => setEditing('new')}>{T.addSchedule}</Button>
       </div>
       {error && <p role="alert" className="text-destructive">{error}</p>}
       <div className="overflow-x-auto rounded-md border">
         <table className="w-full">
           <thead className="text-left">
-            <tr><th className={TH}>Name</th><th className={TH}>Row</th><th className={`${TH} text-right`}>Amount</th><th className={TH}>When</th><th className={TH}>Account</th><th className={TH}><span className="inline-flex items-center gap-1">{formatMonth(m, locale)}<InfoTip help="schedule.status" /></span></th><th className="px-1 py-1" /></tr>
+            <tr><th className={TH}>{txt.common.name}</th><th className={TH}>{T.row}</th><th className={`${TH} text-right`}>{T.amount}</th><th className={TH}>{T.when}</th><th className={TH}>{txt.common.account}</th><th className={TH}><span className="inline-flex items-center gap-1">{formatMonth(m, locale)}<InfoTip help="schedule.status" /></span></th><th className="px-1 py-1" /></tr>
           </thead>
           <tbody className="divide-y divide-border/60">
             {items.map((it) => {
@@ -66,32 +69,32 @@ export function RecurringList({ engine }: {
               return (
                 <Fragment key={it.id}>
                 <tr className={ended ? 'text-muted-foreground' : ''}>
-                  <td className={`${TD} font-medium`}>{it.name}{ended && <span className="ml-1 text-[10px] font-normal">(ended {formatMonth(it.endMonth!, locale)})</span>}</td>
+                  <td className={`${TD} font-medium`}>{it.name}{ended && <span className="ml-1 text-[10px] font-normal">{T.ended(formatMonth(it.endMonth!, locale))}</span>}</td>
                   <td className={TD}>{rowName(it.rowId)}</td>
                   <td className={`${TD} text-right tabular-nums`}>{formatAmount(it.amount, rowCurrencyOf(tables, it.rowId), locale)}</td>
                   <td className={TD}>{describeCadence(it, locale)}</td>
                   <td className={TD}>{accountName(it.accountId)}</td>
                   <td className={TD}>
-                    {status === 'not-due' ? <span className="text-muted-foreground">—</span> : paidOff ? <Chip tone="zinc">paid off</Chip> : (
+                    {status === 'not-due' ? <span className="text-muted-foreground">—</span> : paidOff ? <Chip tone="zinc">{T.paidOff}</Chip> : (
                       <Check
                         label={<Chip tone={status === 'paid' ? 'emerald' : status === 'skipped' ? 'zinc' : 'amber'}>{status === 'paid' ? 'paid' : status === 'skipped' ? 'skipped' : 'due'}</Chip>}
                         checked={status === 'paid'}
-                        aria-label={`${it.name} paid in ${formatMonth(m, locale)}`}
+                        aria-label={T.paidIn(it.name, formatMonth(m, locale))}
                         onChange={(e) => act(() => setRecurringPaid(store, it.id, m, e.target.checked))}
                       />
                     )}
                   </td>
                   <td className="px-1 py-0.5">
                     <DropdownMenu>
-                      <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" aria-label={`Menu for ${it.name}`} />}><MoreHorizontal /></DropdownMenuTrigger>
+                      <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" aria-label={T.menuFor(it.name)} />}><MoreHorizontal /></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setEditing(it)}>Edit…</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setEditing(it)}>{txt.common.editMore}</DropdownMenuItem>
                         {replaced ? null : ended ? (
-                          <DropdownMenuItem onClick={() => act(() => reactivateRecurringItem(store, it.id))}>Reactivate</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => act(() => reactivateRecurringItem(store, it.id))}>{T.reactivate}</DropdownMenuItem>
                         ) : (
-                          <DropdownMenuItem onClick={() => act(() => endRecurringItem(store, it.id, m))}>End after {formatMonth(m, locale)}</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => act(() => endRecurringItem(store, it.id, m))}>{T.endAfter(formatMonth(m, locale))}</DropdownMenuItem>
                         )}
-                        <DropdownMenuItem onClick={() => setRemoving(it)}>Delete…</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setRemoving(it)}>{txt.common.deleteMore}</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>
@@ -99,7 +102,7 @@ export function RecurringList({ engine }: {
                 </Fragment>
               )
             })}
-            {items.length === 0 && <tr><td colSpan={7} className="px-2 py-6 text-center text-muted-foreground">Nothing recurring yet. Rent, salary, insurance, subscriptions all belong here.</td></tr>}
+            {items.length === 0 && <tr><td colSpan={7} className="px-2 py-6 text-center text-muted-foreground">{T.nothingRecurringYetRent}</td></tr>}
           </tbody>
         </table>
       </div>

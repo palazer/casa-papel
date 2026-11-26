@@ -7,14 +7,17 @@ import { useScreen } from '@/app/screens'
 import { DoneDot } from './DoneDot'
 import { ESTIMATE_SHADE } from '@/app/display'
 import { cn } from '@/lib/utils'
+import { txt } from '@/i18n'
+
+const T = txt.components.legend
 
 const KINDS = [
-  { hue: HUES.income, label: 'Income' },
-  { hue: HUES.expense, label: 'Expenses' },
-  { hue: HUES.transfer, label: 'Transfers' },
-  { hue: HUES.worth, label: 'Balances and net worth' },
-  { hue: HUES.pool, label: 'Virtual accounts' },
-  { hue: HUES.goal, label: 'Goals' },
+  { hue: HUES.income, label: txt.common.income },
+  { hue: HUES.expense, label: txt.common.expenses },
+  { hue: HUES.transfer, label: txt.common.transfers },
+  { hue: HUES.worth, label: T.balancesAndNetWorth },
+  { hue: HUES.pool, label: txt.common.virtualAccounts },
+  { hue: HUES.goal, label: T.goals },
 ]
 
 const H4 = 'mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground'
@@ -38,10 +41,10 @@ export function MarksLegend({ neg }: { neg: boolean }) {
   const moreInGuide = () => go('guide', '#guide-marks')
   return (
     <Popover>
-      <PopoverTrigger render={<Button size="xs" variant="ghost" />}>Colours and marks</PopoverTrigger>
+      <PopoverTrigger render={<Button size="xs" variant="ghost" />}>{T.coloursAndMarks}</PopoverTrigger>
       <PopoverContent align="end" className="w-72 gap-3 p-3 text-xs">
         <section>
-          <h4 className={H4}>Kinds of money</h4>
+          <h4 className={H4}>{T.kindsOfMoney}</h4>
           <ul className="space-y-1">
             {KINDS.map((k) => (
               <li key={k.label} className="flex items-center gap-2">
@@ -52,25 +55,25 @@ export function MarksLegend({ neg }: { neg: boolean }) {
           </ul>
         </section>
         <section>
-          <h4 className={H4}>Marks</h4>
+          <h4 className={H4}>{T.marks}</h4>
           <ul className="space-y-1">
-            <Mark sample={<span className={ESTIMATE_SHADE}>€210.00</span>}>An estimate: on the yellow shade; a category too, while one of its lines is one</Mark>
-            <Mark sample={<span>€210.00</span>}>Certain: you know the amount</Mark>
-            <Mark sample={<DoneDot done={1} total={1} state="all" />}>Done: the money has moved</Mark>
-            <Mark sample={<span className="flex gap-1"><DoneDot done={0} total={1} state="none" /><DoneDot done={1} total={2} state="partial" /></span>}>This month only: nothing done yet, partly done</Mark>
-            {neg && <Mark sample={<span className={HUES.expense.text}>-€210.00</span>}>Spending, shown as a negative number</Mark>}
-            <Mark sample={<span className="text-draw">+€120.00</span>}>Drawn from savings this month</Mark>
-            <Mark sample={<span className={HUES.expense.text}>-€80.00</span>}>A balance below zero: a virtual account or savings in the red</Mark>
-            <Mark sample={<span className="underline decoration-dotted underline-offset-4">€8,000.00</span>}>A balance you entered yourself</Mark>
-            <Mark sample={<span className="rounded bg-muted/60 px-1.5 py-0.5 text-muted-foreground">Sept</span>}>A month that is over: grey in the Grid, "past" on the Statement. It can still be changed</Mark>
-            <Mark sample={<span className={cn('block h-4 w-14 rounded-sm ring-1 ring-border', HUES.expense.band)} aria-hidden />}>A faint band: the rows of one category</Mark>
-            <Mark sample={<Repeat className="size-3.5 text-muted-foreground" aria-hidden />}>On a schedule: it lands in its months by itself. In the months between, the line is grey and says when it lands next, and with how much</Mark>
-            {payments && <Mark sample={<span className="text-[11px] text-muted-foreground">15th</span>}>The day an amount goes out, on the Statement: press it for the month's payments</Mark>}
-            <Mark sample={<CircleSlash className="size-3.5 text-muted-foreground" aria-hidden />}>Not in net worth, on the Statement: an account that is a person's own. Its figures are grey, and no total counts it</Mark>
-            <Mark sample={<Link2 className="size-3.5 text-muted-foreground" aria-hidden />}>Linked, on the Statement: a row and the account it fills, takes from or pays off. Press it to go to the other end; faint and open, no row pays that loan or card off yet</Mark>
+            <Mark sample={<span className={ESTIMATE_SHADE}>€210.00</span>}>{T.anEstimateOnThe}</Mark>
+            <Mark sample={<span>€210.00</span>}>{T.certainYouKnowThe}</Mark>
+            <Mark sample={<DoneDot done={1} total={1} state="all" />}>{T.doneTheMoneyHas}</Mark>
+            <Mark sample={<span className="flex gap-1"><DoneDot done={0} total={1} state="none" /><DoneDot done={1} total={2} state="partial" /></span>}>{T.thisMonthOnlyNothing}</Mark>
+            {neg && <Mark sample={<span className={HUES.expense.text}>-€210.00</span>}>{T.spendingShownAsA}</Mark>}
+            <Mark sample={<span className="text-draw">+€120.00</span>}>{T.drawnFromSavingsThis}</Mark>
+            <Mark sample={<span className={HUES.expense.text}>-€80.00</span>}>{T.aBalanceBelowZero}</Mark>
+            <Mark sample={<span className="underline decoration-dotted underline-offset-4">€8,000.00</span>}>{T.aBalanceYouEntered}</Mark>
+            <Mark sample={<span className="rounded bg-muted/60 px-1.5 py-0.5 text-muted-foreground">{T.sampleMonth}</span>}>{T.aMonthThatIs}</Mark>
+            <Mark sample={<span className={cn('block h-4 w-14 rounded-sm ring-1 ring-border', HUES.expense.band)} aria-hidden />}>{T.aFaintBandThe}</Mark>
+            <Mark sample={<Repeat className="size-3.5 text-muted-foreground" aria-hidden />}>{T.onAScheduleIt}</Mark>
+            {payments && <Mark sample={<span className="text-[11px] text-muted-foreground">{T.sampleDay}</span>}>{T.theDayAnAmount}</Mark>}
+            <Mark sample={<CircleSlash className="size-3.5 text-muted-foreground" aria-hidden />}>{T.notInNetWorth}</Mark>
+            <Mark sample={<Link2 className="size-3.5 text-muted-foreground" aria-hidden />}>{T.linkedOnTheStatement}</Mark>
           </ul>
         </section>
-        <Button size="xs" variant="ghost" className="self-start" onClick={moreInGuide}>More in the Guide</Button>
+        <Button size="xs" variant="ghost" className="self-start" onClick={moreInGuide}>{T.moreInTheGuide}</Button>
       </PopoverContent>
     </Popover>
   )

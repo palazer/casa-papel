@@ -7,6 +7,9 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { Household, Tables } from '@/model'
 import { mainAccountChoice, setMainAccount } from '@/store'
+import { txt } from '@/i18n'
+
+const T = txt.main.question
 
 /**
  * Rule B9 on screen (DESIGN.md §8): once, after the app has put a household from before the rule right, it asks
@@ -30,7 +33,7 @@ export function MainAccountQuestion({ tables, household }: { tables: Tables; hou
     try {
       await setMainAccount(store, id)
     } catch (e) {
-      setError(saveError(e, 'Could not save.'))
+      setError(saveError(e, txt.common.couldNotSave))
       setBusy(false)
     }
   }
@@ -40,28 +43,28 @@ export function MainAccountQuestion({ tables, household }: { tables: Tables; hou
       <DialogContent className="sm:max-w-md" data-testid="main-account-question">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-1.5">
-            {choose ? 'Which is your main account?' : 'One main account'} <InfoTip help="statement.mainAccountQuestion" />
+            {choose ? T.whichIsYourMain : T.oneMainAccount} <InfoTip help="statement.mainAccountQuestion" />
           </DialogTitle>
           <DialogDescription>
-            {`The month's money now runs through one account, in ${base}.`} The others keep a balance of their own: money is moved to them with a transfer row, and expenses can come out of them.
+            {T.theMonthsMoneyNow(base)}
           </DialogDescription>
         </DialogHeader>
         {choose && (
-          <Segmented label="Main account" value={chosen} onChange={setChosen} options={eligible.map((a) => ({ value: a.id, label: a.name }))} />
+          <Segmented label={T.mainAccount} value={chosen} onChange={setChosen} options={eligible.map((a) => ({ value: a.id, label: a.name }))} />
         )}
-        <ul className="space-y-1 text-sm" aria-label="What changes">
-          {!choose && eligible.length === 1 && <li>{`"${eligible[0].name}" is the main account.`}</li>}
-          {eligible.length === 0 && <li>{`None of them is in ${base}: the month's money stays on the line "Main account" until you add one.`}</li>}
+        <ul className="space-y-1 text-sm" aria-label={T.whatChanges}>
+          {!choose && eligible.length === 1 && <li>{T.isTheMainAccount(eligible[0].name)}</li>}
+          {eligible.length === 0 && <li>{T.noneOfThemIs(base)}</li>}
           {foreign.map((a) => (
-            <li key={a.id} className="text-muted-foreground">{`"${a.name}" is in ${a.currency}: it keeps its own balance, and its worth moves with the rate.`}</li>
+            <li key={a.id} className="text-muted-foreground">{T.isInItKeeps(a.name, a.currency)}</li>
           ))}
-          <li className="text-muted-foreground">Net worth stays as it was{foreign.length ? ', but for what the rate does' : ''}.</li>
+          <li className="text-muted-foreground">{T.netWorthStays(foreign.length)}</li>
         </ul>
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         <DialogFooter>
           {choose
-            ? <Button disabled={busy || !chosen} onClick={() => void save(chosen)}>Save</Button>
-            : <Button disabled={busy} onClick={() => void save(null)}>OK</Button>}
+            ? <Button disabled={busy || !chosen} onClick={() => void save(chosen)}>{txt.common.save}</Button>
+            : <Button disabled={busy} onClick={() => void save(null)}>{T.ok}</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -1,6 +1,9 @@
 import { ordinalDay } from '@/app/format'
 import type { Payment } from '@/engine'
 import { dayOfDate, payContext, usualMethod, type MonthKey, type Row, type Tables } from '@/model'
+import { txt } from '@/i18n'
+
+const T = txt.payments.scope
 
 /**
  * How far a day and a method count when they are saved from the Payments page (the "Payment" dialog): for the row in
@@ -45,7 +48,7 @@ export function scopeValues(scope: PaymentScope, p: Pick<Payment, 'itemId' | 'so
   const ctx = payContext(tables)
   const known = (id: string | null | undefined) => (id && ctx.methods.has(id) ? id : null)
   const usual = { day: row.payDay ?? null, methodId: usualMethod(row, ctx)?.id ?? null }
-  if (scope === 'row') return { ...usual, noDay: 'No day', noMethod: 'No method', behindDay: null, behindMethodId: null }
+  if (scope === 'row') return { ...usual, noDay: txt.common.noDay, noMethod: txt.common.noMethod, behindDay: null, behindMethodId: null }
 
   const itemId = p.itemId ?? p.soleItemId
   const item = tables.cells.find((c) => c.rowId === row.id && c.month === month)?.items.find((i) => i.id === itemId)
@@ -54,16 +57,16 @@ export function scopeValues(scope: PaymentScope, p: Pick<Payment, 'itemId' | 'so
   if (scope === 'schedule') {
     return {
       day: schedule?.payDay ?? null, methodId: known(schedule?.methodId),
-      noDay: usual.day != null ? `The row's usual day: ${ordinalDay(usual.day)}` : 'No day',
-      noMethod: usual.methodId ? `The row's usual method: ${usualName}` : 'No method',
+      noDay: usual.day != null ? T.theRowsUsualDay(ordinalDay(usual.day)) : txt.common.noDay,
+      noMethod: usual.methodId ? T.theRowsUsualMethod(usualName) : txt.common.noMethod,
       behindDay: usual.day, behindMethodId: usual.methodId,
     }
   }
   const scheduled = { day: schedule?.payDay ?? null, methodId: known(schedule?.methodId) }
   return {
     day: dayOfDate(item?.date, month), methodId: known(item?.methodId),
-    noDay: scheduled.day != null ? `As scheduled: ${ordinalDay(scheduled.day)}` : usual.day != null ? `Usual: ${ordinalDay(usual.day)}` : 'No day',
-    noMethod: scheduled.methodId ? `As scheduled: ${ctx.methods.get(scheduled.methodId)?.name ?? ''}` : usual.methodId ? `Usual: ${usualName}` : 'No method',
+    noDay: scheduled.day != null ? T.asScheduledDay(ordinalDay(scheduled.day)) : usual.day != null ? T.usualDay(ordinalDay(usual.day)) : txt.common.noDay,
+    noMethod: scheduled.methodId ? T.asScheduledMethod(ctx.methods.get(scheduled.methodId)?.name) : usual.methodId ? T.usualMethod(usualName) : txt.common.noMethod,
     behindDay: scheduled.day ?? usual.day, behindMethodId: scheduled.methodId ?? usual.methodId,
   }
 }

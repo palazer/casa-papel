@@ -4,6 +4,9 @@ import { cn } from '@/lib/utils'
 import { AXIS_TEXT, GRID_LINE, tickText } from './frame'
 import { Plot } from './Plot'
 import { amountScale, barPath, barWidth, monthTicks, yOf } from './scale'
+import { txt } from '@/i18n'
+
+const T = txt.components.charts
 
 export interface StackPart {
   id: string
@@ -118,7 +121,7 @@ export function StackedColumns({ months, columns, parts, across, planFrom, now, 
           </>
         )}
       </Plot>
-      <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 px-1 text-[11px]" data-testid="chart-legend" aria-label="Parts">
+      <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 px-1 text-[11px]" data-testid="chart-legend" aria-label={T.parts}>
         {parts.map((p) => (
           <li key={p.id} className="flex items-center gap-1.5">
             <span className="size-2.5 shrink-0 rounded-[3px]" style={{ background: p.color }} aria-hidden />

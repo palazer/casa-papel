@@ -4,6 +4,9 @@ import { cn } from '@/lib/utils'
 import { useScreen } from '@/app/screens'
 import { useSyncView } from '@/sync/useSync'
 import { describeSync } from './syncText'
+import { txt } from '@/i18n'
+
+const T = txt.sync.indicator
 
 /** Small cloud at the end of every page header's toolbar: what sync is doing, one click to the Data screen. Hidden when sync is not in use. */
 export function SyncIndicator({ onOpen, className }: { onOpen?: () => void; className?: string }) {
@@ -18,7 +21,7 @@ export function SyncIndicator({ onOpen, className }: { onOpen?: () => void; clas
     : CloudAlert
   const tone = view.status === 'idle' || view.status === 'syncing' ? 'text-muted-foreground' : view.status === 'offline' ? 'text-partial' : 'text-expense'
   return (
-    <Button variant="ghost" size="icon-xs" className={className} aria-label={`Sync: ${label}`} title={label} onClick={onOpen ?? (() => go('data'))}>
+    <Button variant="ghost" size="icon-xs" className={className} aria-label={T.sync(label)} title={label} onClick={onOpen ?? (() => go('data'))}>
       <Icon className={cn(tone, view.status === 'syncing' && 'animate-spin')} />
     </Button>
   )

@@ -1,5 +1,8 @@
 import type { Payment, PaymentState } from '@/engine'
 import type { Money } from '@/model'
+import { txt } from '@/i18n'
+
+const T = txt.payments.groups
 
 /**
  * What the Payments page shows of a month's payments (`buildPayments`): which of them a pressed sum leaves in view,
@@ -39,12 +42,12 @@ const ORDER: PaymentGroupKey[] = ['overdue', 'today', 'coming', 'open', 'no-day'
 
 /** What a heading says. In the current month a payment with a day is late, due today or still coming; in any other month it is simply to pay. */
 export const GROUP_TITLE: Record<PaymentGroupKey, string> = {
-  overdue: 'Overdue',
-  today: 'Today',
-  coming: 'Coming',
-  open: 'To pay',
-  'no-day': 'No day',
-  done: 'Done',
+  overdue: T.overdue,
+  today: T.today,
+  coming: T.coming,
+  open: T.toPay,
+  'no-day': txt.common.noDay,
+  done: txt.common.done,
 }
 
 /**

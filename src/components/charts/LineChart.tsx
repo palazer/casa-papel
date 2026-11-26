@@ -4,6 +4,9 @@ import { cn } from '@/lib/utils'
 import { AXIS_TEXT, GRID_LINE, cut, tickText } from './frame'
 import { Plot } from './Plot'
 import { amountScale, monthTicks, spreadLabels, yOf } from './scale'
+import { txt } from '@/i18n'
+
+const T = txt.components.charts
 
 export interface ChartLine {
   id: string
@@ -86,7 +89,7 @@ export function LineChart({ months, lines, planFrom, now, at, onAt, unit, axisTe
             {now != null && (
               <g data-now>
                 <line x1={x(now)} x2={x(now)} y1={TOP - 2} y2={bottom} className="stroke-muted-foreground/60" />
-                <text x={x(now)} y={TOP - 5} textAnchor="middle" className={AXIS_TEXT}>now</text>
+                <text x={x(now)} y={TOP - 5} textAnchor="middle" className={AXIS_TEXT}>{T.now}</text>
               </g>
             )}
             {targets.map((t) => (

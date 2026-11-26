@@ -16,6 +16,9 @@ import { previewRule, setRule, type RuleChoice, type RuleTarget } from '@/store'
 import { useSave } from '@/features/grid/RowDialogs'
 import { ruleFacts, type RuleFacts, type RuleKind } from './ruleFacts'
 import { errorText } from '@/app/saveError'
+import { txt } from '@/i18n'
+
+const T = txt.rules.dialog
 
 /**
  * What the fields say, as text (`fixed:30000`, `share-of-income:0.1`, `share-of-row:1:<income row>`, `rest`): a plain
@@ -48,14 +51,14 @@ const shareInput = (share: number): string => String(Math.round(share * 1000) / 
 export function RulePicker({ facts, kind, onKind }: { facts: RuleFacts; kind: RuleKind; onKind: (kind: RuleKind) => void }) {
   /** What a month that overruns does to the account that takes the rest, in that account's own terms. */
   const shortMonth = facts.pool
-    ? `A month that overruns takes the difference back out of ${facts.name}.`
+    ? T.overrunsOutOf(facts.name)
     : facts.account?.type === 'investment'
-      ? `A month that overruns takes the difference back out of ${facts.name}: it shows as money taken out of the investments.`
-      : `A month that overruns takes the difference back from ${facts.name}.`
+      ? T.overrunsInvestments(facts.name)
+      : T.overrunsFrom(facts.name)
   return (
     <fieldset className="space-y-1.5">
-      <legend className="flex items-center gap-1 text-sm font-medium">How the amount is set <InfoTip help="row.rule" /></legend>
-      <Segmented label="How the amount is set" value={kind} onChange={(v) => onKind(v as RuleKind)} options={facts.kinds.map(({ value, label }) => ({ value, label }))} />
+      <legend className="flex items-center gap-1 text-sm font-medium">{T.howTheAmountIs} <InfoTip help="row.rule" /></legend>
+      <Segmented label={T.howTheAmountIs} value={kind} onChange={(v) => onKind(v as RuleKind)} options={facts.kinds.map(({ value, label }) => ({ value, label }))} />
       <p className="text-xs text-muted-foreground">{facts.kinds.find((k) => k.value === kind)?.text}{kind === 'rest' ? ` ${shortMonth}` : ''}</p>
     </fieldset>
   )
@@ -100,7 +103,7 @@ export function RuleFields({ tables, household, target, facts, month, kind, onCl
   const typedAmount = amountText.trim() === '' ? null : parseAmount(amountText, ccy, locale)
   const choiceKey = choiceKeyOf(kind, typedAmount, typedShare, ofRowId)
   const typedSomething = kind === 'fixed' ? amountText.trim() !== '' : share && shareText.trim() !== ''
-  const fieldError = !choiceKey && typedSomething ? (kind === 'fixed' ? unreadableAmount(amountText) : 'That is not a number I can read.') : null
+  const fieldError = !choiceKey && typedSomething ? (kind === 'fixed' ? unreadableAmount(amountText) : txt.app.notANumber) : null
   /** The rule tried on a copy: what the start month would show, or why it cannot be saved. */
   const preview = useMemo(() => {
     if (!choiceKey) return null
@@ -109,7 +112,7 @@ export function RuleFields({ tables, household, target, facts, month, kind, onCl
       const t = engine.totals[from]
       return { amount: engine.cells[cellKey(r.id, from)]?.valueBase ?? 0, takeHome: t.takeHome, own: t.takeHomeBy[r.scope] ?? 0, of: ofRowId ? engine.cells[cellKey(ofRowId, from)]?.netBase ?? 0 : 0, left: t.leftForShares, rest: t.rest, leftover: t.leftover }
     } catch (e) {
-      return { error: errorText(e, 'That rule cannot be saved.') }
+      return { error: errorText(e, T.thatRuleCannotBe) }
     }
   }, [tables, target, from, choiceKey, ofRowId])
   const problem = fieldError ?? (preview && 'error' in preview ? preview.error : null)
@@ -129,63 +132,67 @@ export function RuleFields({ tables, household, target, facts, month, kind, onCl
       <div className="space-y-4">
         {kind === 'fixed' && (
           <div className="space-y-1.5">
-            <Label htmlFor="rule-amount">Amount per month in {ccy}</Label>
-            <Input id="rule-amount" className="w-40" autoFocus inputMode="decimal" value={amountText} onChange={(e) => setAmountText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} placeholder="e.g. 300" />
+            <Label htmlFor="rule-amount">{T.amountPerMonthIn(ccy)}</Label>
+            <Input id="rule-amount" className="w-40" autoFocus inputMode="decimal" value={amountText} onChange={(e) => setAmountText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} placeholder={T.eG300} />
             <AmountHint text={amountText} currency={ccy} locale={locale} />
           </div>
         )}
         {kind === 'share-of-row' && (facts.incomes.length > 0 ? (
           <div className="space-y-1.5">
-            <Label htmlFor="rule-of">Which income</Label>
+            <Label htmlFor="rule-of">{T.whichIncome}</Label>
             <NativeSelect id="rule-of" className="w-full max-w-xs" value={ofRowId} onChange={(e) => setOfRowId(e.target.value)}>
               {facts.incomes.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
             </NativeSelect>
             {facts.ofRowId && !facts.incomes.some((i) => i.id === facts.ofRowId) && (
-              <p className="text-xs text-muted-foreground" data-testid="rule-income-gone">The income this was a percentage of is no longer there, so nothing comes of it now. Saving takes it of the income picked here.</p>
+              <p className="text-xs text-muted-foreground" data-testid="rule-income-gone">{T.theIncomeThisWas}</p>
             )}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground" data-testid="rule-no-income">There is no income line yet to take a percentage of. Add one under Income first.</p>
+          <p className="text-sm text-muted-foreground" data-testid="rule-no-income">{T.thereIsNoIncome}</p>
         ))}
         {share && (kind !== 'share-of-row' || facts.incomes.length > 0) && (
           <div className="space-y-1.5">
-            <Label htmlFor="rule-share">{kind === 'share-of-income' ? 'Percentage of income' : kind === 'share-of-own-income' ? (adult ? `Percentage of ${adult.name}'s income` : 'Percentage of their own income') : kind === 'share-of-row' ? 'Percentage of that income' : 'Percentage of what is left'}</Label>
+            <Label htmlFor="rule-share">{kind === 'share-of-income' ? T.percentageOfIncome : kind === 'share-of-own-income' ? (adult ? T.percentageOfAdultsIncome(adult.name) : T.percentageOfTheirOwn) : kind === 'share-of-row' ? T.percentageOfThatIncome : T.percentageOfWhatIs}</Label>
             <Input id="rule-share" className="w-28" autoFocus={kind !== 'share-of-row'} inputMode="decimal" value={shareText} onChange={(e) => setShareText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submit() }} placeholder={kind === 'share-of-row' ? 'e.g. 100' : 'e.g. 10'} />
-            {kind === 'share-of-rest' && othersOfRest > 0 && <p className="text-xs text-muted-foreground">Other accounts and pocket money already take {formatShare(othersOfRest, locale)} of what is left.</p>}
+            {kind === 'share-of-rest' && othersOfRest > 0 && <p className="text-xs text-muted-foreground">{T.otherAccountsAndPocket(formatShare(othersOfRest, locale))}</p>}
           </div>
         )}
         {kind === 'rest' && !hasRest && restRowName && (
-          <p className="text-xs text-muted-foreground">&quot;{restRowName}&quot; takes the rest now. From {monthName} on it comes here instead, and &quot;{restRowName}&quot; gets nothing more until you give it a rule of its own.</p>
+          <p className="text-xs text-muted-foreground">{T.takesTheRestNow(restRowName, monthName)}</p>
         )}
         {kind !== 'rest' && hasRest && (
-          <p className="text-xs text-muted-foreground">{name} takes the rest now. With this rule no account does: from {monthName} on the rest stays in the main account and shows as Leftover.</p>
+          <p className="text-xs text-muted-foreground">{T.takesTheRestNow2(name, monthName)}</p>
         )}
         {facts.wasShareOfTotal && (
-          <p className="text-xs text-muted-foreground">Until now it was a share of the household&apos;s pocket money total; from the month below on it has an amount of its own.</p>
+          <p className="text-xs text-muted-foreground">{T.untilNowItWas}</p>
         )}
 
         <div className="space-y-1.5">
-          <TipLabel help="row.ruleFrom">Counts from</TipLabel>
-          <MonthField label="Counts from" value={from} onChange={(m) => { if (m) setFrom(m) }} locale={locale} fromYear={startYear} className="max-w-xs" />
+          <TipLabel help="row.ruleFrom">{T.countsFrom}</TipLabel>
+          <MonthField label={T.countsFrom} value={from} onChange={(m) => { if (m) setFrom(m) }} locale={locale} fromYear={startYear} className="max-w-xs" />
           <p className="text-xs text-muted-foreground">
-            Earlier months keep their amounts. What was typed for {name} from {monthName} on is replaced.
-            {kind === 'fixed' && ' A later month in which the amount is ticked as done keeps it.'}
+            {T.earlierMonthsKeep(name, monthName, kind === 'fixed')}
           </p>
         </div>
 
         {figures && (
           <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm" data-testid="rule-preview">
             <dt className="text-muted-foreground">
-              {figures.amount < 0 ? `Taken back from ${name}` : name} in {monthName}
-              {kind === 'share-of-income' && typedShare != null && <> · {formatShare(typedShare, locale)} of {money(figures.takeHome)} take-home income</>}
-              {kind === 'share-of-own-income' && typedShare != null && <> · {formatShare(typedShare, locale)} of {money(figures.own)}, {adult ? `${adult.name}'s` : 'their own'} take-home income</>}
-              {kind === 'share-of-row' && typedShare != null && <> · {formatShare(typedShare, locale)} of {money(figures.of)}{ofName ? `, ${ofName}` : ''}</>}
-              {kind === 'share-of-rest' && typedShare != null && <> · {formatShare(typedShare, locale)} of {money(figures.left)} left</>}
+              {T.previewLine(
+                figures.amount < 0 ? T.takenBackFrom(name) : name,
+                monthName,
+                typedShare == null ? null
+                  : kind === 'share-of-income' ? T.shareOfIncome(formatShare(typedShare, locale), money(figures.takeHome))
+                  : kind === 'share-of-own-income' ? T.shareOfOwnIncome(formatShare(typedShare, locale), money(figures.own), adult ? adult.name : null)
+                  : kind === 'share-of-row' ? T.shareOfRow(formatShare(typedShare, locale), money(figures.of), ofName)
+                  : kind === 'share-of-rest' ? T.shareOfRest(formatShare(typedShare, locale), money(figures.left))
+                  : null,
+              )}
             </dt>
             <dd className="text-right tabular-nums" data-testid="rule-amount">{money(Math.abs(figures.amount))}</dd>
             {kind !== 'rest' && (
               <>
-                <dt className="text-muted-foreground">{figures.rest != null ? (figures.rest < 0 ? 'Then taken back from the rest account' : `Then the rest${restRowName ? ` ("${restRowName}")` : ''}`) : figures.leftover < 0 ? 'Then short in the main account' : 'Then left in the main account'}</dt>
+                <dt className="text-muted-foreground">{figures.rest != null ? (figures.rest < 0 ? T.thenTakenBackFrom : T.thenTheRest(restRowName)) : figures.leftover < 0 ? T.thenShortInThe : T.thenLeftInThe}</dt>
                 <dd className="text-right tabular-nums" data-testid="rule-rest">{money(Math.abs(figures.rest ?? figures.leftover))}</dd>
               </>
             )}
@@ -194,8 +201,8 @@ export function RuleFields({ tables, household, target, facts, month, kind, onCl
         {(problem || error) && <p className="text-sm text-destructive" role="alert">{problem ?? error}</p>}
       </div>
       <DialogFooter>
-        <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-        <Button onClick={submit} disabled={busy || !choiceKey || !!problem}>Save</Button>
+        <Button variant="outline" onClick={onClose} disabled={busy}>{txt.common.cancel}</Button>
+        <Button onClick={submit} disabled={busy || !choiceKey || !!problem}>{txt.common.save}</Button>
       </DialogFooter>
     </>
   )
@@ -229,14 +236,14 @@ export function RuleDialog({ tables, household, target: given, month, start, onC
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>{pocket ? (adult ? `How much pocket money does ${adult.name} get?` : `How much is ${name}?`) : `How much goes to ${name}?`}</DialogTitle>
+          <DialogTitle>{pocket ? (adult ? T.howMuchPocketMoney(adult.name) : T.howMuchIs(name)) : T.howMuchGoesTo(name)}</DialogTitle>
           <DialogDescription>
-            {facts.error ?? (row ? <>Row &quot;{row.name}&quot;. Each month the app works the amount out from the rule you pick.</> : <>Nothing moves money to {name} yet. Saving adds the row &quot;{pool ? poolRowName(pool.name) : `To ${name}`}&quot; under Transfers.</>)}
+            {facts.error ?? (row ? T.rowEachMonthThe(row.name) : T.nothingMovesYet(name, pool ? poolRowName(pool.name) : txt.names.rowTo(name)))}
           </DialogDescription>
         </DialogHeader>
         {facts.error ? (
           <DialogFooter>
-            <Button variant="outline" onClick={onClose}>Close</Button>
+            <Button variant="outline" onClick={onClose}>{txt.common.close}</Button>
           </DialogFooter>
         ) : (
           <>

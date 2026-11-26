@@ -20,6 +20,9 @@ import { FiguresTable, type FigureColumn } from './FiguresTable'
 import { NET_WORTH_LINE, goalMarks, type GoalMark } from './goalMarks'
 import { HORIZON_LABEL, OTHER_COLOR, PART_COLORS, SUBJECTS, rememberedHorizon, rememberedSubjects } from './subjects'
 import { TrendTile } from './TrendTile'
+import { txt } from '@/i18n'
+
+const T = txt.trends.page
 
 /**
  * Trends (DESIGN.md §11): how net worth, income, expenses, accounts and debts move over the months, what was and
@@ -104,7 +107,7 @@ export function TrendsScreen() {
   const lines: ChartLine[] = [...on.map((s) => ({ id: s, label: SUBJECTS[s].label, color: SUBJECTS[s].color, values: points.map((p) => p.totals[s]) })), ...goalLines]
   const unit = 10 ** currencyExponent(ccy)
   const axisText = (v: number) => formatAxis(v, ccy, locale)
-  const span = `from ${formatMonth(months[0], locale, 'long')} to ${formatMonth(months[months.length - 1], locale, 'long')}`
+  const span = T.fromTo(formatMonth(months[0], locale, 'long'), formatMonth(months[months.length - 1], locale, 'long'))
 
   /** The bars: a month each, or a year each on a long range. */
   const yearly = months.length > MONTHLY_BARS
@@ -116,7 +119,7 @@ export function TrendsScreen() {
   /** A year of which only some months are in view (the household's first) moved less than a whole one: it is not compared. */
   const partial = (b: Bucket) => yearly && b.span < 12
   const changeOf = (k: number, s: TrendSubject) => (isFlow(s) && k > 0 && (partial(buckets[k]) || partial(buckets[k - 1])) ? null : trendChange(buckets, k, s))
-  const bucketName = (b: Bucket) => (yearly ? `${parseMonth(b.month).year}${partial(b) ? ` · ${b.span} months` : ''}` : formatMonth(b.month, locale, 'long'))
+  const bucketName = (b: Bucket) => (yearly ? `${parseMonth(b.month).year}${partial(b) ? T.partYear(b.span) : ''}` : formatMonth(b.month, locale, 'long'))
 
   /** One subject as its parts: the six largest over the plan's months keep their name and colour, whatever range is in view. */
   const one = on.length === 1 && goalLines.length === 0 ? on[0] : null
@@ -125,7 +128,7 @@ export function TrendsScreen() {
   const picked = one ? topParts(trends, one, (m) => compareMonths(m, planLast) <= 0) : { shown: [], other: false }
   const stack: StackPart[] = [
     ...picked.shown.map((p, k) => ({ id: p.id, label: p.label, color: PART_COLORS[k] })),
-    ...(picked.other ? [{ id: OTHER_PART, label: 'Other', color: OTHER_COLOR }] : []),
+    ...(picked.other ? [{ id: OTHER_PART, label: T.other, color: OTHER_COLOR }] : []),
   ]
   const columns: StackColumn[] = one ? buckets.map((b) => ({ from: b.from, to: b.to, parts: foldParts(b, one, picked.shown) })) : []
   const choosePartsView = (v: 'total' | 'parts') => {
@@ -137,11 +140,11 @@ export function TrendsScreen() {
   const moved = (i: number, values: number[]) => {
     if (i === 0) return null
     const d = values[i] - values[i - 1]
-    return d === 0 ? 'no change' : `${formatAmount(d, ccy, locale, { sign: 'always' })} from ${formatMonth(months[i - 1], locale)}`
+    return d === 0 ? T.noChange : T.changeFrom(formatAmount(d, ccy, locale, { sign: 'always' }), formatMonth(months[i - 1], locale))
   }
 
   /** What "Amounts" draws, as a table: the lines month by month, or the one subject and its parts column by column. */
-  const planNote = (from: number, to: number) => (now != null && now >= from && now <= to ? 'now' : to >= planFrom ? 'plan' : undefined)
+  const planNote = (from: number, to: number) => (now != null && now >= from && now <= to ? T.now : to >= planFrom ? T.plan : undefined)
   const figureRows = broken
     ? buckets.map((b) => ({ key: b.month, label: bucketName(b), note: planNote(b.from, b.to) }))
     : months.map((m, i) => ({ key: m, label: formatMonth(m, locale), note: planNote(i, i) }))
@@ -154,9 +157,9 @@ export function TrendsScreen() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Trends" subline={`${household.name} · ${formatMonth(months[0], locale)} – ${formatMonth(months[months.length - 1], locale)}`}>
-        <span className="text-muted-foreground">Looks ahead</span>
-        <Segmented label="How far ahead" value={String(horizon)} onChange={(v) => choose(HORIZONS.find((h) => String(h) === v) ?? 'plan')} options={HORIZONS.map((h) => ({ value: String(h), label: HORIZON_LABEL[h] }))} />
+      <PageHeader title={T.trends} subline={`${household.name} · ${formatMonth(months[0], locale)} – ${formatMonth(months[months.length - 1], locale)}`}>
+        <span className="text-muted-foreground">{T.looksAhead}</span>
+        <Segmented label={T.howFarAhead} value={String(horizon)} onChange={(v) => choose(HORIZONS.find((h) => String(h) === v) ?? 'plan')} options={HORIZONS.map((h) => ({ value: String(h), label: HORIZON_LABEL[h] }))} />
       </PageHeader>
 
       <Island title={formatMonth(months[tileAt], locale, 'long')} help="trends.tiles" data-testid="trend-tiles">
@@ -176,7 +179,7 @@ export function TrendsScreen() {
         {marks.length > 0 && (
           <div className="mt-2 px-0.5" data-testid="trend-goals">
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Goals <InfoTip help="trends.goals" /></span>
+              <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{T.goals} <InfoTip help="trends.goals" /></span>
               {marks.map((m) => (
                 <button
                   key={m.progress.goal.id} type="button" aria-pressed={goalOn(m)} onClick={() => toggleGoal(m)} title={goalStatusLine(m.progress, locale, ahead).text}
@@ -190,7 +193,7 @@ export function TrendsScreen() {
             </div>
             {/* what the plan says of every goal that is on, in the Statement's own sentence */}
             {marks.some(goalOn) && (
-              <ul className="mt-1.5 space-y-0.5 text-xs" aria-label="Goals on the chart">
+              <ul className="mt-1.5 space-y-0.5 text-xs" aria-label={T.goalsOnTheChart}>
                 {marks.filter(goalOn).map((m) => {
                   const said = goalStatusLine(m.progress, locale, ahead)
                   return (
@@ -207,29 +210,29 @@ export function TrendsScreen() {
       </Island>
 
       <Island
-        title="Amounts" help="trends.amounts" data-testid="trend-amounts"
+        title={T.amounts} help="trends.amounts" data-testid="trend-amounts"
         // one subject alone can be read as its parts
         right={one && (
           <span className="flex items-center gap-1">
-            <ViewToggle value={showParts ? 'parts' : 'total'} options={['total', 'parts'] as const} labels={{ total: 'Total', parts: 'Breakdown' }} onChange={choosePartsView} ariaLabel={`${SUBJECTS[one].label} as`} />
+            <ViewToggle value={showParts ? 'parts' : 'total'} options={['total', 'parts'] as const} labels={{ total: txt.common.total, parts: T.breakdown }} onChange={choosePartsView} ariaLabel={T.shownAs(SUBJECTS[one].label)} />
             <InfoTip help="trends.breakdown" />
           </span>
         )}
       >
         {lines.length === 0 ? (
-          <p className="px-1 py-10 text-center text-xs text-muted-foreground">Press a tile above to put it on the chart.</p>
+          <p className="px-1 py-10 text-center text-xs text-muted-foreground">{T.pressATileAbove}</p>
         ) : broken && one ? (
           <StackedColumns
             months={months} columns={columns} parts={stack} planFrom={planFrom} now={now} at={at} onAt={setAt} locale={locale} unit={unit} axisText={axisText}
             // net worth is not the height of its columns: what is owed stands below zero, and the line says what is left
             across={one === 'netWorth' ? { label: SUBJECTS.netWorth.label, color: SUBJECTS.netWorth.color, values: buckets.map((b) => b.totals.netWorth) } : undefined}
-            label={`${SUBJECTS[one].label} by its parts (${stack.map((p) => p.label).join(', ')}), ${span}. The arrow keys read a ${yearly ? 'year' : 'month'}.`}
+            label={T.breakdownSummary(SUBJECTS[one].label, stack.map((p) => p.label).join(', '), span, yearly)}
             tip={(i) => {
               const k = bucketAt(i)
               const b = buckets[k]
               return (
                 <>
-                  <p className="mb-1 font-medium">{bucketName(b)}{b.to >= planFrom && <span className="font-normal text-muted-foreground"> · {now != null && now >= b.from && now <= b.to ? 'now' : 'plan'}</span>}</p>
+                  <p className="mb-1 font-medium">{bucketName(b)}{b.to >= planFrom && <span className="font-normal text-muted-foreground"> · {now != null && now >= b.from && now <= b.to ? T.now : T.plan}</span>}</p>
                   <p className="mb-1"><span className="font-semibold tabular-nums">{money(b.totals[one])}</span> <span className="text-muted-foreground">{SUBJECTS[one].label}</span></p>
                   <ul className="space-y-0.5 border-t pt-1">
                     {/* from the top of the column down */}
@@ -247,10 +250,10 @@ export function TrendsScreen() {
         ) : (
           <LineChart
             months={months} lines={lines} targets={targets} planFrom={planFrom} now={now} at={at} onAt={setAt} locale={locale} unit={unit} axisText={axisText}
-            label={`${lines.map((l) => l.label).join(', ')} ${span}${targets.length ? `, with ${targets.length === 1 ? 'the goal' : 'the goals'} ${targets.map((t) => t.label).join(', ')}` : ''}. The arrow keys read a month.`}
+            label={T.linesSummary(lines.map((l) => l.label).join(', '), span, targets.length, targets.map((t) => t.label).join(', '))}
             tip={(i) => (
               <>
-                <p className="mb-1 font-medium">{formatMonth(months[i], locale, 'long')}{i >= planFrom && <span className="font-normal text-muted-foreground"> · {i === now ? 'now' : 'plan'}</span>}</p>
+                <p className="mb-1 font-medium">{formatMonth(months[i], locale, 'long')}{i >= planFrom && <span className="font-normal text-muted-foreground"> · {i === now ? T.now : T.plan}</span>}</p>
                 <ul className="space-y-1">
                   {lines.map((l) => (
                     <li key={l.id} className="grid grid-cols-[auto_1fr] items-baseline gap-x-2">
@@ -267,25 +270,25 @@ export function TrendsScreen() {
       </Island>
 
       {rows.length > 0 && (
-        <Island title={yearly ? 'Change from the year before' : 'Change from the month before'} help="trends.changes" data-testid="trend-changes">
+        <Island title={yearly ? T.changeFromTheYear : T.changeFromTheMonth} help="trends.changes" data-testid="trend-changes">
           <DeltaBars
             months={months} rows={rows} planFrom={planFrom} now={now} at={at} onAt={setAt} locale={locale} unit={unit} axisText={axisText}
-            label={`How ${rows.map((r) => r.label).join(', ')} moved from one ${yearly ? 'year' : 'month'} to the next, ${span}. The arrow keys read a ${yearly ? 'year' : 'month'}.`}
+            label={T.changesSummary(rows.map((r) => r.label).join(', '), yearly, span)}
             tip={(i) => {
               const k = bucketAt(i)
               const b = buckets[k]
               return (
                 <>
-                  <p className="mb-1 font-medium">{bucketName(b)}{b.to >= planFrom && <span className="font-normal text-muted-foreground"> · {now != null && now >= b.from && now <= b.to ? 'now' : 'plan'}</span>}</p>
+                  <p className="mb-1 font-medium">{bucketName(b)}{b.to >= planFrom && <span className="font-normal text-muted-foreground"> · {now != null && now >= b.from && now <= b.to ? T.now : T.plan}</span>}</p>
                   <ul className="space-y-1">
                     {on.map((s) => {
                       const d = changeOf(k, s)
                       return (
                         <li key={s} className="grid grid-cols-[auto_1fr] items-baseline gap-x-2">
                           <span className="size-2 self-center rounded-[2px]" style={{ background: SUBJECTS[s].color }} aria-hidden />
-                          <span><span className="font-semibold tabular-nums">{d == null ? '–' : d === 0 ? 'no change' : formatAmount(d, ccy, locale, { sign: 'always' })}</span> <span className="text-muted-foreground">{SUBJECTS[s].label}</span></span>
+                          <span><span className="font-semibold tabular-nums">{d == null ? '–' : d === 0 ? T.noChange : formatAmount(d, ccy, locale, { sign: 'always' })}</span> <span className="text-muted-foreground">{SUBJECTS[s].label}</span></span>
                           <span className="col-start-2 text-[11px] tabular-nums text-muted-foreground">
-                            {d == null ? (k === 0 ? 'nothing before it to compare with' : 'a year that is only partly in view is not compared') : `${money(b.totals[s])} ${isFlow(s) ? (yearly ? 'in the year' : 'in the month') : (yearly ? 'at the end of the year' : 'at its end')}`}
+                            {d == null ? (k === 0 ? T.nothingBeforeItTo : T.aYearThatIs) : T.amountWhen(money(b.totals[s]), isFlow(s), yearly)}
                           </span>
                         </li>
                       )
@@ -300,10 +303,10 @@ export function TrendsScreen() {
 
       {/* the same figures without a chart: for a screen reader, for copying, for reading a month without pointing at it */}
       {lines.length > 0 && (
-        <Island title="Figures as a table" folded={!figures} onFold={(f) => setFigures(!f)} data-testid="trend-table">
+        <Island title={T.figuresAsATable} folded={!figures} onFold={(f) => setFigures(!f)} data-testid="trend-table">
           <FiguresTable
             rows={figureRows} columns={figureColumns} amount={money} change={(v) => formatAmount(v, ccy, locale, { sign: 'always' })}
-            caption={`${figureColumns.map((c) => c.label).join(', ')} ${span}, ${broken && yearly ? 'by year' : 'by month'}`}
+            caption={T.tableCaption(figureColumns.map((c) => c.label).join(', '), span, broken, yearly)}
           />
         </Island>
       )}

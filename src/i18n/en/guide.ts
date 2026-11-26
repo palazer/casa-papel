@@ -344,4 +344,18 @@ export const guide = {
       ],
     },
   },
+  screen: {
+    theChoices: 'The choices',
+    relatedTips: 'Related tips',
+    open: (label: string) => `Open ${label}`,
+    topics: 'Topics',
+    nothingMatchesTryAnother: (shown: string) => `Nothing matches "${shown}". Try another word.`,
+    topicsMatch: (count: number, shown: string) => `${count} ${count === 1 ? 'topic matches' : 'topics match'} "${shown}"`,
+    guide: 'Guide',
+    howCasaPapelWorks: 'How Casa Papel works, topic by topic',
+    searchTheGuide: 'Search the guide',
+    tryTheDemo: 'Try the demo',
+    openOnGithub: 'Open on GitHub',
+    results: 'Results',
+  },
 }

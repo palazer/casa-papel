@@ -12,6 +12,9 @@ import { useStore } from '@/app/store'
 import { GOAL_KIND_INFO, goalFamilyOf, monthOfDate, type Goal, type GoalFamily, type GoalKind, type Household, type Tables } from '@/model'
 import { addGoal, updateGoal } from '@/store'
 import { saveError } from '@/app/saveError'
+import { txt } from '@/i18n'
+
+const T = txt.goals.dialog
 
 interface Props {
   household: Household
@@ -50,7 +53,7 @@ export function GoalDialog({ household, tables, goal, preset, onClose, onRemove 
 
   const [family, setFamily] = useState<GoalFamily>(given ? goalFamilyOf(given.kind) : 'fill')
   const [thing, setThing] = useState(thingOf(given))
-  const [name, setName] = useState(goal?.name ?? (preset ? (preset.kind === 'net-worth' ? 'Net worth' : nameOf(thingOf(preset)) ?? '') : ''))
+  const [name, setName] = useState(goal?.name ?? (preset ? (preset.kind === 'net-worth' ? txt.common.netWorth : nameOf(thingOf(preset)) ?? '') : ''))
   const [targetMonth, setTargetMonth] = useState(goal?.targetMonth ?? '')
   const [notes, setNotes] = useState(goal?.notes ?? '')
   const [error, setError] = useState<string | null>(null)
@@ -65,7 +68,7 @@ export function GoalDialog({ household, tables, goal, preset, onClose, onRemove 
   // a virtual account is kept in the currency of the savings account that holds it (rule X14)
   const holder = tracked.startsWith('pool:') ? tables.accounts.find((a) => a.id === pools.find((p) => `pool:${p.id}` === tracked)?.accountId) : undefined
   const currency = (account ?? holder)?.currency ?? baseCurrency
-  const trackedName = family === 'net-worth' ? 'net worth' : nameOf(tracked) ?? ''
+  const trackedName = family === 'net-worth' ? T.netWorthInASentence : nameOf(tracked) ?? ''
   // a debt is paid down to zero unless another amount is typed
   const [target, setTarget] = useState(goal ? amountToInput(goal.target, currency, locale) : given?.kind === 'pay-off' ? '0' : '')
   const thisMonth = monthOfDate()
@@ -82,7 +85,7 @@ export function GoalDialog({ household, tables, goal, preset, onClose, onRemove 
   async function save() {
     // a debt with nothing typed is paid down to zero
     const minor = family === 'pay-down' && target.trim() === '' ? 0 : parseAmount(target, currency, locale)
-    if (minor == null) return setError(unreadableAmount(target, `${family === 'pay-down' ? 'That amount' : 'Target'} is not a number I can read.`))
+    if (minor == null) return setError(unreadableAmount(target, T.notANumber(family)))
     setBusy(true)
     setError(null)
     try {
@@ -91,7 +94,7 @@ export function GoalDialog({ household, tables, goal, preset, onClose, onRemove 
       else await addGoal(store, input)
       onClose()
     } catch (e) {
-      setError(saveError(e, 'Could not save.'))
+      setError(saveError(e, txt.common.couldNotSave))
     } finally {
       setBusy(false)
     }
@@ -101,58 +104,58 @@ export function GoalDialog({ household, tables, goal, preset, onClose, onRemove 
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>{goal ? 'Edit goal' : given ? `Goal for ${trackedName}` : 'New goal'}</DialogTitle>
+          <DialogTitle>{goal ? T.editGoal : given ? T.goalFor(trackedName) : T.newGoal}</DialogTitle>
           <DialogDescription>
-            {given && <>{family === 'pay-down' ? `Pays ${trackedName} down to an amount.` : family === 'net-worth' ? 'Net worth reaches an amount.' : `Fills ${trackedName} to an amount.`} </>}
-            Measured against the plan in the grid every month, nothing to update by hand.
+            {given && <>{family === 'pay-down' ? T.paysDownToAn(trackedName) : family === 'net-worth' ? T.netWorthReachesAn : T.fillsToAnAmount(trackedName)} </>}
+            {T.measuredAgainstThePlan}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3">
-          <div className="space-y-1.5"><Label htmlFor="goal-name">Name</Label><Input id="goal-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Emergency fund" /></div>
+          <div className="space-y-1.5"><Label htmlFor="goal-name">{txt.common.name}</Label><Input id="goal-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder={T.eGEmergencyFund} /></div>
           {!given && (
             <>
               <fieldset className="space-y-1.5">
-                <legend className="text-sm font-medium">Kind</legend>
-                <Segmented label="Kind" value={family} onChange={(v) => pickFamily(v as GoalFamily)} options={FAMILIES} />
+                <legend className="text-sm font-medium">{txt.common.kind}</legend>
+                <Segmented label={txt.common.kind} value={family} onChange={(v) => pickFamily(v as GoalFamily)} options={FAMILIES} />
                 <p className="text-xs text-muted-foreground">{info?.help}</p>
               </fieldset>
               <div className="space-y-1.5">
-                <Label htmlFor="goal-tracks">Tracks</Label>
+                <Label htmlFor="goal-tracks">{T.tracks}</Label>
                 <NativeSelect id="goal-tracks" className="w-full" value={tracked} onChange={(e) => setThing(e.target.value)} disabled={noChoice}>
                   {family === 'fill' ? (
                     <>
-                      {fillAccounts.length > 0 && <optgroup label="Accounts">{fillAccounts.map((a) => <option key={a.id} value={`acc:${a.id}`}>{a.name}{a.tracked ? '' : ' (not tracked)'}</option>)}</optgroup>}
-                      {pools.length > 0 && <optgroup label="Virtual accounts">{pools.map((p) => <option key={p.id} value={`pool:${p.id}`}>{p.name}</option>)}</optgroup>}
+                      {fillAccounts.length > 0 && <optgroup label={txt.common.accounts}>{fillAccounts.map((a) => <option key={a.id} value={`acc:${a.id}`}>{T.accountChoice(a.name, a.tracked)}</option>)}</optgroup>}
+                      {pools.length > 0 && <optgroup label={txt.common.virtualAccounts}>{pools.map((p) => <option key={p.id} value={`pool:${p.id}`}>{p.name}</option>)}</optgroup>}
                     </>
-                  ) : debts.map((a) => <option key={a.id} value={`acc:${a.id}`}>{a.name}{a.tracked ? '' : ' (not tracked)'}</option>)}
+                  ) : debts.map((a) => <option key={a.id} value={`acc:${a.id}`}>{T.accountChoice(a.name, a.tracked)}</option>)}
                 </NativeSelect>
-                {noChoice && <p className="text-xs text-muted-foreground">{family === 'pay-down' ? 'Add a credit card or loan account first.' : 'Add a savings, investment or other asset account, or a virtual account, first.'}</p>}
+                {noChoice && <p className="text-xs text-muted-foreground">{family === 'pay-down' ? T.addACreditCard : T.addASavingsInvestment}</p>}
               </div>
             </>
           )}
           <div className="space-y-1.5">
-            <Label htmlFor="goal-target">{family === 'pay-down' ? `Bring it down to (${currency})` : `Target (${currency})`}</Label>
+            <Label htmlFor="goal-target">{family === 'pay-down' ? T.bringItDownTo(currency) : T.target(currency)}</Label>
             <Input id="goal-target" inputMode="decimal" value={target} onChange={(e) => setTarget(e.target.value)} placeholder={family === 'pay-down' ? '0' : 'e.g. 10000'} />
             <AmountHint text={target} currency={currency} locale={locale} />
-            {family === 'pay-down' && <p className="text-xs text-muted-foreground">Zero means nothing is owed{trackedName ? ` on ${trackedName}` : ''}. Progress counts down from what is owed when you set the goal.</p>}
+            {family === 'pay-down' && <p className="text-xs text-muted-foreground">{T.zeroMeansNothingIs(trackedName)}</p>}
           </div>
           <div className="space-y-1.5">
-            <Label>Target month (optional)</Label>
-            <MonthField label="Target month" value={targetMonth} onChange={setTargetMonth} locale={locale} allowEmpty />
+            <Label>{T.targetMonthOptional}</Label>
+            <MonthField label={T.targetMonth} value={targetMonth} onChange={setTargetMonth} locale={locale} allowEmpty />
             <p className="text-xs text-muted-foreground">
-              {targetMonth && targetMonth < thisMonth ? `${formatMonth(targetMonth, locale)} has passed; the goal shows as late until it is reached.` : 'Compared with the month the plan reaches the target.'}
+              {targetMonth && targetMonth < thisMonth ? T.hasPassedTheGoal(formatMonth(targetMonth, locale)) : T.comparedWithTheMonth}
             </p>
           </div>
-          <div className="space-y-1.5"><Label htmlFor="goal-notes">Notes</Label><Input id="goal-notes" value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
+          <div className="space-y-1.5"><Label htmlFor="goal-notes">{txt.common.notes}</Label><Input id="goal-notes" value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
         </div>
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         <DialogFooter className="flex-row flex-wrap gap-2 sm:justify-between">
           <div>
-            {goal && onRemove && <Button variant="ghost" size="sm" onClick={onRemove} disabled={busy}>Delete…</Button>}
+            {goal && onRemove && <Button variant="ghost" size="sm" onClick={onRemove} disabled={busy}>{txt.common.deleteMore}</Button>}
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-            <Button onClick={() => void save()} disabled={busy || !name.trim() || noChoice}>Save</Button>
+            <Button variant="outline" onClick={onClose} disabled={busy}>{txt.common.cancel}</Button>
+            <Button onClick={() => void save()} disabled={busy || !name.trim() || noChoice}>{txt.common.save}</Button>
           </div>
         </DialogFooter>
       </DialogContent>

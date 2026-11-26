@@ -2,6 +2,9 @@ import { RULE_KIND_INFO, isOldPocketShare, isPocketRow, isShareRule, isTakenFrom
 import { sortRows } from '@/engine'
 import { ruleRowOf, type RuleChoice, type RuleTarget } from '@/store'
 import { errorText } from '@/app/saveError'
+import { txt } from '@/i18n'
+
+const T = txt.rules.facts
 
 export type RuleKind = RuleChoice['kind']
 
@@ -48,7 +51,7 @@ export function ruleFacts(tables: Tables, household: Household, target: RuleTarg
   try {
     row = ruleRowOf(tables, target)
   } catch (e) {
-    error = errorText(e, 'That cannot have a rule.')
+    error = errorText(e, T.thatCannotHaveA)
   }
   const pool = 'poolId' in target ? tables.pools.find((p) => p.id === target.poolId) : row ? tables.pools.find((p) => !p.deletedAt && p.allocationRowId === row.id) : undefined
   const account = 'accountId' in target ? tables.accounts.find((a) => a.id === target.accountId) : row?.accountId ? tables.accounts.find((a) => a.id === row.accountId) : undefined
@@ -56,7 +59,7 @@ export function ruleFacts(tables: Tables, household: Household, target: RuleTarg
   const adult = row && pocket ? tables.entities.find((e) => e.id === row.scope && !e.deletedAt && e.kind === 'adult') : undefined
   const kinds = KINDS
     .filter((k) => (pocket ? k.value !== 'rest' : k.value !== 'share-of-own-income'))
-    .map((k) => (k.value === 'share-of-own-income' && adult ? { ...k, label: `A percentage of ${adult.name}'s income` } : k))
+    .map((k) => (k.value === 'share-of-own-income' && adult ? { ...k, label: T.aPercentageOfS(adult.name) } : k))
   const liveRows = sortRows(tables.rows.filter((r) => !r.deletedAt), tables.categories)
   const rules = resolveRules(liveRows, household.closingRule)
   const state = row ? rules.byRow.get(row.id) : undefined
@@ -66,7 +69,7 @@ export function ruleFacts(tables: Tables, household: Household, target: RuleTarg
   for (const [id, s] of rules.byRow) if (s.kind === 'share-of-rest' && id !== row?.id) othersOfRest += s.share
   return {
     row, error, pool, account, pocket, adult, kinds,
-    name: pool?.name ?? account?.name ?? row?.name ?? 'this account',
+    name: pool?.name ?? account?.name ?? row?.name ?? T.thisAccount,
     wasShareOfTotal: !!row && isOldPocketShare(row),
     current: state && (isShareRule(state.kind) || state.kind === 'rest') ? state.kind : 'fixed',
     share: state && state.share > 0 ? state.share : null,

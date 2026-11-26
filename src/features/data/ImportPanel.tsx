@@ -4,6 +4,9 @@ import { useStore } from '@/app/store'
 import type { ExportFile } from '@/model'
 import { changeLineText, checkFile, importMerge, importReplace, moreText, otherText, parseExportFile, type FileCheck, type FileChoice } from '@/store'
 import { errorText } from '@/app/saveError'
+import { txt } from '@/i18n'
+
+const T = txt.data.importPanel
 
 type Pending = { file: ExportFile; name: string }
 
@@ -16,7 +19,7 @@ function ChoiceList({ title, choice, check }: { title: string; choice: FileChoic
     <section aria-label={title} className="space-y-1">
       <p className="font-medium">{title}</p>
       {lines.length === 0 && !other ? (
-        <p className="text-muted-foreground">Nothing.</p>
+        <p className="text-muted-foreground">{T.nothing}</p>
       ) : (
         <ul className="space-y-0.5 tabular-nums">
           {lines.map((l, i) => <li key={i}>{changeLineText(l, check.locale, { planEnd: check.planEnd })}</li>)}
@@ -58,7 +61,7 @@ export function ImportPanel({ trigger, onMessage, onError, emptyDevice = false }
       // on an empty device there is nothing to change: the file is simply restored
       if (!emptyDevice) setCheck(await checkFile(store, file))
     } catch (e) {
-      onError(errorText(e, 'Could not read that file.'))
+      onError(errorText(e, T.couldNotReadThat))
     } finally {
       ev.target.value = ''
     }
@@ -69,45 +72,45 @@ export function ImportPanel({ trigger, onMessage, onError, emptyDevice = false }
     try {
       if (mode === 'replace') {
         await importReplace(store, pending.file)
-        onMessage(emptyDevice ? `Restored ${pending.name}.` : `Replaced everything with ${pending.name}.`)
+        onMessage(emptyDevice ? T.restored(pending.name) : T.replacedEverythingWith(pending.name))
       } else {
         const r = await importMerge(store, pending.file)
-        onMessage(`Merged ${pending.name}: ${r.applied} records updated, ${r.kept} kept, ${r.newEvents} new history entries.`)
+        onMessage(T.mergedRecordsUpdatedKept(pending.name, r.applied, r.kept, r.newEvents))
       }
       setPending(null)
       setCheck(null)
     } catch (e) {
-      onError(errorText(e, 'Import failed.'))
+      onError(errorText(e, T.importFailed))
     }
   }
 
   return (
     <>
       <input id={inputId} type="file" accept="application/json,.json" className="hidden" onChange={onPickFile} />
-      {trigger ? trigger(open) : <Button size="sm" variant="outline" onClick={open}>Choose a file…</Button>}
+      {trigger ? trigger(open) : <Button size="sm" variant="outline" onClick={open}>{T.chooseAFile}</Button>}
       {pending && (
         <div className="basis-full space-y-2 rounded-md border p-3 text-xs">
           <p>
-            <strong>{pending.name}</strong> · exported {new Date(pending.file.exportedAt).toLocaleString()} · {pending.file.tables.household[0]?.name ?? 'unnamed household'} · {pending.file.events.length} history entries
+            <strong>{pending.name}</strong> {T.exportedLine(new Date(pending.file.exportedAt).toLocaleString(), pending.file.tables.household[0]?.name, pending.file.events.length)}
           </p>
           {!emptyDevice && (check ? (
             <div className="grid gap-3 sm:grid-cols-2" data-testid="file-check">
-              <ChoiceList title="Merging it would change here:" choice={check.merge} check={check} />
-              <ChoiceList title="Replacing everything would change here:" choice={check.replace} check={check} />
+              <ChoiceList title={T.mergingItWouldChange} choice={check.merge} check={check} />
+              <ChoiceList title={T.replacingEverythingWouldChange} choice={check.replace} check={check} />
             </div>
           ) : (
-            <p className="text-muted-foreground">Looking at what it would change here…</p>
+            <p className="text-muted-foreground">{T.lookingAtWhatIt}</p>
           ))}
           <div className="flex flex-wrap gap-2">
             {emptyDevice ? (
-              <Button size="xs" onClick={() => applyImport('replace')}>Restore this file</Button>
+              <Button size="xs" onClick={() => applyImport('replace')}>{T.restoreThisFile}</Button>
             ) : (
               <>
-                <Button size="xs" onClick={() => applyImport('merge')}>Merge into this device</Button>
-                <Button size="xs" variant="destructive" onClick={() => applyImport('replace')}>Replace everything here</Button>
+                <Button size="xs" onClick={() => applyImport('merge')}>{T.mergeIntoThisDevice}</Button>
+                <Button size="xs" variant="destructive" onClick={() => applyImport('replace')}>{T.replaceEverythingHere}</Button>
               </>
             )}
-            <Button size="xs" variant="ghost" onClick={() => { setPending(null); setCheck(null) }}>Cancel</Button>
+            <Button size="xs" variant="ghost" onClick={() => { setPending(null); setCheck(null) }}>{txt.common.cancel}</Button>
           </div>
         </div>
       )}

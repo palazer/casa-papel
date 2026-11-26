@@ -5,6 +5,9 @@ import { cn } from '@/lib/utils'
 import { useStore } from '@/app/store'
 import { useStoreVersion } from '@/app/useStoreVersion'
 import { SyncIndicator } from '@/features/sync/SyncIndicator'
+import { txt } from '@/i18n'
+
+const T = txt.components.header
 
 /**
  * The toolbar, with what stands above it, as a bar that stays at the top of the window (DESIGN.md §2), from `md` up:
@@ -83,8 +86,8 @@ function HistoryControls() {
   useStoreVersion(store)
   return (
     <span className="ml-auto inline-flex items-center gap-0.5 pl-1.5">
-      <Button variant="ghost" size="icon-xs" aria-label="Undo" disabled={!store.canUndo} onClick={() => void store.undo()}><Undo2 /></Button>
-      <Button variant="ghost" size="icon-xs" aria-label="Redo" disabled={!store.canRedo} onClick={() => void store.redo()}><Redo2 /></Button>
+      <Button variant="ghost" size="icon-xs" aria-label={txt.common.undo} disabled={!store.canUndo} onClick={() => void store.undo()}><Undo2 /></Button>
+      <Button variant="ghost" size="icon-xs" aria-label={T.redo} disabled={!store.canRedo} onClick={() => void store.redo()}><Redo2 /></Button>
     </span>
   )
 }

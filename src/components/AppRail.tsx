@@ -5,6 +5,9 @@ import { groupOf, railFor, screenDef, screenHref, setSettingsOpen, settingsOpen,
 import { Chip } from '@/components/ui/chip'
 import { cn } from '@/lib/utils'
 import { follow, labelClass, monogram, tileClass } from './railStyles'
+import { txt } from '@/i18n'
+
+const T = txt.components.rail
 
 const ITEM = 'group flex w-16 flex-col items-center gap-0.5 rounded-lg py-1 outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
@@ -42,7 +45,7 @@ function RailGroup({ item, screen, go }: { item: Extract<RailItem, { kind: 'grou
   }
   return (
     <>
-      <button type="button" onClick={toggle} aria-expanded={open} aria-controls={open ? 'rail-settings' : undefined} aria-current={tile ? 'page' : undefined} title={open ? `${item.label} · fold` : item.label} className={ITEM}>
+      <button type="button" onClick={toggle} aria-expanded={open} aria-controls={open ? 'rail-settings' : undefined} aria-current={tile ? 'page' : undefined} title={open ? T.fold(item.label) : item.label} className={ITEM}>
         <span className={tileClass(tile)}>
           <Icon size={20} strokeWidth={tile ? 2.5 : 2} aria-hidden />
         </span>
@@ -70,16 +73,16 @@ export const AppRail = memo(function AppRail({ householdName }: { householdName?
   const { screen, go, payments } = useScreen()
   const home: Screen = 'grid'
   return (
-    <nav aria-label="Screens" className="dark sticky top-0 hidden h-dvh w-[72px] shrink-0 flex-col items-center gap-3 overflow-y-auto border-r border-sidebar-border bg-sidebar py-3 text-sidebar-foreground md:flex">
+    <nav aria-label={T.screens} className="dark sticky top-0 hidden h-dvh w-[72px] shrink-0 flex-col items-center gap-3 overflow-y-auto border-r border-sidebar-border bg-sidebar py-3 text-sidebar-foreground md:flex">
       <a
-        href={screenHref(home)} onClick={(e) => follow(e, () => go(home))} title={householdName ?? 'Casa Papel'} aria-label="Casa Papel"
+        href={screenHref(home)} onClick={(e) => follow(e, () => go(home))} title={householdName ?? txt.common.appName} aria-label={txt.common.appName}
         className="mb-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/5 text-sm font-bold tracking-tight text-white ring-2 ring-primary outline-none focus-visible:ring-ring"
       >
-        {monogram(householdName ?? 'Casa Papel')}
+        {monogram(householdName ?? txt.common.appName)}
       </a>
       {isDemoMode() && (
-        <button type="button" onClick={leaveDemoSandbox} title="Back to your own household" className="-mt-2 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <Chip tone="amber">demo</Chip>
+        <button type="button" onClick={leaveDemoSandbox} title={T.backToYourOwn} className="-mt-2 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Chip tone="amber">{T.demo}</Chip>
         </button>
       )}
       {railFor({ payments }).map((it) => (it.kind === 'page'

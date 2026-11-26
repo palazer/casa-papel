@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button'
 import { DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogLayers, DialogOver, DialogTitle } from '@/components/ui/dialog'
 import { listMonths } from '@/features/grid/followingText'
 import { changeLineText, moreText, pastGuard, type PastAnswer, type PastQuestion } from '@/store'
+import { txt } from '@/i18n'
+
+const T = txt.past.question
 
 interface Asked {
   question: PastQuestion
@@ -40,17 +43,17 @@ function PastQuestionDialog({ question, onAnswer }: { question: PastQuestion; on
     <DialogOver open onOpenChange={(open) => { if (!open) onAnswer('cancel') }}>
       <DialogContent showCloseButton={false} className="sm:max-w-md" data-testid="past-question">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-1.5">This changes months that are over <InfoTip help="past.question" /></DialogTitle>
-          <DialogDescription>{listMonths(changes.months, locale)} {changes.months.length === 1 ? 'changes' : 'change'}:</DialogDescription>
+          <DialogTitle className="flex items-center gap-1.5">{T.thisChangesMonthsThat} <InfoTip help="past.question" /></DialogTitle>
+          <DialogDescription>{T.monthsChange(listMonths(changes.months, locale), changes.months.length)}</DialogDescription>
         </DialogHeader>
-        <ul className="space-y-1 text-sm tabular-nums" aria-label="What changes">
+        <ul className="space-y-1 text-sm tabular-nums" aria-label={T.whatChanges}>
           {changes.lines.map((line, i) => <li key={i}>{changeLineText(line, locale)}</li>)}
           {more && <li className="text-muted-foreground">{more}</li>}
         </ul>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onAnswer('cancel')}>Cancel</Button>
-          {fromNow && <Button variant="outline" onClick={() => onAnswer('from-now')}>Only from {formatMonth(fromNow, locale, 'long')} on</Button>}
-          <Button onClick={() => onAnswer('save')}>Save anyway</Button>
+          <Button variant="outline" onClick={() => onAnswer('cancel')}>{txt.common.cancel}</Button>
+          {fromNow && <Button variant="outline" onClick={() => onAnswer('from-now')}>{T.onlyFromOn(formatMonth(fromNow, locale, 'long'))}</Button>}
+          <Button onClick={() => onAnswer('save')}>{T.saveAnyway}</Button>
         </DialogFooter>
       </DialogContent>
     </DialogOver>

@@ -172,4 +172,5 @@ export const errors = {
   notSigned: 'Not signed in.',
   recoveryCodeLettersDigits: 'A recovery code has 26 letters and digits.',
   notRecoveryCodeCharacter: (c: string) => `Not a recovery code character: ${c}`,
+  requestTimedOut: 'The request timed out.',
 }

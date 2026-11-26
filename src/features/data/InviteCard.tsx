@@ -5,6 +5,9 @@ import { inviteLink } from '@/app/url'
 import type { Invite } from '@/sync/remote'
 import { useSyncEngine, useSyncView } from '@/sync/useSync'
 import { errorText } from '@/app/saveError'
+import { txt } from '@/i18n'
+
+const T = txt.data.invite
 
 /** Admins only: one-time links that let someone create an account. */
 export function InviteCard({ onError }: { onError: (m: string) => void }) {
@@ -36,22 +39,22 @@ export function InviteCard({ onError }: { onError: (m: string) => void }) {
     setLatest(inv.code)
     setCopied(false)
     await refresh()
-  }).catch((e) => onError(errorText(e, 'Could not create the invite.')))
-  const revoke = (code: string) => void engine.revokeInvite(code).then(refresh).catch((e) => onError(errorText(e, 'Could not revoke the invite.')))
+  }).catch((e) => onError(errorText(e, T.couldNotCreateThe)))
+  const revoke = (code: string) => void engine.revokeInvite(code).then(refresh).catch((e) => onError(errorText(e, T.couldNotRevokeThe)))
   const copy = (code: string) => {
     void navigator.clipboard?.writeText(inviteLink(code))
     setCopied(true)
   }
 
   return (
-    <Island air title="Invite someone" description="Only you can make these. A link creates one account, works once, and expires after seven days. Send it by message; nothing is emailed.">
+    <Island air title={T.inviteSomeone} description={T.onlyYouCanMake}>
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={create}>Invite someone</Button>
+          <Button size="sm" onClick={create}>{T.inviteSomeone}</Button>
           {latest && (
             <>
               <code className="break-all rounded bg-muted px-2 py-1" data-testid="invite-link">{inviteLink(latest)}</code>
-              <Button size="xs" variant="outline" onClick={() => copy(latest)}>{copied ? 'Copied' : 'Copy link'}</Button>
+              <Button size="xs" variant="outline" onClick={() => copy(latest)}>{copied ? T.copied : T.copyLink}</Button>
             </>
           )}
         </div>
@@ -60,9 +63,9 @@ export function InviteCard({ onError }: { onError: (m: string) => void }) {
             {invites.map((i) => (
               <li key={i.code} className="flex flex-wrap items-center gap-2">
                 <code>{i.code}</code>
-                <span className="text-muted-foreground">valid until {new Date(i.expiresAt).toLocaleDateString()}</span>
-                <Button size="xs" variant="ghost" onClick={() => copy(i.code)}>Copy link</Button>
-                <Button size="xs" variant="ghost" onClick={() => revoke(i.code)}>Revoke</Button>
+                <span className="text-muted-foreground">{T.validUntil(new Date(i.expiresAt).toLocaleDateString())}</span>
+                <Button size="xs" variant="ghost" onClick={() => copy(i.code)}>{T.copyLink}</Button>
+                <Button size="xs" variant="ghost" onClick={() => revoke(i.code)}>{T.revoke}</Button>
               </li>
             ))}
           </ul>

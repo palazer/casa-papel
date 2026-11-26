@@ -1,4 +1,7 @@
 import { cn } from '@/lib/utils'
+import { txt } from '@/i18n'
+
+const T = txt.trends.table
 
 export interface FigureColumn {
   id: string
@@ -27,7 +30,7 @@ export function FiguresTable({ rows, columns, amount, change, caption }: {
         <caption className="sr-only">{caption}</caption>
         <thead>
           <tr>
-            <th scope="col" className="sticky top-0 border-b bg-card px-2 py-1 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Month</th>
+            <th scope="col" className="sticky top-0 border-b bg-card px-2 py-1 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{txt.common.month}</th>
             {columns.map((c) => (
               <th key={c.id} scope="col" className="sticky top-0 border-b bg-card px-2 py-1 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{c.label}</th>
             ))}
@@ -44,7 +47,7 @@ export function FiguresTable({ rows, columns, amount, change, caption }: {
                 return (
                   <td key={c.id} className={cn('border-b px-2 py-1 text-right tabular-nums', i === rows.length - 1 && 'border-b-0')}>
                     {amount(c.values[i])}
-                    {c.changes && <span className="block text-[11px] text-muted-foreground">{d == null ? '–' : d === 0 ? 'no change' : change(d)}</span>}
+                    {c.changes && <span className="block text-[11px] text-muted-foreground">{d == null ? '–' : d === 0 ? T.noChange : change(d)}</span>}
                   </td>
                 )
               })}

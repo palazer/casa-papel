@@ -8,6 +8,9 @@ import { cn } from '@/lib/utils'
 import type { Tables } from '@/model'
 import { sameFilter, type PaymentFilter } from './groups'
 import { methodDetail } from './methods'
+import { txt } from '@/i18n'
+
+const T = txt.payments.totals
 
 /**
  * A sum that is a switch (DESIGN.md §12): pressed, the list shows only its payments, and it wears the lime's
@@ -57,15 +60,15 @@ export function PaymentTotals({ data, tables, filter, onFilter, locale, classNam
     writePref(`payments.fold.${which}`, to)
   }
   /** What of a sum is not ticked yet: nothing said while none of it is, "all done" once all of it is. */
-  const open = (t: { total: number; left: number }) => (t.left === 0 ? 'all done' : t.left !== t.total ? `${money(t.left)} open` : undefined)
-  const saidOpen = (t: { left: number }) => (t.left === 0 ? 'all done' : `${money(t.left)} not done yet`)
+  const open = (t: { total: number; left: number }) => (t.left === 0 ? T.allDone : t.left !== t.total ? T.open(money(t.left)) : undefined)
+  const saidOpen = (t: { left: number }) => (t.left === 0 ? T.allDone : T.notDoneYet(money(t.left)))
   const methods = new Map(tables.paymentMethods.map((m) => [m.id, m]))
 
   // one line that says "Household" for everything tells nothing
   const people = data.people.length > 1 || data.people.some((p) => p.ownerId != null) ? data.people : []
   return (
     <div className={cn('grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-1', className)}>
-      <Island air tone={HUES.transfer} title="By method" help="payments.totals" data-testid="payment-totals" folded={folded.methods} onFold={fold('methods')} className={cn(people.length === 0 && 'sm:col-span-2 lg:col-span-1')}>
+      <Island air tone={HUES.transfer} title={T.byMethod} help="payments.totals" data-testid="payment-totals" folded={folded.methods} onFold={fold('methods')} className={cn(people.length === 0 && 'sm:col-span-2 lg:col-span-1')}>
         <ul className="-mx-1.5 text-sm md:text-xs">
           {data.methods.map((m) => {
             const f: PaymentFilter = { kind: 'method', methodId: m.methodId }
@@ -74,7 +77,7 @@ export function PaymentTotals({ data, tables, filter, onFilter, locale, classNam
               <li key={m.methodId ?? 'none'} data-method-total={m.label}>
                 <TotalRow
                   label={m.label} detail={method ? methodDetail(method, tables) : undefined} amount={money(m.total)} note={open(m)} pressed={sameFilter(filter, f)} onPress={() => press(f)}
-                  said={`${m.label}: ${money(m.total)}, ${m.count} ${m.count === 1 ? 'payment' : 'payments'}, ${saidOpen(m)}`}
+                  said={T.totalSaid(m.label, money(m.total), m.count, saidOpen(m))}
                 />
               </li>
             )
@@ -82,7 +85,7 @@ export function PaymentTotals({ data, tables, filter, onFilter, locale, classNam
         </ul>
       </Island>
       {people.length > 0 && (
-        <Island air title="By person" help="payments.people" data-testid="payment-people" folded={folded.people} onFold={fold('people')}>
+        <Island air title={T.byPerson} help="payments.people" data-testid="payment-people" folded={folded.people} onFold={fold('people')}>
           <ul className="-mx-1.5 text-sm md:text-xs">
             {people.map((p) => {
               const f: PaymentFilter = { kind: 'person', ownerId: p.ownerId }
@@ -90,7 +93,7 @@ export function PaymentTotals({ data, tables, filter, onFilter, locale, classNam
                 <li key={p.ownerId ?? 'household'}>
                   <TotalRow
                     label={p.label} amount={money(p.total)} note={open(p)} pressed={sameFilter(filter, f)} onPress={() => press(f)}
-                    said={`${p.label}: ${money(p.total)}, ${p.count} ${p.count === 1 ? 'payment' : 'payments'}, ${saidOpen(p)}`}
+                    said={T.totalSaid(p.label, money(p.total), p.count, saidOpen(p))}
                   />
                 </li>
               )

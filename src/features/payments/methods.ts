@@ -1,4 +1,7 @@
 import { methodNote, type PaymentMethod, type Tables } from '@/model'
+import { txt } from '@/i18n'
+
+const TX = txt.payments.methods
 
 /** What the screens say about a payment method: the words after its name, and where it is offered. */
 
@@ -19,5 +22,5 @@ export function methodChoices(tables: Pick<Tables, 'paymentMethods'>, keep: stri
 /** A method as one choice of a list: its name, and its note where it has one ("PayPal · main account"). */
 export function methodOption(method: PaymentMethod, tables: Pick<Tables, 'accounts'>): string {
   const note = methodNote(method, tables.accounts).trim()
-  return `${method.name}${note ? ` · ${note}` : ''}${method.archived ? ' (archived)' : ''}`
+  return TX.label(method.name, note, method.archived)
 }

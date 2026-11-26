@@ -4,6 +4,9 @@ import { HELP, type HelpKey } from '@/app/help'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
+import { txt } from '@/i18n'
+
+const T = txt.components.infoTip
 
 interface Props {
   /** The text to show, from the one help map. */
@@ -29,7 +32,8 @@ export function InfoTip({ help, title, text, side = 'top', className }: Props) {
         openOnHover
         delay={150}
         closeDelay={100}
-        aria-label={`About ${heading}`}
+        aria-label={T.about(heading)}
+        data-info
         className={cn(
           'inline-flex size-4 shrink-0 items-center justify-center rounded-full align-middle text-muted-foreground/70 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-popup-open:text-foreground pointer-coarse:size-6',
           className,

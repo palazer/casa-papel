@@ -3,6 +3,7 @@ import type { MonthKey } from '@/model'
 import { AXIS_TEXT, GRID_LINE, cut, tickText } from './frame'
 import { Plot } from './Plot'
 import { amountScale, barPath, barWidth, monthTicks, yOf } from './scale'
+import { txt } from '@/i18n'
 
 /** A bar of a chart of months: the months it stands for (one, or a year's), and its amount. Null: nothing to compare with. */
 export interface SpanBar {
@@ -60,7 +61,7 @@ export function DeltaBars({ months, rows, planFrom, now, at, onAt, unit, axisTex
               <g key={row.id} data-row={row.id}>
                 <rect x={left} y={top - 12} width={8} height={8} rx={2} style={{ fill: row.color }} />
                 <text x={left + 12} y={top - 5} className="fill-foreground text-[11px]">
-                  {cut(row.label, 28)}{still && <tspan className="fill-muted-foreground"> · no change</tspan>}
+                  {cut(row.label, 28)}{still && <tspan className="fill-muted-foreground"> · {txt.components.charts.noChange}</tspan>}
                 </text>
                 {/* the two ends of the row's own scale, and the line the bars grow from */}
                 {!still && [scale.max, scale.min].filter((t) => t !== 0).map((t) => (

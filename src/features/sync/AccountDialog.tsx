@@ -7,6 +7,10 @@ import { normalizeRecoveryCode } from '@/sync/crypto'
 import type { SignInResult } from '@/sync/engine'
 import { describeRemoteError } from '@/sync/remote'
 import { useSyncEngine } from '@/sync/useSync'
+import { txt } from '@/i18n'
+import { sentence } from '@/lib/sentence'
+
+const T = txt.sync.account
 
 export type AccountStep = 'signin' | 'bootstrap' | 'join' | 'reset' | 'recovery-code' | 'locked' | 'choose' | 'change-password' | 'new-recovery'
 
@@ -18,8 +22,8 @@ interface Props {
   onClose: (message?: string) => void
 }
 
-const PRIVACY = 'Only your password opens the cloud copy. Nobody else can read it, not even the person who runs this app. The password itself never leaves this device.'
-const PASSWORD_HELP = 'At least 12 characters. A few words you will remember work well. Everyone in the household who signs in uses the same email and password.'
+const PRIVACY = T.onlyYourPasswordOpens
+const PASSWORD_HELP = T.atLeast12Characters
 
 /** Sign in, join with an invite, recover, change the password or rotate the recovery code: one dialog, several steps. */
 export function AccountDialog({ initial, inviteCode, hasLocalData, onClose }: Props) {
@@ -63,7 +67,7 @@ export function AccountDialog({ initial, inviteCode, hasLocalData, onClose }: Pr
 
   function handleResult(res: SignInResult, okMessage: string) {
     if (res.kind === 'ok') onClose(okMessage)
-    else if (res.kind === 'created') showCode(res.recoveryCode, { step: null, message: 'Your household now has a cloud copy. Other devices can sign in with the same email and password.' })
+    else if (res.kind === 'created') showCode(res.recoveryCode, { step: null, message: T.yourHouseholdNowHas })
     else if (res.kind === 'locked') setStep('locked')
     else {
       setChoice(engine!.getView().choice)
@@ -75,54 +79,54 @@ export function AccountDialog({ initial, inviteCode, hasLocalData, onClose }: Pr
   /** Locked after a reload: the key derived at sign-in is gone, so the password is asked once more. */
   const needsPassword = step === 'locked' && engine.needsPasswordToUnlock()
 
-  const signIn = () => run('Working out your keys…', async () => {
-    handleResult(await engine.signIn(email, password), 'Signed in. This device now syncs with your household.')
+  const signIn = () => run(T.workingOutYourKeys, async () => {
+    handleResult(await engine.signIn(email, password), T.signedInThisDevice)
   })
 
-  const bootstrap = () => run('Setting the household password…', async () => {
-    if (!passwordsMatch) throw new Error('The two passwords are not the same.')
+  const bootstrap = () => run(T.settingTheHouseholdPassword, async () => {
+    if (!passwordsMatch) throw new Error(T.theTwoPasswordsAre)
     const { recoveryCode } = await engine.bootstrap(email, current, password)
-    showCode(recoveryCode, { step: null, message: 'The household password is set and the cloud copy exists. Other devices sign in with it.' })
+    showCode(recoveryCode, { step: null, message: T.theHouseholdPasswordIs })
   })
 
-  const join = () => run('Creating your account…', async () => {
-    if (!passwordsMatch) throw new Error('The two passwords are not the same.')
+  const join = () => run(T.creatingYourAccount, async () => {
+    if (!passwordsMatch) throw new Error(T.theTwoPasswordsAre)
     const { recoveryCode } = await engine.join(code.trim(), email, password)
-    showCode(recoveryCode, { step: null, message: 'Welcome. Your household now has a cloud copy; sign in on another device with the same email and password.' })
+    showCode(recoveryCode, { step: null, message: T.welcomeYourHouseholdNow })
   })
 
-  const reset = () => run('Checking the recovery code…', async () => {
-    if (!passwordsMatch) throw new Error('The two passwords are not the same.')
+  const reset = () => run(T.checkingTheRecoveryCode, async () => {
+    if (!passwordsMatch) throw new Error(T.theTwoPasswordsAre)
     const res = await engine.resetWithRecovery(email, recovery, password)
     if (res.kind === 'locked') return setStep('locked')
     const fresh = await engine.newRecoveryCode()
-    showCode(fresh, res.kind === 'choose' ? { step: 'choose' } : { step: null, message: 'Password set. This device syncs again.' }, 'The code you just used has been replaced. Store this new one.')
+    showCode(fresh, res.kind === 'choose' ? { step: 'choose' } : { step: null, message: T.passwordSetThisDevice }, T.theCodeYouJust)
     if (res.kind === 'choose') setChoice(engine.getView().choice)
   })
 
-  const unlock = () => run('Unlocking…', async () => {
+  const unlock = () => run(T.unlocking, async () => {
     await engine.unlockWithRecovery(recovery, password || undefined)
-    onClose('Unlocked. The cloud copy now opens with the password you typed.')
+    onClose(T.unlockedTheCloudCopy)
   })
 
-  const replaceCloud = () => run('Uploading this device\'s data…', async () => {
+  const replaceCloud = () => run(T.uploadingThisDevicesData, async () => {
     const fresh = await engine.replaceCloudWithLocal(password || undefined)
-    showCode(fresh, { step: null, message: 'The cloud copy was replaced with this device\'s data.' }, 'The old recovery code is no longer valid.')
+    showCode(fresh, { step: null, message: T.theCloudCopyWas }, T.theOldRecoveryCode)
   })
 
-  const decide = (c: 'keep-local' | 'take-cloud') => run('Applying…', async () => {
+  const decide = (c: 'keep-local' | 'take-cloud') => run(T.applying, async () => {
     await engine.finishFirstSync(c)
-    onClose(c === 'keep-local' ? 'The cloud copy now holds this device\'s data.' : 'This device now holds the cloud copy.')
+    onClose(c === 'keep-local' ? T.theCloudCopyNow : T.thisDeviceNowHolds)
   })
 
-  const changePassword = () => run('Working out your keys…', async () => {
-    if (!passwordsMatch) throw new Error('The two passwords are not the same.')
+  const changePassword = () => run(T.workingOutYourKeys, async () => {
+    if (!passwordsMatch) throw new Error(T.theTwoPasswordsAre)
     await engine.changePassword(current, password)
-    onClose('Password changed. Devices already signed in keep working; new ones sign in with the new password.')
+    onClose(T.passwordChangedDevicesAlready)
   })
 
-  const rotate = () => run('Making a new code…', async () => {
-    showCode(await engine.newRecoveryCode(), { step: null, message: 'New recovery code saved. The old one no longer works.' })
+  const rotate = () => run(T.makingANewCode, async () => {
+    showCode(await engine.newRecoveryCode(), { step: null, message: T.newRecoveryCodeSaved })
   })
 
   const finishCode = () => {
@@ -132,15 +136,15 @@ export function AccountDialog({ initial, inviteCode, hasLocalData, onClose }: Pr
   }
 
   const title: Record<AccountStep, string> = {
-    signin: 'Sign in',
-    bootstrap: 'First sign-in with a temporary password',
-    join: 'Join with an invite',
-    reset: 'Forgot the password',
-    'recovery-code': 'Your recovery code',
-    locked: 'This device is locked out',
-    choose: 'Which data do you want to keep?',
-    'change-password': 'Change the household password',
-    'new-recovery': 'New recovery code',
+    signin: txt.common.signIn,
+    bootstrap: T.firstSignInWith,
+    join: T.joinWithAnInvite,
+    reset: T.forgotThePassword,
+    'recovery-code': T.yourRecoveryCode,
+    locked: T.thisDeviceIsLocked,
+    choose: T.whichDataDoYou,
+    'change-password': T.changeTheHouseholdPassword,
+    'new-recovery': T.newRecoveryCode,
   }
 
   const codeOk = shownCode !== '' && normalizeRecoveryCode(retype) === normalizeRecoveryCode(shownCode)
@@ -150,69 +154,69 @@ export function AccountDialog({ initial, inviteCode, hasLocalData, onClose }: Pr
       <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{title[step]}</DialogTitle>
-          {step === 'signin' && <DialogDescription>Use the household's email and password. Signing in keeps an encrypted copy of this household in the cloud and syncs it to every device that signs in.</DialogDescription>}
-          {step === 'join' && <DialogDescription>Pick the email and password your household will sign in with. {PRIVACY}</DialogDescription>}
-          {step === 'bootstrap' && <DialogDescription>For the very first account, created in the Supabase dashboard with a temporary password. Sign in with that once; the app replaces it with your household password. {PRIVACY}</DialogDescription>}
-          {step === 'reset' && <DialogDescription>Your recovery code proves it is you and unlocks the data under a new password.</DialogDescription>}
-          {step === 'locked' && <DialogDescription>The account's password is right, but the cloud copy was locked with a different one, probably after a reset on another device.</DialogDescription>}
-          {step === 'change-password' && <DialogDescription>Devices that are already signed in keep working. New devices sign in with the new password.</DialogDescription>}
-          {step === 'new-recovery' && <DialogDescription>Makes a fresh code and invalidates the old one. Do this if the old code may have been seen by someone else.</DialogDescription>}
+          {step === 'signin' && <DialogDescription>{T.useTheHouseholdsEmail}</DialogDescription>}
+          {step === 'join' && <DialogDescription>{T.pickTheEmailAnd(PRIVACY)}</DialogDescription>}
+          {step === 'bootstrap' && <DialogDescription>{T.forTheVeryFirst(PRIVACY)}</DialogDescription>}
+          {step === 'reset' && <DialogDescription>{T.yourRecoveryCodeProves}</DialogDescription>}
+          {step === 'locked' && <DialogDescription>{T.theAccountsPasswordIs}</DialogDescription>}
+          {step === 'change-password' && <DialogDescription>{T.devicesThatAreAlready}</DialogDescription>}
+          {step === 'new-recovery' && <DialogDescription>{T.makesAFreshCode}</DialogDescription>}
         </DialogHeader>
 
         <div className="space-y-3">
           {step === 'join' && (
-            <Field id="acc-code" label="Invite code" value={code} onChange={setCode} help="From the link you were sent. A code works once and for seven days." />
+            <Field id="acc-code" label={T.inviteCode} value={code} onChange={setCode} help={T.fromTheLinkYou} />
           )}
           {(step === 'signin' || step === 'bootstrap' || step === 'join' || step === 'reset') && (
-            <Field id="acc-email" label="Email" type="email" value={email} onChange={setEmail} autoFocus={step !== 'join' || !!inviteCode} help={step === 'join' ? 'The household\'s sign-in name. It cannot be changed later.' : undefined} />
+            <Field id="acc-email" label={T.email} type="email" value={email} onChange={setEmail} autoFocus={step !== 'join' || !!inviteCode} help={step === 'join' ? T.theHouseholdsSignIn : undefined} />
           )}
           {step === 'bootstrap' && (
-            <Field id="acc-temporary" label="Temporary password" type="password" value={current} onChange={setCurrent} help="The one typed into the dashboard when the user was created. It stops working after this." />
+            <Field id="acc-temporary" label={T.temporaryPassword} type="password" value={current} onChange={setCurrent} help={T.theOneTypedInto} />
           )}
           {step === 'reset' && (
-            <Field id="acc-recovery" label="Recovery code" value={recovery} onChange={setRecovery} help="The 26-character code shown when the household was set up. Dashes and case do not matter." />
+            <Field id="acc-recovery" label={T.recoveryCode} value={recovery} onChange={setRecovery} help={T.the26CharacterCode} />
           )}
           {step === 'change-password' && (
-            <Field id="acc-current" label="Current password" type="password" value={current} onChange={setCurrent} autoFocus />
+            <Field id="acc-current" label={T.currentPassword} type="password" value={current} onChange={setCurrent} autoFocus />
           )}
           {step === 'locked' && (
-            <Field id="acc-recovery" label="Recovery code" value={recovery} onChange={setRecovery} autoFocus help="Unlocks the cloud copy and re-locks it with the password you sign in with." />
+            <Field id="acc-recovery" label={T.recoveryCode} value={recovery} onChange={setRecovery} autoFocus help={T.unlocksTheCloudCopy} />
           )}
           {needsPassword && (
-            <Field id="acc-password-locked" label="Password" type="password" value={password} onChange={setPassword} help="Your sign-in password, once more: what was derived from it at sign-in does not survive a reload." />
+            <Field id="acc-password-locked" label={T.password} type="password" value={password} onChange={setPassword} help={T.yourSignInPassword} />
           )}
           {(step === 'signin' || step === 'bootstrap' || step === 'join' || step === 'reset' || step === 'change-password') && (
             <Field
-              id="acc-password" label={step === 'signin' ? 'Password' : 'New password'} type="password" value={password} onChange={setPassword}
+              id="acc-password" label={step === 'signin' ? T.password : T.newPassword} type="password" value={password} onChange={setPassword}
               onEnter={step === 'signin' ? signIn : undefined}
               help={step === 'signin' ? undefined : PASSWORD_HELP}
             />
           )}
           {(step === 'join' || step === 'bootstrap' || step === 'reset' || step === 'change-password') && (
-            <Field id="acc-password2" label="New password again" type="password" value={password2} onChange={setPassword2} />
+            <Field id="acc-password2" label={T.newPasswordAgain} type="password" value={password2} onChange={setPassword2} />
           )}
 
           {step === 'recovery-code' && (
             <div className="space-y-3">
-              <p className="text-sm">This code is the only way back into the cloud copy if you forget the password. Keep it with your passwords, or print it. It is shown once.</p>
+              <p className="text-sm">{T.thisCodeIsThe}</p>
               {codeNote && <p className="text-sm">{codeNote}</p>}
               <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 p-3">
                 <code className="text-base tracking-wider" data-testid="recovery-code">{shownCode}</code>
-                <Button size="sm" variant="outline" onClick={() => void navigator.clipboard?.writeText(shownCode)}>Copy</Button>
+                <Button size="sm" variant="outline" onClick={() => void navigator.clipboard?.writeText(shownCode)}>{T.copy}</Button>
               </div>
-              <Field id="acc-retype" label="Type the code back to continue" value={retype} onChange={setRetype} autoFocus help="Proof to yourself that it is stored somewhere." />
+              <Field id="acc-retype" label={T.typeTheCodeBack} value={retype} onChange={setRetype} autoFocus help={T.proofToYourselfThat} />
             </div>
           )}
 
           {step === 'choose' && choice && (
             <div className="space-y-2 text-sm">
-              <p>This device holds <strong>{choice.localName}</strong>; the cloud copy holds <strong>{choice.cloudName}</strong>. They are different households, so one has to go.</p>
-              <p className="text-muted-foreground">Export first from the Data screen if you want to keep a file of what you replace.</p>
+              <p>{sentence(T.twoHouseholds(<strong>{choice.localName}</strong>, <strong>{choice.cloudName}</strong>))}</p>
+              <p className="text-muted-foreground">{T.exportFirstFromThe}</p>
             </div>
           )}
 
           {step === 'locked' && hasLocalData && (
-            <p className="text-xs text-muted-foreground">No recovery code? You can also start over: replace the cloud copy with this device's data under a fresh key.</p>
+            <p className="text-xs text-muted-foreground">{T.noRecoveryCodeYou}</p>
           )}
 
           {busy && <p className="text-sm text-muted-foreground" role="status">{busy}</p>}
@@ -221,25 +225,25 @@ export function AccountDialog({ initial, inviteCode, hasLocalData, onClose }: Pr
 
         <DialogFooter className="min-w-0 flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div className="flex min-w-0 flex-wrap gap-x-1 gap-y-0">
-            {step === 'signin' && <Button variant="ghost" size="sm" onClick={() => { setError(null); setStep('reset') }} disabled={!!busy}>Forgot the password?</Button>}
-            {step === 'signin' && <Button variant="ghost" size="sm" onClick={() => { setError(null); setStep('join') }} disabled={!!busy}>I have an invite</Button>}
-            {step === 'signin' && <Button variant="ghost" size="sm" onClick={() => { setError(null); setStep('bootstrap') }} disabled={!!busy}>First time, temporary password</Button>}
-            {step === 'locked' && hasLocalData && <Button variant="outline" size="sm" className="h-auto whitespace-normal py-1.5 text-left" onClick={replaceCloud} disabled={!!busy || (needsPassword && !password)}>Replace the cloud copy with this device's data</Button>}
+            {step === 'signin' && <Button variant="ghost" size="sm" onClick={() => { setError(null); setStep('reset') }} disabled={!!busy}>{T.forgotThePassword2}</Button>}
+            {step === 'signin' && <Button variant="ghost" size="sm" onClick={() => { setError(null); setStep('join') }} disabled={!!busy}>{txt.common.haveInvite}</Button>}
+            {step === 'signin' && <Button variant="ghost" size="sm" onClick={() => { setError(null); setStep('bootstrap') }} disabled={!!busy}>{T.firstTimeTemporaryPassword}</Button>}
+            {step === 'locked' && hasLocalData && <Button variant="outline" size="sm" className="h-auto whitespace-normal py-1.5 text-left" onClick={replaceCloud} disabled={!!busy || (needsPassword && !password)}>{T.replaceTheCloudCopy}</Button>}
           </div>
           <div className="flex flex-wrap justify-end gap-2">
-            {step !== 'recovery-code' && <Button variant="outline" onClick={() => onClose()} disabled={!!busy}>Cancel</Button>}
-            {step === 'signin' && <Button onClick={signIn} disabled={!!busy || !email || !password}>Sign in</Button>}
-            {step === 'join' && <Button onClick={join} disabled={!!busy || !code || !email || !passwordsMatch}>Create account</Button>}
-            {step === 'bootstrap' && <Button onClick={bootstrap} disabled={!!busy || !email || !current || !passwordsMatch}>Set household password</Button>}
-            {step === 'reset' && <Button onClick={reset} disabled={!!busy || !email || !recovery || !passwordsMatch}>Set new password</Button>}
-            {step === 'locked' && <Button onClick={unlock} disabled={!!busy || !recovery || (needsPassword && !password)}>Unlock</Button>}
-            {step === 'change-password' && <Button onClick={changePassword} disabled={!!busy || !current || !passwordsMatch}>Change password</Button>}
-            {step === 'new-recovery' && <Button onClick={rotate} disabled={!!busy}>Make a new code</Button>}
-            {step === 'recovery-code' && <Button onClick={finishCode} disabled={!codeOk}>I have stored it</Button>}
+            {step !== 'recovery-code' && <Button variant="outline" onClick={() => onClose()} disabled={!!busy}>{txt.common.cancel}</Button>}
+            {step === 'signin' && <Button onClick={signIn} disabled={!!busy || !email || !password}>{txt.common.signIn}</Button>}
+            {step === 'join' && <Button onClick={join} disabled={!!busy || !code || !email || !passwordsMatch}>{T.createAccount}</Button>}
+            {step === 'bootstrap' && <Button onClick={bootstrap} disabled={!!busy || !email || !current || !passwordsMatch}>{T.setHouseholdPassword}</Button>}
+            {step === 'reset' && <Button onClick={reset} disabled={!!busy || !email || !recovery || !passwordsMatch}>{T.setNewPassword}</Button>}
+            {step === 'locked' && <Button onClick={unlock} disabled={!!busy || !recovery || (needsPassword && !password)}>{T.unlock}</Button>}
+            {step === 'change-password' && <Button onClick={changePassword} disabled={!!busy || !current || !passwordsMatch}>{T.changePassword}</Button>}
+            {step === 'new-recovery' && <Button onClick={rotate} disabled={!!busy}>{T.makeANewCode}</Button>}
+            {step === 'recovery-code' && <Button onClick={finishCode} disabled={!codeOk}>{T.iHaveStoredIt}</Button>}
             {step === 'choose' && (
               <>
-                <Button variant="outline" onClick={() => decide('take-cloud')} disabled={!!busy}>Take the cloud copy</Button>
-                <Button onClick={() => decide('keep-local')} disabled={!!busy}>Keep this device's data</Button>
+                <Button variant="outline" onClick={() => decide('take-cloud')} disabled={!!busy}>{T.takeTheCloudCopy}</Button>
+                <Button onClick={() => decide('keep-local')} disabled={!!busy}>{T.keepThisDevicesData}</Button>
               </>
             )}
           </div>

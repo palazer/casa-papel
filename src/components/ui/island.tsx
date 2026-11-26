@@ -4,6 +4,9 @@ import { cn } from '@/lib/utils'
 import type { Hue } from '@/app/hues'
 import type { HelpKey } from '@/app/help'
 import { InfoTip } from '@/components/InfoTip'
+import { txt } from '@/i18n'
+
+const T = txt.components.island
 
 /**
  * The panel every screen is built from (DESIGN.md §3, after nfl-fantasy's Island): a bordered card on the card
@@ -37,7 +40,7 @@ export function Island({ title, tabs, right, description, toolbar, children, cla
   'data-testid'?: string
 }) {
   const fold = onFold && (
-    <button type="button" aria-expanded={!folded} title={folded ? 'open' : 'minimize'} onClick={() => onFold(!folded)} className="flex min-w-0 items-center gap-1 hover:text-foreground">
+    <button type="button" aria-expanded={!folded} title={folded ? T.open : T.minimize} onClick={() => onFold(!folded)} className="flex min-w-0 items-center gap-1 hover:text-foreground">
       <ChevronDown className={cn('size-3 shrink-0 transition-transform', folded && '-rotate-90')} aria-hidden />
       <span className="truncate">{title}</span>
     </button>

@@ -2,6 +2,9 @@ import type { ChartLine, ChartTarget } from '@/components/charts/LineChart'
 import { formatAmount, formatMonth } from '@/app/format'
 import type { EngineOutput, GoalProgress } from '@/engine'
 import type { MonthKey, Tables } from '@/model'
+import { txt } from '@/i18n'
+
+const T = txt.trends.goals
 
 /** The line a net worth goal is drawn on: the subject's own. */
 export const NET_WORTH_LINE = 'netWorth'
@@ -33,7 +36,7 @@ export function goalMarks(goals: GoalProgress[], tables: Tables, engine: EngineO
   }
   return goals.map((p): GoalMark => {
     const { goal } = p
-    const undrawn = p.problem ?? (p.currency !== base ? `It is in ${p.currency}; the charts are in ${base}, so it is not drawn.` : null)
+    const undrawn = p.problem ?? (p.currency !== base ? T.itIsInThe(p.currency, base) : null)
     const own = goal.kind === 'net-worth' ? null
       : goal.kind === 'pool-balance'
         ? { name: tables.pools.find((x) => x.id === goal.poolId)?.name, read: (m: MonthKey) => engine.pools[goal.poolId ?? '']?.months[m]?.balance }
@@ -44,7 +47,7 @@ export function goalMarks(goals: GoalProgress[], tables: Tables, engine: EngineO
     const starts = months.length > 0 && goal.startMonth <= months[months.length - 1]
     const target: ChartTarget | null = undrawn || !starts ? null : {
       id: goal.id,
-      label: `${goal.name}: ${formatAmount(p.target, base, locale, { compact: true })}${goal.targetMonth ? ` by ${formatMonth(goal.targetMonth, locale)}` : ''}`,
+      label: `${goal.name}: ${formatAmount(p.target, base, locale, { compact: true })}${goal.targetMonth ? T.byMonth(formatMonth(goal.targetMonth, locale)) : ''}`,
       value: p.target,
       from: at(goal.startMonth) ?? 0,
       due: at(goal.targetMonth),

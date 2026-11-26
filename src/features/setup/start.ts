@@ -1,5 +1,8 @@
 import type { EntityKind, MonthKey } from '@/model'
 import type { SetupInput } from '@/store'
+import { txt } from '@/i18n'
+
+const T = txt.setup.start
 
 /**
  * The first screen of a new household: the facts the Statement needs before it can open. The format, the first
@@ -30,7 +33,7 @@ const key = (name: string) => name.trim().toLocaleLowerCase()
 /** The people and things that will be made: blank names are skipped, and a household with no named adult gets "Me". */
 export function keptStart(d: StartDraft): { adults: string[]; things: Array<{ kind: ThingKind; name: string }> } {
   const adults = d.adults.map((n) => n.trim()).filter(Boolean)
-  return { adults: adults.length ? adults : ['Me'], things: d.things.map((t) => ({ kind: t.kind, name: t.name.trim() })).filter((t) => t.name) }
+  return { adults: adults.length ? adults : [T.me], things: d.things.map((t) => ({ kind: t.kind, name: t.name.trim() })).filter((t) => t.name) }
 }
 
 /**
@@ -56,7 +59,7 @@ export function duplicateNames(d: StartDraft): string[] {
 export function toSetupInput(d: StartDraft): SetupInput {
   const { adults, things } = keptStart(d)
   return {
-    household: { name: d.name.trim() || 'Our household', baseCurrency: d.currency, locale: d.locale, startMonth: d.startMonth, closingRule: 'leftover-plug', setupOpen: true },
+    household: { name: d.name.trim() || T.ourHousehold, baseCurrency: d.currency, locale: d.locale, startMonth: d.startMonth, closingRule: 'leftover-plug', setupOpen: true },
     adults: adults.map((name) => ({ name })),
     dependents: things,
     accounts: [],

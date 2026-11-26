@@ -15,6 +15,9 @@ import { ImportPanel } from './ImportPanel'
 import { InviteCard } from './InviteCard'
 import { SyncCard } from './SyncCard'
 import { errorText } from '@/app/saveError'
+import { txt } from '@/i18n'
+
+const T = txt.data.page
 
 /** Where the data lives and how it moves: storage status, cloud sync, export, import, the demo, the danger zone. */
 export function DataScreen() {
@@ -38,7 +41,7 @@ export function DataScreen() {
       if (navigator.storage?.persisted) setPersisted(await navigator.storage.persisted())
       if (navigator.storage?.estimate) {
         const e = await navigator.storage.estimate()
-        if (e.usage != null) setUsage(`${(e.usage / 1024).toFixed(0)} KB used`)
+        if (e.usage != null) setUsage(T.kbUsed((e.usage / 1024).toFixed(0)))
       }
     } catch {
       /* storage API unavailable */
@@ -54,9 +57,9 @@ export function DataScreen() {
     try {
       const ok = await navigator.storage.persist()
       setPersisted(ok)
-      setMessage(ok ? 'This browser will keep your data unless you delete it yourself.' : 'The browser declined. Install the app to improve the odds.')
+      setMessage(ok ? T.thisBrowserWillKeep : T.theBrowserDeclinedInstall)
     } catch {
-      setError('Persistent storage is not available in this browser.')
+      setError(T.persistentStorageIsNot)
     }
   }
 
@@ -73,11 +76,11 @@ export function DataScreen() {
       a.click()
       // not at once: Safari starts the download a moment after the click (later still when it asks first), and a link that is already gone cancels it
       setTimeout(() => URL.revokeObjectURL(url), 60_000)
-      setMessage(`Exported ${name}`)
+      setMessage(T.exported(name))
     } catch (e) {
       // the export is the backup: a failure must not look like a button that did nothing
       setMessage(null)
-      setError(`The export did not work: ${errorText(e, 'unknown error')}. Nothing was saved to a file.`)
+      setError(T.theExportDidNot(errorText(e, T.unknownError)))
     }
   }
 
@@ -88,9 +91,9 @@ export function DataScreen() {
       if (signedIn && sync) await sync.signOut({ wipe: true })
       else await wipeAll(store)
       setWipeWord('')
-      setMessage(signedIn ? 'Signed out and all data removed from this browser. The cloud copy is untouched.' : 'All data removed from this browser.')
+      setMessage(signedIn ? T.signedOutAndAll : T.allDataRemoved)
     } catch (e) {
-      setError(errorText(e, 'Could not wipe.'))
+      setError(errorText(e, T.couldNotWipe))
     }
   }
 
@@ -100,9 +103,9 @@ export function DataScreen() {
     try {
       await sync.deleteCloudCopy()
       setDeleteWord('')
-      setMessage('The cloud copy was deleted and this device signed out. Your data stays here.')
+      setMessage(T.theCloudCopyWas)
     } catch (e) {
-      setError(errorText(e, 'Could not delete the cloud copy.'))
+      setError(errorText(e, T.couldNotDeleteThe))
     }
   }
 
@@ -116,38 +119,38 @@ export function DataScreen() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 text-xs">
-      <PageHeader title="Data" subline={h ? `${h.name} · export, import, sync` : 'Export, import, sync'} />
+      <PageHeader title={T.data} subline={h ? T.exportImportSync(h.name) : T.exportImportSyncPlain} />
       <GroupTabs />
       {message && (
         <Alert>
-          <AlertTitle>Done</AlertTitle>
+          <AlertTitle>{txt.common.done}</AlertTitle>
           <AlertDescription>{message}</AlertDescription>
         </Alert>
       )}
       {error && (
         <Alert variant="destructive">
-          <AlertTitle>Something went wrong</AlertTitle>
+          <AlertTitle>{T.somethingWentWrong}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       <Island
-        air title="Where your data lives"
+        air title={T.whereYourDataLives}
         description={sync
-          ? 'In this browser, on this device. Sign in below to keep an encrypted copy in the cloud as well; only your password opens it. Export a file now and then so a cleared browser cannot take your history with it.'
-          : 'In this browser only, on this device. Casa Papel has no server. Export a file now and then so a cleared browser cannot take your history with it.'}
+          ? T.inThisBrowserOn
+          : T.inThisBrowserOnly}
       >
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Chip tone={persisted ? 'emerald' : persisted === false ? 'amber' : 'zinc'}>{persisted ? 'persistent storage granted' : persisted === false ? 'storage may be evicted' : 'storage status unknown'}</Chip>
+            <Chip tone={persisted ? 'emerald' : persisted === false ? 'amber' : 'zinc'}>{persisted ? T.persistentStorageGranted : persisted === false ? T.storageMayBeEvicted : T.storageStatusUnknown}</Chip>
             {usage && <Chip tone="zinc">{usage}</Chip>}
-            {isDemoMode() && <Chip tone="amber">demo sandbox</Chip>}
+            {isDemoMode() && <Chip tone="amber">{T.demoSandbox}</Chip>}
             {!persisted && (
-              <Button size="xs" variant="outline" onClick={requestPersist}>Ask the browser to keep my data</Button>
+              <Button size="xs" variant="outline" onClick={requestPersist}>{T.askTheBrowserTo}</Button>
             )}
           </div>
           <p className="text-muted-foreground">
-            History entries: {eventCount ?? 0} · since last export: {since} · last export: {lastExport}
+            {T.historyEntriesSinceLast(eventCount, since, lastExport)}
           </p>
         </div>
       </Island>
@@ -155,52 +158,52 @@ export function DataScreen() {
       <SyncCard hasLocalData={!!h} onMessage={setMessage} onError={setError} />
       <InviteCard onError={setError} />
 
-      <Island air title="Export" help="data.export" description="One JSON file with every table and the full change history. Keep it anywhere you like.">
+      <Island air title={T.export} help="data.export" description={T.oneJsonFileWith}>
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={doExport} disabled={!h}>Export now</Button>
-          {nag && <span role="status" className="text-amber-700 dark:text-amber-400">You have unsaved changes since your last export.</span>}
+          <Button size="sm" onClick={doExport} disabled={!h}>{T.exportNow}</Button>
+          {nag && <span role="status" className="text-amber-700 dark:text-amber-400">{T.youHaveUnsavedChanges}</span>}
         </div>
       </Island>
 
-      <Island air title="Import" description="Restore an export, or merge a copy of the same household from another device.">
+      <Island air title={T.import} description={T.restoreAnExportOr}>
         <div className="space-y-3">
           <ImportPanel onMessage={(m) => { setError(null); setMessage(m) }} onError={(m) => { setMessage(null); setError(m) }} />
         </div>
       </Island>
 
       <Island
-        air title="Demo household"
+        air title={T.demoHousehold}
         description={isDemoMode()
-          ? 'You are in the demo sandbox. Loading the demo never touches your real data.'
-          : 'Loads a fictional household into this store, replacing what is here. Prefer the sandbox at ?demo=1.'}
+          ? T.youAreInThe
+          : T.loadsAFictionalHousehold}
       >
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2">
             {signedIn
-              ? <Button size="sm" variant="outline" onClick={openDemoSandbox}>Open the demo sandbox</Button>
-              : <Button size="sm" variant={isDemoMode() ? 'default' : 'outline'} onClick={() => void loadDemo(store)}>Load demo household</Button>}
-            {isDemoMode() && <Button size="sm" variant="outline" onClick={leaveDemoSandbox} title="Back to your own household">Leave the demo</Button>}
+              ? <Button size="sm" variant="outline" onClick={openDemoSandbox}>{T.openTheDemoSandbox}</Button>
+              : <Button size="sm" variant={isDemoMode() ? 'default' : 'outline'} onClick={() => void loadDemo(store)}>{T.loadDemoHousehold}</Button>}
+            {isDemoMode() && <Button size="sm" variant="outline" onClick={leaveDemoSandbox} title={T.backToYourOwn}>{T.leaveTheDemo}</Button>}
           </div>
-          {signedIn && <p className="text-muted-foreground">While signed in, the demo opens in its own sandbox so it never lands in your household's cloud copy.</p>}
+          {signedIn && <p className="text-muted-foreground">{T.whileSignedInThe}</p>}
         </div>
       </Island>
 
       <Island
-        air title="Danger zone" className="border-destructive/40"
-        description={signedIn ? 'Remove everything from this browser and stop syncing here. The cloud copy and other devices are untouched. Type WIPE to enable the button.' : 'Remove everything from this browser. Export first. Type WIPE to enable the button.'}
+        air title={T.dangerZone} className="border-destructive/40"
+        description={signedIn ? T.removeEverythingFromThis : T.removeEverythingPlain}
       >
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Input className="max-w-40" value={wipeWord} onChange={(e) => setWipeWord(e.target.value)} placeholder="WIPE" aria-label="Type WIPE to confirm" />
-            <Button size="sm" variant="destructive" disabled={wipeWord !== 'WIPE'} onClick={doWipe}>{signedIn ? 'Sign out and wipe this device' : 'Wipe this device'}</Button>
+            <Input className="max-w-40" value={wipeWord} onChange={(e) => setWipeWord(e.target.value)} placeholder={T.wipe} aria-label={T.typeWipeToConfirm} />
+            <Button size="sm" variant="destructive" disabled={wipeWord !== T.wipe} onClick={doWipe}>{signedIn ? T.signOutAndWipe : T.wipeThisDevice}</Button>
           </div>
           {signedIn && syncView.owner && (
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
-                <Input className="max-w-40" value={deleteWord} onChange={(e) => setDeleteWord(e.target.value)} placeholder="DELETE" aria-label="Type DELETE to confirm" />
-                <Button size="sm" variant="destructive" disabled={deleteWord !== 'DELETE'} onClick={doDeleteCloud}>Delete the cloud copy</Button>
+                <Input className="max-w-40" value={deleteWord} onChange={(e) => setDeleteWord(e.target.value)} placeholder={T.delete} aria-label={T.typeDeleteToConfirm} />
+                <Button size="sm" variant="destructive" disabled={deleteWord !== T.delete} onClick={doDeleteCloud}>{T.deleteTheCloudCopy}</Button>
               </div>
-              <p className="text-muted-foreground">Removes the household from the server for every device. Each device keeps what it has locally. Type DELETE to enable the button.</p>
+              <p className="text-muted-foreground">{T.removesTheHouseholdFrom}</p>
             </div>
           )}
         </div>

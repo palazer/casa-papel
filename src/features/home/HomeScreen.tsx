@@ -9,6 +9,10 @@ import { ImportPanel } from '@/features/data/ImportPanel'
 import { SetupStart } from '@/features/setup/SetupStart'
 import { describeSync } from '@/features/sync/syncText'
 import { useSyncView } from '@/sync/useSync'
+import { lower, txt } from '@/i18n'
+import { sentence } from '@/lib/sentence'
+
+const T = txt.home.welcome
 
 interface Props {
   onOpenData: () => void
@@ -44,31 +48,31 @@ export function HomeScreen({ onOpenData, onCreated, syncAvailable = false, onSig
   const links = (
     <div className="flex flex-wrap items-center gap-2">
       {demo
-        ? <Button size="xs" variant="ghost" onClick={leaveDemoSandbox}>Leave the demo</Button>
-        : <Button size="xs" variant="ghost" onClick={openDemoSandbox}>Look at the demo first</Button>}
-      <Button size="xs" variant="ghost" onClick={() => go('guide')}>How it works</Button>
-      <ImportPanel emptyDevice trigger={(open) => <Button size="xs" variant="ghost" onClick={open}>Import a file</Button>} onMessage={setMessage} onError={setError} />
+        ? <Button size="xs" variant="ghost" onClick={leaveDemoSandbox}>{T.leaveTheDemo}</Button>
+        : <Button size="xs" variant="ghost" onClick={openDemoSandbox}>{T.lookAtTheDemo}</Button>}
+      <Button size="xs" variant="ghost" onClick={() => go('guide')}>{T.howItWorks}</Button>
+      <ImportPanel emptyDevice trigger={(open) => <Button size="xs" variant="ghost" onClick={open}>{T.importAFile}</Button>} onMessage={setMessage} onError={setError} />
     </div>
   )
 
   const description = demo
-    ? 'You are in the demo sandbox: its own store, never synced. Leave it any time to get back to your own household.'
+    ? T.youAreInThe
     : syncAvailable
-      ? 'Everything stays on this device unless you sign in, which keeps an encrypted copy in the cloud that only your password opens.'
-      : 'Everything stays on this device. Casa Papel has no server.'
+      ? T.everythingStaysOnThis
+      : T.everythingStaysOnThis2
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <PageHeader title="Casa Papel" subline="Your household budget as a month-by-month grid that knows what a household is." controls={false}>
+      <PageHeader title={txt.common.appName} subline={T.yourHouseholdBudgetAs} controls={false}>
         {status && <p role="status" className="basis-full text-muted-foreground">{status}</p>}
         {error && <p role="alert" className="basis-full text-destructive">{error}</p>}
       </PageHeader>
 
       {blocked && view ? (
-        <Island air title="Welcome to Casa Papel" description={describeSync(view)}>
+        <Island air title={T.welcomeToCasaPapel} description={describeSync(view)}>
           <ul className="divide-y divide-border/60">
-            <Path label="Open Data" primary onClick={onOpenData}>
-              Unlock the cloud copy, or decide which data to keep, under Data. This device starts no new household until then.
+            <Path label={T.openData} primary onClick={onOpenData}>
+              {T.unlockTheCloudCopy}
             </Path>
           </ul>
         </Island>
@@ -77,30 +81,30 @@ export function HomeScreen({ onOpenData, onCreated, syncAvailable = false, onSig
           <SetupStart
             onCreated={onCreated}
             onBack={signedIn ? undefined : () => setMode('choose')}
-            notice={signedIn && view ? <>Signed in as <strong>{view.email}</strong>{view.status !== 'idle' && view.status !== 'syncing' ? ` (${describeSync(view).toLowerCase()})` : ''}. This household is uploaded to your account when you finish.</> : undefined}
+            notice={signedIn && view ? sentence(T.signedInAs(<strong>{view.email}</strong>, view.status !== 'idle' && view.status !== 'syncing' ? lower(describeSync(view)) : null)) : undefined}
           />
           {signedIn && links}
         </>
       ) : (
-        <Island air title="Welcome to Casa Papel" description={description}>
+        <Island air title={T.welcomeToCasaPapel} description={description}>
           <ul className="divide-y divide-border/60">
             {demo && (
-              <Path label="Load the demo household" primary onClick={() => void loadDemo(store)}>
-                A made-up household with two adults, a child, a dog and a car, so you can click around. Nothing here touches your own data.
+              <Path label={T.loadTheDemoHousehold} primary onClick={() => void loadDemo(store)}>
+                {T.aMadeUpHousehold}
               </Path>
             )}
-            <Path label="Start on this device" primary={!demo} onClick={() => setMode('setup')}>
+            <Path label={T.startOnThisDevice} primary={!demo} onClick={() => setMode('setup')}>
               {syncAvailable
-                ? 'Set up your household here. Everything stays in this browser; you can sign in later from Data to keep an encrypted copy in the cloud.'
-                : 'Set up your household here. Everything stays in this browser.'}
+                ? T.setUpYourHousehold
+                : T.setUpYourHousehold2}
             </Path>
             {syncAvailable && !demo && (
               <>
-                <Path label="Sign in" onClick={() => onSignIn?.()}>
-                  Use your household's email and password. A household already in your account appears here; otherwise you set one up next and it is uploaded when you finish.
+                <Path label={txt.common.signIn} onClick={() => onSignIn?.()}>
+                  {T.useYourHouseholdsEmail}
                 </Path>
-                <Path label="I have an invite" onClick={() => onJoin?.()}>
-                  Someone invited you. Pick your own email and password; your household gets its own cloud copy.
+                <Path label={txt.common.haveInvite} onClick={() => onJoin?.()}>
+                  {T.someoneInvitedYouPick}
                 </Path>
               </>
             )}

@@ -1,13 +1,27 @@
 import { app } from './app'
+import { common } from './common'
+import { components } from './components'
+import { data } from './data'
 import { engine } from './engine'
 import { errors } from './errors'
+import { goals } from './goals'
 import { guide } from './guide'
 import { help } from './help'
+import { home } from './home'
 import { impact } from './impact'
+import { main } from './main'
 import { model } from './model'
 import { names } from './names'
+import { past } from './past'
+import { payments } from './payments'
+import { recurring } from './recurring'
+import { remove } from './remove'
+import { rules } from './rules'
+import { setup } from './setup'
 import { statement } from './statement'
 import { store } from './store'
+import { sync } from './sync'
+import { trends } from './trends'
 
 /** Every text the app shows, in English. English is the source: another language's catalogue has exactly this shape. */
-export const en = { app, engine, errors, guide, help, impact, model, names, statement, store }
+export const en = { app, common, components, data, engine, errors, goals, guide, help, home, impact, main, model, names, past, payments, recurring, remove, rules, setup, statement, store, sync, trends }

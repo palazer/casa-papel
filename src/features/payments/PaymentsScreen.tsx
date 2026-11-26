@@ -23,6 +23,9 @@ import { GROUP_TITLE, groupPayments, inFilter, type PaymentFilter, type PaymentG
 import { PaymentDialog } from './PaymentDialog'
 import { PaymentLine, UntrackedLine } from './PaymentLine'
 import { PaymentTotals } from './PaymentTotals'
+import { txt } from '@/i18n'
+
+const T = txt.payments.page
 
 const EYEBROW = 'text-[10px] font-semibold uppercase tracking-wider'
 
@@ -159,16 +162,16 @@ export function PaymentsScreen() {
     const run = p.itemId
       ? setItemStatus(store, row.id, m!, p.itemId, done ? 'done' : row.defaultStatus)
       : cell.source === 'derived' ? setDerivedDone(store, row.id, m!, done) : setCellDone(store, row.id, m!, done)
-    run.catch((e) => setError(saveError(e, 'Action failed'))).finally(() => setBusy(null))
+    run.catch((e) => setError(saveError(e, txt.common.actionFailed))).finally(() => setBusy(null))
   }
 
   /** What a pressed sum is called above the list. */
   const filterLabel = (f: PaymentFilter): string =>
-    f.kind === 'person' ? data.people.find((p) => p.ownerId === f.ownerId)?.label ?? 'Household' : data.methods.find((x) => x.methodId === f.methodId)?.label ?? NO_METHOD
+    f.kind === 'person' ? data.people.find((p) => p.ownerId === f.ownerId)?.label ?? txt.common.household : data.methods.find((x) => x.methodId === f.methodId)?.label ?? NO_METHOD
 
   const heading = (g: PaymentGroup): string => {
     const first = g.payments[0]
-    return g.key === 'today' && first.day != null ? `Today, ${weekdayOf(m, first.day, locale)} ${first.day}` : GROUP_TITLE[g.key]
+    return g.key === 'today' && first.day != null ? T.todayOn(weekdayOf(m, first.day, locale), first.day) : GROUP_TITLE[g.key]
   }
   const HEAD_TONE: Partial<Record<PaymentGroupKey, string>> = { overdue: 'text-rose-700 dark:text-rose-300', today: 'text-foreground' }
   const lines = (g: PaymentGroup) => (
@@ -216,18 +219,18 @@ export function PaymentsScreen() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Payments" subline={household.name} sticky
-        above={strip.length > 0 && <MonthStrip months={strip} month={m} today={monthOfDate()} currency={ccy} locale={locale} onChange={setMonth} onAddYear={() => void addPlanYear(store).catch((e) => setError(saveError(e, 'Action failed')))} />}
+        title={T.payments} subline={household.name} sticky
+        above={strip.length > 0 && <MonthStrip months={strip} month={m} today={monthOfDate()} currency={ccy} locale={locale} onChange={setMonth} onAddYear={() => void addPlanYear(store).catch((e) => setError(saveError(e, txt.common.actionFailed)))} />}
         notes={error && <p role="alert" className="text-destructive">{error}</p>}
       >
         <h2 className="text-sm font-semibold leading-5">{formatMonth(m, locale, 'long')}</h2>
-        {isPastMonth(m) && <Chip tone="zinc" title="This month is over. It can still be changed.">past</Chip>}
+        {isPastMonth(m) && <Chip tone="zinc" title={T.thisMonthIsOver}>{T.past}</Chip>}
         {data.payments.length > 0 && (
           <p role="status" className="flex items-center gap-1 text-muted-foreground" data-testid="payments-summary">
             <span>
-              {money(data.toPay)} to pay · {money(data.paid)} done
-              {data.overdue > 0 && <> · <span className="text-rose-700 dark:text-rose-300">{data.overdue} overdue</span></>}
-              {data.untracked.count > 0 && <> · {data.untracked.count} untracked</>}
+              {T.toPayAndDone(money(data.toPay), money(data.paid))}
+              {data.overdue > 0 && <> · <span className="text-rose-700 dark:text-rose-300">{T.overdue(data.overdue)}</span></>}
+              {data.untracked.count > 0 && <> · {T.untracked(data.untracked.count)}</>}
             </span>
             <InfoTip help="payments.toPay" />
           </p>
@@ -235,40 +238,40 @@ export function PaymentsScreen() {
       </PageHeader>
 
       {data.payments.length === 0 ? (
-        <Island air title="By day">
-          <p className="text-muted-foreground" data-testid="payments-empty">Nothing leaves in {formatMonth(m, locale, 'long')}: the month's Statement has no amount under "Money out".</p>
+        <Island air title={T.byDay}>
+          <p className="text-muted-foreground" data-testid="payments-empty">{T.nothingLeavesInThe(formatMonth(m, locale, 'long'))}</p>
         </Island>
       ) : (
         <div className={cn('grid grid-cols-1 items-start gap-4', tracked.length > 0 && 'lg:grid-cols-[minmax(0,1fr)_22rem]')}>
           <div className="min-w-0 space-y-4">
             <Island
-              air title="By day" help="payments.byDay" data-testid="payments-list" data-list="tracked"
+              air title={T.byDay} help="payments.byDay" data-testid="payments-list" data-list="tracked"
               right={filter && (
                 <span className="flex items-center gap-1.5" data-testid="payments-filter">
-                  <span>Only {filterLabel(filter)}</span>
-                  <Button size="xs" variant="outline" onClick={() => setFilter(null)}>Show all</Button>
+                  <span>{T.only(filterLabel(filter))}</span>
+                  <Button size="xs" variant="outline" onClick={() => setFilter(null)}>{T.showAll}</Button>
                 </span>
               )}
             >
               <div className="space-y-2">
                 {noMethods && (
                   <p className="text-xs text-muted-foreground" data-testid="payments-no-methods">
-                    No payment methods yet, so nothing can say how an amount is paid.{' '}
-                    <Button size="xs" variant="outline" onClick={() => go('household')}>Add them under Household</Button>
+                    {T.noPaymentMethodsYet}{' '}
+                    <Button size="xs" variant="outline" onClick={() => go('household')}>{T.addThemUnderHousehold}</Button>
                   </p>
                 )}
                 {tracked.length === 0
-                  ? <p className="text-muted-foreground" data-testid="payments-none-tracked">Nothing is tracked in {formatMonth(m, locale, 'long')} yet. An amount is tracked once it has a day or a method: press one under "Untracked".</p>
-                  : groups.length === 0 ? <p className="text-muted-foreground">Nothing of it in this month.</p> : groups.map(group)}
+                  ? <p className="text-muted-foreground" data-testid="payments-none-tracked">{T.nothingIsTrackedIn(formatMonth(m, locale, 'long'))}</p>
+                  : groups.length === 0 ? <p className="text-muted-foreground">{T.nothingOfItIn}</p> : groups.map(group)}
               </div>
             </Island>
             {/* outside every sum, so not there while one sum's payments are picked out */}
             {untracked.length > 0 && !filter && (
               <Island
-                air title="Untracked" help="payments.untracked" data-testid="payments-untracked" data-list="untracked"
+                air title={T.untracked2} help="payments.untracked" data-testid="payments-untracked" data-list="untracked"
                 folded={untrackedFolded} onFold={(to) => { setUntrackedFolded(to); writePref('payments.fold.untracked', to) }}
                 right={<span>{data.untracked.count} · {money(data.untracked.total)}</span>}
-                description={`What leaves in ${formatMonth(m, locale, 'long')} with no day and no method. It counts in none of the sums here, and its tick is on the Statement.`}
+                description={T.whatLeavesInWith(formatMonth(m, locale, 'long'))}
               >
                 <ul className="-ml-2 divide-y divide-border/60">
                   {untracked.map((p) => <UntrackedLine key={p.id} payment={p} currency={ccy} locale={locale} onTrack={() => setPaying(p.id)} />)}

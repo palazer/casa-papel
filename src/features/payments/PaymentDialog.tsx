@@ -11,9 +11,12 @@ import type { Household, MonthKey, Row, Tables } from '@/model'
 import { setPaymentOf, type PaymentOf, type PaymentTarget } from '@/store'
 import { DaySelect, MethodSelect } from './PaidFields'
 import { paymentScopes, scopeValues, startScope, type PaymentScope } from './scope'
+import { txt } from '@/i18n'
+
+const T = txt.payments.dialog
 
 /** What a place is called where the dialog offers more than one. */
-const SCOPE_LABEL: Record<PaymentScope, string> = { schedule: 'This and following months', item: 'Only this month', row: 'This row, every month' }
+const SCOPE_LABEL: Record<PaymentScope, string> = { schedule: txt.common.thisAndFollowing, item: txt.common.onlyThisMonth, row: T.thisRowEveryMonth }
 
 /**
  * "Payment" (DESIGN.md §12): the day and the method of one amount, from the Payments page. It opens from a tracked
@@ -53,10 +56,10 @@ export function PaymentDialog({ payment: p, row, month, tables, household, onClo
 
   /** How far the chosen place reaches. */
   const reach = scope === 'schedule'
-    ? `From ${monthName} on, wherever it repeats. Earlier months keep how they were paid.`
+    ? T.fromOnWhereverIt(monthName)
     : scope === 'row'
-      ? 'For this row, in every month, past ones included.'
-      : p.scheduleId ? `For ${monthName} alone. The other months keep what its schedule says.` : `For this amount, in ${monthName} alone.`
+      ? T.forThisRowIn
+      : p.scheduleId ? T.forAloneTheOther(monthName) : T.forThisAmountIn(monthName)
   const untracked = (pay.day ?? at.behindDay) == null && (pay.methodId ?? at.behindMethodId) == null
   const noMethods = tables.paymentMethods.every((m) => m.deletedAt || m.archived)
 
@@ -64,32 +67,32 @@ export function PaymentDialog({ payment: p, row, month, tables, household, onClo
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Payment</DialogTitle>
+          <DialogTitle>{T.payment}</DialogTitle>
           <DialogDescription>{fullLabel}</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <p className="flex items-center gap-2 text-sm" data-testid="payment-of">
-            <span className="min-w-0 flex-1"><span className="tabular-nums">{formatAmount(p.amount, baseCurrency, locale)}</span> <span className="text-muted-foreground">in {monthName}</span></span>
-            <Button size="xs" variant="outline" onClick={onAmount} disabled={busy}>Amount…</Button>
+            <span className="min-w-0 flex-1"><span className="tabular-nums">{formatAmount(p.amount, baseCurrency, locale)}</span> <span className="text-muted-foreground">{T.inMonth(monthName)}</span></span>
+            <Button size="xs" variant="outline" onClick={onAmount} disabled={busy}>{T.amountMore}</Button>
           </p>
           {scopes.length > 1 && (
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="text-muted-foreground">Counts for</span>
-              <Segmented label="Counts for" value={scope} onChange={(v) => setScope(v as PaymentScope)} options={scopes.map((s) => ({ value: s, label: SCOPE_LABEL[s] }))} />
+              <span className="text-muted-foreground">{T.countsFor}</span>
+              <Segmented label={T.countsFor} value={scope} onChange={(v) => setScope(v as PaymentScope)} options={scopes.map((s) => ({ value: s, label: SCOPE_LABEL[s] }))} />
             </div>
           )}
           <div className="grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)]">
-            <div className="space-y-1"><Label htmlFor="payment-day" className="text-xs text-muted-foreground">Paid on</Label><DaySelect id="payment-day" className="w-full" none={at.noDay} value={pay.day} onChange={(day) => set({ day })} /></div>
-            <div className="space-y-1"><Label htmlFor="payment-method" className="text-xs text-muted-foreground">Paid with</Label><MethodSelect id="payment-method" className="w-full" tables={tables} none={at.noMethod} value={pay.methodId} onChange={(methodId) => set({ methodId })} /></div>
+            <div className="space-y-1"><Label htmlFor="payment-day" className="text-xs text-muted-foreground">{txt.common.paidOn}</Label><DaySelect id="payment-day" className="w-full" none={at.noDay} value={pay.day} onChange={(day) => set({ day })} /></div>
+            <div className="space-y-1"><Label htmlFor="payment-method" className="text-xs text-muted-foreground">{txt.common.paidWith}</Label><MethodSelect id="payment-method" className="w-full" tables={tables} none={at.noMethod} value={pay.methodId} onChange={(methodId) => set({ methodId })} /></div>
           </div>
-          <p className="text-xs text-muted-foreground" data-testid="payment-reach">{reach}{pay.day != null && pay.day > 28 ? ` In a shorter month the ${ordinalDay(pay.day)} is its last day.` : ''}</p>
-          {untracked && <p className="text-xs text-muted-foreground" data-testid="payment-untracked">With no day and no method it is not tracked: it stands under "Untracked" and counts in none of the page's sums.</p>}
-          {noMethods && <p className="text-xs text-muted-foreground">No payment methods yet: add them under Household → "Payment methods".</p>}
+          <p className="text-xs text-muted-foreground" data-testid="payment-reach">{txt.payments.fields.withShortMonth(reach, pay.day != null && pay.day > 28 ? ordinalDay(pay.day) : null)}</p>
+          {untracked && <p className="text-xs text-muted-foreground" data-testid="payment-untracked">{T.withNoDayAnd}</p>}
+          {noMethods && <p className="text-xs text-muted-foreground">{T.noPaymentMethodsYet}</p>}
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button onClick={() => void save(async () => { await setPaymentOf(store, target, pay); onSaved() })} disabled={busy}>Save</Button>
+          <Button variant="outline" onClick={onClose} disabled={busy}>{txt.common.cancel}</Button>
+          <Button onClick={() => void save(async () => { await setPaymentOf(store, target, pay); onSaved() })} disabled={busy}>{txt.common.save}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

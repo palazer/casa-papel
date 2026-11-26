@@ -11,6 +11,9 @@ import { useSave } from '@/features/grid/RowDialogs'
 import type { Household, MonthKey, Tables } from '@/model'
 import { archiveMonthProblem, archiveThing, describeRemoval, removeThing, type Impact, type RemovalTarget } from '@/store'
 import { errorText } from '@/app/saveError'
+import { lower, txt } from '@/i18n'
+
+const T = txt.remove.dialog
 
 interface Props {
   target: RemovalTarget
@@ -35,7 +38,7 @@ export function RemoveDialog({ target, tables, household, onClose, onDone }: Pro
     try {
       return { impact: describeRemoval(tables, target, { locale, archiveFrom: from ?? undefined }), failure: null }
     } catch (e) {
-      return { impact: null, failure: errorText(e, 'Something went wrong.') }
+      return { impact: null, failure: errorText(e, txt.common.somethingWentWrong) }
     }
   }, [tables, target, locale, from])
   const { error, busy, save } = useSave(() => {
@@ -47,9 +50,9 @@ export function RemoveDialog({ target, tables, household, onClose, onDone }: Pro
     return (
       <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
         <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
-          <DialogHeader><DialogTitle>Nothing to remove</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{T.nothingToRemove}</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground" role="alert">{failure}</p>
-          <DialogFooter><Button variant="outline" onClick={onClose}>Close</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={onClose}>{txt.common.close}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     )
@@ -57,42 +60,42 @@ export function RemoveDialog({ target, tables, household, onClose, onDone }: Pro
 
   const month = impact.archiveFrom
   const problem = archiveMonthProblem(impact, month, locale)
-  const kindWord = impact.kindLabel.toLowerCase()
+  const kindWord = lower(impact.kindLabel)
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{impact.kindLabel} "{impact.subject}"</DialogTitle>
-          <DialogDescription>{impact.canArchive ? 'Archive it or delete it. You can undo this right after.' : 'You can undo this right after.'}</DialogDescription>
+          <DialogDescription>{impact.canArchive ? T.archiveItOrDelete : T.youCanUndoThis}</DialogDescription>
         </DialogHeader>
         <div className="space-y-5 text-sm">
           {impact.canArchive && (
             <section className="space-y-2" aria-labelledby="rm-archive">
-              <h3 id="rm-archive" className="flex items-center gap-1 font-medium">Archive <InfoTip help="remove.archiveFrom" /></h3>
+              <h3 id="rm-archive" className="flex items-center gap-1 font-medium">{txt.common.archive} <InfoTip help="remove.archiveFrom" /></h3>
               <div className="space-y-1.5">
-                <Label>Archive from</Label>
-                <MonthField label="Archive from" value={month} onChange={setFrom} locale={locale} />
+                <Label>{T.archiveFrom}</Label>
+                <MonthField label={T.archiveFrom} value={month} onChange={setFrom} locale={locale} />
                 {problem && <p className="text-xs text-destructive" role="alert">{problem}</p>}
               </div>
               <Lines items={impact.archiveChanges} />
-              <p className="text-xs text-muted-foreground">Earlier months stay exactly as they are. Restore any time under Household: restoring puts back what is listed here.</p>
+              <p className="text-xs text-muted-foreground">{T.earlierMonthsStayExactly}</p>
             </section>
           )}
           <section className="space-y-2" aria-labelledby="rm-delete">
-            {impact.canArchive && <h3 id="rm-delete" className="font-medium">Delete</h3>}
-            <p className="text-xs text-muted-foreground">Deleting removes</p>
-            <Lines items={[...(impact.loses.length ? impact.loses : [`Only the ${kindWord} itself`]), ...(impact.over ? [impact.over] : [])]} />
+            {impact.canArchive && <h3 id="rm-delete" className="font-medium">{txt.common.delete}</h3>}
+            <p className="text-xs text-muted-foreground">{T.deletingRemoves}</p>
+            <Lines items={[...(impact.loses.length ? impact.loses : [T.onlyTheItself(kindWord)]), ...(impact.over ? [impact.over] : [])]} />
             {impact.changes.length > 0 && (
               <>
-                <p className="text-xs text-muted-foreground">Also changes</p>
+                <p className="text-xs text-muted-foreground">{T.alsoChanges}</p>
                 <Lines items={impact.changes} />
               </>
             )}
             {impact.note && <p className="text-xs text-muted-foreground">{impact.note}</p>}
             {impact.blockers.length > 0 && (
               <Alert variant="destructive">
-                <AlertTitle>Resolve these first</AlertTitle>
+                <AlertTitle>{T.resolveTheseFirst}</AlertTitle>
                 <AlertDescription>
                   <ul className="list-disc space-y-1 pl-4">
                     {impact.blockers.map((b) => (
@@ -106,13 +109,13 @@ export function RemoveDialog({ target, tables, household, onClose, onDone }: Pro
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button variant="outline" onClick={onClose} disabled={busy}>{txt.common.cancel}</Button>
           {impact.canArchive && (
             <Button variant="outline" disabled={busy || !!problem} onClick={() => void save(() => archiveThing(store, target, month))}>
-              Archive from {formatMonth(month, locale)}
+              {T.archiveFromMonth(formatMonth(month, locale))}
             </Button>
           )}
-          <Button variant="destructive" disabled={busy || !impact.canDelete} onClick={() => void save(() => removeThing(store, target))}>Delete</Button>
+          <Button variant="destructive" disabled={busy || !impact.canDelete} onClick={() => void save(() => removeThing(store, target))}>{txt.common.delete}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

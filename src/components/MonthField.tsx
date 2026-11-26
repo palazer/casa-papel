@@ -1,5 +1,8 @@
 import { useMemo, useState } from 'react'
 import { NativeSelect } from './NativeSelect'
+import { txt } from '@/i18n'
+
+const T = txt.components.monthPicker
 
 interface Props {
   id?: string
@@ -31,7 +34,7 @@ export function MonthField({ id, value, onChange, locale = 'en', label, allowEmp
     <div className={`flex gap-2 ${className ?? ''}`}>
       <NativeSelect
         id={id}
-        aria-label={`${label}: month`}
+        aria-label={T.monthOf(label)}
         className="min-w-0 flex-1"
         value={Number.isFinite(m) ? String(m) : ''}
         onChange={(e) => (e.target.value === '' ? onChange('') : set(Number.isFinite(y) ? y : now.getFullYear(), Number(e.target.value)))}
@@ -40,7 +43,7 @@ export function MonthField({ id, value, onChange, locale = 'en', label, allowEmp
         {names.map((n, i) => <option key={n} value={i + 1}>{n}</option>)}
       </NativeSelect>
       <NativeSelect
-        aria-label={`${label}: year`}
+        aria-label={T.yearOf(label)}
         className="w-24"
         value={Number.isFinite(y) ? String(y) : ''}
         onChange={(e) => (e.target.value === '' ? onChange('') : set(Number(e.target.value), Number.isFinite(m) ? m : now.getMonth() + 1))}

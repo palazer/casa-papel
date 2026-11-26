@@ -1,5 +1,8 @@
 import { formatMonth } from '@/app/format'
 import { cadenceOf, dueMonthNumbers, nextDue, parseMonth, type MonthKey, type RepeatChoice } from '@/model'
+import { txt } from '@/i18n'
+
+const T = txt.recurring.text
 
 /** A month of the year by name, in the household's language. */
 export function monthName(m: number, locale: string, style: 'long' | 'short' = 'long'): string {
@@ -15,10 +18,10 @@ export function landsText(choice: RepeatChoice, month: MonthKey, locale: string)
   if (choice.kind === 'none') return ''
   const cadence = cadenceOf(choice)
   const due = dueMonthNumbers(cadence)
-  if (due.length === 0) return 'Pick at least one month.'
-  const list = due.length === 1 ? monthName(due[0], locale) : `${due.slice(0, -1).map((m) => monthName(m, locale, 'short')).join(', ')} and ${monthName(due[due.length - 1], locale, 'short')}`
-  const lands = due.length === 12 ? 'Lands in every month.' : due.length === 1 ? `Lands in ${list} each year.` : `Lands in ${list}.`
+  if (due.length === 0) return txt.common.pickAMonth
+  const list = due.length === 1 ? monthName(due[0], locale) : T.listAnd(due.slice(0, -1).map((m) => monthName(m, locale, 'short')).join(', '), monthName(due[due.length - 1], locale, 'short'))
+  const lands = due.length === 12 ? T.landsInEveryMonth : due.length === 1 ? T.landsInEachYear(list) : T.landsIn(list)
   if (due.includes(parseMonth(month).month)) return lands
   const next = nextDue({ ...cadence, startMonth: month, endMonth: null }, month)
-  return `${lands} Not in ${formatMonth(month, locale, 'long')}${next ? `; next: ${formatMonth(next, locale, 'long')}` : ''}.`
+  return T.notInThisMonth(lands, formatMonth(month, locale, 'long'), next ? formatMonth(next, locale, 'long') : null)
 }

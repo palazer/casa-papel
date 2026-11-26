@@ -1,0 +1,56 @@
+/** The parts every screen shares: the rail, the page header, the legend, the month picker, the charts. */
+export const components = {
+  rail: {
+    fold: (label: string) => `${label} · fold`,
+    screens: 'Screens',
+    backToYourOwn: 'Back to your own household',
+    demo: 'demo',
+    settingsPages: 'Settings pages',
+  },
+  infoTip: {
+    about: (heading: string) => `About ${heading}`,
+  },
+  legend: {
+    balancesAndNetWorth: 'Balances and net worth',
+    goals: 'Goals',
+    coloursAndMarks: 'Colours and marks',
+    kindsOfMoney: 'Kinds of money',
+    marks: 'Marks',
+    anEstimateOnThe: 'An estimate: on the yellow shade; a category too, while one of its lines is one',
+    certainYouKnowThe: 'Certain: you know the amount',
+    doneTheMoneyHas: 'Done: the money has moved',
+    thisMonthOnlyNothing: 'This month only: nothing done yet, partly done',
+    spendingShownAsA: 'Spending, shown as a negative number',
+    drawnFromSavingsThis: 'Drawn from savings this month',
+    aBalanceBelowZero: 'A balance below zero: a virtual account or savings in the red',
+    aBalanceYouEntered: 'A balance you entered yourself',
+    sampleMonth: 'Sept',
+    aMonthThatIs: 'A month that is over: grey in the Grid, "past" on the Statement. It can still be changed',
+    aFaintBandThe: 'A faint band: the rows of one category',
+    onAScheduleIt: 'On a schedule: it lands in its months by itself. In the months between, the line is grey and says when it lands next, and with how much',
+    sampleDay: '15th',
+    theDayAnAmount: 'The day an amount goes out, on the Statement: press it for the month\'s payments',
+    notInNetWorth: 'Not in net worth, on the Statement: an account that is a person\'s own. Its figures are grey, and no total counts it',
+    linkedOnTheStatement: 'Linked, on the Statement: a row and the account it fills, takes from or pays off. Press it to go to the other end; faint and open, no row pays that loan or card off yet',
+    moreInTheGuide: 'More in the Guide',
+  },
+  monthPicker: {
+    previousMonth: 'Previous month',
+    addYear: (year: number) => `Add ${year + 1}`,
+    nextMonth: 'Next month',
+    monthOf: (label: string) => `${label}: month`,
+    yearOf: (label: string) => `${label}: year`,
+  },
+  header: {
+    redo: 'Redo',
+  },
+  charts: {
+    now: 'now',
+    parts: 'Parts',
+    noChange: 'no change',
+  },
+  island: {
+    open: 'open',
+    minimize: 'minimize',
+  },
+}

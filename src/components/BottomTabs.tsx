@@ -1,6 +1,9 @@
 import { memo } from 'react'
 import { groupOf, railFor, screenDef, screenHref, settingsPage, useScreen, type Screen } from '@/app/screens'
 import { follow, labelClass, tileClass } from './railStyles'
+import { txt } from '@/i18n'
+
+const T = txt.components.rail
 
 /** The phone's navigation (DESIGN.md §2): the rail's tiles (four, five with Payments) as a dark bar along the bottom
  *  edge, above the home indicator. The Settings tab opens the group's page open last; its pages switch through the tab row under the page
@@ -8,7 +11,7 @@ import { follow, labelClass, tileClass } from './railStyles'
 export const BottomTabs = memo(function BottomTabs() {
   const { screen, go, payments } = useScreen()
   return (
-    <nav aria-label="Screens" className="dark fixed inset-x-0 bottom-0 z-40 flex justify-around border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] text-sidebar-foreground md:hidden">
+    <nav aria-label={T.screens} className="dark fixed inset-x-0 bottom-0 z-40 flex justify-around border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] text-sidebar-foreground md:hidden">
       {railFor({ payments }).map((it) => {
         const target: Screen = it.kind === 'page' ? it.key : settingsPage()
         const active = it.kind === 'page' ? screen === it.key : groupOf(screen) === it.key

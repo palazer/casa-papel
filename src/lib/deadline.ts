@@ -1,3 +1,5 @@
+import { txt } from '@/i18n'
+
 /**
  * A fetch that gives up. Without a deadline a request that never gets an answer (a dropped
  * connection, a laptop waking up) stays pending for as long as the browser cares to wait, and
@@ -8,7 +10,7 @@
  * expects from a cancelled request: it reports it at once instead of retrying it three more times.
  * A `signal` the caller passed keeps working.
  */
-export function withDeadline(fetchFn: typeof fetch, ms: number, message = 'The request timed out.'): typeof fetch {
+export function withDeadline(fetchFn: typeof fetch, ms: number, message = txt.errors.requestTimedOut): typeof fetch {
   return (input, init) => {
     const controller = new AbortController()
     const outer = init?.signal

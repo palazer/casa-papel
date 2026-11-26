@@ -1,6 +1,9 @@
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react'
 import { Sparkline } from '@/components/charts/Sparkline'
 import { cn } from '@/lib/utils'
+import { txt } from '@/i18n'
+
+const T = txt.trends.tile
 
 /**
  * A subject of the Trends page as a tile that is a switch (DESIGN.md §11): its figure for the current month, how it
@@ -22,7 +25,7 @@ export function TrendTile({ label, color, on, onToggle, value, change, changeTex
   values: number[]
   planFrom: number
 }) {
-  const moved = change == null ? 'nothing before it to compare with' : change === 0 ? `no change from ${since}` : `${change > 0 ? 'up' : 'down'} ${changeText} from ${since}`
+  const moved = change == null ? T.nothingBeforeItTo : change === 0 ? T.noChangeFrom(since) : T.upOrDownFrom(change, changeText, since)
   return (
     <button
       type="button" aria-pressed={on} onClick={onToggle} aria-label={`${label}: ${value}, ${moved}`} data-subject-tile
@@ -36,8 +39,8 @@ export function TrendTile({ label, color, on, onToggle, value, change, changeTex
         <span className="truncate">{label}</span>
       </span>
       <span className="mt-0.5 block truncate text-lg font-semibold leading-6">{value}</span>
-      <span className="flex items-center gap-0.5 text-[11px] leading-[15px] text-muted-foreground" title={change == null ? undefined : `From ${since}`}>
-        {change == null ? '–' : change === 0 ? 'no change' : (
+      <span className="flex items-center gap-0.5 text-[11px] leading-[15px] text-muted-foreground" title={change == null ? undefined : T.fromSince(since)}>
+        {change == null ? '–' : change === 0 ? T.noChange : (
           <>
             {change > 0 ? <ArrowUpRight className="size-3" aria-hidden /> : <ArrowDownRight className="size-3" aria-hidden />}
             <span className="tabular-nums">{changeText}</span>
