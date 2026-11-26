@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 import {
   accountIdOf, accountRef, compareMonths, conversionOf, fromMinor, growthIn, isOldPocketShare, isOutsideNetWorth, isShareRule, isTakenFromAccount, movesInto, monthRange, ownBalance, isPayOffRow, paysExpenses, pocketLandsIn, poolIdOf, poolRef, resolveRules, scaleMoney, toMinor,
   type Account, type Category, type Cell, type FundedBy, type Money, type MonthKey, type Row, type RuleState, type Section, type Tables,
@@ -122,6 +123,9 @@ function emptyOutput(months: MonthKey[]): EngineOutput {
   return { months, rows: [], cells: {}, totals: {}, accounts: {}, pools: {}, rowTotals: {}, incomeTotal: 0, main: null, netWorth: {}, recurringRowIds: [], primarySavingsId: null, warnings: [] }
 }
 
+/** What the calculation warns about, in words (`src/i18n`). */
+const W = txt.engine.warning
+
 /**
  * Recompute everything from the tables. Deterministic and allocation-light:
  * a household of 60 rows × 60 months resolves in well under a millisecond.
@@ -211,7 +215,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
     // pocket money from before pocket rows had rules: a share of the household's pocket total, until the row gets a rule
     const derivedPocket = isOldPocketShare(row)
     const follows = row.followsRowId && !rule ? row.followsRowId : null
-    if (follows && !rowsById.has(follows)) warnings.push(`"${row.name}" follows a row that no longer exists.`)
+    if (follows && !rowsById.has(follows)) warnings.push(W.followsMissingRow(row.name))
     const rowCells = cellsByRow.get(row.id)
     let prev: Money = 0
     let everSet = false
@@ -304,7 +308,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
       // what was recorded counts as recorded; the rest is converted at the month's rate as one amount, as before
       const recordedAmount = recorded ? recorded.reduce((sum, p) => sum + p.amount, 0) : 0
       const conv = recorded && value === recordedAmount ? { value: 0, missingRate: false, projected: false } : convertMoney(fx, value - recordedAmount, currency, base, m)
-      if (conv.missingRate) warnOnce(row.id, `No ${currency}→${base} rate for ${m} (${row.name})`)
+      if (conv.missingRate) warnOnce(row.id, W.noRate(currency, base, m, row.name))
       const valueBase = recorded ? conv.value + recorded.reduce((sum, p) => sum + partIn(p, currency, base, m), 0) : conv.value
       // scale funding split into base currency proportionally
       const fundingBase = zeroFunding()
@@ -354,7 +358,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
   /** A balance in the base currency; a missing rate leaves it 1:1 and warns once per account. */
   const inBase = (acc: Account, balance: Money, m: MonthKey): { balanceBase: Money; missingRate: boolean } => {
     const conv = convertMoney(fx, balance, acc.currency, base, m)
-    if (conv.missingRate) warnOnce(acc.id, `No ${acc.currency}→${base} rate for ${m} (${acc.name})`)
+    if (conv.missingRate) warnOnce(acc.id, W.noRate(acc.currency, base, m, acc.name))
     return { balanceBase: conv.value, missingRate: conv.missingRate }
   }
 
@@ -365,7 +369,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
   /** A row's amount of a month in an account's currency. */
   const inAccountCurrency = (acc: Account, c: CellResult, m: MonthKey): Money => {
     const conv = amountIn(c, acc.currency, m)
-    if (conv.missingRate) warnOnce(`${acc.id}|${c.currency}`, `No ${c.currency}→${acc.currency} rate for ${m} (${acc.name})`)
+    if (conv.missingRate) warnOnce(`${acc.id}|${c.currency}`, W.noRate(c.currency, acc.currency, m, acc.name))
     return conv.value
   }
 
@@ -504,7 +508,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
     if (row.section !== 'expense' || !row.deductedFromRowId) continue
     const target = rowsById.get(row.deductedFromRowId)
     if (!target || target.section !== 'income') {
-      warnings.push(`"${row.name}" is deducted from a row that no longer exists.`)
+      warnings.push(W.deductedFromMissingRow(row.name))
       continue
     }
     for (const m of months) {
@@ -624,7 +628,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
       if (e.rule.kind === 'share-of-income') fill(e, Math.max(0, scaleMoney(t.takeHome, e.rule.share)))
       else if (e.rule.kind === 'share-of-own-income') {
         // pocket money as a share of what its adult brings home; a row that belongs to no adult has nothing to take it of
-        if (!adultIds.has(e.row.scope)) warnOnce(`own-income|${e.row.id}`, `"${e.row.name}" takes a percentage of its adult's own income, but it does not belong to an adult.`)
+        if (!adultIds.has(e.row.scope)) warnOnce(`own-income|${e.row.id}`, W.ownIncomeWithoutAdult(e.row.name))
         fill(e, Math.max(0, scaleMoney(adultIds.has(e.row.scope) ? t.takeHomeBy[e.row.scope] ?? 0 : 0, e.rule.share)))
       } else if (e.rule.kind === 'share-of-row') {
         // a share of one income line's take-home (its amount minus what is deducted from it); a line that is gone,
@@ -632,7 +636,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
         const of = e.rule.ofRowId ? rowsById.get(e.rule.ofRowId) : undefined
         const ofCell = of && of.section === 'income' && !isTakenFromAccount(of) ? cells[cellKey(of.id, m)] : undefined
         const there = ofCell != null && ofCell.source !== 'archived'
-        if (!there) warnOnce(`share-of-row|${e.row.id}`, `"${e.row.name}" takes a percentage of an income line that is no longer there (${m}).`)
+        if (!there) warnOnce(`share-of-row|${e.row.id}`, W.shareOfMissingIncome(e.row.name, m))
         fill(e, Math.max(0, scaleMoney(there ? ofCell.netBase : 0, e.rule.share)))
       }
     }
@@ -648,7 +652,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
       shareOfRest += e.rule.share
       fill(e, scaleMoney(t.leftForShares, e.rule.share))
     }
-    if (shareOfRest > 1.000001) warnOnce('share-of-rest', 'The percentages of what is left add up to more than 100%.')
+    if (shareOfRest > 1.000001) warnOnce('share-of-rest', W.sharesOfRestOver100)
     if (plugged) {
       const rest = t.income - outflows() - userToSavings - t.buffer
       t.rest = rest
@@ -682,7 +686,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
     let paid: Money = 0
     for (const [currency, amount] of Object.entries(totals[m].fundedOwn[source] ?? {})) {
       const conv = convertMoney(fx, amount, currency, acc.currency, m)
-      if (conv.missingRate) warnOnce(`${acc.id}|${currency}`, `No ${currency}→${acc.currency} rate for ${m} (${acc.name})`)
+      if (conv.missingRate) warnOnce(`${acc.id}|${currency}`, W.noRate(currency, acc.currency, m, acc.name))
       paid += conv.value
     }
     return paid
@@ -809,7 +813,7 @@ export function computeEngine(input: EngineInput): EngineOutput {
         return value + toMinor(fromMinor(restBase, base) * inv.fixedRate, acc.currency)
       }
       const conv = amountIn(c, acc.currency, m)
-      if (conv.missingRate) warnOnce(`${acc.id}|${c.currency}`, `No ${c.currency}→${acc.currency} rate for ${m} (${acc.name})`)
+      if (conv.missingRate) warnOnce(`${acc.id}|${c.currency}`, W.noRate(c.currency, acc.currency, m, acc.name))
       return conv.value
     }
     for (const m of months) {

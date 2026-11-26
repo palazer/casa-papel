@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 import {
   compareMonths, methodFrom, methodOf, payContext, payDayFrom, payDayOf, paymentKindInfo,
   type CellItem, type Money, type MonthKey, type PayFrom, type PaymentAsk, type PaymentMethod, type Row, type Tables,
@@ -89,7 +90,7 @@ export interface Payments {
   untracked: { count: number; total: Money }
 }
 
-export const NO_METHOD = 'No method'
+export const NO_METHOD = txt.engine.noMethod
 
 /**
  * A month's payments, read from its Statement (`buildStatement`): every row of "Money out" that has an amount, and
@@ -188,7 +189,7 @@ export function buildPayments(tables: Tables, engine: EngineOutput, month: Month
     let method = byMethod.get(p.methodId ?? '')
     if (!method) byMethod.set(p.methodId ?? '', (method = { methodId: p.methodId, label: p.methodId ? ctx.methods.get(p.methodId)?.name ?? NO_METHOD : NO_METHOD, total: 0, left: 0, count: 0 }))
     let person = byPerson.get(p.ownerId ?? '')
-    if (!person) byPerson.set(p.ownerId ?? '', (person = { ownerId: p.ownerId, label: p.ownerId ? entities.get(p.ownerId)?.name ?? 'Household' : 'Household', total: 0, left: 0, count: 0 }))
+    if (!person) byPerson.set(p.ownerId ?? '', (person = { ownerId: p.ownerId, label: p.ownerId ? entities.get(p.ownerId)?.name ?? txt.engine.household : txt.engine.household, total: 0, left: 0, count: 0 }))
     for (const total of [method, person]) {
       total.total += p.amount
       total.count += 1

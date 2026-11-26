@@ -2,6 +2,7 @@
  * Goals: a finish line the household chose, read against numbers the engine already computes.
  * No new maths: a goal watches an account balance, a virtual account, a debt or the net worth.
  */
+import { txt } from '@/i18n'
 import { addMonths, compareMonths, type Goal, type Money, type MonthKey, type Tables } from '@/model'
 import type { EngineOutput } from './types'
 
@@ -31,16 +32,16 @@ function reader(goal: Goal, tables: Tables, out: EngineOutput, month: MonthKey):
   if (goal.kind === 'pool-balance') {
     const pool = goal.poolId ? tables.pools.find((p) => p.id === goal.poolId && !p.deletedAt) : undefined
     const series = goal.poolId ? out.pools[goal.poolId] : undefined
-    if (!pool || !series) return { read: () => null, currency: base, problem: 'The virtual account this goal watched is gone. Edit the goal and pick another.', opening: 0, openingMonth: null }
-    if (pool.archivedMonth && compareMonths(pool.archivedMonth, month) <= 0) return { read: () => null, currency: base, problem: `The virtual account "${pool.name}" is archived. Restore it under Household or edit the goal.`, opening: pool.openingBalance, openingMonth: null }
+    if (!pool || !series) return { read: () => null, currency: base, problem: txt.engine.goal.virtualAccountGone, opening: 0, openingMonth: null }
+    if (pool.archivedMonth && compareMonths(pool.archivedMonth, month) <= 0) return { read: () => null, currency: base, problem: txt.engine.goal.virtualAccountArchived(pool.name), opening: pool.openingBalance, openingMonth: null }
     // in the currency of the savings account that holds it (rule X14)
     return { read: (m) => series.months[m]?.balance ?? null, currency: series.currency, problem: null, opening: pool.openingBalance, openingMonth: null }
   }
   const acc = goal.accountId ? tables.accounts.find((a) => a.id === goal.accountId && !a.deletedAt) : undefined
   const series = goal.accountId ? out.accounts[goal.accountId] : undefined
-  if (!acc) return { read: () => null, currency: base, problem: 'The account this goal watched is gone. Edit the goal and pick another.', opening: 0, openingMonth: null }
-  if (acc.archivedMonth && compareMonths(acc.archivedMonth, month) <= 0) return { read: () => null, currency: acc.currency, problem: `"${acc.name}" is archived. Restore it under Household or edit the goal.`, opening: acc.openingBalance, openingMonth: acc.openingMonth }
-  if (!series) return { read: () => null, currency: acc.currency, problem: `"${acc.name}" is not tracked. Turn on "Track the balance" in its account settings.`, opening: acc.openingBalance, openingMonth: acc.openingMonth }
+  if (!acc) return { read: () => null, currency: base, problem: txt.engine.goal.accountGone, opening: 0, openingMonth: null }
+  if (acc.archivedMonth && compareMonths(acc.archivedMonth, month) <= 0) return { read: () => null, currency: acc.currency, problem: txt.engine.goal.accountArchived(acc.name), opening: acc.openingBalance, openingMonth: acc.openingMonth }
+  if (!series) return { read: () => null, currency: acc.currency, problem: txt.engine.goal.accountNotTracked(acc.name), opening: acc.openingBalance, openingMonth: acc.openingMonth }
   return { read: (m) => series.months[m]?.balance ?? null, currency: series.currency, problem: null, opening: acc.openingBalance, openingMonth: acc.openingMonth }
 }
 

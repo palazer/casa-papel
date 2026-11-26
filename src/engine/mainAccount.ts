@@ -14,6 +14,7 @@
  * before rule B9 can hold several main accounts until the app's upgrade has run (`planMainAccount`); they count
  * together in the same way, and one in another currency is converted once, when it opens, as it was then.
  */
+import { txt } from '@/i18n'
 import { compareMonths, type Account, type AccountMonth, type Money, type MonthKey } from '@/model'
 import { convertMoney, type FxIndex } from './fx'
 import type { MainAccountSeries, MonthTotals } from './types'
@@ -45,7 +46,7 @@ export function mainAccountLabel(series: MainAccountSeries, accounts: Account[])
   const open = counted.filter((a) => !a.archivedMonth)
   const named = open.length ? open : counted.sort((a, b) => compareMonths(a.archivedMonth ?? '', b.archivedMonth ?? '')).slice(-1)
   if (named.length === 1) return named[0].name
-  return named.length > 1 ? 'Main accounts' : 'Main account'
+  return named.length > 1 ? txt.engine.mainAccounts : txt.engine.mainAccount
 }
 
 /**

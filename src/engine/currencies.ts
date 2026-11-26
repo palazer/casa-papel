@@ -1,3 +1,4 @@
+import { txt } from '@/i18n'
 import { accountIdOf, movesInto, paysExpenses, pocketLandsIn, poolIdOf, resolveRules, type Account, type FundedBy, type Row, type Tables } from '@/model'
 import { primarySavingsOf } from './compute'
 
@@ -144,9 +145,6 @@ export function unitCurrencies(unit: AmountUnit, home: string): Set<string> {
   return new Set([home, unit.currency, ...unit.ends.map((e) => e.account.currency)])
 }
 
-const verb = (way: AmountEnd['way'], form: 'is' | 'can') =>
-  way === 'out-of' ? (form === 'is' ? 'comes out of' : 'come out of') : (form === 'is' ? 'goes into' : 'go into')
-
 /**
  * Why the change from `before` to `after` would make an amount of one of `rowIds` count across three currencies, or
  * null. Only what the change brings in is refused: an amount that already counted across three currencies before it,
@@ -186,7 +184,7 @@ interface Before {
 
 function reasonFor(now: View, was: View | null, row: Row, unit: AmountUnit, before: Before): string {
   const home = now.home
-  const name = `"${row.name}"`
+  const say = txt.engine.thirdCurrency
   const accountMoved = (e: AmountEnd) => {
     const then = was?.accounts.get(e.account.id)
     return then != null && then.currency !== e.account.currency
@@ -198,19 +196,19 @@ function reasonFor(now: View, was: View | null, row: Row, unit: AmountUnit, befo
     const foreignEnds = unit.ends.filter((e) => e.account.currency !== unit.currency && e.account.currency !== home)
     const e = foreignEnds.find(accountMoved) ?? foreignEnds.find(isNew) ?? foreignEnds[0]
     // the account's own currency is what changed
-    if (e && accountMoved(e)) return `${name} is in ${unit.currency} and ${verb(e.way, 'is')} "${e.account.name}", so "${e.account.name}" can be in ${unit.currency} or in ${home}.`
+    if (e && accountMoved(e)) return say.accountMoved({ row: row.name, currency: unit.currency, way: e.way, account: e.account.name, home })
     // the amount's currency is what changed: the account stays, and says which two the amount can be in
     if (e && currencyMoved && !isNew(e)) {
       return followed
-        ? `${name} ${verb(e.way, 'is')} "${e.account.name}", in ${e.account.currency}, so it can follow a row in ${e.account.currency} or in ${home}. "${followed.name}" is in ${unit.currency}.`
-        : `${name} ${verb(e.way, 'is')} "${e.account.name}", in ${e.account.currency}, so it can be in ${e.account.currency} or in ${home}.`
+        ? say.followedRow({ row: row.name, way: e.way, account: e.account.name, accountCurrency: e.account.currency, home, followed: followed.name, currency: unit.currency })
+        : say.amountMoved({ row: row.name, way: e.way, account: e.account.name, accountCurrency: e.account.currency, home })
     }
-    if (e) return `${name} is in ${unit.currency}, so it can ${verb(e.way, 'can')} an account in ${unit.currency} or in ${home}. "${e.account.name}" is in ${e.account.currency}.`
+    if (e) return say.accountNew({ row: row.name, currency: unit.currency, way: e.way, home, account: e.account.name, accountCurrency: e.account.currency })
   }
   // in the household's currency, between accounts in two others: the one that came with the change is the third
   const foreign = unit.ends.filter((x) => x.account.currency !== home)
   const e = foreign.find(accountMoved) ?? foreign.find(isNew) ?? foreign[foreign.length - 1]
   const kept = foreign.find((x) => x.account.currency !== e.account.currency) ?? foreign[0]
-  if (accountMoved(e)) return `${name} ${verb(kept.way, 'is')} "${kept.account.name}", in ${kept.account.currency}, and ${verb(e.way, 'is')} "${e.account.name}", so "${e.account.name}" can be in ${kept.account.currency} or in ${home}.`
-  return `${name} ${verb(kept.way, 'is')} "${kept.account.name}", in ${kept.account.currency}, so it can ${verb(e.way, 'can')} an account in ${kept.account.currency} or in ${home}. "${e.account.name}" is in ${e.account.currency}.`
+  if (accountMoved(e)) return say.betweenMoved({ row: row.name, keptWay: kept.way, kept: kept.account.name, keptCurrency: kept.account.currency, way: e.way, account: e.account.name, home })
+  return say.betweenNew({ row: row.name, keptWay: kept.way, kept: kept.account.name, keptCurrency: kept.account.currency, way: e.way, home, account: e.account.name, accountCurrency: e.account.currency })
 }
