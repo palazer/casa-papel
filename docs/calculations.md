@@ -464,6 +464,14 @@ in N2, and the months after continue from the real figure.
     96,300.00 typed for the start of January: December ends on it, 7,300.00 that the plan did not have
     January starts with 96,300.00 and ends, after 5,000.00, on 91,300.00
 
+The line of a debt on the Statement says the same in parts that add up to what is owed: what was owed at the start
+of the month, what was paid, and what a typed figure says beyond that ("Not in the plan"). The parts are shown in
+the household's currency only: for a debt kept in another one they would not add up, since the rate moves between
+the start and the end. Because a card keeps being used, the plan cannot know what is owed on it, and in the current
+calendar month its line says "not checked against the statement" until a real figure is typed for the start of that
+month or for its end. A card's first month starts on the amount typed in its form and says nothing; a loan never
+does.
+
 A card that is paid off in full every month carries no debt and needs no account. One that has an account and no
 tracked balance is not followed: its payment is an ordinary expense and is never cut.
 

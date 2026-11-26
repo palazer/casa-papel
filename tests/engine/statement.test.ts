@@ -8,6 +8,7 @@ import type { RawFixture } from './fixtures/rawFixture'
 import { v2ToTables } from './fixtures/v2Adapter'
 import { T0, account, actual, cellItems, cellValue, household, pool, row, tables } from './helpers'
 import { all, calculatedOf, coveringOf, expectSound, find, topLine } from './sound'
+import { restoreToday, setToday } from '../today'
 
 const months = monthRange('2026-01', '2026-03')
 const fixture = JSON.parse(readFileSync(new URL('./golden/v2-raw.json', import.meta.url), 'utf8')) as RawFixture
@@ -752,5 +753,95 @@ describe('expenses that come straight out of an account', () => {
     const bare = tables({ household: [household()], rows: [w.salary, w.school], cells: cells.slice(0, 2) })
     expect(calculatedOf(statementFor(bare, '2026-01').s).map((c) => [c.id, c.label, c.amount])).toEqual([['src:savings', 'From savings', 700_00]])
     expectSound(bare, months)
+  })
+})
+
+describe('a debt\'s line says what its month did, and a card asks for its statement', () => {
+  const parts = (s: Statement, id: string) => find(s, `acc:${id}`)!.children.map((c) => [c.kind, c.label, c.amount])
+  function carried(over: { accounts?: Partial<Tables['accounts'][number]>; actuals?: Array<[string, number]> } = {}) {
+    const card = account({ name: 'Card', type: 'credit-card', openingBalance: 94_000_00, ...over.accounts })
+    const salary = row({ name: 'Salary', section: 'income' })
+    const groceries = row({ name: 'Groceries', section: 'expense', order: 'a1' })
+    const pay = row({ name: 'Card – Payment', section: 'expense', kind: 'card-payment', accountId: card.id, order: 'a2' })
+    const t = tables({
+      household: [household()], accounts: [card], rows: [salary, groceries, pay],
+      cells: [cellValue(salary.id, '2026-01', 40_000_00), cellValue(groceries.id, '2026-01', 12_000_00), cellValue(pay.id, '2026-01', 5_000_00)],
+      accountMonths: (over.actuals ?? []).map(([m, v]) => actual(card.id, m, v)),
+    })
+    return { t, card, pay }
+  }
+
+  it('what was owed at the start and what was paid add up to what is owed; a typed figure adds "Not in the plan"', () => {
+    const { t, card } = carried()
+    expect(parts(statementFor(t, '2026-01').s, card.id)).toEqual([['note', 'At the start of the month', 94_000_00], ['note', 'Paid', -5_000_00]])
+    expect(parts(statementFor(t, '2026-02').s, card.id)).toEqual([['note', 'At the start of the month', 89_000_00], ['note', 'Paid', -5_000_00]])
+    expectSound(t, months)
+    // the statement at the start of February says 96,300: January ended on it, 7,300 over what the plan worked out
+    const typed = carried({ actuals: [['2026-01', 96_300_00]] })
+    const january = statementFor(typed.t, '2026-01').s
+    expect(find(january, `acc:${typed.card.id}`)).toMatchObject({ amount: 96_300_00, change: 2_300_00, entered: true, adjustment: 7_300_00 })
+    expect(parts(january, typed.card.id)).toEqual([['note', 'At the start of the month', 94_000_00], ['note', 'Paid', -5_000_00], ['note', 'Not in the plan', 7_300_00]])
+    expect(parts(statementFor(typed.t, '2026-02').s, typed.card.id)).toEqual([['note', 'At the start of the month', 96_300_00], ['note', 'Paid', -5_000_00]])
+    expectSound(typed.t, months)
+  })
+
+  it('a loan has the same parts; a month in which nothing happened has none; money drawn again says so', () => {
+    const loan = carried({ accounts: { type: 'loan' } })
+    expect(parts(statementFor(loan.t, '2026-01').s, loan.card.id)).toEqual([['note', 'At the start of the month', 94_000_00], ['note', 'Paid', -5_000_00]])
+    const quiet = { ...loan.t, cells: loan.t.cells.filter((c) => c.rowId !== loan.pay.id) }
+    expect(parts(statementFor(quiet, '2026-01').s, loan.card.id)).toEqual([])
+    const drawn = { ...loan.t, cells: loan.t.cells.map((c) => (c.rowId === loan.pay.id ? { ...c, value: -1_000_00 } : c)) }
+    expect(parts(statementFor(drawn, '2026-01').s, loan.card.id)).toEqual([['note', 'At the start of the month', 94_000_00], ['note', 'Drawn again', 1_000_00]])
+    expectSound(drawn, months)
+  })
+
+  it('a debt in another currency has no parts: they would not add up in the household\'s', () => {
+    const { t, card } = carried({ accounts: { currency: 'USD' } })
+    const rated = { ...t, fxRates: [fx('EUR/USD', '2026-01', 1.1), fx('EUR/USD', '2026-02', 1.2), fx('EUR/USD', '2026-03', 1.25)] }
+    expect(parts(statementFor(rated, '2026-02').s, card.id)).toEqual([])
+    expectSound(rated, months)
+  })
+
+  describe('"not checked against the statement"', () => {
+    const noteOf = (t: Tables, card: { id: string }, m: MonthKey, today: MonthKey) => find(buildStatement(t, computeEngine({ tables: t, months }), m, today)!, `acc:${card.id}`)!.note
+
+    it('stands on a tracked card in the current month until a figure is typed for its start or its end', () => {
+      const { t, card } = carried()
+      expect(noteOf(t, card, '2026-02', '2026-02')).toBe('not checked against the statement')
+      // the start of February is the end of January
+      const start = carried({ actuals: [['2026-01', 96_300_00]] })
+      expect(noteOf(start.t, start.card, '2026-02', '2026-02')).toBeUndefined()
+      const end = carried({ actuals: [['2026-02', 90_000_00]] })
+      expect(noteOf(end.t, end.card, '2026-02', '2026-02')).toBeUndefined()
+      // a figure typed two months back says nothing about this month
+      const old = carried({ actuals: [['2026-01', 96_300_00]] })
+      expect(noteOf(old.t, old.card, '2026-03', '2026-03')).toBe('not checked against the statement')
+    })
+
+    it('stands in no other month, on no loan, and not in the card\'s first month: that starts on the amount typed in its form', () => {
+      const { t, card } = carried()
+      expect(noteOf(t, card, '2026-02', '2026-03')).toBeUndefined()
+      expect(noteOf(t, card, '2026-03', '2026-02')).toBeUndefined()
+      expect(noteOf(t, card, '2026-01', '2026-01')).toBeUndefined()
+      const loan = carried({ accounts: { type: 'loan' } })
+      expect(noteOf(loan.t, loan.card, '2026-02', '2026-02')).toBeUndefined()
+    })
+
+    it('reads what is stored, not the months the engine was asked for', () => {
+      const { t, card } = carried({ actuals: [['2026-01', 96_300_00]] })
+      const out = computeEngine({ tables: t, months: ['2026-02'] })
+      expect(find(buildStatement(t, out, '2026-02', '2026-02')!, `acc:${card.id}`)!.note).toBeUndefined()
+    })
+
+    it('by default the current month is today\'s', () => {
+      const { t, card } = carried()
+      setToday('2026-02-10')
+      try {
+        expect(find(statementFor(t, '2026-02').s, `acc:${card.id}`)!.note).toBe('not checked against the statement')
+        expect(find(statementFor(t, '2026-03').s, `acc:${card.id}`)!.note).toBeUndefined()
+      } finally {
+        restoreToday()
+      }
+    })
   })
 })

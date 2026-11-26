@@ -20,7 +20,8 @@ interface Props {
 /**
  * What an account really held when a month began and when it ended (DESIGN.md §8). The start is the end of the month
  * before, so changing it corrects that month too; the engine shows the gap and continues from the real
- * numbers. For a card this is where what its statement says is typed.
+ * numbers. For a card this is where what its statement says is typed: in the current month the cursor waits in the
+ * start, the figure a statement brings.
  */
 export function BalanceDialog({ account, month, tables, household, onClose }: Props) {
   const store = useStore()
@@ -54,7 +55,7 @@ export function BalanceDialog({ account, month, tables, household, onClose }: Pr
           <DialogTitle>{account.name} · {formatMonth(month, locale, 'long')}</DialogTitle>
           <DialogDescription>
             {isInvestment ? 'What the account was worth when the month began and when it ended, from your broker.'
-              : owed ? 'What was really owed when the month began and when it ended, from your bank.'
+              : owed ? 'What the statement says is owed: when the month began, before this month\'s payment, and when it ended, after it.'
               : 'What the account really held when the month began and when it ended, from your bank.'}
             {' '}An empty field keeps the calculated amount. The start is the end of the month before: changing it corrects that month too.
           </DialogDescription>

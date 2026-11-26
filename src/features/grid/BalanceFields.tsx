@@ -3,7 +3,7 @@ import { AmountHint } from '@/components/AmountHint'
 import { Input } from '@/components/ui/input'
 import { formatAmount, formatMonth } from '@/app/format'
 import { cn } from '@/lib/utils'
-import type { MonthKey } from '@/model'
+import { monthOfDate, type MonthKey } from '@/model'
 import type { BalanceLine } from '@/store'
 import type { BalanceSide, MonthBalancesForm } from './useMonthBalances'
 
@@ -31,8 +31,14 @@ export function BalanceFields({ form, groups, month, base, named, onEnter }: {
 }) {
   const { locale } = form
   const long = formatMonth(month, locale, 'long')
-  // the cursor waits in the first end field: the number a bank statement closes on
-  const focusId = groups.flatMap((g) => g.lines)[0]?.account.id
+  const first = groups.flatMap((g) => g.lines)[0]
+  /** The one account of the dialog is a debt: its two fields say on which side of the month's payment they stand. */
+  const owed = !named && first?.group === 'debt'
+  // The cursor waits in the first end field: the number a bank statement closes on. A debt in the current month is
+  // checked when its statement comes, and that says what is owed before this month's payment: there it waits in the
+  // start (not in a debt's first month, whose start is the amount typed in its form).
+  const focusId = first?.account.id
+  const focusSide: BalanceSide = owed && !first.opening && month === monthOfDate() ? 'start' : 'end'
 
   function field(side: BalanceSide, line: BalanceLine) {
     const { account } = line
@@ -49,7 +55,7 @@ export function BalanceFields({ form, groups, month, base, named, onEnter }: {
     return (
       <div className="min-w-0 space-y-0.5" data-testid={`balance-${side}`}>
         <Input
-          aria-label={label} inputMode="decimal" autoFocus={side === 'end' && account.id === focusId} className="h-8 text-right tabular-nums"
+          aria-label={label} inputMode="decimal" autoFocus={side === focusSide && account.id === focusId} className="h-8 text-right tabular-nums"
           value={text} onChange={(e) => form.setText(side, account.id, e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') onEnter() }}
           placeholder={!opening && calculated != null ? formatAmount(calculated, ccy, locale) : undefined}
         />
@@ -62,8 +68,8 @@ export function BalanceFields({ form, groups, month, base, named, onEnter }: {
   return (
     <div className={cn('grid items-start gap-x-3 gap-y-1.5', named ? 'grid-cols-2 sm:grid-cols-[minmax(0,1fr)_9.5rem_9.5rem]' : 'grid-cols-2')} data-testid="balance-fields">
       {named && <span className="hidden sm:block" />}
-      <span className="text-xs text-muted-foreground">At the start{named ? '' : ` of ${long}`}</span>
-      <span className="text-xs text-muted-foreground">At the end{named ? '' : ` of ${long}`}</span>
+      <span className="text-xs text-muted-foreground">At the start{named ? '' : ` of ${long}`}{owed && <span className="block" data-testid="balance-when">before this month's payment</span>}</span>
+      <span className="text-xs text-muted-foreground">At the end{named ? '' : ` of ${long}`}{owed && <span className="block" data-testid="balance-when">after it</span>}</span>
       {groups.filter((g) => g.lines.length > 0).map((g, i) => (
         <Fragment key={g.heading ?? i}>
           {g.heading && <p className="col-span-full mt-1.5 text-xs font-medium">{g.heading}</p>}

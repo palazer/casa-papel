@@ -1,7 +1,9 @@
-import { AccountSchema, RowSchema } from '@/model'
+import { expect } from 'vitest'
+import { AccountSchema, RowSchema, type MonthKey } from '@/model'
 import { PAY_OFF, addAccount, addAccountWithRow, addRowOfKind, loadTables, setCellValue, setRowAccount, updateAccount } from '@/store'
-import { step } from '../registry'
-import type { World } from '../world'
+import { find } from '../../engine/sound'
+import { moneyText, monthName, step } from '../registry'
+import { ScenarioError, type World } from '../world'
 
 // ---------- loans ----------
 
@@ -86,4 +88,29 @@ step('{string} becomes a credit card', async (world: World, name: string) => {
 
 step('{string} becomes a savings account', async (world: World, name: string) => {
   await updateAccount(world.store, (await world.account(name)).id, { type: 'savings' })
+})
+
+// ---------- the line of a debt on the Statement ----------
+
+async function debtLine(world: World, name: string, month: MonthKey) {
+  const line = find((await world.view()).statement(month), `acc:${(await world.account(name)).id}`)
+  if (!line) throw new ScenarioError(`The Statement of ${monthName(month)} has no line for "${name}".`)
+  return line
+}
+
+// what stands under the line when it is opened: the parts that add up to what is owed
+step('under {string} in {month} stands {string} at {money}', async (world: World, name: string, month: string, label: string, amount: number) => {
+  const line = await debtLine(world, name, month)
+  const part = line.children.find((c) => c.label === label)
+  if (!part) throw new ScenarioError(`Under "${name}" in ${monthName(month)} stands no "${label}" (there: ${line.children.map((c) => c.label).join(', ') || 'nothing'}).`)
+  expect(moneyText(part.amount), `"${label}" under "${name}" in ${monthName(month)}`).toBe(moneyText(amount))
+})
+
+// the grey words after the line's figure
+step('{string} says {string} in {month}', async (world: World, name: string, text: string, month: string) => {
+  expect((await debtLine(world, name, month)).note, `what "${name}" says in ${monthName(month)}`).toBe(text)
+})
+
+step('{string} says nothing in {month}', async (world: World, name: string, month: string) => {
+  expect((await debtLine(world, name, month)).note, `what "${name}" says in ${monthName(month)}`).toBeUndefined()
 })

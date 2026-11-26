@@ -227,7 +227,7 @@ test.describe('whole stories, as the scenarios tell them', () => {
     await s.dlg.getByLabel('Name', { exact: true }).fill('Amex')
     await s.dlg.getByLabel(/^Owed at the start of November 2026/).fill('500')
     // the form says what a payment to a card is
-    await expect(s.dlg.getByTestId('acc-row')).toHaveText('"Amex – Payment". Each payment brings down what is owed.')
+    await expect(s.dlg.getByTestId('acc-row')).toContainText('"Amex – Payment". Each payment brings down what is owed.')
     await s.dlg.getByRole('button', { name: 'Save' }).click()
     await expect(s.dlg.getByRole('heading', { name: 'Amex – Payment · November 2026' })).toBeVisible()
     await s.dlg.getByLabel('Amount in EUR').fill('300')

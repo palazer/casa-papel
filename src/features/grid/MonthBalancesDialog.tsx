@@ -42,7 +42,7 @@ export function MonthBalancesDialog({ month, tables, engine, household, onClose 
   const together = current.length > 0 && !(current.length === 1 && current[0].endCalculated != null)
   const groups: BalanceGroup[] = [
     { heading: current.length > 1 ? 'Main accounts' : undefined, note: together ? <span data-testid="current-together"><CurrentTogether form={form} base={base} /> Fill in both or neither.</span> : undefined, lines: current },
-    ...HEADINGS.map(([group, heading]) => ({ heading, lines: lines.filter((l) => l.group === group) })),
+    ...HEADINGS.map(([group, heading]) => ({ heading, note: group === 'debt' ? 'What the statement says is owed: the start is before this month\'s payment, the end after it.' : undefined, lines: lines.filter((l) => l.group === group) })),
   ]
 
   async function submit() {

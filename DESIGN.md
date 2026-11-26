@@ -509,7 +509,13 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   balance is typed for a month the chip goes, the amount is underlined like any entered balance, the line says
   `entered, -€120.00 against the plan`, and its parts (At the start of the month, Kept this month)
   gain `Not in the plan`, so they still add up. The month after is `calculated` again, from the real number. The line
-  is that account: no account stands under it. **Only where two main accounts were open in one month** (an archived
+  is that account: no account stands under it. **A loan's or a card's line has parts too**, as quiet `note` lines
+  under it when it is opened: `At the start of the month`, `Paid` (below zero; `Drawn again` for an amount below
+  zero on the payment row) and, once a figure is typed, `Not in the plan`. They add up to the line's figure, so a debt
+  kept in another currency has none, and a month in which nothing happened has none. **A tracked card says `not
+  checked against the statement`** in the muted `text-[11px]` words after its figure, in the current calendar month
+  only, until a real figure is typed for the start of that month or its end; never in the card's first month, and
+  never on a loan. **Only where two main accounts were open in one month** (an archived
   one and the one that replaced it, or data from before rule B9 until the upgrade has run) each stands under the
   line, before its parts: the account's name in `font-medium`, its own `…` menu, and no amount of its own while the
   plan only knows them together (a faint `·` and the zinc chip `counted together`). In a month whose real balances
@@ -755,7 +761,10 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   "use the calculated amount" button: emptying a field is that. The pair is used three ways:
   - **The balance dialog** (`BalanceDialog.tsx`, `<account> · <month>`): one pair across the width, each field under
     its own label (`At the start of <Month>`, `At the end of <Month>`), under a `dl` with `Calculated for the end`
-    and, for an investment account, `Deposited so far` and `Return so far`.
+    and, for an investment account, `Deposited so far` and `Return so far`. **For a loan or a card** each label has a
+    second line that says on which side of the month's payment the figure stands (`before this month's payment`,
+    `after it`), the description reads "What the statement says is owed: …", and in the current calendar month the
+    cursor waits in the start field, the figure a statement brings (in every other case: the end field).
   - **The main account's dialog** (`CurrentBalanceDialog.tsx`, the same frame, titled `<name> · <Month>`): one pair,
     `At the start of <Month>` and `At the end of <Month>`, with the plan's own figures in grey in the fields, as in
     `BalanceDialog`. **In a month where two main accounts were open** (an archived one and the one that replaced it)
@@ -770,7 +779,8 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
     `Balances…` on the Statement and `Balances for <Mon YYYY>…` in the Grid's month menu. Every account that has a
     balance in the month, under the Statement's headings as `text-xs font-medium` lines (the main account first and
     without one, `Main accounts` where two were open, `Savings accounts`, `Investment accounts`, `Other assets` with
-    the other current accounts and cash, `Debts`), the column heads `At
+    the other current accounts and cash, `Debts`, with the muted line "What the statement says is owed: the start is
+    before this month's payment, the end after it." under that heading), the column heads `At
     the start` and `At the end` once at the top; on a phone the name stands on a line of its own above its pair. A
     household without an account that has a balance reads `No account keeps a balance yet.` in their place. Under
     the fields, while something in the month is not ticked, a `Check` `Count everything in <Month> as done` with

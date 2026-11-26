@@ -18,7 +18,7 @@
  * Grid): that it brings a debt down shows in the lower half. "From what is left" is how the rest is shared out:
  * pocket money, savings, investments, virtual accounts, and the figure that closes the month.
  */
-import { accountGroup, addMonths, canCarryRule, describeCadence, isPaymentRow, isTakenFromAccount, movesInto, nextDue, payContext, payDayOf, pocketLandsIn, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
+import { accountGroup, addMonths, canCarryRule, describeCadence, isPaymentRow, isTakenFromAccount, monthOfDate, movesInto, nextDue, payContext, payDayOf, pocketLandsIn, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
 import { computeGoals, type GoalProgress } from './goals'
 import { mainAccountsIn, mainAccountLabel } from './mainAccount'
 import { cellKey, fundingTotal, type AccountSeries, type CellResult, type CellStatus, type EngineOutput } from './types'
@@ -217,8 +217,11 @@ function side(key: StatementSide['key'], label: string, lines: StatementLine[]):
   return { key, label, total: sum(lines), lines }
 }
 
-/** Null when the engine has no figures for the month. */
-export function buildStatement(tables: Tables, engine: EngineOutput, month: MonthKey): Statement | null {
+/**
+ * Null when the engine has no figures for the month. `today` is the current calendar month: a card's line asks for its
+ * statement there, and nowhere else.
+ */
+export function buildStatement(tables: Tables, engine: EngineOutput, month: MonthKey, today: MonthKey = monthOfDate()): Statement | null {
   const main = engine.main
   const household = tables.household.find((h) => !h.deletedAt)
   const t = engine.totals[month]
@@ -500,6 +503,8 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
     const openingBase = s.currency !== base && r.balance !== 0 ? Math.round(opening * (r.balanceBase / r.balance)) : opening
     return r.balanceBase - openingBase
   }
+  /** The months of an account for which a real balance is stored. */
+  const typedBalance = new Set(tables.accountMonths.filter((am) => am.actualBalance != null).map((am) => `${am.accountId}|${am.month}`))
   const accountLines = new Map<string, StatementLine>()
   const poolLines = new Map<string, StatementLine>()
   const assets: StatementLine[] = []
@@ -560,6 +565,23 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
     if (s.outside) Object.assign(line, { memo: true, outside: true })
     accountLines.set(acc.id, line)
     if (s.liability) {
+      // What the month did to the debt, under its line: what was owed when it began, what was paid, and what a typed
+      // figure says beyond that. Only in the household's currency, where the three add up to the line's figure (in
+      // another one the rate moves between the start and the end), and only when the month did something.
+      if (s.currency === base && (r.outflow !== 0 || r.adjustment !== 0)) {
+        const part = (key: string, label: string, amount: Money): StatementLine => ({ id: `owed:${acc.id}:${key}`, kind: 'note', label, amount, children: [] })
+        line.children.push(part('start', 'At the start of the month', r.start))
+        // an amount below zero on the payment row is money drawn again
+        if (r.outflow !== 0) line.children.push(part('paid', r.outflow > 0 ? 'Paid' : 'Drawn again', -r.outflow))
+        if (r.adjustment !== 0) line.children.push(part('adjustment', 'Not in the plan', r.adjustment))
+      }
+      // A card keeps being used, so the plan cannot know what is owed on it: in the current month its line says so
+      // until what the statement says is typed, for the start of the month (the end of the one before) or its end.
+      // Read from what is stored: the engine holds only the months it was asked for. A card's first month starts on
+      // the amount typed in its form.
+      if (acc.type === 'credit-card' && month === today && month !== acc.openingMonth && !acc.archivedMonth && !typedBalance.has(`${acc.id}|${month}`) && !typedBalance.has(`${acc.id}|${prevMonth}`)) {
+        line.note = 'not checked against the statement'
+      }
       debts.push(line)
       continue
     }

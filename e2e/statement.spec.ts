@@ -1409,6 +1409,75 @@ test.describe('working the month in the Statement', () => {
     await dlg.getByRole('button', { name: 'Cancel' }).click()
   })
 
+  test('a card that carries a debt: its line says what the month did, asks for the statement in the current month, and takes the figure where a statement gives it', async ({ page }) => {
+    await openStatement(page)
+    await goToMonth(page, 'November 2026')
+    const claims = page.getByRole('region', { name: 'Debts and net worth' })
+    const dlg = page.getByRole('dialog')
+
+    // a card owing 9,400 since September, paid down by 500 a month from November on
+    await claims.getByRole('button', { name: 'Add a card or loan' }).click()
+    await dlg.getByLabel('Name', { exact: true }).fill('Store card')
+    await dlg.getByLabel('Owed at the start of September 2026 (EUR)').fill('9400')
+    await expect(dlg.getByTestId('acc-row')).toContainText('It holds what you pay beyond what you buy with the card that month')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg.getByRole('heading', { name: 'Store card – Payment · November 2026' })).toBeVisible()
+    await dlg.getByLabel('Amount in EUR').fill('500')
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+
+    // the current month: what the plan works out, and the reminder that no statement has confirmed it
+    const card = claims.locator('[data-line^="acc:"]').filter({ hasText: 'Store card' })
+    await expect(card).toContainText('€8,900.00')
+    await expect(card).toContainText('not checked against the statement')
+    // under the line: the parts that add up to it
+    const details = card.getByRole('button', { name: 'What is under Store card' })
+    await details.click()
+    const part = (label: string) => claims.locator('[data-line^="owed:"]').filter({ hasText: label })
+    await expect(part('At the start of the month')).toContainText('€9,400.00')
+    await expect(part('Paid')).toContainText('-€500.00')
+    await expect(part('Not in the plan')).toHaveCount(0)
+    await page.screenshot({ path: 'e2e/output/statement-card-debt.png', fullPage: true })
+
+    // the statement came: what it says is owed goes into the start, where the cursor waits
+    await claims.getByRole('button', { name: /^Store card balance:/ }).click()
+    await expect(dlg.getByRole('heading', { name: 'Store card · November 2026' })).toBeVisible()
+    await expect(dlg).toContainText('What the statement says is owed')
+    await expect(dlg.getByTestId('balance-when')).toHaveText(['before this month\'s payment', 'after it'])
+    const start = dlg.getByLabel('At the start of November 2026 (EUR)')
+    await expect(start).toBeFocused()
+    await start.fill('9630')
+    await settled(dlg)
+    await dlg.screenshot({ path: 'e2e/output/card-statement-dialog.png' })
+    await dlg.getByRole('button', { name: 'Save' }).click()
+    await expect(dlg).toBeHidden()
+
+    // November continues from the real figure, and no longer asks
+    await expect(card).toContainText('€9,130.00')
+    await expect(card).not.toContainText('not checked against the statement')
+    await expect(part('At the start of the month')).toContainText('€9,630.00')
+    await expect(part('Paid')).toContainText('-€500.00')
+
+    // what the plan did not have stands on the month whose end the figure is
+    await goToMonth(page, 'October 2026')
+    await expect(card).toContainText('€9,630.00')
+    await expect(card).toContainText('entered, +€230.00 against the plan')
+    await expect(card).not.toContainText('not checked against the statement')
+    await expect(part('At the start of the month')).toContainText('€9,400.00')
+    await expect(part('Not in the plan')).toContainText('€230.00')
+    await expect(part('Paid')).toHaveCount(0)
+    // in a month that is over the cursor waits in the end, as for every account
+    await claims.getByRole('button', { name: /^Store card balance:/ }).click()
+    await expect(dlg.getByLabel('At the end of October 2026 (EUR)')).toBeFocused()
+    await dlg.getByRole('button', { name: 'Cancel' }).click()
+    await expect(dlg).toBeHidden()
+
+    // a month that is still to come says nothing: there is no statement to check it against yet
+    await goToMonth(page, 'December 2026')
+    await expect(card).toContainText('€8,630.00')
+    await expect(card).not.toContainText('not checked against the statement')
+  })
+
   test('suggested rows are offered where they will appear: one is added with its amount, one is dismissed and leaves the page', async ({ page }) => {
     await openStatement(page)
     await goToMonth(page, 'November 2026')

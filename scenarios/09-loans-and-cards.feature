@@ -168,6 +168,36 @@ Feature: Loans and credit cards
     When "Car loan" becomes a savings account
     Then it is refused with '"Car loan – Payment" pays it off'
 
+  # The line of a debt says what its month did: what was owed when it began, what was paid, and what the statement
+  # says beyond that. A card keeps being used, so in the current month its line asks for the statement until the
+  # figure is typed (the owner's decisions of 26 November 2026).
+  @C2 @B5
+  Scenario: A card's line says what was owed, what was paid and what the statement added
+    Given a credit card "Card" owing 9,400.00
+    And a payment "Card – Payment" of 500.00 to "Card" from January 2026
+    When "Card" really held 9,630.00 at the end of January 2026
+    Then under "Card" in January 2026 stands "At the start of the month" at 9,400.00
+    And under "Card" in January 2026 stands "Paid" at -500.00
+    And under "Card" in January 2026 stands "Not in the plan" at 730.00
+    And under "Card" in February 2026 stands "At the start of the month" at 9,630.00
+    And "Card" ends February 2026 with 9,130.00
+
+  @C2
+  Scenario: In the current month a card's line asks for its statement until the figure is typed
+    Given a credit card "Card" owing 9,400.00
+    And a payment "Card – Payment" of 500.00 to "Card" from January 2026
+    Then "Card" says "not checked against the statement" in March 2026
+    And "Card" says nothing in February 2026
+    And "Card" says nothing in April 2026
+    When "Card" really held 8,650.00 at the end of February 2026
+    Then "Card" says nothing in March 2026
+
+  @C1
+  Scenario: A loan's line asks for nothing
+    Given a loan "Car loan" of 6,000.00, paid off with 250.00 a month from January 2026
+    Then "Car loan" says nothing in March 2026
+    And under "Car loan" in March 2026 stands "Paid" at -250.00
+
   # Cards from before schema 23 had a mode. The app puts them right when it meets them (`planCards`).
   @C2
   Scenario: An older card that recorded only its bill and never owed anything keeps counting the bill

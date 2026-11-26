@@ -176,7 +176,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
             <AmountHint text={opening} currency={ccy} locale={locale} />
             <p className="text-xs text-muted-foreground">
               {type === 'loan' ? 'What is still owed. A payment row that names this loan brings it down, and stops counting once nothing is owed.'
-                : type === 'credit-card' ? 'Everything you owe on the card: the whole debt, not the month\'s bill. A payment row that names this card brings it down, and stops counting once nothing is owed.'
+                : type === 'credit-card' ? 'Everything you owe on the card: the whole debt, not the month\'s bill. A payment row that names this card brings it down. Once a month, press the card\'s amount on the Statement and type what its statement says.'
                 : type === 'other-asset' ? 'What it is worth. Enter a real value from its line whenever that changes.'
                 : 'From then on every month starts with what the month before ended on. Press the account\'s amount in a month to type what it really held at the start and at the end.'}
             </p>
@@ -186,7 +186,7 @@ export function HouseholdAccountDialog({ account, entities, baseCurrency, locale
               <Check label="Add the row that pays it off" checked={payOff} onChange={(e) => setPayOff(e.target.checked)} />
               <p className="pl-6 text-xs text-muted-foreground" data-testid="acc-row">
                 {payOff
-                  ? <>{rowName ? `"${rowName}"` : 'Named after the account'}. Each payment brings down what is owed.</>
+                  ? <>{rowName ? `"${rowName}"` : 'Named after the account'}. Each payment brings down what is owed.{type === 'credit-card' && ' It holds what you pay beyond what you buy with the card that month: what you buy is in your rows already.'}</>
                   : 'No row yet. One can be added later from this form.'}
               </p>
             </div>
