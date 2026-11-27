@@ -10,7 +10,7 @@ import { doneness, type DoneState } from '@/app/display'
 import { formatMonth } from '@/app/format'
 import { readPref, writePref } from '@/app/prefs'
 import { useStore } from '@/app/store'
-import { clearHandedMonth, handPayment, handedOverMonth, useScreen } from '@/app/screens'
+import { handPayment, keepMonth, keptMonth, useScreen } from '@/app/screens'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { useUndoNotice } from '@/app/useUndoNotice'
 import { UndoNotice } from '@/components/UndoNotice'
@@ -124,10 +124,15 @@ export function StatementScreen() {
   const household = activeHousehold(tables)
   const months = useMemo(() => (household && tables ? defaultMonths(household, tables) : []), [household, tables])
   const engine = useEngine(tables, months)
-  /** The month someone picked. Until then: today's month, or the first month while the household is being set up. */
-  const [picked, setMonth] = useState<MonthKey | null>(() => handedOverMonth() as MonthKey | null)
-  // a month handed over by the Grid ("Open in the Statement") is for this visit only
-  useEffect(() => clearHandedMonth(), [])
+  /**
+   * The month someone picked, here or on another screen (`keptMonth`). Until then: today's month, or the first month
+   * while the household is being set up.
+   */
+  const [picked, setPicked] = useState<MonthKey | null>(() => keptMonth() as MonthKey | null)
+  const setMonth = (next: MonthKey) => {
+    setPicked(next)
+    keepMonth(next)
+  }
   /** Lines someone opened or closed; the rest follow their own default. */
   const [openLines, setOpenLines] = useState<Record<string, boolean>>({})
   /** The household whose folded headings were read into `openLines`. */

@@ -213,7 +213,7 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   months and kept per device (`grid.earlier`). Hiding columns hides nothing from the sums: the engine counts every
   month, and the Σ line stays the all-time total.
 - A month header is a menu button: the month's totals, then `Open in the Statement` (the Statement opens on that month,
-  for that visit only: `handMonth` in `src/app/screens.ts`), then `Balances for <Mon YYYY>…` (the month's balances
+  which becomes the month being worked on: `keepMonth` in `src/app/screens.ts`, §7), then `Balances for <Mon YYYY>…` (the month's balances
   dialog, §8).
 - A cell in another currency is two lines: the typed amount over a `text-[10px] leading-3` muted `≈ €3,120` in the household
   currency at that month's rate (the cell button becomes `flex-col items-end`; the certainty styling stays on the amount
@@ -361,6 +361,10 @@ headers `z-20`, the label cells `z-10`, and the box is `isolate` so none of them
   month (the strip scrolls to its end when that month is pressed). An (i) (`statement.months`)
   ends the row. Not shown while a household is being set up (the month keeps the `MonthPicker`'s arrows there), and
   not in the Grid, whose columns are the months already.
+  **One month for the Statement and Payments**: the month picked on either (or handed over by the Grid's `Open in the
+  Statement` or a line's day) is the month being worked on (`keepMonth` / `keptMonth` in `src/app/screens.ts`), and
+  the other opens on it, so switching screens never jumps back to today. It is kept for the page's life only: a reload
+  or a fresh visit opens on the current month. A kept month outside the plan gives way to the nearest one.
   **The line under the strip** is the toolbar (§2), and reads as the caption of the pressed month. At the left, what
   is the month's: its name (`h2 text-sm font-semibold`), the zinc `past` chip when it is over, the **progress**
   (`monthProgress` and `progressText` in `src/features/statement/progress.ts`: a muted `role="status"` text with an

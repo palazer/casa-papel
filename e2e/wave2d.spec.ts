@@ -52,10 +52,10 @@ test('the plan ends in a December and "Add <year>" appends a calendar year on ev
   await page.getByRole('menuitem', { name: 'Open in the Statement' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Statement' })).toBeVisible()
   await expect(page.getByRole('heading', { level: 2, name: 'December 2026' })).toBeVisible()
-  // coming back to the Statement later starts at the current month again
+  // coming back to the Statement later stays on that month
   await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Grid' }).click()
   await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Statement' }).click()
-  await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: 'December 2026' })).toBeVisible()
   await page.getByRole('navigation', { name: 'Screens' }).getByRole('link', { name: 'Grid' }).click()
   // November: next year is already planned, so the button offers the year after
   await page.getByRole('button', { name: 'Add 2028' }).click()
@@ -70,8 +70,8 @@ test('the plan ends in a December and "Add <year>" appends a calendar year on ev
   await strip.getByRole('button', { name: 'Add 2029' }).click()
   await expect(strip.locator('[data-month]').last()).toHaveAttribute('data-month', '2029-12')
   await expect(strip.getByRole('button', { name: 'Add 2030' })).toBeVisible()
-  // the month on screen stays, and the arrows beside its name are gone: the strip is where the month is changed
-  await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
+  // the month on screen (December, opened from the Grid) stays, and the arrows beside its name are gone: the strip is where the month is changed
+  await expect(page.getByRole('heading', { level: 2, name: 'December 2026' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Next month' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Undo' }).click()
   await expect(strip.locator('[data-month]').last()).toHaveAttribute('data-month', '2028-12')

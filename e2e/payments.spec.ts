@@ -370,6 +370,28 @@ test.describe('Payments: the page', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Statement' })).toBeVisible()
   })
 
+  test('the Statement and Payments keep one month: switching between them stays on it, a reload starts on today\'s', async ({ page }) => {
+    await loadDemo(page)
+    await openHousehold(page)
+    await turnPayments(page, true)
+    await openStatement(page)
+    await openMonth(page, 'January 2027')
+    await openPayments(page)
+    await expect(page.getByRole('heading', { level: 2, name: 'January 2027' })).toBeVisible()
+    await openMonth(page, 'February 2027')
+    await openStatement(page)
+    await expect(page.getByRole('heading', { level: 2, name: 'February 2027' })).toBeVisible()
+    // the Grid's "Open in the Statement" sets it too, and Payments follows
+    await rail(page).getByRole('link', { name: 'Grid' }).click()
+    await page.getByRole('button', { name: 'Dec 2026', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'Open in the Statement' }).click()
+    await expect(page.getByRole('heading', { level: 2, name: 'December 2026' })).toBeVisible()
+    await openPayments(page)
+    await expect(page.getByRole('heading', { level: 2, name: 'December 2026' })).toBeVisible()
+    await page.reload()
+    await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
+  })
+
   test('the month day by day: what is late, today, what is coming, what has no day; a tick is the Statement\'s tick', async ({ page }) => {
     await withDays(page)
     await openPayments(page)
@@ -790,10 +812,11 @@ test.describe('Payments: the day on the Statement', () => {
     await expect(page.getByRole('heading', { level: 2, name: 'October 2026' })).toBeVisible()
     await expect(page.locator('[data-marked]')).toHaveText(/Thu 1\s*The flat – Rent/)
     await expect(group(page, 'done').getByRole('button', { name: /^Done/ })).toHaveAttribute('aria-expanded', 'true')
-    // a later visit starts on the current month again
+    // the handed month is the one being worked on: the Statement and a later visit stay on it
     await openStatement(page)
+    await expect(page.getByRole('heading', { level: 2, name: 'October 2026' })).toBeVisible()
     await openPayments(page)
-    await expect(page.getByRole('heading', { level: 2, name: 'November 2026' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 2, name: 'October 2026' })).toBeVisible()
   })
 
   test('items that go out on different days each say their own, and the row says none', async ({ page }) => {

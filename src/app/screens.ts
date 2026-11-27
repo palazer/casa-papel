@@ -106,13 +106,13 @@ export function rememberScreen(s: Screen, hash?: string): void {
 }
 
 /**
- * A month one screen hands to the Statement ("Open in the Statement" in the Grid). The Statement opens on it and
- * clears it once it is on screen, so a later visit starts on the current month again.
+ * The month being worked on: the Statement and Payments open on it and set it whenever their month changes, so moving
+ * between them (or "Open in the Statement" in the Grid) keeps the month. Until a month is picked each opens on its own
+ * default (today's month). It lasts as long as the page: a reload starts on today's month again.
  */
-let handedMonth: string | null = null
-export const handMonth = (month: string): void => { handedMonth = month }
-export const handedOverMonth = (): string | null => handedMonth
-export const clearHandedMonth = (): void => { handedMonth = null }
+let workingMonth: string | null = null
+export const keepMonth = (month: string): void => { workingMonth = month }
+export const keptMonth = (): string | null => workingMonth
 
 /**
  * A payment the Statement hands to the Payments page (a line's day was pressed): the page opens on its month with the

@@ -8,7 +8,7 @@ import { Island } from '@/components/ui/island'
 import { formatAmount, formatMonth, weekdayOf } from '@/app/format'
 import { saveError } from '@/app/saveError'
 import { readPref, writePref } from '@/app/prefs'
-import { clearHandedPayment, handedOverPayment, useScreen } from '@/app/screens'
+import { clearHandedPayment, handedOverPayment, keepMonth, keptMonth, useScreen } from '@/app/screens'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { NO_METHOD, buildPayments, cellKey, type Payment } from '@/engine'
@@ -80,12 +80,13 @@ export function PaymentsScreen() {
   const engine = useEngine(tables, months)
   /** A line of the Statement whose day was pressed: the page opens on its month, with its payments marked. */
   const [handed, setHanded] = useState(handedOverPayment)
-  /** The month someone picked; until then, the handed one, or today's. */
-  const [picked, setPicked] = useState<MonthKey | null>(() => (handedOverPayment()?.month as MonthKey | undefined) ?? null)
+  /** The month of a handed payment, else the one someone picked here or on another screen (`keptMonth`), else today's. */
+  const [picked, setPicked] = useState<MonthKey | null>(() => ((handedOverPayment()?.month ?? keptMonth()) as MonthKey | null))
   // handed over for this visit only; the mark goes after a moment, as on the Statement
   useEffect(() => {
     clearHandedPayment()
     if (!handed) return
+    keepMonth(handed.month)
     document.querySelector('[data-marked]')?.scrollIntoView({ block: 'center' })
     const timer = window.setTimeout(() => setHanded(null), 2500)
     return () => window.clearTimeout(timer)
@@ -137,6 +138,7 @@ export function PaymentsScreen() {
   /** A month of its own has totals of its own: a pressed one does not carry over. */
   const setMonth = (next: MonthKey) => {
     setPicked(next)
+    keepMonth(next)
     setFilter(null)
     setHanded(null)
   }

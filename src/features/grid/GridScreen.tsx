@@ -10,7 +10,7 @@ import { formatAmount, formatMonth, formatPercent } from '@/app/format'
 import { balanceHelp, type HelpKey } from '@/app/help'
 import { HUES, SECTION_HUE, type Hue } from '@/app/hues'
 import { readPref, writePref } from '@/app/prefs'
-import { handMonth, useScreen } from '@/app/screens'
+import { keepMonth, useScreen } from '@/app/screens'
 import { useStore } from '@/app/store'
 import { activeHousehold, defaultMonths, useEngine, useTables } from '@/app/useEngine'
 import { useUndoNotice } from '@/app/useUndoNotice'
@@ -201,7 +201,7 @@ export function GridScreen() {
                           </DropdownMenuLabel>
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => { handMonth(m); go('statement') }}>{T.openInTheStatement}</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { keepMonth(m); go('statement') }}>{T.openInTheStatement}</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setBalancesFor(m)}>{T.balancesFor(formatMonth(m, locale))}</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
