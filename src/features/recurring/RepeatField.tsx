@@ -52,7 +52,7 @@ export function RepeatField({ value, onChange, month, locale, name, label = txt.
         </NativeSelect>
         {value.kind === 'every' && value.interval !== 1 && (
           <>
-            <span className="text-muted-foreground">{value.interval === 12 ? 'in' : 'from'}</span>
+            <span className="text-muted-foreground">{value.interval === 12 ? T.inMonth : T.fromMonth}</span>
             <NativeSelect
               aria-label={T.whichMonthOf(value.interval, name)} className="h-7 text-xs"
               value={value.anchor} onChange={(e) => onChange({ ...value, anchor: Number(e.target.value) })}

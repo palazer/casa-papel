@@ -9,11 +9,9 @@ import { HELP } from '@/app/help'
 import { screenDef, useScreen } from '@/app/screens'
 import { isDemoMode, openDemoSandbox } from '@/app/store'
 import { highlightRanges, queryWords, searchGuide } from './search'
-import { guideLang, lang, txt } from '@/i18n'
+import { txt } from '@/i18n'
 
 const T = txt.guide.screen
-/** The Guide's own text is marked with its language while that is not the page's (DESIGN.md §13). */
-const GUIDE_TEXT = guideLang === lang ? undefined : guideLang
 
 /** A text with the query's words wrapped in `<mark>`; the plain text when nothing is searched. */
 function Highlight({ text, words }: { text: string; words: string[] }) {
@@ -31,11 +29,11 @@ function Highlight({ text, words }: { text: string; words: string[] }) {
 }
 
 /** A list of `label: text` pairs (a topic's facts, its related tips). */
-function Pairs({ title, items, words, textLang }: { title: string; items: Array<{ label: string; text: string }>; words: string[]; textLang?: string }) {
+function Pairs({ title, items, words }: { title: string; items: Array<{ label: string; text: string }>; words: string[] }) {
   return (
     <div>
       <h4 className="text-xs font-medium">{title}</h4>
-      <dl lang={textLang} className="mt-1 grid gap-x-4 gap-y-1 text-xs leading-4 sm:grid-cols-[max-content_1fr]">
+      <dl className="mt-1 grid gap-x-4 gap-y-1 text-xs leading-4 sm:grid-cols-[max-content_1fr]">
         {items.map((it) => (
           <Fragment key={it.label}>
             <dt className="font-medium"><Highlight text={it.label} words={words} /></dt>
@@ -49,13 +47,13 @@ function Pairs({ title, items, words, textLang }: { title: string; items: Array<
 
 function Topic({ topic, words, go }: { topic: GuideTopic; words: string[]; go: (s: GuideTopic['open']) => void }) {
   return (
-    <Island air as="section" id={`guide-${topic.key}`} title={<span lang={GUIDE_TEXT}><Highlight text={topic.title} words={words} /></span>} description={<span lang={GUIDE_TEXT}><Highlight text={topic.summary} words={words} /></span>}>
+    <Island air as="section" id={`guide-${topic.key}`} title={<Highlight text={topic.title} words={words} />} description={<Highlight text={topic.summary} words={words} />}>
       <div className="space-y-3 text-sm leading-6">
-        {topic.what.map((p) => <p key={p.slice(0, 32)} lang={GUIDE_TEXT}><Highlight text={p} words={words} /></p>)}
-        <ol lang={GUIDE_TEXT} className="list-decimal space-y-1 pl-5">
+        {topic.what.map((p) => <p key={p.slice(0, 32)}><Highlight text={p} words={words} /></p>)}
+        <ol className="list-decimal space-y-1 pl-5">
           {topic.steps.map((s) => <li key={s.slice(0, 32)}><Highlight text={s} words={words} /></li>)}
         </ol>
-        {topic.facts && <Pairs title={topic.factsTitle ?? T.theChoices} items={topic.facts} words={words} textLang={GUIDE_TEXT} />}
+        {topic.facts && <Pairs title={topic.factsTitle ?? T.theChoices} items={topic.facts} words={words} />}
         {topic.tips.length > 0 && <Pairs title={T.relatedTips} items={topic.tips.map((k) => ({ label: HELP[k].title, text: HELP[k].text }))} words={words} />}
         <div className="flex flex-wrap items-center gap-2 pt-1">
           <Button size="xs" variant="outline" onClick={() => go(topic.open)}>{T.open(screenDef(topic.open).label)}</Button>
@@ -108,8 +106,8 @@ export function GuideScreen() {
       <GroupTabs />
       <div className="mx-auto max-w-3xl space-y-4 text-xs">
         {!searching && (
-          <Island air title={<span lang={GUIDE_TEXT}>{GUIDE_LEAD.title}</span>}>
-            <div lang={GUIDE_TEXT} className="space-y-2 text-sm leading-6">
+          <Island air title={GUIDE_LEAD.title}>
+            <div className="space-y-2 text-sm leading-6">
               {GUIDE_LEAD.paragraphs.map((p) => <p key={p.slice(0, 24)}>{p}</p>)}
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -120,7 +118,7 @@ export function GuideScreen() {
         )}
         {!searching && (
           <Island air as="div" title={T.topics}>
-            <nav id="guide-topics" aria-label={T.topics} lang={GUIDE_TEXT} className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+            <nav id="guide-topics" aria-label={T.topics} className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
               {GUIDE.map((t) => (
                 <a key={t.key} href={`#guide-${t.key}`} className="group rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <span className="text-sm font-medium text-foreground group-hover:underline">{t.title}</span>
@@ -132,7 +130,7 @@ export function GuideScreen() {
         )}
         {searching && hits.length > 0 && (
           <nav aria-label={T.results} className="rounded-lg border bg-card">
-            <ul lang={GUIDE_TEXT} className="divide-y divide-border/60">
+            <ul className="divide-y divide-border/60">
               {hits.map((h) => (
                 <li key={h.topic.key}>
                   <a href={`#guide-${h.topic.key}`} className="block rounded-lg px-4 py-2 outline-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring">

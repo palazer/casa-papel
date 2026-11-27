@@ -58,7 +58,7 @@ export const data: Messages['data'] = {
     removesTheHouseholdFrom: 'Haneyi sunucudan, bütün cihazlar için kaldırır. Her cihaz kendinde olanı korur. Düğmeyi etkinleştirmek için YOK ET yaz.',
     unknownError: 'bilinmeyen hata',
     never: 'hiç',
-    languageOnThisDevice: 'Yalnızca bu cihazda: hanenin her cihazı kendi dilini seçer. Yazdığın adlar ve sayı biçimi olduğu gibi kalır. Değiştirince sayfa yeniden yüklenir. Kılavuz ve demo hane şimdilik İngilizce.',
+    languageOnThisDevice: 'Yalnızca bu cihazda: hanenin her cihazı kendi dilini seçer. Yazdığın adlar ve sayı biçimi olduğu gibi kalır. Değiştirince sayfa yeniden yüklenir.',
   },
   importPanel: {
     nothing: 'Hiçbir şey.',

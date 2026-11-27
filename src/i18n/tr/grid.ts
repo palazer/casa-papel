@@ -89,7 +89,7 @@ export const grid: Messages['grid'] = {
     workedOutByThe: 'Uygulama hesaplar',
     carriedFromThePrevious: 'Önceki aydan taşındı',
     setInThisMonth: 'Bu ayda belirlendi',
-    onASchedule: 'Düzenli kalem',
+    onASchedule: 'Düzenli olarak',
     itemCount: (count) => `${count} kalem`,
     nothingLandsThisMonth: 'Bu aya bir şey düşmüyor',
     nothingYet: 'Henüz bir şey yok',

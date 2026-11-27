@@ -317,7 +317,7 @@ export const guide = {
       summary: 'Your data lives in this browser; export a file now and then, or sign in to keep an encrypted copy in the cloud.',
       what: [
         '"Where your data lives" under Data says it plainly: in this browser, on this device. "Ask the browser to keep my data" asks it not to evict the store. "Export now" writes one JSON file with every table and the change history; "Choose a file…" reads one back, to "Merge into this device" or "Replace everything here".',
-        'Cloud sync is optional and by invitation: "Sign in" or "I have an invite". Everything is encrypted on the device before it leaves, only your password opens it, and a recovery code shown once is the way back in. Apart from that, only currency codes and dates ever leave the device, when rates are fetched. "Demo household" opens the sandbox; the "Danger zone" wipes.',
+        'Cloud sync is optional and by invitation: "Sign in" or "I have an invite". Everything is encrypted on the device before it leaves, only your password opens it, and a recovery code shown once is the way back in. Apart from that, only currency codes and dates ever leave the device, when rates are fetched. "Demo household" opens the sandbox; the "Danger zone" wipes. "Language" picks the app\'s language on this device.',
       ],
       steps: [
         'Data → "Export" → "Export now"; keep the file anywhere you like.',

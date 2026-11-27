@@ -68,6 +68,8 @@ export const recurring: Messages['recurring'] = {
     inChosenMonths: 'Seçilen aylarda',
     whichMonthOf: (interval, name) => `${interval === 12 ? 'Hangi ayda' : 'Hangi aydan başlayarak'}, ${name}`,
     monthsOf: (name) => `Aylar, ${name}`,
+    inMonth: 'ay:',
+    fromMonth: 'başlangıç:',
   },
   text: {
     listAnd: (first, last) => `${first} ve ${last}`,

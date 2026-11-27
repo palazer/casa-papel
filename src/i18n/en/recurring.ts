@@ -66,6 +66,9 @@ export const recurring = {
     inChosenMonths: 'In chosen months',
     whichMonthOf: (interval: number, name: string) => `${interval === 12 ? 'In which month' : 'From which month'}, ${name}`,
     monthsOf: (name: string) => `Months, ${name}`,
+    /** Between the rhythm and its month: "Every year in March", "Every 3 months from January". */
+    inMonth: 'in',
+    fromMonth: 'from',
   },
   text: {
     listAnd: (first: string, last: string) => `${first} and ${last}`,

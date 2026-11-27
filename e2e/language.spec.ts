@@ -17,10 +17,10 @@ test('the language is chosen on the welcome screen and stays after a reload', as
 
   await page.reload()
   await expect(page.getByText('Casa Papel\'e hoş geldin')).toBeVisible()
-  // the Guide's own text is still English, and says so to what reads the page
   await page.getByRole('button', { name: 'Nasıl çalışır' }).click()
   await expect(page.getByRole('heading', { name: 'Kılavuz', level: 1 })).toBeVisible()
-  await expect(page.locator('#guide-topics')).toHaveAttribute('lang', 'en')
+  await expect(page.locator('#guide-topics')).toContainText('Başlangıç ve Bilanço')
+  await expect(page.getByRole('heading', { name: 'Casa Papel nedir' })).toBeVisible()
   await page.screenshot({ path: 'e2e/output/language-guide-tr.png' })
 
   await page.goto('')

@@ -48,9 +48,6 @@ function ofTheBrowser(): Lang | null {
 /** The language of this page: what was chosen on this device, else the browser's own, else English. */
 export const lang: Lang = chosen() ?? ofTheBrowser() ?? 'en'
 
-/** The language the Guide's lead and topics are written in, until they are translated: the screen marks them so. */
-export const guideLang: Lang = 'en'
-
 /** The catalogue of this page's language. */
 export const txt: Messages = CATALOGUES[lang]
 

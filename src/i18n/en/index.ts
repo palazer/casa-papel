@@ -2,6 +2,7 @@ import { app } from './app'
 import { common } from './common'
 import { components } from './components'
 import { data } from './data'
+import { demo } from './demo'
 import { engine } from './engine'
 import { errors } from './errors'
 import { goals } from './goals'
@@ -26,7 +27,7 @@ import { sync } from './sync'
 import { trends } from './trends'
 
 /** Every text the app shows, in English. English is the source: another language's catalogue has exactly this shape. */
-export const en = { app, common, components, data, engine, errors, goals, grid, guide, help, home, household, impact, main, model, names, past, payments, recurring, remove, rules, setup, statement, store, sync, trends }
+export const en = { app, common, components, data, demo, engine, errors, goals, grid, guide, help, home, household, impact, main, model, names, past, payments, recurring, remove, rules, setup, statement, store, sync, trends }
 
 /** The shape every language's catalogue has. */
 export type Messages = typeof en

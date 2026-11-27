@@ -3,6 +3,7 @@ import { app } from './app'
 import { common } from './common'
 import { components } from './components'
 import { data } from './data'
+import { demo } from './demo'
 import { engine } from './engine'
 import { errors } from './errors'
 import { goals } from './goals'
@@ -30,4 +31,4 @@ import { trends } from './trends'
  * Every text the app shows, in Turkish (DESIGN.md §13 has the words it uses). A part that is still imported from
  * `../en` has not been written yet; the Guide's topics stay English until they are.
  */
-export const tr: Messages = { app, common, components, data, engine, errors, goals, grid, guide, help, home, household, impact, main, model, names, past, payments, recurring, remove, rules, setup, statement, store, sync, trends }
+export const tr: Messages = { app, common, components, data, demo, engine, errors, goals, grid, guide, help, home, household, impact, main, model, names, past, payments, recurring, remove, rules, setup, statement, store, sync, trends }

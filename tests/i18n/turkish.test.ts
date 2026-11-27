@@ -2,20 +2,22 @@ import { describe, expect, it } from 'vitest'
 import { foldName, inEveryLanguage, sameText } from '@/i18n'
 import { en } from '@/i18n/en'
 import { tr } from '@/i18n/tr'
-import { isUsualCategory, missingUsualCategories } from '@/model'
+import { computeEngine } from '@/engine'
+import { buildDemoTables } from '@/demo/demoHousehold'
+import { isUsualCategory, missingUsualCategories, monthRange } from '@/model'
 import { isEstimateRowName } from '@/store'
 
 type Leaf = string | ((...args: never[]) => unknown)
 
 /** Every text of a catalogue with the path to it. */
+const textsOf = (node: unknown): Array<[string, Leaf]> => texts(node)
 function texts(node: unknown, path = ''): Array<[string, Leaf]> {
   if (typeof node === 'string' || typeof node === 'function') return [[path, node as Leaf]]
+  if (Array.isArray(node)) return node.flatMap((v, i) => texts(v, `${path}[${i}]`))
   if (node && typeof node === 'object') return Object.entries(node).flatMap(([k, v]) => texts(v, path ? `${path}.${k}` : k))
   throw new Error(`${path} is neither a text nor a group of texts`)
 }
 
-/** The Guide's lead and topics are English in both catalogues until they are translated (step 3 of the language plan). */
-const untranslated = (path: string) => path.startsWith('guide.lead') || path.startsWith('guide.topics')
 /**
  * Stand-ins a text that takes something is tried with: in each of up to five places a name, a count or a list of
  * names, in every combination, since a catalogue does not say what its texts take.
@@ -63,7 +65,6 @@ describe('the Turkish catalogue', () => {
   it('leaves no sentence in English', () => {
     const same: string[] = []
     for (const [path, text] of turkish) {
-      if (untranslated(path)) continue
       for (const args of STAND_INS) {
         const ours = said(text, args)
         const theirs = said(english.get(path)!, args)
@@ -91,7 +92,7 @@ describe('the Turkish catalogue', () => {
     expect(tr.common).toMatchObject({ cancel: 'İptal', save: 'Kaydet', repeats: 'Tekrarlar', transfers: 'Transferler', comesOutOf: 'Nereden çıkar', thisAndFollowing: 'Bu ay ve sonrası', paidOn: 'Ödeme günü', paidWith: 'Ödeme yöntemi', netWorth: 'Net varlık' })
     expect(tr.grid.page).toMatchObject({ leftover: 'Arta kalan', keptInAccount: 'Hesapta kalan', balances: 'Bakiyeler' })
     expect(tr.household.page.schedules).toBe('Düzenli kalemler')
-    const all = [...turkish].filter(([path]) => !untranslated(path)).map(([, text]) => (typeof text === 'string' ? text : '')).join('\n')
+    const all = [...turkish].map(([, text]) => (typeof text === 'string' ? text : '')).join('\n')
     // the words he replaced are not used for the things he named
     expect(all).not.toMatch(/Vazgeç|Aktarımlar|Gidişat|Tekrarlayanlar/)
   })
@@ -101,6 +102,64 @@ describe('the Turkish catalogue', () => {
     for (const word of [tr.data.page.wipe, tr.data.page.delete]) expect(word).toMatch(/^[A-Z ]+$/)
     expect(tr.data.page.removeEverythingPlain).toContain(tr.data.page.wipe)
     expect(tr.data.page.removesTheHouseholdFrom).toContain(tr.data.page.delete)
+  })
+})
+
+describe('the Guide in Turkish', () => {
+  const sentence = (text: string, what: string) => {
+    expect(text.trim().length, what).toBeGreaterThan(0)
+    expect(text.trim().endsWith('.'), `${what} ends with a full stop: …${text.slice(-24)}`).toBe(true)
+    expect(text, what).not.toMatch(/\s{2,}/)
+  }
+
+  it('keeps the Guide\'s rules: the same topics, short titles, whole sentences, three to eight steps', () => {
+    expect(Object.keys(tr.guide.topics)).toEqual(Object.keys(en.guide.topics))
+    expect(tr.guide.lead.paragraphs).toHaveLength(3)
+    tr.guide.lead.paragraphs.forEach((p, i) => sentence(p, `lead ${i}`))
+    for (const [key, topic] of Object.entries(tr.guide.topics)) {
+      const english = en.guide.topics[key as keyof typeof en.guide.topics]
+      expect(topic.title.length, key).toBeLessThanOrEqual(40)
+      sentence(topic.summary, `${key} summary`)
+      expect(topic.what.length, key).toBe(english.what.length)
+      topic.what.forEach((p, i) => sentence(p, `${key} paragraph ${i}`))
+      expect(topic.steps.length, key).toBe(english.steps.length)
+      topic.steps.forEach((step, i) => sentence(step, `${key} step ${i}`))
+      expect('factsTitle' in topic, key).toBe('factsTitle' in english)
+    }
+  })
+
+  it('quotes the controls by their Turkish names, and speaks of the Turkish demo household', () => {
+    const texts = [...tr.guide.lead.paragraphs, ...Object.values(tr.guide.topics).flatMap((t) => [t.title, t.summary, ...t.what, ...t.steps])]
+    const all = texts.join(' ')
+    for (const name of [...Object.values(tr.demo.entity), tr.demo.row.rent, tr.demo.row.samSalary, tr.demo.account.invest, tr.demo.pool.travel, tr.demo.row.travelAlloc]) expect(all, name).toContain(name)
+    // a label in quotes that is a plain text of the English catalogue has not been translated
+    const plain = (catalogue: unknown, skip: (path: string) => boolean): Set<string> => new Set(textsOf(catalogue).filter(([path, text]) => typeof text === 'string' && !skip(path)).map(([, text]) => text as string))
+    const turkish = plain(tr, (path) => path.startsWith('guide.lead') || path.startsWith('guide.topics'))
+    const english = plain(en, (path) => path.startsWith('guide.') || path.startsWith('demo.'))
+    const left = new Set<string>()
+    for (const text of texts) for (const [, quoted] of text.matchAll(/"([^"]+)"/g)) if (english.has(quoted) && !turkish.has(quoted)) left.add(quoted)
+    expect([...left]).toEqual([])
+  })
+})
+
+describe('the demo household in Turkish', () => {
+  it('is the same household: the same records and figures, other names, the Turkish format', () => {
+    const english = buildDemoTables(en.demo)
+    const turkish = buildDemoTables(tr.demo)
+    expect(turkish.household[0]).toMatchObject({ name: 'Demo hane', locale: 'tr-TR', baseCurrency: 'EUR' })
+    for (const table of ['entities', 'accounts', 'categories', 'rows', 'recurringItems', 'pools', 'paymentMethods'] as const) {
+      expect(turkish[table].map((r) => r.id), table).toEqual(english[table].map((r) => r.id))
+    }
+    expect(turkish.rows.map((r) => r.name)).toContain('Daire – Kira')
+    expect(turkish.rows.filter((r, i) => r.name === english.rows[i].name).map((r) => r.name)).toEqual([])
+    const months = monthRange('2026-09', '2027-12')
+    const figures = (tables: ReturnType<typeof buildDemoTables>) => { const e = computeEngine({ tables, months }); return months.map((m) => [e.netWorth[m], e.totals[m]?.expensesTotal, e.totals[m]?.leftover, e.totals[m]?.toSavings]) }
+    expect(figures(turkish)).toEqual(figures(english))
+  })
+
+  it('carries the usual categories under the names a Turkish household gets', () => {
+    const names = buildDemoTables(tr.demo).categories.map((c) => c.name)
+    for (const key of ['housing', 'living', 'transport', 'family', 'fun', 'personal'] as const) expect(names.some((n) => isUsualCategory(n, key)), key).toBe(true)
   })
 })
 

@@ -1382,9 +1382,14 @@ schema step.
   format stay. Choosing stores the language (`chooseLanguage()`) and loads the page again; other open tabs keep
   theirs until they are reloaded.
 - **The page says its language**: `<html lang>` is set when the app starts, so capitals, hyphenation and a screen
-  reader follow it. Text in another language than the page's is marked where it stands: the Guide's lead and topics
-  carry `lang="en"` on a Turkish page until they are translated (`guideLang`), and the demo household is English in
-  both languages until then.
+  reader follow it.
+- **The Guide is written per language** (`guide.ts` in each catalogue): the same topics, paragraphs and steps, and
+  every label it quotes is the control's real text in that language. `tests/i18n/turkish.test.ts` fails on a quoted
+  label that is still the English one.
+- **The demo household is the same household in every language**: `buildDemoTables()` takes its names and its
+  number format from the catalogue's `demo` part, and its ids, amounts and dates from the code. The people and the
+  dog keep their names; things, accounts, rows and items are named the way the app names them in that language
+  ("Daire – Kira", "Seyahat – Ayrılan"), so the Guide's examples are what the sandbox shows.
 - **The app's name and description on a phone's home screen** (the manifest, `index.html`) are one file per build
   and stay English.
 
