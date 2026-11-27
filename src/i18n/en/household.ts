@@ -181,6 +181,8 @@ export const household = {
     partOfWhat: (holder: string | null, free: string | null) => `A part of what ${holder ? `"${holder}"` : 'the account'} already holds: it adds no money to the account.${holder && free ? ` "${holder}" has ${free} that is not set aside.` : ''}`,
   },
   rate: {
+    /** Where a month's rate came from, as its chip says it. */
+    tag: { manual: 'manual', ECB: 'ECB', forecast: 'forecast', carried: 'carried', missing: 'missing' },
     yourOwnRateFor: 'Your own rate for this month.',
     ecb: 'The European Central Bank\'s rate.',
     aForecastWorkedOut: 'A forecast: worked out from the last official rate, the way "Months to come" under Household says.',

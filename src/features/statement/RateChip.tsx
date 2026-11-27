@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitl
 import { formatMonth } from '@/app/format'
 import { HELP } from '@/app/help'
 import type { Household, MonthKey, Tables } from '@/model'
-import { TAG_TONE, formatRate, rateSource } from '@/features/household/fxDisplay'
+import { TAG_LABEL, TAG_TONE, formatRate, rateSource } from '@/features/household/fxDisplay'
 import { useMonthRate } from '@/features/grid/useMonthRate'
 import { txt } from '@/i18n'
 
@@ -50,7 +50,7 @@ export function RateChip({ tables, household, month, currency }: {
         <PopoverHeader className="gap-1 text-xs">
           <PopoverTitle className="text-xs font-semibold">{T.currencyIn(currency, long)}</PopoverTitle>
           <PopoverDescription className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs leading-4">
-            <Chip tone={TAG_TONE[tag]}>{tag}</Chip>
+            <Chip tone={TAG_TONE[tag]}>{TAG_LABEL[tag]}</Chip>
             <span>{rateSource(tag, rec, month, locale)}</span>
           </PopoverDescription>
         </PopoverHeader>

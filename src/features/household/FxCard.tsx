@@ -10,7 +10,7 @@ import { useStore } from '@/app/store'
 import { TREND_CHANGES, historyMonths, householdFx, rateInfo, trendFor } from '@/engine'
 import { monthOfDate, type Household, type MonthKey, type Tables } from '@/model'
 import { neededPairs, refreshRates, restoreEcbRate, setManualRate, setPairForecast } from '@/store'
-import { TAG_TONE, formatRate, rateTag, readableRate, toStored } from './fxDisplay'
+import { TAG_LABEL, TAG_TONE, formatRate, rateTag, readableRate, toStored } from './fxDisplay'
 import { errorText, showSaveError } from '@/app/saveError'
 import { txt } from '@/i18n'
 
@@ -177,7 +177,7 @@ export function FxCard({ household, tables, months, onError }: { household: Hous
                                 act(() => setManualRate(store, p, m, value))
                               }}
                             />
-                            <Chip tone={TAG_TONE[tag]}>{tag}</Chip>
+                            <Chip tone={TAG_TONE[tag]}>{TAG_LABEL[tag]}</Chip>
                           </div>
                         </td>
                       )

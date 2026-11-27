@@ -50,4 +50,5 @@ export const common = {
   appName: 'Casa Papel',
   signIn: 'Sign in',
   haveInvite: 'I have an invite',
+  language: 'Language',
 }

@@ -47,5 +47,6 @@ export const trends = {
     plan: 'Plan',
     n3Years: '3 years',
     n5Years: '5 years',
+    n10Years: '10 years',
   },
 }

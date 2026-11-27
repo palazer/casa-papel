@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Island } from '@/components/ui/island'
 import { PageHeader } from '@/components/PageHeader'
+import { LanguageChoice } from '@/components/LanguageChoice'
 import { useScreen } from '@/app/screens'
 import { isDemoMode, leaveDemoSandbox, openDemoSandbox, useStore } from '@/app/store'
 import { loadDemo } from '@/demo/loadDemo'
@@ -63,7 +64,7 @@ export function HomeScreen({ onOpenData, onCreated, syncAvailable = false, onSig
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <PageHeader title={txt.common.appName} subline={T.yourHouseholdBudgetAs} controls={false}>
+      <PageHeader title={txt.common.appName} subline={T.yourHouseholdBudgetAs} controls={false} tools={<LanguageChoice />}>
         {status && <p role="status" className="basis-full text-muted-foreground">{status}</p>}
         {error && <p role="alert" className="basis-full text-destructive">{error}</p>}
       </PageHeader>

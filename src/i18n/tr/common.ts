@@ -51,4 +51,5 @@ export const common: Messages['common'] = {
   appName: 'Casa Papel',
   signIn: 'Giriş yap',
   haveInvite: 'Davetim var',
+  language: 'Dil',
 }

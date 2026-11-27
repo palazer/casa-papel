@@ -77,7 +77,7 @@ export function RecurringList({ engine }: {
                   <td className={TD}>
                     {status === 'not-due' ? <span className="text-muted-foreground">—</span> : paidOff ? <Chip tone="zinc">{T.paidOff}</Chip> : (
                       <Check
-                        label={<Chip tone={status === 'paid' ? 'emerald' : status === 'skipped' ? 'zinc' : 'amber'}>{status === 'paid' ? 'paid' : status === 'skipped' ? 'skipped' : 'due'}</Chip>}
+                        label={<Chip tone={status === 'paid' ? 'emerald' : status === 'skipped' ? 'zinc' : 'amber'}>{status === 'paid' ? T.paid : status === 'skipped' ? T.skipped : T.due}</Chip>}
                         checked={status === 'paid'}
                         aria-label={T.paidIn(it.name, formatMonth(m, locale))}
                         onChange={(e) => act(() => setRecurringPaid(store, it.id, m, e.target.checked))}

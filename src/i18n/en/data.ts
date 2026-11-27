@@ -54,6 +54,7 @@ export const data = {
     removesTheHouseholdFrom: 'Removes the household from the server for every device. Each device keeps what it has locally. Type DELETE to enable the button.',
     unknownError: 'unknown error',
     never: 'never',
+    languageOnThisDevice: 'On this device only: every device of a household chooses its own. The names you typed and the number format stay as they are. Changing it loads the page again.',
   },
   importPanel: {
     nothing: 'Nothing.',

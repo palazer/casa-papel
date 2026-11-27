@@ -7,7 +7,7 @@ import { InfoTip } from '@/components/InfoTip'
 import { formatAmount, formatMonth } from '@/app/format'
 import { convertMoney } from '@/engine'
 import type { Household, Money, MonthKey, Tables } from '@/model'
-import { TAG_TONE, formatDay, formatRate } from '@/features/household/fxDisplay'
+import { TAG_LABEL, TAG_TONE, formatDay, formatRate } from '@/features/household/fxDisplay'
 import { useMonthRate } from './useMonthRate'
 import { txt } from '@/i18n'
 
@@ -35,7 +35,7 @@ export function RateLine({ tables, household, month, currency, amount, recorded 
         {info && inBase != null
           ? <>{!recorded && <><span>≈ {formatAmount(inBase, base, locale)}</span><span aria-hidden>·</span></>}<span>{readable.text}</span><span aria-hidden>·</span></>
           : <span>{T.noRateForYet(currency, formatMonth(month, locale))}</span>}
-        <Chip tone={TAG_TONE[tag]}>{tag}</Chip>
+        <Chip tone={TAG_TONE[tag]}>{TAG_LABEL[tag]}</Chip>
         {rec?.date && <span>{formatDay(rec.date, locale)}</span>}
         <InfoTip help="cell.rate" />
         {!editing && <Button size="xs" variant="ghost" onClick={() => { setText(info ? formatRate(readable.rate, locale) : ''); setError(null); setEditing(true) }}>{T.changeThisMonthsRate}</Button>}

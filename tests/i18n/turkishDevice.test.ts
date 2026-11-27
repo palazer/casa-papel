@@ -111,3 +111,29 @@ describe('an English device that opens that household', () => {
     expect(starterMethods(await loadTables(store)).map((m) => m.name)).toEqual(['Standing order', 'Transfer by hand'])
   })
 })
+
+describe('the language a device starts in', () => {
+  /** The layer as a device loads it: what its storage holds for the choice, and the browser's own language. */
+  async function startsIn(stored: string | null, browser: string): Promise<string> {
+    vi.resetModules()
+    vi.stubGlobal('window', { localStorage: { getItem: (key: string) => (key === 'casa.lang' ? stored : null), setItem: () => undefined } })
+    vi.stubGlobal('navigator', { language: browser })
+    return (await import('@/i18n')).lang
+  }
+  afterAll(() => { vi.unstubAllGlobals() })
+
+  it('is the browser\'s own where the app speaks it, else English', async () => {
+    expect(await startsIn(null, 'tr-TR')).toBe('tr')
+    expect(await startsIn(null, 'tr')).toBe('tr')
+    expect(await startsIn(null, 'en-GB')).toBe('en')
+    expect(await startsIn(null, 'de-DE')).toBe('en')
+  })
+
+  it('is what was chosen on the device, whatever the browser speaks', async () => {
+    expect(await startsIn('"en"', 'tr-TR')).toBe('en')
+    expect(await startsIn('"tr"', 'en-US')).toBe('tr')
+    // a choice the app does not know counts for nothing
+    expect(await startsIn('"de"', 'tr-TR')).toBe('tr')
+    expect(await startsIn('not json', 'en-US')).toBe('en')
+  })
+})

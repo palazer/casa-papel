@@ -49,5 +49,6 @@ export const trends: Messages['trends'] = {
     plan: 'Plan',
     n3Years: '3 yıl',
     n5Years: '5 yıl',
+    n10Years: '10 yıl',
   },
 }

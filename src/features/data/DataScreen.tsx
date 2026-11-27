@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Island } from '@/components/ui/island'
 import { GroupTabs } from '@/components/GroupTabs'
 import { PageHeader } from '@/components/PageHeader'
+import { LanguageChoice } from '@/components/LanguageChoice'
 import { isDemoMode, leaveDemoSandbox, openDemoSandbox, useStore } from '@/app/store'
 import { loadDemo } from '@/demo/loadDemo'
 import { exportFileName, exportSnapshot, wipeAll } from '@/store'
@@ -186,6 +187,10 @@ export function DataScreen() {
           </div>
           {signedIn && <p className="text-muted-foreground">{T.whileSignedInThe}</p>}
         </div>
+      </Island>
+
+      <Island air title={txt.common.language} description={T.languageOnThisDevice}>
+        <LanguageChoice />
       </Island>
 
       <Island

@@ -21,7 +21,7 @@ export const SUBJECTS: Record<TrendSubject, { label: string; color: string }> = 
 export const PART_COLORS = ['var(--part-1)', 'var(--part-2)', 'var(--part-3)', 'var(--part-4)', 'var(--part-5)', 'var(--part-6)']
 export const OTHER_COLOR = 'var(--part-other)'
 
-export const HORIZON_LABEL: Record<string, string> = { plan: T.plan, 3: T.n3Years, 5: T.n5Years, 10: '10 years' }
+export const HORIZON_LABEL: Record<string, string> = { plan: T.plan, 3: T.n3Years, 5: T.n5Years, 10: T.n10Years }
 
 /** What this device remembers of the page: which subjects are on the charts, and how far ahead they look. */
 export function rememberedSubjects(): TrendSubject[] {

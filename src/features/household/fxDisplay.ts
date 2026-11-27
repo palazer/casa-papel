@@ -9,6 +9,9 @@ const T = txt.household.rate
 /** Where a month's rate came from, as a chip: yours is sky, the ECB's a fact in zinc, a forecast amber, a gap rose. */
 export const TAG_TONE: Record<string, ChipTone> = { manual: 'sky', ECB: 'zinc', forecast: 'amber', carried: 'zinc', missing: 'rose' }
 
+/** What the chip says: the tag is a key, the word is the language's. */
+export const TAG_LABEL: Record<string, string> = T.tag
+
 export function rateTag(rec: Pick<FxRate, 'source'> | undefined, info: RateInfo | null): string {
   return rec?.source === 'manual' ? 'manual' : rec?.source === 'api' ? 'ECB' : info ? (info.projected ? 'forecast' : 'carried') : 'missing'
 }

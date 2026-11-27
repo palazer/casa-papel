@@ -98,7 +98,8 @@ Payments frame   full width, space-y-4 under the sticky header: grid grid-cols-1
   muted sentence each; quiet `xs ghost` links beneath (the demo sandbox, Import a file). Signed out it offers Start on this
   device, Sign in, I have an invite; without sync only the first; in the sandbox it leads with Load the demo household; signed
   in with no household it skips straight to the first setup screen with a "Signed in as …" line and no chooser; a locked or
-  undecided cloud copy offers Open Data instead.
+  undecided cloud copy offers Open Data instead. The right end of its header holds the language choice (§13) in every
+  one of these states, so the first screen can be read before anything is chosen.
 - **The first setup screen** (`src/features/setup/SetupStart.tsx`, its checks in `start.ts`): one air island "Set up your
   household", a single screen with no steps. It asks only what the Statement needs before it can open: "Household
   name", "Currency", "Number and date format", "First month" (with the sentence that currency and first month cannot be
@@ -1370,8 +1371,22 @@ Every text the app shows comes from a catalogue in `src/i18n/`, read through one
 
 The app speaks English (`src/i18n/en/`) and Turkish (`src/i18n/tr/`). The language belongs to the device, never to
 the household: it is kept beside the other things a device remembers (`casa.lang`), is not synced, and takes no
-schema step. `chooseLanguage()` stores it and loads the page again. The Guide's topics and the demo household are
-English in both languages until they are translated.
+schema step.
+
+- **A device starts in its browser's own language** where the app speaks it (the browser's first language counts,
+  not the ones after it), else in English. What was chosen on the device wins over the browser.
+- **The choice is `LanguageChoice`** (`src/components/LanguageChoice.tsx`): a segmented control whose options always
+  read "English" and "Türkçe", each in its own words whatever the page speaks, so it is found by someone who reads
+  neither. It stands in two places: at the right end of the welcome screen's header, and under Settings → Data in an
+  island "Language", whose description says that it holds for this device only and that names and the number
+  format stay. Choosing stores the language (`chooseLanguage()`) and loads the page again; other open tabs keep
+  theirs until they are reloaded.
+- **The page says its language**: `<html lang>` is set when the app starts, so capitals, hyphenation and a screen
+  reader follow it. Text in another language than the page's is marked where it stands: the Guide's lead and topics
+  carry `lang="en"` on a Turkish page until they are translated (`guideLang`), and the demo household is English in
+  both languages until then.
+- **The app's name and description on a phone's home screen** (the manifest, `index.html`) are one file per build
+  and stay English.
 
 ### Names the app writes, in two languages
 

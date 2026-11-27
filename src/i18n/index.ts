@@ -26,7 +26,7 @@ const isLang = (v: unknown): v is Lang => v === 'en' || v === 'tr'
 /** Where the device keeps its choice: beside the other things it remembers (`src/app/prefs.ts`), never in a household. */
 const KEY = 'casa.lang'
 
-/** The language chosen on this device, if one was. There is no device under the tests, which therefore run in English. */
+/** The language chosen on this device, if one was. */
 function chosen(): Lang | null {
   try {
     if (typeof window === 'undefined') return null
@@ -38,8 +38,18 @@ function chosen(): Lang | null {
   }
 }
 
-/** The language of this page. */
-export const lang: Lang = chosen() ?? 'en'
+/** The language the browser itself speaks, when the app speaks it too. Its first language counts, not the ones after it. */
+function ofTheBrowser(): Lang | null {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return null
+  const first = (navigator.language ?? '').split('-')[0].toLowerCase()
+  return isLang(first) ? first : null
+}
+
+/** The language of this page: what was chosen on this device, else the browser's own, else English. */
+export const lang: Lang = chosen() ?? ofTheBrowser() ?? 'en'
+
+/** The language the Guide's lead and topics are written in, until they are translated: the screen marks them so. */
+export const guideLang: Lang = 'en'
 
 /** The catalogue of this page's language. */
 export const txt: Messages = CATALOGUES[lang]

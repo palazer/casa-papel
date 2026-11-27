@@ -181,6 +181,7 @@ export const household: Messages['household'] = {
     partOfWhat: (holder, free) => `${holder ? `"${holder}" hesabının` : 'Hesabın'} şimdiden tuttuğunun bir parçası: hesaba para eklemez.${holder && free ? ` "${holder}" hesabında ayrılmamış ${free} var.` : ''}`,
   },
   rate: {
+    tag: { manual: 'elle', ECB: 'AMB', forecast: 'öngörü', carried: 'taşınan', missing: 'eksik' },
     yourOwnRateFor: 'Bu ay için kendi kurun.',
     ecb: 'Avrupa Merkez Bankası\'nın kuru.',
     aForecastWorkedOut: 'Bir öngörü: Hane altındaki "Gelecek aylar" ne diyorsa öyle, son resmî kurdan hesaplanır.',
