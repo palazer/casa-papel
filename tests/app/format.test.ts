@@ -85,6 +85,8 @@ describe('weekdayOf: the weekday a day of a month falls on', () => {
     expect(weekdayOf('2026-11', 1, 'en-GB')).toBe('Sun')
     expect(weekdayOf('2027-02', 28, 'en-GB')).toBe('Sun')
     expect(weekdayOf('2026-12', 31, 'en-GB')).toBe('Thu')
-    expect(weekdayOf('2026-11', 23, 'de-DE')).toBe('Mo')
+    // the name is a word, and words are in the page's language (English under the tests), whatever the household's format
+    expect(weekdayOf('2026-11', 23, 'de-DE')).toBe('Mon')
+    expect(weekdayOf('2026-11', 23, 'tr-TR')).toBe('Mon')
   })
 })

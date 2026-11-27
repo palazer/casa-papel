@@ -1,4 +1,5 @@
 import { formatMonth } from '@/app/format'
+import { formatDate } from '@/i18n'
 import { parseMonth, type MonthKey } from '@/model'
 import { monthAxis, type MonthAxis } from './scale'
 
@@ -29,7 +30,7 @@ export function tickText(t: { month: MonthKey; year: boolean; only: boolean }, l
   const { year, month } = parseMonth(t.month)
   if (t.only) return String(year)
   if (t.year) return formatMonth(t.month, locale)
-  return new Intl.DateTimeFormat(locale, { month: 'short' }).format(new Date(year, month - 1, 1))
+  return formatDate(new Date(year, month - 1, 1), locale, { month: 'short' })
 }
 
 /** Text in a chart is ink, never a line's colour (the mark beside it carries that). */

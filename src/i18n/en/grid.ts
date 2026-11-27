@@ -7,6 +7,7 @@ export const grid = {
     newInvestmentAccount: 'New investment account…',
     investmentAccount: 'investment account',
     newLoan: 'New loan…',
+    loan: 'loan',
     newCreditCard: 'New credit card…',
     creditCard: 'credit card',
     newVirtualAccount: 'New virtual account…',

@@ -1,6 +1,6 @@
 import type { EntityKind, MonthKey } from '@/model'
 import type { SetupInput } from '@/store'
-import { txt } from '@/i18n'
+import { foldName, lang, txt } from '@/i18n'
 
 const T = txt.setup.start
 
@@ -23,12 +23,16 @@ export interface StartDraft {
 export const LOCALES = ['en-IE', 'en-GB', 'en-US', 'de-DE', 'de-AT', 'tr-TR', 'fr-FR', 'es-ES', 'nl-NL', 'it-IT', 'pt-PT', 'sv-SE']
 export const THING_KINDS: ThingKind[] = ['child', 'pet', 'vehicle', 'property', 'company', 'other']
 
-/** A fresh draft: two adults to name, nothing else; the browser's own format when the app has it. */
-export function newStart(today: MonthKey, language: string): StartDraft {
-  return { name: '', currency: 'EUR', locale: LOCALES.includes(language) ? language : 'en-IE', startMonth: today, adults: ['', ''], things: [] }
+/**
+ * A fresh draft: two adults to name, nothing else; the browser's own format when the app has it. A device that
+ * speaks Turkish starts with the Turkish format and the lira; both can be changed on the form.
+ */
+export function newStart(today: MonthKey, language: string, turkish = lang === 'tr'): StartDraft {
+  const locale = turkish ? 'tr-TR' : LOCALES.includes(language) ? language : 'en-IE'
+  return { name: '', currency: turkish ? 'TRY' : 'EUR', locale, startMonth: today, adults: ['', ''], things: [] }
 }
 
-const key = (name: string) => name.trim().toLocaleLowerCase()
+const key = foldName
 
 /** The people and things that will be made: blank names are skipped, and a household with no named adult gets "Me". */
 export function keptStart(d: StartDraft): { adults: string[]; things: Array<{ kind: ThingKind; name: string }> } {

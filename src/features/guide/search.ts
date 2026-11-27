@@ -12,8 +12,19 @@ export interface GuideHit {
   snippet: string
 }
 
-/** The query as lowercase words; an empty query has none. */
-export const queryWords = (query: string): string[] => query.toLowerCase().split(/\s+/).filter(Boolean)
+/**
+ * A text as the search compares it: lower case with every index kept in place (a character whose lower-case form is
+ * longer stays as it is), and I, İ, ı and i read as one letter, so "izle" finds "İzle" and "living" finds "LIVING"
+ * whichever keyboard typed it.
+ */
+export const fold = (s: string): string => Array.from(s, (ch) => {
+  if (ch === 'I' || ch === 'İ' || ch === 'ı') return 'i'
+  const l = ch.toLowerCase()
+  return l.length === ch.length ? l : ch
+}).join('')
+
+/** The query as folded words; an empty query has none. */
+export const queryWords = (query: string): string[] => fold(query).split(/\s+/).filter(Boolean)
 
 /** Every text a topic is searched by, in reading order: title, summary, paragraphs, steps, facts and the related tips. */
 export function topicTexts(topic: GuideTopic, help: Record<HelpKey, HelpText>): string[] {
@@ -30,12 +41,9 @@ export function topicTexts(topic: GuideTopic, help: Record<HelpKey, HelpText>): 
 /** A topic matches when every word of the query appears somewhere in its texts (case-insensitive, substrings). */
 export function topicMatches(topic: GuideTopic, words: string[], help: Record<HelpKey, HelpText>): boolean {
   if (words.length === 0) return true
-  const hay = topicTexts(topic, help).join('\n').toLowerCase()
+  const hay = fold(topicTexts(topic, help).join('\n'))
   return words.every((w) => hay.includes(w))
 }
-
-/** Lowercase that keeps every index in place: a character whose lowercase form is longer (İ) stays as it is. */
-const fold = (s: string): string => Array.from(s, (ch) => { const l = ch.toLowerCase(); return l.length === ch.length ? l : ch }).join('')
 
 /** Where the words occur in one text, as non-overlapping ranges in order, longer words first so "pool" inside "pools" is one mark. */
 export function highlightRanges(text: string, words: string[]): Range[] {

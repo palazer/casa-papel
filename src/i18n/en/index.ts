@@ -27,3 +27,6 @@ import { trends } from './trends'
 
 /** Every text the app shows, in English. English is the source: another language's catalogue has exactly this shape. */
 export const en = { app, common, components, data, engine, errors, goals, grid, guide, help, home, household, impact, main, model, names, past, payments, recurring, remove, rules, setup, statement, store, sync, trends }
+
+/** The shape every language's catalogue has. */
+export type Messages = typeof en

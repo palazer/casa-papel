@@ -2,7 +2,7 @@ import type { ChipTone } from '@/components/ui/chip'
 import type { RateInfo } from '@/engine'
 import { compareMonths, monthOfDate, type FxRate, type MonthKey } from '@/model'
 import { rateSettled } from '@/store'
-import { txt } from '@/i18n'
+import { formatDate, txt } from '@/i18n'
 
 const T = txt.household.rate
 
@@ -58,5 +58,5 @@ export function toStored(readable: Pick<ReadableRate, 'from'>, base: string, typ
 
 /** The day a fetched rate was taken on, in the household's locale ("2 Nov 2026"). */
 export function formatDay(iso: string, locale: string): string {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })
+  return formatDate(new Date(`${iso}T00:00:00`), locale, { day: 'numeric', month: 'short', year: 'numeric' })
 }

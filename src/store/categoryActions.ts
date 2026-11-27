@@ -1,8 +1,8 @@
-import { txt } from '@/i18n'
+import { sameText, txt } from '@/i18n'
 import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing'
-import { CategorySchema, DEFAULT_CATEGORIES, RowSchema, newId, type Category, type Money, type MonthKey, type Section, type Tables } from '@/model'
+import { CategorySchema, RowSchema, missingUsualCategories, newId, type Category, type Money, type MonthKey, type Section, type Tables } from '@/model'
 import { NO_QUESTION, type Mutation, type Store } from './store'
-import { categoryEstimateMutations, categoryPlacement, estimateRowName, estimateRowOf, loadTables } from './actions'
+import { categoryEstimateMutations, categoryPlacement, estimateRowName, estimateRowOf, isEstimateRowName, loadTables } from './actions'
 
 const now = () => Date.now()
 const live = (cs: Category[]) => cs.filter((c) => !c.deletedAt)
@@ -11,7 +11,7 @@ const byOrder = (a: Category, b: Category) => (a.order < b.order ? -1 : a.order 
 function assertName(tables: Tables, section: Section, name: string, exceptId?: string): string {
   const n = name.trim()
   if (!n) throw new Error(txt.errors.giveCategoryName)
-  if (live(tables.categories).some((c) => c.section === section && c.id !== exceptId && c.name.toLowerCase() === n.toLowerCase())) {
+  if (live(tables.categories).some((c) => c.section === section && c.id !== exceptId && sameText(c.name, n))) {
     throw new Error(txt.errors.categoryNameTaken(n))
   }
   return n
@@ -56,7 +56,7 @@ export async function renameCategory(store: Store, id: string, name: string): Pr
   const mutations: Mutation[] = [{ op: 'put', table: 'categories', record: CategorySchema.parse({ ...cat, name: n, updatedAt: ts }) }]
   // the estimate's row is named after its category, so it follows the new name (unless someone renamed it by hand)
   const estimate = estimateRowOf(tables, id)
-  if (estimate && estimate.name === estimateRowName(cat)) mutations.push({ op: 'put', table: 'rows', record: RowSchema.parse({ ...estimate, name: estimateRowName({ name: n }), updatedAt: ts }) })
+  if (estimate && isEstimateRowName(estimate.name, cat)) mutations.push({ op: 'put', table: 'rows', record: RowSchema.parse({ ...estimate, name: estimateRowName({ name: n }), updatedAt: ts }) })
   await store.commit(mutations)
 }
 
@@ -98,11 +98,10 @@ export async function setRowCategory(store: Store, rowId: string, categoryId: st
   await store.commit([{ op: 'put', table: 'rows', record: RowSchema.parse({ ...row, ...categoryPlacement(tables, row, categoryId), updatedAt: now() }) }])
 }
 
-/** The usual expense categories, skipping names the household already has (case does not matter). Pure. */
+/** The usual expense categories, skipping those the household already has, under their name in either language (case does not matter). Pure. */
 export function buildDefaultCategoryMutations(existing: Category[], ts: number): { mutations: Mutation[]; categories: Category[] } {
   const expense = live(existing).filter((c) => c.section === 'expense')
-  const have = new Set(expense.map((c) => c.name.toLowerCase()))
-  const names = DEFAULT_CATEGORIES.filter((n) => !have.has(n.toLowerCase()))
+  const names = missingUsualCategories(expense.map((c) => c.name))
   const last = expense.map((c) => c.order).sort().at(-1) ?? null
   const orders = generateNKeysBetween(last, null, names.length)
   const categories = names.map((name, i) => CategorySchema.parse({ id: newId(), createdAt: ts, updatedAt: ts, name, section: 'expense', order: orders[i] }))

@@ -48,7 +48,7 @@ const withType = (a: Account): Target => ({ id: a.id, name: T.debtChoice(a.name,
 const NEW = {
   savings: { type: 'savings', label: T.newSavingsAccount, thing: T.savingsAccount },
   investment: { type: 'investment', label: T.newInvestmentAccount, thing: T.investmentAccount },
-  loan: { type: 'loan', label: T.newLoan, thing: 'loan' },
+  loan: { type: 'loan', label: T.newLoan, thing: T.loan },
   card: { type: 'credit-card', label: T.newCreditCard, thing: T.creditCard },
   pool: { type: 'pool', label: T.newVirtualAccount, thing: T.virtualAccount },
 } satisfies Record<string, New>

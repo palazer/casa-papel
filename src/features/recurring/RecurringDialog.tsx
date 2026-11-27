@@ -16,11 +16,12 @@ import { fundingOptions } from '@/features/grid/funding'
 import { DaySelect, MethodSelect } from '@/features/payments/PaidFields'
 import { ordinalDay } from '@/app/format'
 import { saveError } from '@/app/saveError'
-import { txt } from '@/i18n'
+import { lang, txt } from '@/i18n'
 
 const T = txt.recurring.dialog
+const SECTION_NAME: Record<Section, string> = { income: txt.common.income, expense: T.expense, transfer: T.transfer }
 
-const MONTH_NAMES = Array.from({ length: 12 }, (_, i) => new Intl.DateTimeFormat('en', { month: 'short' }).format(new Date(2026, i, 1)))
+const MONTH_NAMES = Array.from({ length: 12 }, (_, i) => new Intl.DateTimeFormat(lang, { month: 'short' }).format(new Date(2026, i, 1)))
 type CadenceChoice = '1' | '2' | '3' | '6' | '12' | 'months'
 
 interface Props {
@@ -112,7 +113,7 @@ export function RecurringDialog({ tables, household, item, defaultMonth, onClose
             <Label htmlFor="rc-row">{T.gridRow}</Label>
             <NativeSelect id="rc-row" className="w-full" value={rowId} onChange={(e) => setRowId(e.target.value)}>
               {(['income', 'expense', 'transfer'] as Section[]).map((s) => (
-                <optgroup key={s} label={s[0].toUpperCase() + s.slice(1)}>
+                <optgroup key={s} label={SECTION_NAME[s]}>
                   {rows.filter((r) => r.section === s).map((r: Row) => <option key={r.id} value={r.id}>{r.name}</option>)}
                 </optgroup>
               ))}

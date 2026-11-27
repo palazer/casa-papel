@@ -1,9 +1,10 @@
-import { txt } from '@/i18n'
+import { sameText, txt } from '@/i18n'
 import { generateKeyBetween } from 'fractional-indexing'
 import { sortRows } from '@/engine'
 import {
   ENTITY_TEMPLATES, HOUSEHOLD_TEMPLATES, compareMonths, resolveRules, templateTitle,
   type AccountType, type Entity, type Money, type MonthKey, type Row, type RowTemplate, type Section, type Tables,
+  isUsualCategory,
 } from '@/model'
 import { NO_QUESTION, type Mutation, type Store } from './store'
 import { loadTables, updateHousehold } from './actions'
@@ -39,7 +40,7 @@ export interface RowSuggestion {
 const FROM_THE_ACCOUNT = new Set(['h.toSavings', 'h.toInvestments'])
 const HOUSEHOLD = 'household'
 const byOrder = <T extends { order: string }>(a: T, b: T) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0)
-const sameName = (a: string, b: string) => a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase()
+const sameName = sameText
 const live = <T extends { deletedAt: number | null; archivedMonth?: MonthKey | null }>(xs: T[]) => xs.filter((x) => !x.deletedAt && !x.archivedMonth)
 
 export const suggestionId = (entityId: string | null, key: string) => `${entityId ?? HOUSEHOLD}:${key}`
@@ -66,7 +67,7 @@ export function rowSuggestions(tables: Tables): RowSuggestion[] {
     if (t.section === 'transfer') return 'set-aside'
     if (t.section === 'income') return 'income'
     // an expense, a loan's payment among them, sits in its category
-    const category = t.category ? categories.find((c) => c.section === t.section && c.name === t.category) : undefined
+    const category = t.category ? categories.find((c) => c.section === t.section && isUsualCategory(c.name, t.category!)) : undefined
     return category ? `cat:${t.section}:${category.id}` : 'expenses'
   }
 

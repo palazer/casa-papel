@@ -8,7 +8,7 @@
  * are over, the impact says which (`over`).
  */
 import { computeEngine, cellKey, type CellResult, type EngineOutput } from '@/engine'
-import { lower, txt } from '@/i18n'
+import { formatDate, lower, txt } from '@/i18n'
 import { assertMainAccount } from './mainAccount'
 import {
   AccountSchema, CategorySchema, CellSchema, EntitySchema, GoalSchema, PaymentMethodSchema, PoolSchema, RecurringItemSchema, RowSchema,
@@ -83,7 +83,7 @@ export const quoteNames = (names: string[], max = 4): string => I.quoteNames(nam
 
 function monthLabel(m: MonthKey, locale: string, withYear = true): string {
   const { year, month } = parseMonth(m)
-  return new Intl.DateTimeFormat(locale, withYear ? { month: 'short', year: 'numeric' } : { month: 'short' }).format(new Date(year, month - 1, 1))
+  return formatDate(new Date(year, month - 1, 1), locale, withYear ? { month: 'short', year: 'numeric' } : { month: 'short' })
 }
 
 /** `Sept 2026`, `Sept–Oct 2026`, `Nov 2026 – Mar 2027`. */

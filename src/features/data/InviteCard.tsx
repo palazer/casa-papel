@@ -5,7 +5,7 @@ import { inviteLink } from '@/app/url'
 import type { Invite } from '@/sync/remote'
 import { useSyncEngine, useSyncView } from '@/sync/useSync'
 import { errorText } from '@/app/saveError'
-import { txt } from '@/i18n'
+import { deviceLocale, txt } from '@/i18n'
 
 const T = txt.data.invite
 
@@ -63,7 +63,7 @@ export function InviteCard({ onError }: { onError: (m: string) => void }) {
             {invites.map((i) => (
               <li key={i.code} className="flex flex-wrap items-center gap-2">
                 <code>{i.code}</code>
-                <span className="text-muted-foreground">{T.validUntil(new Date(i.expiresAt).toLocaleDateString())}</span>
+                <span className="text-muted-foreground">{T.validUntil(new Date(i.expiresAt).toLocaleDateString(deviceLocale()))}</span>
                 <Button size="xs" variant="ghost" onClick={() => copy(i.code)}>{T.copyLink}</Button>
                 <Button size="xs" variant="ghost" onClick={() => revoke(i.code)}>{T.revoke}</Button>
               </li>

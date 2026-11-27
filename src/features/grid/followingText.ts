@@ -1,6 +1,6 @@
 import { formatAmount, formatMonth } from '@/app/format'
 import { addMonths, parseMonth, type Money, type MonthKey } from '@/model'
-import { txt } from '@/i18n'
+import { formatDate, txt } from '@/i18n'
 
 const T = txt.grid.following
 
@@ -41,7 +41,7 @@ export function onlyThisMonthText(month: MonthKey, goesOn: Money | null | undefi
   const next = addMonths(month, 1)
   const sameYear = parseMonth(next).year === parseMonth(month).year
   const name = sameYear
-    ? new Intl.DateTimeFormat(locale, { month: 'long' }).format(new Date(parseMonth(next).year, parseMonth(next).month - 1, 1))
+    ? formatDate(new Date(parseMonth(next).year, parseMonth(next).month - 1, 1), locale, { month: 'long' })
     : formatMonth(next, locale, 'long')
   return goesOn == null ? `${only} ${name} ${empty}.` : T.goesOnWith(only, name, formatAmount(goesOn, currency, locale))
 }

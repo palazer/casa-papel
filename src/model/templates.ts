@@ -1,4 +1,4 @@
-import { txt } from '@/i18n'
+import { inEveryLanguage, sameText, txt, type Messages } from '@/i18n'
 import type { AccountType, EntityKind, GoalKind, RowKind, RowRule, Section } from './schema'
 
 /**
@@ -27,12 +27,24 @@ export interface RowTemplate {
   pool?: boolean
   /** One of the usual rows: the Statement suggests it straight away, the others wait behind "More suggestions". */
   recommended?: boolean
-  /** The usual expense category the row belongs to, by name, when the household has it. */
-  category?: string
+  /** The usual expense category the row belongs to, when the household has it (`isUsualCategory` finds it by name). */
+  category?: CategoryKey
 }
 
 /** The six expense categories most households use, in grid order, by the name the household gets them under. */
 const CATEGORY = txt.names.category
+/** One of the six usual expense categories. */
+export type CategoryKey = keyof Messages['names']['category']
+const CATEGORY_KEYS = Object.keys(CATEGORY) as CategoryKey[]
+
+/**
+ * Whether a category's name is that usual category's: in either language, since the device that made it may speak
+ * another one, and whatever its case. A category the household renamed is no longer it.
+ */
+export const isUsualCategory = (name: string, key: CategoryKey): boolean => inEveryLanguage((m) => m.names.category[key]).some((n) => sameText(n, name))
+
+/** The usual categories a household does not have yet, by the names of this device's language. */
+export const missingUsualCategories = (have: string[]): string[] => CATEGORY_KEYS.filter((k) => !have.some((n) => isUsualCategory(n, k))).map((k) => CATEGORY[k])
 export const DEFAULT_CATEGORIES: readonly string[] = Object.values(CATEGORY)
 
 /** A suggestion: its words from the catalogue, by its key, and the rest of what it is. */
@@ -40,16 +52,16 @@ const t = (key: keyof typeof txt.model.templates, rest: Omit<RowTemplate, 'key' 
 
 export const HOUSEHOLD_TEMPLATES: RowTemplate[] = [
   t('h.otherIncome', { section: 'income', recommended: true }),
-  t('h.groceries', { section: 'expense', recommended: true, category: CATEGORY.living }),
-  t('h.transport', { section: 'expense', recommended: true, category: CATEGORY.transport }),
-  t('h.subscriptions', { section: 'expense', defaultStatus: 'committed', recommended: true, category: CATEGORY.fun }),
-  t('h.health', { section: 'expense', category: CATEGORY.living }),
-  t('h.gym', { section: 'expense', category: CATEGORY.personal }),
-  t('h.insurance', { section: 'expense', defaultStatus: 'committed', recommended: true, category: CATEGORY.living }),
+  t('h.groceries', { section: 'expense', recommended: true, category: 'living' }),
+  t('h.transport', { section: 'expense', recommended: true, category: 'transport' }),
+  t('h.subscriptions', { section: 'expense', defaultStatus: 'committed', recommended: true, category: 'fun' }),
+  t('h.health', { section: 'expense', category: 'living' }),
+  t('h.gym', { section: 'expense', category: 'personal' }),
+  t('h.insurance', { section: 'expense', defaultStatus: 'committed', recommended: true, category: 'living' }),
   t('h.other', { section: 'expense', recommended: true }),
-  t('h.poolTravel', { section: 'expense', pool: true, recommended: true, category: CATEGORY.fun }),
-  t('h.poolClothing', { section: 'expense', pool: true, category: CATEGORY.fun }),
-  t('h.poolFun', { section: 'expense', pool: true, category: CATEGORY.fun }),
+  t('h.poolTravel', { section: 'expense', pool: true, recommended: true, category: 'fun' }),
+  t('h.poolClothing', { section: 'expense', pool: true, category: 'fun' }),
+  t('h.poolFun', { section: 'expense', pool: true, category: 'fun' }),
   t('h.toSavings', { section: 'transfer', kind: 'to-savings', defaultStatus: 'committed', account: 'savings', recommended: true }),
   t('h.toInvestments', { section: 'transfer', kind: 'to-investment', defaultStatus: 'committed', account: 'investment' }),
 ]
@@ -58,34 +70,34 @@ export const ENTITY_TEMPLATES: Record<EntityKind, RowTemplate[]> = {
   adult: [
     t('a.salary', { section: 'income', kind: 'salary', defaultStatus: 'committed', scope: 'entity', recommended: true }),
     t('a.extra', { section: 'income', scope: 'entity' }),
-    t('a.personal', { section: 'expense', scope: 'entity', recommended: true, category: CATEGORY.personal }),
+    t('a.personal', { section: 'expense', scope: 'entity', recommended: true, category: 'personal' }),
     t('a.pocket', { section: 'transfer', kind: 'pocket-money', defaultStatus: 'committed', scope: 'entity', pocket: true, recommended: true }),
   ],
   child: [
     t('c.benefit', { section: 'income', defaultStatus: 'committed', scope: 'entity', tag: true, recommended: true }),
-    t('c.care', { section: 'expense', defaultStatus: 'committed', scope: 'entity', tag: true, recommended: true, category: CATEGORY.family }),
-    t('c.gear', { section: 'expense', tag: true, category: CATEGORY.family }),
+    t('c.care', { section: 'expense', defaultStatus: 'committed', scope: 'entity', tag: true, recommended: true, category: 'family' }),
+    t('c.gear', { section: 'expense', tag: true, category: 'family' }),
     t('c.longterm', { section: 'transfer', kind: 'to-investment', defaultStatus: 'committed', scope: 'entity', tag: true, account: 'investment' }),
   ],
   pet: [
-    t('p.insurance', { section: 'expense', defaultStatus: 'committed', tag: true, recommended: true, category: CATEGORY.family }),
-    t('p.tax', { section: 'expense', defaultStatus: 'committed', tag: true, category: CATEGORY.family }),
-    t('p.food', { section: 'expense', tag: true, recommended: true, category: CATEGORY.family }),
-    t('p.vet', { section: 'expense', tag: true, category: CATEGORY.family }),
+    t('p.insurance', { section: 'expense', defaultStatus: 'committed', tag: true, recommended: true, category: 'family' }),
+    t('p.tax', { section: 'expense', defaultStatus: 'committed', tag: true, category: 'family' }),
+    t('p.food', { section: 'expense', tag: true, recommended: true, category: 'family' }),
+    t('p.vet', { section: 'expense', tag: true, category: 'family' }),
   ],
   vehicle: [
-    t('v.loan', { section: 'expense', kind: 'debt-payment', defaultStatus: 'committed', tag: true, account: 'loan', category: CATEGORY.transport }),
-    t('v.insurance', { section: 'expense', defaultStatus: 'committed', tag: true, recommended: true, category: CATEGORY.transport }),
-    t('v.tax', { section: 'expense', defaultStatus: 'committed', tag: true, category: CATEGORY.transport }),
-    t('v.fuel', { section: 'expense', tag: true, recommended: true, category: CATEGORY.transport }),
-    t('v.maintenance', { section: 'expense', tag: true, category: CATEGORY.transport }),
+    t('v.loan', { section: 'expense', kind: 'debt-payment', defaultStatus: 'committed', tag: true, account: 'loan', category: 'transport' }),
+    t('v.insurance', { section: 'expense', defaultStatus: 'committed', tag: true, recommended: true, category: 'transport' }),
+    t('v.tax', { section: 'expense', defaultStatus: 'committed', tag: true, category: 'transport' }),
+    t('v.fuel', { section: 'expense', tag: true, recommended: true, category: 'transport' }),
+    t('v.maintenance', { section: 'expense', tag: true, category: 'transport' }),
   ],
   property: [
-    t('r.rent', { section: 'expense', defaultStatus: 'committed', tag: true, recommended: true, category: CATEGORY.housing }),
-    t('r.utilities', { section: 'expense', defaultStatus: 'committed', tag: true, recommended: true, category: CATEGORY.housing }),
-    t('r.internet', { section: 'expense', defaultStatus: 'committed', tag: true, category: CATEGORY.housing }),
-    t('r.improvement', { section: 'expense', tag: true, category: CATEGORY.housing }),
-    t('r.insurance', { section: 'expense', defaultStatus: 'committed', tag: true, category: CATEGORY.housing }),
+    t('r.rent', { section: 'expense', defaultStatus: 'committed', tag: true, recommended: true, category: 'housing' }),
+    t('r.utilities', { section: 'expense', defaultStatus: 'committed', tag: true, recommended: true, category: 'housing' }),
+    t('r.internet', { section: 'expense', defaultStatus: 'committed', tag: true, category: 'housing' }),
+    t('r.improvement', { section: 'expense', tag: true, category: 'housing' }),
+    t('r.insurance', { section: 'expense', defaultStatus: 'committed', tag: true, category: 'housing' }),
   ],
   company: [
     t('k.expenses', { section: 'expense', tag: true, recommended: true }),

@@ -1,4 +1,4 @@
-import { lang, txt } from '@/i18n'
+import { formatDate, lang, txt } from '@/i18n'
 import { fromMinor, parseMonth, toMinor, type Money, type MonthKey } from '@/model'
 
 export function formatAmount(minor: Money, currency: string, locale: string, opts: { compact?: boolean; sign?: 'auto' | 'always' | 'never' | 'exceptZero' } = {}): string {
@@ -30,7 +30,7 @@ export function formatShare(fraction: number, locale: string): string {
 
 export function formatMonth(m: MonthKey, locale: string, style: 'short' | 'long' = 'short'): string {
   const { year, month } = parseMonth(m)
-  return new Intl.DateTimeFormat(locale, { month: style, year: 'numeric' }).format(new Date(year, month - 1, 1))
+  return formatDate(new Date(year, month - 1, 1), locale, { month: style, year: 'numeric' })
 }
 
 export function decimalSeparator(locale: string): string {
@@ -130,15 +130,15 @@ export function localeLabel(locale: string): string {
 /** How a number and a date look in this locale, e.g. "1,234,567.89 · 1 Nov 2026". */
 export function localeExample(locale: string): string {
   const n = new Intl.NumberFormat(locale).format(1234567.89)
-  const d = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(2026, 10, 1))
+  const d = formatDate(new Date(2026, 10, 1), locale, { day: 'numeric', month: 'short', year: 'numeric' })
   return `${n} · ${d}`
 }
 
 /** A day of the month as it is said: 1st, 2nd, 3rd, 4th, 11th, 21st, 22nd, 23rd, 31st. */
 export const ordinalDay = (day: number): string => txt.app.ordinalDay(day)
 
-/** The weekday a day of a month falls on, short, in the household's language: `Sun`. */
+/** The weekday a day of a month falls on, short, in the page's language: `Sun`. */
 export function weekdayOf(month: MonthKey, day: number, locale: string): string {
   const [year, m] = month.split('-').map(Number)
-  return new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(year, m - 1, day)))
+  return formatDate(new Date(Date.UTC(year, m - 1, day)), locale, { weekday: 'short', timeZone: 'UTC' })
 }

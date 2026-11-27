@@ -12,7 +12,7 @@ import { BalanceFields, type BalanceGroup } from './BalanceFields'
 import { CurrentTogether } from './CurrentBalanceDialog'
 import { useMonthBalances } from './useMonthBalances'
 import { saveError } from '@/app/saveError'
-import { txt } from '@/i18n'
+import { formatDate, txt } from '@/i18n'
 
 const T = txt.grid.monthBalances
 
@@ -35,7 +35,7 @@ export function MonthBalancesDialog({ month, tables, engine, household, onClose 
   const { locale, lines } = form
   const base = household.baseCurrency
   const long = formatMonth(month, locale, 'long')
-  const name = new Intl.DateTimeFormat(locale, { month: 'long' }).format(new Date(Number(month.slice(0, 4)), Number(month.slice(5)) - 1, 1))
+  const name = formatDate(new Date(Number(month.slice(0, 4)), Number(month.slice(5)) - 1, 1), locale, { month: 'long' })
   const progress = monthProgress(engine.rows, engine.cells, month)
   const open = progress.total - progress.done
   const [countDone, setCountDone] = useState(() => isPastMonth(month))

@@ -5,6 +5,7 @@ import {
   AccountMonthSchema, AccountSchema, CellSchema, EntitySchema, HouseholdSchema, PoolSchema, RowSchema,
   ACCOUNT_TYPE_INFO, ENTITY_TEMPLATES, HOUSEHOLD_TEMPLATES, accountRef, growthChangedFrom, growthIn, isPayOffRow, isOutsideNetWorth, monthOfDate, newId, pocketLandsIn, poolRef, poolRowName, templateTitle,
   type Account, type Entity, type EntityKind, type Household, type MonthKey, type Pool, type Row, type RowTemplate, type Tables,
+  isUsualCategory,
 } from '@/model'
 import { NO_QUESTION, type Mutation, type Store } from './store'
 import { refuseThirdCurrency } from './currencies'
@@ -295,7 +296,7 @@ export function buildTemplateMutations(t: RowTemplate, ctx: TemplateContext, ord
     entityTags: ctx.entity && (t.tag || t.scope === 'entity') ? [ctx.entity.id] : [],
     accountId: destination?.id ?? null,
     defaultFundedBy,
-    categoryId: t.category ? ctx.tables.categories?.find((c) => !c.deletedAt && c.section === t.section && c.name === t.category)?.id ?? null : null,
+    categoryId: t.category ? ctx.tables.categories?.find((c) => !c.deletedAt && c.section === t.section && isUsualCategory(c.name, t.category!))?.id ?? null : null,
     // pocket money is a line of its own: an amount that is typed, or a rule set later
     pocketMode: t.pocket ? 'fixed' : null,
     templateKey: t.key,

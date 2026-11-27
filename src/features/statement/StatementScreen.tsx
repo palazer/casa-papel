@@ -47,7 +47,7 @@ import { AddLead } from './AddLead'
 import { LEAD_BUTTON, LEAD_PAD } from './lead'
 import { cn } from '@/lib/utils'
 import { saveError } from '@/app/saveError'
-import { txt } from '@/i18n'
+import { formatDate, txt } from '@/i18n'
 
 const T = txt.statement.page
 
@@ -578,7 +578,7 @@ export function StatementScreen() {
   const hasDebts = statement.position.right.lines.some((l) => l.id === 'debts')
   const debtsFoot = <Button variant="ghost" size="sm" className={cn(ADD, LEAD_BUTTON)} onClick={() => setAccountNew({ types: DEBT_TYPES })}><AddLead ticks={false} /> <span data-lead="text">{T.addACardOr}</span></Button>
   const positionCtx: LineContext = { ...base, withChange: true, onGoal, onBalance: openBalance, onCurrentBalance: () => setCurrentBalance(true), footer: (line) => (line.id === 'debts' ? debtsFoot : null), menu: lineMenu, onOpen: lineOpen }
-  const day = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${lastDayOfMonth(m)}T00:00:00Z`))
+  const day = formatDate(new Date(`${lastDayOfMonth(m)}T00:00:00Z`), locale, { day: 'numeric', month: 'short', timeZone: 'UTC' })
   const foldable = walk([...statement.flow.left.lines, ...statement.flow.right.lines, ...statement.position.left.lines, ...statement.position.right.lines])
     .filter((l) => l.kind === 'group' || l.children.length > 0 || !!l.goals?.length || autoOpen.has(l.id))
   const setAll = (open: boolean) => setOpenLines(Object.fromEntries(foldable.map((l) => [l.id, open])))

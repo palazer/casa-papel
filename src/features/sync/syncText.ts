@@ -1,5 +1,5 @@
 import type { SyncView } from '@/sync/engine'
-import { txt } from '@/i18n'
+import { deviceLocale, txt } from '@/i18n'
 
 const T = txt.sync.status
 
@@ -28,5 +28,5 @@ export function ago(ts: number, now: number = Date.now()): string {
   if (m < 60) return T.minAgo(m)
   const h = Math.round(m / 60)
   if (h < 24) return T.hAgo(h)
-  return new Date(ts).toLocaleDateString()
+  return new Date(ts).toLocaleDateString(deviceLocale())
 }

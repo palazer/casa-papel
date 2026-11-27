@@ -1356,8 +1356,87 @@ Every text the app shows comes from a catalogue in `src/i18n/`, read through one
   (`data-info` on every (i)), never the text of a label.
 - **Names the household typed are never translated or changed**, and nothing is glued to them: a name stands in
   quotes or at the start of a phrase ("Sam – Salary").
-- **Numbers, amounts and date order** follow the household's "Number format", not the language.
+- **Numbers, amounts and date order** follow the household's "Number format", not the language. **The names of
+  months and weekdays are words, and words follow the device's language**: every date with a name in it goes through
+  `formatDate()` (`src/i18n/index.ts`; `formatMonth`, `weekdayOf` and the rest call it), which takes the order, the
+  digits and the signs from the household's format and the names from the page's language. A household whose format
+  is in the page's language is written exactly as its format says ("Sept" for en-IE). A date that belongs to no
+  household (the last export, the last sync) uses `deviceLocale()`.
 - **The tests run in English**: the unit tests have no browser to ask, and the browser tests pin `en-US`
-  (`playwright.config.ts`).
+  (`playwright.config.ts`). A test that needs another language loads the app's modules anew with the choice in a
+  stand-in for the device's storage (`tests/i18n/turkishDevice.test.ts`).
 
-English is the only language so far.
+### The languages and the device's choice
+
+The app speaks English (`src/i18n/en/`) and Turkish (`src/i18n/tr/`). The language belongs to the device, never to
+the household: it is kept beside the other things a device remembers (`casa.lang`), is not synced, and takes no
+schema step. `chooseLanguage()` stores it and loads the page again. The Guide's topics and the demo household are
+English in both languages until they are translated.
+
+### Names the app writes, in two languages
+
+A household can be shared by an English and a Turkish device, so a name the app wrote itself has to be known
+whichever device wrote it. Nothing is stored for this; a name is compared.
+
+- **A name is written in the language of the device that makes the thing**, once, and is never renamed afterwards:
+  the usual categories, a suggested row ("Sam – Maaş"), a row the app names after its account ("Tatil – Ayrılan"),
+  an estimate's row, the starter payment methods, "Ben" and "Hanemiz".
+- **Two names are the same name by `sameText()`**, which folds case by one rule for both languages (I, İ, ı and i
+  are one letter). Never compare names with `toLowerCase()`.
+- **A name of the app's own is found in either language** with `inEveryLanguage()`: `isUsualCategory(name, key)`
+  for a template's category (templates carry a category key, not a name), `isEstimateRowName()`, the starter
+  methods, a row named like its source on the Statement. A category the household renamed drops out, as before.
+
+### Turkish wording
+
+- **Address is "sen"**: "Haneni kur", "Bir hesap seç".
+- **A name the household typed takes no ending.** It stands in quotes with a generic noun that takes the ending
+  (`"Tatil" sanal hesabı`, `"Birikim" hesabından`), after a colon ("Kaldır: Araba"), or first, before a dash
+  ("Tatil – Ayrılan"). The same holds for a month: "Kasım 2026 ayından itibaren", "Kasım 2026 ve sonrası", never
+  "Kasım 2026'dan".
+- **No plural after a number** ("3 satır", "2 düzenli kalem"), and one form of the verb for one or several things.
+- **A kind word that arrives in lower case or as a key** (a section, "savings account") is worded inside the Turkish
+  catalogue, which maps it; the screen does not know.
+- **The two words typed before data is wiped** ("KALDIR", "YOK ET") hold only letters a Turkish and an English
+  keyboard both have, because they are compared letter for letter.
+- **The core words are fixed** (his choices of 27 November 2026). A text uses these and no other word for the same
+  thing; a new core word is proposed to him before it is used in many places.
+
+| English | Turkish |
+|---|---|
+| Statement · Grid · Payments · Trends | Bilanço · Tablo · Ödemeler · Grafikler |
+| Household · Data · Guide · Settings | Hane · Veriler · Kılavuz · Ayarlar |
+| Income · Expenses · Transfers | Gelir · Giderler · Transferler |
+| Money in · Money out · From accounts | Giren para · Çıkan para · Hesaplardan |
+| From what is left · Leftover · the rest | Geriye kalandan · Arta kalan · geriye kalan |
+| Kept in account · Not in the plan | Hesapta kalan · Plan dışı |
+| Balances · Net worth · Assets · Debts | Bakiyeler · Net varlık · Varlıklar · Borçlar |
+| Set aside · Not set aside · Free | Ayrılan · Ayrılmamış · Serbest |
+| Main account · Current account | Ana hesap · Vadesiz hesap |
+| Savings account · Investment account | Birikim hesabı · Yatırım hesabı |
+| Credit card · Loan · Other asset · Cash | Kredi kartı · Kredi · Diğer varlık · Nakit |
+| Virtual account · Top up | Sanal hesap · Takviye et |
+| Row · Category · Item | Satır · Kategori · Kalem |
+| Estimate · Certain · Done | Tahmin · Kesin · Tamam |
+| Not broken down yet | Henüz dağıtılmadı |
+| Rule · Goal · Pocket money | Kural · Hedef · Harçlık |
+| Comes out of · Goes into · Lands in | Nereden çıkar · Nereye gider · Nereye yatar |
+| Pays off · Belongs to | Neyi öder · Kime ait |
+| Schedules · Repeats | Düzenli kalemler · Tekrarlar |
+| Only this month · This and following months | Yalnızca bu ay · Bu ay ve sonrası |
+| All months, past included · Every month | Tüm aylar, geçmiş dahil · Her ay |
+| past · calculated · automatic | geçmiş · hesaplanan · otomatik |
+| Paid on · Paid with · Usually paid | Ödeme günü · Ödeme yöntemi · Olağan ödeme |
+| Payment methods | Ödeme yöntemleri |
+| Untracked · Overdue · To pay | Takip edilmeyen · Gecikmiş · Ödenecek |
+| Direct debit · Standing order | Otomatik ödeme · Düzenli transfer |
+| Save · Cancel · Add · Edit · Delete | Kaydet · İptal · Ekle · Düzenle · Sil |
+| Archive · Restore · Undo | Arşivle · Geri getir · Geri al |
+| Real balance · a card's statement | Gerçek bakiye · Ekstre |
+| People & things | Kişiler ve diğerleri |
+| Currency rates · ECB | Döviz kurları · AMB (Avrupa Merkez Bankası) |
+| Cloud sync · Recovery code | Bulut eşitleme · Kurtarma kodu |
+| Leave out of net worth · Not in net worth | Net varlığın dışında tut · Net varlıkta değil |
+
+`tests/i18n/turkish.test.ts` holds the Turkish catalogue to this: the same texts as the English one, the rules of
+the (i) texts (360 characters), no sentence left in English, and the core words.

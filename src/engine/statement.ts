@@ -19,7 +19,7 @@
  * pocket money, savings, investments, virtual accounts, and the figure that closes the month.
  */
 import { accountGroup, addMonths, canCarryRule, describeCadence, isPaymentRow, isTakenFromAccount, monthOfDate, movesInto, nextDue, payContext, payDayOf, pocketLandsIn, repeatsText, resolveRules, rowsFeeding, runningSchedules, type Account, type Money, type MonthKey, type RecurringItem, type Row, type Section, type Tables } from '@/model'
-import { lower, txt } from '@/i18n'
+import { inEveryLanguage, lower, sameText, txt } from '@/i18n'
 import { computeGoals, type GoalProgress } from './goals'
 import { mainAccountsIn, mainAccountLabel } from './mainAccount'
 import { cellKey, fundingTotal, type AccountSeries, type CellResult, type CellStatus, type EngineOutput } from './types'
@@ -256,6 +256,17 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
     return { label: row.kind === 'from-investment' || row.kind === 'to-investment' ? S.from.investments : S.from.savings }
   }
 
+  /**
+   * Whether a row's own name says no more than its line's label does: the name the app gave it ("From Savings"), in
+   * whichever language the device that made it spoke.
+   */
+  const namedLikeSource = (row: Row, label: string): boolean => {
+    const pool = tables.pools.find((p) => !p.deletedAt && p.allocationRowId === row.id)
+    const target = pool?.name ?? (row.accountId ? accountsById.get(row.accountId)?.name : undefined)
+    const forms = inEveryLanguage((m) => (target != null ? [m.statement.from.named(target), m.names.rowFrom(target)] : [m.statement.from.savings, m.statement.from.investments])).flat()
+    return [label, ...forms].some((form) => sameText(form, row.name))
+  }
+
   const schedulesById = new Map(tables.recurringItems.map((r) => [r.id, r]))
   // "Plan payments by day and method": only then does a line say its day (rule W1: the item, its schedule, the row)
   const pay = household.payments ? payContext(tables) : null
@@ -382,7 +393,7 @@ export function buildStatement(tables: Tables, engine: EngineOutput, month: Mont
       case 'from-account': {
         // the line leads with the account; the row's own name follows when it says something else
         const from = fromOf(row)
-        fromAccounts.push(rowLine(row, c, v, { ...from, ownName: lower(row.name.trim()) === lower(from.label) ? undefined : row.name }))
+        fromAccounts.push(rowLine(row, c, v, { ...from, ownName: namedLikeSource(row, from.label) ? undefined : row.name }))
         break
       }
       case 'expense': {

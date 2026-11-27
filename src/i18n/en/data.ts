@@ -53,6 +53,7 @@ export const data = {
     deleteTheCloudCopy: 'Delete the cloud copy',
     removesTheHouseholdFrom: 'Removes the household from the server for every device. Each device keeps what it has locally. Type DELETE to enable the button.',
     unknownError: 'unknown error',
+    never: 'never',
   },
   importPanel: {
     nothing: 'Nothing.',

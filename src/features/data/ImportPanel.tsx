@@ -4,7 +4,7 @@ import { useStore } from '@/app/store'
 import type { ExportFile } from '@/model'
 import { changeLineText, checkFile, importMerge, importReplace, moreText, otherText, parseExportFile, type FileCheck, type FileChoice } from '@/store'
 import { errorText } from '@/app/saveError'
-import { txt } from '@/i18n'
+import { deviceLocale, txt } from '@/i18n'
 
 const T = txt.data.importPanel
 
@@ -91,7 +91,7 @@ export function ImportPanel({ trigger, onMessage, onError, emptyDevice = false }
       {pending && (
         <div className="basis-full space-y-2 rounded-md border p-3 text-xs">
           <p>
-            <strong>{pending.name}</strong> {T.exportedLine(new Date(pending.file.exportedAt).toLocaleString(), pending.file.tables.household[0]?.name, pending.file.events.length)}
+            <strong>{pending.name}</strong> {T.exportedLine(new Date(pending.file.exportedAt).toLocaleString(deviceLocale()), pending.file.tables.household[0]?.name, pending.file.events.length)}
           </p>
           {!emptyDevice && (check ? (
             <div className="grid gap-3 sm:grid-cols-2" data-testid="file-check">

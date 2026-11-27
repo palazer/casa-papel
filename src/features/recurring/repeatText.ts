@@ -1,12 +1,12 @@
 import { formatMonth } from '@/app/format'
 import { cadenceOf, dueMonthNumbers, nextDue, parseMonth, type MonthKey, type RepeatChoice } from '@/model'
-import { txt } from '@/i18n'
+import { formatDate, txt } from '@/i18n'
 
 const T = txt.recurring.text
 
 /** A month of the year by name, in the household's language. */
 export function monthName(m: number, locale: string, style: 'long' | 'short' = 'long'): string {
-  return new Intl.DateTimeFormat(locale, { month: style }).format(new Date(2026, m - 1, 1))
+  return formatDate(new Date(2026, m - 1, 1), locale, { month: style })
 }
 
 /**

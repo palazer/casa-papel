@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { NativeSelect } from './NativeSelect'
-import { txt } from '@/i18n'
+import { formatDate, txt } from '@/i18n'
 
 const T = txt.components.monthPicker
 
@@ -22,8 +22,7 @@ interface Props {
 export function MonthField({ id, value, onChange, locale = 'en', label, allowEmpty = false, fromYear, toYear, className }: Props) {
   const [now] = useState(() => new Date())
   const names = useMemo(() => {
-    const fmt = new Intl.DateTimeFormat(locale, { month: 'long' })
-    return Array.from({ length: 12 }, (_, i) => fmt.format(new Date(2026, i, 1)))
+    return Array.from({ length: 12 }, (_, i) => formatDate(new Date(2026, i, 1), locale, { month: 'long' }))
   }, [locale])
   const [y, m] = value ? value.split('-').map(Number) : [NaN, NaN]
   const y0 = Math.min(fromYear ?? now.getFullYear() - 6, Number.isFinite(y) ? y : Infinity)

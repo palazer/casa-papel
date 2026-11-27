@@ -1,4 +1,4 @@
-import { txt } from '@/i18n'
+import { inEveryLanguage, txt } from '@/i18n'
 import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing'
 import { computeEngine, cellKey, sortRows, typedAmount, type EngineOutput } from '@/engine'
 import {
@@ -553,6 +553,8 @@ export async function addRowOfKind(store: Store, input: RowOfKindInput): Promise
 
 /** The row that carries a category's estimate; the Grid shows it by this name. */
 export const estimateRowName = (category: Pick<Category, 'name'>): string => txt.names.estimateRow(category.name)
+/** Whether a row still carries the name the app gave it for that category, in whichever language it was given. */
+export const isEstimateRowName = (name: string, category: Pick<Category, 'name'>): boolean => inEveryLanguage((m) => m.names.estimateRow(category.name)).includes(name)
 
 /** A category's estimate row, archived or not; there is one per category at most. */
 export const estimateRowOf = (tables: Tables, categoryId: string): Row | undefined =>

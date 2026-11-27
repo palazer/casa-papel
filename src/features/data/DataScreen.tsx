@@ -15,7 +15,7 @@ import { ImportPanel } from './ImportPanel'
 import { InviteCard } from './InviteCard'
 import { SyncCard } from './SyncCard'
 import { errorText } from '@/app/saveError'
-import { txt } from '@/i18n'
+import { deviceLocale, txt } from '@/i18n'
 
 const T = txt.data.page
 
@@ -111,7 +111,7 @@ export function DataScreen() {
 
   const h = household?.[0]
   const since = meta?.eventsSinceExport ?? 0
-  const lastExport = meta?.lastExportAt ? new Date(meta.lastExportAt).toLocaleString() : 'never'
+  const lastExport = meta?.lastExportAt ? new Date(meta.lastExportAt).toLocaleString(deviceLocale()) : T.never
   const exportNag = since > 50 || (meta?.lastExportAt != null && openedAt - meta.lastExportAt > 30 * 86_400_000) || (meta?.lastExportAt == null && since > 0)
   // a healthy cloud copy counts as a backup; the reminder returns after a week of failed pushes
   const syncHealthy = signedIn && (syncView.failingSince == null || openedAt - syncView.failingSince < 7 * 86_400_000)

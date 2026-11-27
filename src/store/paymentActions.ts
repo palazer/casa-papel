@@ -1,4 +1,4 @@
-import { txt } from '@/i18n'
+import { foldName, inEveryLanguage, txt } from '@/i18n'
 import { generateKeyBetween } from 'fractional-indexing'
 import {
   HouseholdSchema, PaymentMethodSchema, RowSchema, compareMonths, dateOn, isPaymentRow, methodNote, newId, payContext,
@@ -103,21 +103,24 @@ export async function removePaymentMethod(store: Store, id: string): Promise<'de
 /**
  * The methods a household would start with: a direct debit, a standing order and a transfer by hand, noted with the
  * main account's name where there is one; one per credit card, named after it; cash. Without what is there already
- * (the same kind under the same name).
+ * (the same kind under the same name, in either language).
  */
 export function starterMethods(tables: Pick<Tables, 'accounts' | 'paymentMethods'>): PaymentMethodInput[] {
-  const have = new Set(tables.paymentMethods.filter((m) => !m.deletedAt).map((m) => `${m.kind}|${m.name.trim().toLowerCase()}`))
+  const have = new Set(tables.paymentMethods.filter((m) => !m.deletedAt).map((m) => `${m.kind}|${foldName(m.name)}`))
   const accounts = tables.accounts.filter((a) => !a.deletedAt && !a.archivedMonth).sort((a, b) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0))
   const main = accounts.find((a) => a.type === 'checking')
   const out: PaymentMethodInput[] = []
-  const offer = (kind: PaymentKind, name: string, ownerEntityId: string | null, note: string) => {
-    if (!have.has(`${kind}|${name.trim().toLowerCase()}`)) out.push({ kind, name, ownerEntityId, note })
+  // a method is there already under any of the names given: its name in this language, and for the app's own names the other language's too
+  const offer = (kind: PaymentKind, names: string[], ownerEntityId: string | null, note: string) => {
+    if (!names.some((n) => have.has(`${kind}|${foldName(n)}`))) out.push({ kind, name: names[0], ownerEntityId, note })
   }
-  offer('direct-debit', txt.names.starterMethod.directDebit, null, main?.name ?? '')
-  offer('standing-order', txt.names.starterMethod.standingOrder, null, main?.name ?? '')
-  offer('transfer', txt.names.starterMethod.transfer, null, main?.name ?? '')
-  for (const a of accounts) if (a.type === 'credit-card') offer('credit-card', a.name, a.ownerEntityId, '')
-  offer('cash', txt.names.starterMethod.cash, null, '')
+  type Starter = keyof typeof txt.names.starterMethod
+  const named = (key: Starter) => [txt.names.starterMethod[key], ...inEveryLanguage((m) => m.names.starterMethod[key])]
+  offer('direct-debit', named('directDebit'), null, main?.name ?? '')
+  offer('standing-order', named('standingOrder'), null, main?.name ?? '')
+  offer('transfer', named('transfer'), null, main?.name ?? '')
+  for (const a of accounts) if (a.type === 'credit-card') offer('credit-card', [a.name], a.ownerEntityId, '')
+  offer('cash', named('cash'), null, '')
   return out
 }
 

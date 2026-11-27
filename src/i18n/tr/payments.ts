@@ -1,0 +1,80 @@
+import type { Messages } from '../en'
+
+const NO_METHODS = 'Henüz ödeme yöntemi yok: Hane → "Ödeme yöntemleri" altından ekle.'
+
+/** Payments: the page, a payment's dialog, "Paid on" and "Paid with". */
+export const payments: Messages['payments'] = {
+  fields: {
+    usuallyPaid: 'Olağan ödeme',
+    noPaymentMethodsYet: NO_METHODS,
+    withShortMonth: (says, lastDay) => `${says}${lastDay ? ` Daha kısa bir ayda ${lastDay}, o ayın son günü sayılır.` : ''}`,
+  },
+  dialog: {
+    thisRowEveryMonth: 'Bu satır, her ay',
+    fromOnWhereverIt: (monthName) => `${monthName} ve sonrası için, tekrarlandığı her yerde. Önceki aylar nasıl ödendiklerini korur.`,
+    forThisRowIn: 'Bu satır için, geçmiş olanlar dahil her ayda.',
+    forAloneTheOther: (monthName) => `Yalnızca ${monthName} için. Diğer aylar düzenli kalemin söylediğini korur.`,
+    forThisAmountIn: (monthName) => `Bu tutar için, yalnızca ${monthName} ayında.`,
+    payment: 'Ödeme',
+    inMonth: (monthName) => `· ${monthName}`,
+    amountMore: 'Tutar…',
+    countsFor: 'Nerede geçerli',
+    withNoDayAnd: 'Günü ve yöntemi olmayan bir tutar takip edilmez: "Takip edilmeyen" altında durur ve sayfanın hiçbir toplamına girmez.',
+    noPaymentMethodsYet: NO_METHODS,
+  },
+  line: {
+    workedOutByThe: 'Uygulama hesaplar: ay sürerken hâlâ değişebilir.',
+    calculated: 'hesaplanan',
+    tickLabel: (fullLabel) => `${fullLabel} tamam`,
+    noMethodShown: 'yöntem yok',
+    youMakeThisPayment: 'Bu ödemeyi kendin yaparsın.',
+    byHand: 'elle',
+    track: 'Takip et…',
+    said: (label, amount, day, method, done) => `${label}: ${amount}, ${day ?? 'gün yok'}${method ? `, ${method}` : ''}${done ? ', tamam' : ''}`,
+    trackSaid: (label, amount) => `Takip et: ${label}, ${amount}`,
+  },
+  totals: {
+    allDone: 'hepsi tamam',
+    open: (money) => `${money} açık`,
+    notDoneYet: (money) => `${money} henüz tamam değil`,
+    byMethod: 'Yönteme göre',
+    totalSaid: (label, money, count, open) => `${label}: ${money}, ${count} ödeme, ${open}`,
+    byPerson: 'Kişiye göre',
+  },
+  page: {
+    todayOn: (weekday, day) => `Bugün, ${day} ${weekday}`,
+    payments: 'Ödemeler',
+    thisMonthIsOver: 'Bu ay geçti. Yine de değiştirilebilir.',
+    past: 'geçmiş',
+    toPayAndDone: (toPay, done) => `${toPay} ödenecek · ${done} tamam`,
+    overdue: (overdue) => `${overdue} gecikmiş`,
+    byDay: 'Güne göre',
+    nothingLeavesInThe: (month) => `${month} ayında çıkan bir şey yok: ayın Bilanço'sunda "Çıkan para" altında tutar yok.`,
+    only: (filterLabel) => `Yalnızca ${filterLabel}`,
+    showAll: 'Hepsini göster',
+    noPaymentMethodsYet: 'Henüz ödeme yöntemi yok; bu yüzden bir tutarın nasıl ödendiğini söyleyecek bir şey de yok.',
+    addThemUnderHousehold: 'Hane altından ekle',
+    nothingIsTrackedIn: (month) => `${month} ayında henüz takip edilen bir şey yok. Bir tutar, günü ya da yöntemi olunca takip edilir: "Takip edilmeyen" altında birine bas.`,
+    nothingOfItIn: 'Bu ayda ondan bir şey yok.',
+    untracked2: 'Takip edilmeyen',
+    whatLeavesInWith: (month) => `${month} ayında günü ve yöntemi olmadan çıkanlar. Buradaki hiçbir toplama girmez; işareti Bilanço'dadır.`,
+    untracked: (count) => `${count} takip edilmeyen`,
+  },
+  groups: {
+    overdue: 'Gecikmiş',
+    today: 'Bugün',
+    coming: 'Yaklaşan',
+    toPay: 'Ödenecek',
+  },
+  methods: {
+    label: (name, note, archived) => `${name}${note ? ` · ${note}` : ''}${archived ? ' (arşivlendi)' : ''}`,
+  },
+  scope: {
+    theRowsUsualDay: (day) => `Satırın olağan günü: ${day}`,
+    theRowsUsualMethod: (method) => `Satırın olağan yöntemi: ${method}`,
+    usualDay: (day) => `Olağan: ${day}`,
+    usualMethod: (method) => `Olağan: ${method}`,
+    asScheduledDay: (day) => `Düzenli kalemdeki gibi: ${day}`,
+    asScheduledMethod: (method) => `Düzenli kalemdeki gibi: ${method ?? ''}`,
+  },
+}

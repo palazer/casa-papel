@@ -1,4 +1,4 @@
-import { txt } from '@/i18n'
+import { formatDate, txt } from '@/i18n'
 import { addMonths, compareMonths, parseMonth, type MonthKey } from './month'
 import type { RecurringItem } from './schema'
 
@@ -54,8 +54,7 @@ export function repeatsText(items: CadenceLike[], locale = 'en'): string {
 
 /** How a schedule repeats, in the words the app uses for it everywhere: "Every month", "Every year (Jan)", "In Mar, Sep". */
 export function describeCadence(item: CadenceLike, locale = 'en'): string {
-  const fmt = new Intl.DateTimeFormat(locale, { month: 'short' })
-  const names = (ms: number[]) => ms.map((m) => fmt.format(new Date(2026, m - 1, 1))).join(', ')
+  const names = (ms: number[]) => ms.map((m) => formatDate(new Date(2026, m - 1, 1), locale, { month: 'short' })).join(', ')
   if (item.dueMonths && item.dueMonths.length > 0) return txt.model.cadence.inMonths(names(dueMonthNumbers(item)))
   if (!item.cadence || item.cadence.intervalMonths === 1) return txt.model.cadence.everyMonth
   if (item.cadence.intervalMonths === 12) return txt.model.cadence.everyYear(names([item.cadence.anchorMonth]))
